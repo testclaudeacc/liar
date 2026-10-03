@@ -2340,9 +2340,15 @@ def handle_m(data):
         else: x, y, d_int = float(data[0]), float(data[1]), int(data[2])
 
         destino_tile = tile_de(x, y)
-        if any(int(npc.get('floor', 1)) == int(p.get('floor', 1) or 1)
-               and tile_de(npc.get('pos_x', 0), npc.get('pos_y', 0)) == destino_tile
-               for npc in active_npcs.values()):
+        andar_p = int(p.get('floor', 1) or 1)
+        npc_no_caminho = any(int(npc.get('floor', 1)) == andar_p
+                             and tile_de(npc.get('pos_x', 0), npc.get('pos_y', 0)) == destino_tile
+                             for npc in active_npcs.values())
+        # Mob vivo tambem bloqueia o SQM (nao da pra atravessar).
+        mob_no_caminho = andar_p == MOB_FLOOR and any(
+            o.get('hp', 1) > 0 and 'pos_x' in o and tile_do_mob(o) == destino_tile
+            for o in active_mobs.values())
+        if npc_no_caminho or mob_no_caminho:
             emit('sync_local_player', {
                 'pos_x': p.get('pos_x', -1), 'pos_y': p.get('pos_y', -1),
                 'direction': p.get('direction', 'down')

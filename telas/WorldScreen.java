@@ -847,7 +847,10 @@ public class WorldScreen extends ScreenAdapter {
         FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal("fonts/TAHOMAB0.TTF"));
         FreeTypeFontGenerator.FreeTypeFontParameter parametros = new FreeTypeFontGenerator.FreeTypeFontParameter();
         parametros.size = 32;
-        parametros.color = new Color(0f, 0.94f, 0f, 1f);
+        // Glifos BRANCOS (antes vinham verdes): a cor final vem de
+        // font.setColor(), que multiplica a cor do glifo - com glifo verde,
+        // vermelho/amarelo da vida saiam pretos/esverdeados.
+        parametros.color = Color.WHITE;
         // 2 -> 1 -> 2: tinha ido pra 1 porque o usuario achou 2 grosso demais
         // numa rodada anterior de teste; pediu de volta mais grosso depois
         // (texto fino demais pra ler em movimento) - gerado a 32px (2x, ver
@@ -874,6 +877,8 @@ public class WorldScreen extends ScreenAdapter {
         // sem precisar (e sem poder conviver bem com) esse arredondamento
         // automatico e incompativel da fonte por baixo dos panos.
         fonte.setUseIntegerPositions(false);
+        // Cor padrao dos nomes (NPCs etc) continua o verde de antes.
+        fonte.setColor(0f, 0.94f, 0f, 1f);
         gerador.dispose();
         return fonte;
     }
@@ -1770,13 +1775,10 @@ public class WorldScreen extends ScreenAdapter {
 
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
-        desenharJogador(local);
-        for (Jogador j : remotos.values()) desenharJogador(j);
-        for (NPCVisual npc : npcs.values()) desenharNPC(npc);
-        // Cadaveres primeiro (ficam por baixo dos mobs vivos), bags por cima deles.
+        // Chao primeiro: cadaveres e bags ficam sempre por baixo de quem passa.
         for (MobVisual mob : mobs.values()) if (mob.morto) desenharMob(mob);
         desenharBags();
-        for (MobVisual mob : mobs.values()) if (!mob.morto) desenharMob(mob);
+        desenharEntidadesOrdenadas();
         desenharEfeitos();
         if (spawnSmokeTempo >= 0f) {
             spawnSmokeTempo += delta;
@@ -1922,12 +1924,28 @@ public class WorldScreen extends ScreenAdapter {
         float alvoY = local.y + dy;
         if (!colisao.ehParede(alvoX, alvoY)
             && !colisao.movimentoBloqueado(local.x, local.y, alvoX, alvoY)
-            && !npcOcupaTile(alvoX, alvoY)) {
+            && !npcOcupaTile(alvoX, alvoY)
+            && !mobOcupaTile(alvoX, alvoY)) {
             local.iniciarPasso(dx, dy, direcao);
             enviarMove(alvoX, alvoY, direcao);
         } else {
             local.direcao = direcao;
         }
+    }
+
+    /** Mob vivo no SQM (onde esta ou pra onde esta indo) bloqueia o passo -
+     * o servidor tambem recusa (servidor.py::handle_m). */
+    private boolean mobOcupaTile(float mundoX, float mundoY) {
+        int tileX = (int) Math.floor(mundoX / Jogador.TILE);
+        int tileY = (int) Math.floor((mundoY - 1f) / Jogador.TILE);
+        for (MobVisual mob : mobs.values()) {
+            if (mob.morto || !mob.visivel) continue;
+            if ((int) Math.floor(mob.destinoFinalX() / Jogador.TILE) == tileX
+                && (int) Math.floor((mob.destinoFinalY() - 1f) / Jogador.TILE) == tileY) return true;
+            if ((int) Math.floor(mob.x / Jogador.TILE) == tileX
+                && (int) Math.floor((mob.y - 1f) / Jogador.TILE) == tileY) return true;
+        }
+        return false;
     }
 
     private boolean npcOcupaTile(float mundoX, float mundoY) {
@@ -2135,6 +2153,30 @@ public class WorldScreen extends ScreenAdapter {
         float ancoraX = Math.round(npc.movimento.x / camera.zoom) * camera.zoom;
         float ancoraY = Math.round(npc.movimento.y / camera.zoom) * camera.zoom;
         batch.draw(quadro, ancoraX - largura / 2f, ancoraY, largura, altura);
+    }
+
+    // Players, NPCs e mobs vivos ordenados pela profundidade (Y): quem esta
+    // mais ao norte e' desenhado antes, quem esta mais ao sul fica na frente.
+    private final List<Object> ordemDesenho = new ArrayList<>();
+
+    private float yDe(Object o) {
+        if (o instanceof Jogador) return ((Jogador) o).y;
+        if (o instanceof NPCVisual) return ((NPCVisual) o).movimento.y;
+        return ((MobVisual) o).y;
+    }
+
+    private void desenharEntidadesOrdenadas() {
+        ordemDesenho.clear();
+        ordemDesenho.add(local);
+        ordemDesenho.addAll(remotos.values());
+        ordemDesenho.addAll(npcs.values());
+        for (MobVisual mob : mobs.values()) if (!mob.morto) ordemDesenho.add(mob);
+        ordemDesenho.sort((a, b) -> Float.compare(yDe(b), yDe(a)));
+        for (Object o : ordemDesenho) {
+            if (o instanceof Jogador) desenharJogador((Jogador) o);
+            else if (o instanceof NPCVisual) desenharNPC((NPCVisual) o);
+            else desenharMob((MobVisual) o);
+        }
     }
 
     /** Id que o servidor usa pro mob: "<mob_id>_<x cru>_<y cru>" do ponto do
@@ -2538,12 +2580,25 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Cor do nome/barra pela vida: verde cheio, verde claro, amarelo,
      * vermelho e vermelho escuro conforme o HP cai. */
+    private static final float[] VIDA_PONTOS = {1f, 0.75f, 0.5f, 0.25f, 0f};
+    private static final Color[] VIDA_CORES = {
+        new Color(0f, 0.85f, 0f, 1f),      // verde (cheio)
+        new Color(0.95f, 0.9f, 0.1f, 1f),  // amarelo
+        new Color(1f, 0.55f, 0f, 1f),      // laranja
+        new Color(1f, 0.35f, 0.35f, 1f),   // vermelho claro
+        new Color(0.6f, 0f, 0f, 1f),       // vermelho escuro (quase morto)
+    };
+
+    /** Cor do nome/barra pela vida, com transicao suave entre as faixas. */
     private static Color corDaVida(float pct) {
-        if (pct > 0.95f) return new Color(0f, 0.75f, 0f, 1f);
-        if (pct > 0.60f) return new Color(0.38f, 0.75f, 0.38f, 1f);
-        if (pct > 0.30f) return new Color(0.75f, 0.75f, 0f, 1f);
-        if (pct > 0.10f) return new Color(0.75f, 0.19f, 0.19f, 1f);
-        return new Color(0.75f, 0f, 0f, 1f);
+        pct = Math.max(0f, Math.min(1f, pct));
+        for (int i = 0; i < VIDA_PONTOS.length - 1; i++) {
+            if (pct >= VIDA_PONTOS[i + 1]) {
+                float t = (VIDA_PONTOS[i] - pct) / (VIDA_PONTOS[i] - VIDA_PONTOS[i + 1]);
+                return new Color(VIDA_CORES[i]).lerp(VIDA_CORES[i + 1], t);
+            }
+        }
+        return new Color(VIDA_CORES[VIDA_CORES.length - 1]);
     }
 
     /** "Level 8!" / "Magic 19!" subindo devagar em cima da cabeca e sumindo no fim. */
@@ -2577,7 +2632,7 @@ public class WorldScreen extends ScreenAdapter {
             layout.setText(font, n.texto);
             float x = Math.round((n.x - layout.width / 2f) / camera.zoom) * camera.zoom;
             float y = Math.round((n.y + 20f + subida) / camera.zoom) * camera.zoom;
-            Color cor = n.critico ? new Color(1f, 0.6f, 0f, 1f) : new Color(1f, 0.2f, 0.2f, 1f);
+            Color cor = new Color(1f, 0.4f, 0.4f, 1f); // vermelho claro (critico so' ganha o "!")
             cor.a = Math.max(0f, alfa);
             font.setColor(cor);
             font.draw(batch, n.texto, x, y);
