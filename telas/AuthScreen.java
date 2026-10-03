@@ -778,7 +778,10 @@ public class AuthScreen extends ScreenAdapter {
                     atualizarLogout();
                     telaErro("Session expired. Please log in again.", AuthScreen.this::telaLogin);
                 } else {
-                    telaErro("Failed to load characters.", AuthScreen.this::telaMenuPrincipal);
+                    // Codigo + mensagem do servidor ajudam a saber o que houve
+                    // (ex: 500 = erro no servidor, ver o console dele).
+                    String detalhe = body != null && body.has("erro") ? " " + body.getString("erro") : "";
+                    telaErro("Failed to load characters (" + statusCode + ")." + detalhe, AuthScreen.this::telaMenuPrincipal);
                 }
             }
             @Override public void onFailure(String motivo) {
