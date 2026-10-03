@@ -312,6 +312,7 @@ public class WorldScreen extends ScreenAdapter {
     private static final float DURACAO_QUADRO_HIT = 0.1f;
     // Hit fisico (mobs, ex: worm) e de flecha: um pouco mais rapido que os outros.
     private static final float DURACAO_QUADRO_HIT_RAPIDO = 0.07f;
+    private static final float DURACAO_QUADRO_HIT_FLECHA = 0.05f;
     private final List<Efeito> efeitos = new ArrayList<>();
     private final Map<String, TextureRegion[]> cacheEfeitos = new HashMap<>();
 
@@ -524,6 +525,24 @@ public class WorldScreen extends ScreenAdapter {
         CadaverPlayer(float x, float y) { this.x = x; this.y = y; }
     }
     private static final float TEMPO_CADAVER_PLAYER = 120f; // 2 minutos
+
+    /** SpawnWarning (4 quadros) tocando 3x no SQM onde um mob vai nascer,
+     * com uma luz azul pequena (so' o SQM). */
+    private static class AvisoSpawn {
+        final float x, y;          // ancora (centro em X, base em Y), igual mob
+        final float duracao;       // ate o mob nascer
+        final MapaPropriedades.Luz luz;
+        float tempo = 0f;
+        AvisoSpawn(float x, float y, float duracao) {
+            this.x = x; this.y = y; this.duracao = duracao;
+            this.luz = new MapaPropriedades.Luz(x, y + 8f, COR_LUZ_AVISO_SPAWN, RAIO_LUZ_AVISO_SPAWN);
+        }
+    }
+    private static final int REPETICOES_AVISO_SPAWN = 3;
+    private static final Color COR_LUZ_AVISO_SPAWN = new Color(0.25f, 0.5f, 1f, 1f);
+    private static final float RAIO_LUZ_AVISO_SPAWN = 12f;
+    private final List<AvisoSpawn> avisosSpawn = new ArrayList<>();
+    private TextureRegion[] quadrosAvisoSpawn;
     private final List<CadaverPlayer> cadaveres = new ArrayList<>();
 
     private static class CamadaSkin {
@@ -687,6 +706,12 @@ public class WorldScreen extends ScreenAdapter {
         pmBranco.dispose();
         regiaoAlvo = atlas.findRegion("ui/slots/Target");
         regiaoAlvoAmigo = atlas.findRegion("ui/slots/FriendTarget");
+        TextureRegion tiraAviso = atlas.findRegion("ui/SpawnWarning");
+        if (tiraAviso != null) {
+            int n = Math.max(1, tiraAviso.getRegionWidth() / 16);
+            quadrosAvisoSpawn = new TextureRegion[n];
+            for (int i = 0; i < n; i++) quadrosAvisoSpawn[i] = new TextureRegion(tiraAviso, i * 16, 0, 16, tiraAviso.getRegionHeight());
+        }
         regiaoTargetHit = atlas.findRegion("ui/items/HitHitbox");
         regiaoFlag = atlas.findRegion("ui/items/Flag");
         regiaoBag = atlas.findRegion("ui/currency/BasicBag");
@@ -919,7 +944,7 @@ public class WorldScreen extends ScreenAdapter {
         imagemIconeChat = (Image) botaoTopoChat.getChildren().first();
         // Icone de "mensagem nova" (chat fechado). Sem ele no atlas, usa o
         // NotificationIcon no lugar.
-        iconeChatNovo = atlas.findRegion("ui/ChatButtonNotify");
+        iconeChatNovo = atlas.findRegion("ui/ChatNotify");
         if (iconeChatNovo == null) iconeChatNovo = atlas.findRegion("ui/NotificationIcon");
         barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).padRight(12);
         botaoTopoMenu = criarBotaoTopo(iconeMenu, this::alternarBookMenu);
@@ -1473,6 +1498,13 @@ public class WorldScreen extends ScreenAdapter {
             // Mesmo efeito de fumaca do spawn do player (sprites/spawn/Smoke).
             if (mob.visivel) efeitos.add(new Efeito(quadrosFumaca(), mob.x, mob.y));
         });
+        // Mob vai renascer em ~6s nesse SQM (servidor ja' sorteou onde).
+        socket.on("mob_spawn_warning", (nomeEvt, data) -> {
+            if (data == null || quadrosAvisoSpawn == null) return;
+            float mx = conversor.rawParaMundoX(data.getFloat("pos_x", 0f));
+            float my = conversor.rawParaMundoY(data.getFloat("pos_y", 0f));
+            avisosSpawn.add(new AvisoSpawn(mx, my, Math.max(1f, data.getFloat("seconds", 6f))));
+        });
         socket.on("mob_respawn", (nomeEvt, data) -> {
             if (data == null) return;
             MobVisual mob = mobs.get(data.getString("mob_id", ""));
@@ -1909,6 +1941,11 @@ public class WorldScreen extends ScreenAdapter {
             l.tempo += delta;
             if (l.tempo >= DURACAO_LOOT_FLUTUANTE) lootsFlutuantes.remove(i);
         }
+        for (int i = avisosSpawn.size() - 1; i >= 0; i--) {
+            AvisoSpawn a = avisosSpawn.get(i);
+            a.tempo += delta;
+            if (a.tempo >= a.duracao) avisosSpawn.remove(i);
+        }
         for (int i = cadaveres.size() - 1; i >= 0; i--) {
             CadaverPlayer c = cadaveres.get(i);
             c.restante -= delta;
@@ -2046,6 +2083,7 @@ public class WorldScreen extends ScreenAdapter {
             luzesDoFrame.add(luz);
         }
         luzesRemotos.keySet().retainAll(remotos.keySet());
+        for (AvisoSpawn a : avisosSpawn) luzesDoFrame.add(a.luz);
         iluminacao.renderizar(batch, camera, luzesDoFrame);
 
         // Mundo inteiro desenhado DIRETO na tela real, num passo so' - igual
@@ -2060,6 +2098,7 @@ public class WorldScreen extends ScreenAdapter {
         for (MobVisual mob : mobs.values()) if (mob.morto) desenharMob(mob);
         desenharBags();
         desenharCadaveres();
+        desenharAvisosSpawn();
         desenharEntidadesOrdenadas();
         desenharEfeitos();
         if (spawnSmokeTempo >= 0f) {
@@ -2631,7 +2670,8 @@ public class WorldScreen extends ScreenAdapter {
         if (quadros == null) return null;
         Efeito e = new Efeito(quadros, x, y);
         boolean rapido = !"Sword".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome); // Arrow ou Physical
-        e.duracaoQuadro = rapido ? DURACAO_QUADRO_HIT_RAPIDO : DURACAO_QUADRO_HIT;
+        e.duracaoQuadro = "Arrow".equals(nome) ? DURACAO_QUADRO_HIT_FLECHA
+            : rapido ? DURACAO_QUADRO_HIT_RAPIDO : DURACAO_QUADRO_HIT;
         efeitos.add(e);
         return e;
     }
@@ -2928,6 +2968,18 @@ public class WorldScreen extends ScreenAdapter {
             }
         }
         if (!c.quadros.isEmpty()) cadaveres.add(c);
+    }
+
+    /** 3 ciclos do SpawnWarning espalhados no tempo ate o mob nascer. */
+    private void desenharAvisosSpawn() {
+        for (AvisoSpawn a : avisosSpawn) {
+            int n = quadrosAvisoSpawn.length;
+            float porQuadro = a.duracao / (REPETICOES_AVISO_SPAWN * n);
+            TextureRegion q = quadrosAvisoSpawn[((int) (a.tempo / porQuadro)) % n];
+            float ancoraX = Math.round(a.x / camera.zoom) * camera.zoom;
+            float ancoraY = Math.round(a.y / camera.zoom) * camera.zoom;
+            batch.draw(q, ancoraX - q.getRegionWidth() / 2f, ancoraY);
+        }
     }
 
     private void desenharCadaveres() {

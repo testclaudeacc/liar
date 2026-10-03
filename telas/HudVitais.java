@@ -42,8 +42,10 @@ public final class HudVitais {
     // Tudo aqui e' medido em pixels de tela (da print do PC); no celular, com
     // tela de alta densidade, isso ficava pequeno demais - aumenta tudo junto.
     private static final float FATOR_MOBILE = 1.7f;
-    private static final float FATOR = (com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
-        || com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS) ? FATOR_MOBILE : 1f;
+    private static final boolean MOBILE = com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
+        || com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
+    private static final float FATOR = MOBILE ? FATOR_MOBILE : 1f;
+    private static final float FATOR_TEXTO = MOBILE ? 1.35f : 1f;
     private final Texture pixel;
     private final BitmapFont fonte;
     private final Table raiz = new Table();
@@ -132,8 +134,12 @@ public final class HudVitais {
                 com.badlogic.gdx.Gdx.files.internal("fonts/TAHOMAB0.TTF"));
         com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter p =
             new com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter();
-        p.size = Math.round(14 * FATOR * escala);
-        p.borderWidth = 2;
+        // No mobile o texto cresce menos que as barras (FATOR_TEXTO_MOBILE):
+        // com o FATOR inteiro ficava grande demais pra barra. A borda acompanha
+        // o tamanho (2px pra 14px, igual o PC) - fixa em 2px, numa fonte
+        // gerada bem maior na tela do celular, a letra parecia fina.
+        p.size = Math.round(14 * FATOR_TEXTO * escala);
+        p.borderWidth = Math.max(2, Math.round(p.size / 7f));
         p.borderColor = Color.BLACK;
         p.minFilter = Texture.TextureFilter.Linear;
         p.magFilter = Texture.TextureFilter.Linear;

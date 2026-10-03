@@ -3669,6 +3669,8 @@ def trade_invite_cleanup_loop():
             if alvo_sid in online_players:
                 socketio.emit('trade_pending_status', {'pending': False, 'inviter_name': inviter_name}, room=alvo_sid)
 
+MOB_AVISO_SPAWN_SEG = 6.0  # SpawnWarning no client antes do mob renascer
+
 def mob_cleanup_loop():
     while True:
         # Tick curto: com 60s o respawn de 120s acontecia entre 120 e 180s.
@@ -3678,7 +3680,18 @@ def mob_cleanup_loop():
             if m_data.get('hp', 1) > 0: continue
             if 'died_at' not in m_data:
                 m_data['died_at'] = now
-            if now - m_data['died_at'] < m_data.get('respawn_seg', MOB_RESPAWN_SEG): continue
+            falta = m_data.get('respawn_seg', MOB_RESPAWN_SEG) - (now - m_data['died_at'])
+            # Aviso de spawn: ~6s antes, ja' sorteia o SQM onde ele vai nascer e
+            # avisa a area (o client toca o SpawnWarning nesse SQM).
+            if falta <= MOB_AVISO_SPAWN_SEG and 'nascimento_reservado' not in m_data:
+                reservado = _tile_de_nascimento(m_id, m_data) or m_data.get('spawn')
+                if reservado is not None:
+                    m_data['nascimento_reservado'] = reservado
+                    ax, ay = centro_tile(reservado)
+                    emit_area('mob_spawn_warning', {'mob_id': m_id, 'pos_x': ax, 'pos_y': ay,
+                                                    'seconds': max(0.0, falta)},
+                              get_chunk(ax, ay, MOB_FLOOR))
+            if falta > 0: continue
             # Renasce no spawn com tudo zerado.
             m_data['hp'] = m_data.get('max_hp', 40)
             m_data.pop('died_at', None)
@@ -3693,7 +3706,10 @@ def mob_cleanup_loop():
             m_data['dmg_tracker'] = {}
             # Renasce num SQM sorteado dentro do spawn_range do ponto do Tiled;
             # esse SQM vira a "casa" dele nessa vida (pra onde volta/leash).
-            nascimento = _tile_de_nascimento(m_id, m_data)
+            # Usa o SQM ja' avisado (se ninguem parou em cima dele nesse meio tempo).
+            nascimento = m_data.pop('nascimento_reservado', None)
+            if nascimento is None or nascimento in _tiles_ocupados(excluir_mob=m_id):
+                nascimento = _tile_de_nascimento(m_id, m_data)
             if nascimento is not None:
                 m_data['spawn'] = nascimento
             if m_data.get('spawn') is not None:
