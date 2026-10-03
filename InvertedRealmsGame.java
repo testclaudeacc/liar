@@ -71,6 +71,14 @@ public class InvertedRealmsGame extends Game {
         // do jogo Godot, ver LoadingScreen).
         setScreen(new LoadingScreen(() -> {}));
         socket = new GameSocket();
+        // Outra pessoa entrou nesta mesma conta: o servidor manda isso antes
+        // de derrubar a conexao - volta pro menu com o aviso certo (em vez de
+        // "Server shutdown").
+        socket.on("force_disconnect", (nomeEvt, data) -> {
+            desconexaoEsperada = true;
+            socket.disconnect();
+            setScreen(new AuthScreen(InvertedRealmsGame.this::entrarNoMundo, "Someone logged in your account."));
+        });
         socket.setConnectionListener(new GameSocket.ConnectionListener() {
             @Override
             public void onConnected() {

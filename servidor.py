@@ -1718,22 +1718,40 @@ def handle_join_game(data):
         data['npc_dialogue_state'] = json.loads(row[16]) if row[16] else {}
         data['session_start'] = time.time()
         
+        # Uma sessao por conta: quem ja estava logado nela e' derrubado (o
+        # client dele mostra "Someone logged in your account." e volta pro
+        # menu) e quem acabou de entrar fica.
         for existing_sid, player in list(online_players.items()):
-            if player.get('user_id') == user_id and existing_sid != sid:
+            if str(player.get('user_id')) == str(user_id) and existing_sid != sid:
                 _remover_do_party(existing_sid, motivo="relogged")
+                _limpar_convites_de_party_pendentes(existing_sid, player.get('name', ''))
+                _remover_do_trade(existing_sid, motivo="relogged")
+                _sair_de_todos_os_canais_chat(existing_sid)
                 _queue_save(player)
                 players_by_name.pop(player.get('name'), None)
                 data['current_hp'] = player.get('current_hp')
                 data['current_mp'] = player.get('current_mp')
                 if player.get('pos_x') == -1 and player.get('pos_y') == -1: data['pos_x'], data['pos_y'] = -1, -1
-                
-                emit('force_disconnect', {"reason": "Alguem entrou na sua conta."}, room=existing_sid)
+                # Mesmo personagem: o estado em memoria e' mais novo que o do
+                # banco (o save acima ainda esta na fila), entao continua dele
+                # em vez de voltar posicao/itens/xp pro ultimo save.
+                if player.get('name') == p_name:
+                    for chave in ('pos_x', 'pos_y', 'direction', 'floor', 'inventory', 'equipped_items',
+                                  'skills', 'level', 'exp', 'kills', 'currency', 'npc_dialogue_state'):
+                        if chave in player: data[chave] = player[chave]
+
+                emit('force_disconnect', {"reason": "Someone logged in your account."}, room=existing_sid)
                 room_to_leave = player.get('room')
                 if room_to_leave: leave_room(room_to_leave, sid=existing_sid)
                 emit('player_left', {"name": player.get('name')}, broadcast=True, include_self=False)
                 del online_players[existing_sid]
-                try: disconnect(sid=existing_sid)
-                except: pass
+                # Derruba um pouco depois: da' tempo do force_disconnect chegar
+                # antes do socket fechar (senao o client mostraria "Server shutdown").
+                def _derrubar(s=existing_sid):
+                    socketio.sleep(1.0)
+                    try: socketio.server.disconnect(s, namespace='/')
+                    except Exception: pass
+                socketio.start_background_task(_derrubar)
                 
         room = get_chunk(data['pos_x'], data['pos_y'], data.get('floor', 1))
         join_room(room)

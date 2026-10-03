@@ -512,11 +512,10 @@ public class AuthScreen extends ScreenAdapter {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoOk.run(); }
         });
         Table painel = criarPainel();
-        painel.add(label).width(400).pad(20).row();
-        // Altura igual aos outros botoes de painel avulso (Play/Register/Exit
-        // em telaMenuPrincipal) - faltava, ficava baixinho/desproporcional
-        // perto dos outros.
-        painel.add(ok).width(150).height(72).padBottom(20);
+        // Mais compacto (o aviso de "Server shutdown" ficava grande demais na
+        // tela, a pedido do usuario); no mobile continua maior pro dedo.
+        painel.add(label).width(mobile ? 360 : 280).pad(mobile ? 18 : 12).padBottom(mobile ? 14 : 8).row();
+        painel.add(ok).width(mobile ? 150 : 110).height(mobile ? 72 : 48).padBottom(mobile ? 18 : 12);
         content.add(painel);
         definirRodape();
     }
