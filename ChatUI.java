@@ -98,6 +98,8 @@ public class ChatUI {
          * ja censurada pra todos (inclusive quem mandou) - ai nao adiciona
          * aqui direto pra nao duplicar. */
         boolean enviouLocal(String texto);
+        /** Idem pra um chat de idioma: o servidor repassa pra todo mundo do canal. */
+        boolean enviouCanal(String canal, String texto);
     }
     private OuvinteCanais ouvinteCanais;
     private String abaAtual = ABA_LOCAL;
@@ -443,7 +445,12 @@ public class ChatUI {
         if (texto == null || texto.trim().isEmpty()) return;
         texto = texto.trim();
         if (texto.length() > MAX_CARACTERES) texto = texto.substring(0, MAX_CARACTERES);
-        if (abaAtual.equals(ABA_LOCAL) && ouvinteCanais != null && ouvinteCanais.enviouLocal(texto)) return;
+        if (ouvinteCanais != null) {
+            boolean foiProServidor = abaAtual.equals(ABA_LOCAL)
+                ? ouvinteCanais.enviouLocal(texto)
+                : ouvinteCanais.enviouCanal(abaAtual, texto);
+            if (foiProServidor) return;
+        }
         adicionarNaAba(abaAtual, linhaDeJogador(nomeJogadorLocal, corJogadorLocal, texto));
     }
 
@@ -463,6 +470,12 @@ public class ChatUI {
      * seja a aba selecionada agora. */
     public void adicionarMensagemLocal(String nome, Color corNome, String texto) {
         adicionarNaAba(ABA_LOCAL, linhaDeJogador(nome, corNome, texto));
+    }
+
+    /** Mensagem de um jogador num chat de idioma (vinda do servidor). Ignora
+     * se o jogador ja fechou essa aba. */
+    public void adicionarMensagemCanal(String canal, String nome, Color corNome, String texto) {
+        adicionarNaAba(canal, linhaDeJogador(nome, corNome, texto));
     }
 
     /** Aviso do sistema no chat Local (sem nome): level/skill up, anti-spam... */

@@ -1983,59 +1983,67 @@ def _mutar(nome, seg):
     chat_mutes[nome] = max(chat_mutes.get(nome, 0), time.time() + seg)
     salvar_mutes_chat()
 
+def _filtrar_mensagem_chat(sid, p, texto):
+    """Regras comuns do chat (Local e idiomas): limite de caracteres, mute,
+    anti-spam e censura. Devolve a mensagem pronta pra repassar, ou None se
+    ela foi barrada (o aviso pro jogador ja' foi mandado aqui)."""
+    nome = p.get('name', '')
+    msg = str(texto).strip()[:CHAT_MAX_CARACTERES]
+    if not msg: return None
+    agora = time.time()
+    hist = chat_historico.setdefault(nome, {'msgs': [], 'avisos': [], 'palavroes': []})
+
+    # Mutado: nao conta como spam de novo, so' lembra quanto falta.
+    fim_mute = chat_mutes.get(nome, 0)
+    if fim_mute > agora:
+        restante = fim_mute - agora
+        cor = 'red' if restante > 5 * 60 else 'yellow'
+        chat_sistema(sid, f"You are muted. Wait {_formatar_tempo(restante)} to talk again.", cor)
+        return None
+
+    # Anti-spam: mais de CHAT_SPAM_MAX_MSGS na janela -> descarta, avisa e
+    # muta por um tempo que cresce a cada aviso (nos ultimos 20 min). No 8o
+    # aviso, mute de 1 hora. Conta Local e idiomas juntos.
+    hist['msgs'] = [t for t in hist['msgs'] if agora - t < CHAT_SPAM_JANELA_SEG]
+    if len(hist['msgs']) >= CHAT_SPAM_MAX_MSGS:
+        hist['msgs'] = []
+        hist['avisos'] = [t for t in hist['avisos'] if agora - t < CHAT_SPAM_AVISOS_JANELA_SEG]
+        hist['avisos'].append(agora)
+        n = len(hist['avisos'])
+        if n >= CHAT_SPAM_AVISOS_MAX:
+            hist['avisos'] = []
+            _mutar(nome, CHAT_MUTE_LONGO_SEG)
+            chat_sistema(sid, "You have been muted for 1 hour for spam.", 'red')
+        else:
+            seg = CHAT_SPAM_MUTE_BASE_SEG * n
+            _mutar(nome, seg)
+            chat_sistema(sid, f"You are sending messages too fast. You are muted for {_formatar_tempo(seg)}.")
+        return None
+    hist['msgs'].append(agora)
+
+    msg, palavroes = censurar(msg)
+    if palavroes:
+        hist['palavroes'] = [t for t in hist['palavroes'] if agora - t < CHAT_TOXICO_JANELA_SEG]
+        hist['palavroes'].extend([agora] * palavroes)
+        if len(hist['palavroes']) >= CHAT_TOXICO_MAX:
+            hist['palavroes'] = []
+            _mutar(nome, CHAT_MUTE_LONGO_SEG)
+            chat_sistema(sid, "You have been muted for 1 hour for toxic behavior.", 'red')
+            return None
+    return msg
+
 @socketio.on('c')
 def handle_c(data):
     try:
         sid = request.sid
         if sid not in online_players: return
         p = online_players[sid]
-        nome = p.get('name', '')
         if not isinstance(data, list) or len(data) == 0: return
-        msg = str(data[0]).strip()[:CHAT_MAX_CARACTERES]
-        if not msg: return
-        agora = time.time()
-        hist = chat_historico.setdefault(nome, {'msgs': [], 'avisos': [], 'palavroes': []})
-
-        # Mutado: nao conta como spam de novo, so' lembra quanto falta.
-        fim_mute = chat_mutes.get(nome, 0)
-        if fim_mute > agora:
-            restante = fim_mute - agora
-            cor = 'red' if restante > 5 * 60 else 'yellow'
-            chat_sistema(sid, f"You are muted. Wait {_formatar_tempo(restante)} to talk again.", cor)
-            return
-
-        # Anti-spam: mais de CHAT_SPAM_MAX_MSGS na janela -> descarta, avisa e
-        # muta por um tempo que dobra a cada aviso (nos ultimos 20 min). No 8o
-        # aviso, mute de 1 hora.
-        hist['msgs'] = [t for t in hist['msgs'] if agora - t < CHAT_SPAM_JANELA_SEG]
-        if len(hist['msgs']) >= CHAT_SPAM_MAX_MSGS:
-            hist['msgs'] = []
-            hist['avisos'] = [t for t in hist['avisos'] if agora - t < CHAT_SPAM_AVISOS_JANELA_SEG]
-            hist['avisos'].append(agora)
-            n = len(hist['avisos'])
-            if n >= CHAT_SPAM_AVISOS_MAX:
-                hist['avisos'] = []
-                _mutar(nome, CHAT_MUTE_LONGO_SEG)
-                chat_sistema(sid, "You have been muted for 1 hour for spam.", 'red')
-            else:
-                seg = CHAT_SPAM_MUTE_BASE_SEG * n
-                _mutar(nome, seg)
-                chat_sistema(sid, f"You are sending messages too fast. You are muted for {_formatar_tempo(seg)}.")
-            return
-        hist['msgs'].append(agora)
-
-        msg, palavroes = censurar(msg)
-        if palavroes:
-            hist['palavroes'] = [t for t in hist['palavroes'] if agora - t < CHAT_TOXICO_JANELA_SEG]
-            hist['palavroes'].extend([agora] * palavroes)
-            if len(hist['palavroes']) >= CHAT_TOXICO_MAX:
-                hist['palavroes'] = []
-                _mutar(nome, CHAT_MUTE_LONGO_SEG)
-                chat_sistema(sid, "You have been muted for 1 hour for toxic behavior.", 'red')
-                return
+        msg = _filtrar_mensagem_chat(sid, p, data[0])
+        if msg is None: return
 
         room = p.get('room')
-        payload = [nome, msg, p.get('class_name', 'Knight')]
+        payload = [p.get('name', ''), msg, p.get('class_name', 'Knight')]
         # Mesma área do movimento ('m'): o chunk do player + os 8 vizinhos.
         # Antes ia só pro chunk (800px) exato dele: quem estava do lado, mas
         # do outro lado da borda do chunk, via o player andar e nunca recebia
@@ -2043,6 +2051,24 @@ def handle_c(data):
         # Inclui quem mandou: ele recebe de volta a versao ja censurada.
         if room:
             emit_area('c', payload, room)
+    except Exception: traceback.print_exc()
+
+# Chat de idioma (Portuguese/Spanish/...): vai pra todo mundo que tem o canal
+# aberto, em qualquer lugar do mapa (igual grupo). So' quem esta no canal fala nele.
+@socketio.on('cc')
+def handle_cc(data):
+    try:
+        sid = request.sid
+        if sid not in online_players or not isinstance(data, dict): return
+        canal = data.get('channel')
+        if canal not in chat_channels or sid not in chat_channels[canal]: return
+        p = online_players[sid]
+        msg = _filtrar_mensagem_chat(sid, p, data.get('msg', ''))
+        if msg is None: return
+        payload = {'channel': canal, 'name': p.get('name', ''), 'msg': msg,
+                   'class': p.get('class_name', 'Knight')}
+        for membro in list(chat_channels[canal]):
+            socketio.emit('cc', payload, room=membro)
     except Exception: traceback.print_exc()
 
 def _emit_membros_canal(canal):

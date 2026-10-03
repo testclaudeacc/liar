@@ -83,6 +83,7 @@ public class WorldScreen extends ScreenAdapter {
     private static class AnimacaoCorpo {
         TextureRegion idleCima, idleBaixo, idleDireita, idleEsquerda;
         TextureRegion[] andarCima, andarBaixo, andarDireita, andarEsquerda;
+        TextureRegion morte; // quadro 10; null se a tira nao tiver (skin sem quadro de morte)
     }
 
     // SpawnPoint (jogo/world.tscn, Marker2D "SpawnPoint") - posicao CRUA (antes
@@ -358,6 +359,8 @@ public class WorldScreen extends ScreenAdapter {
     private static final float DURACAO_LOOT_FLUTUANTE = 1.4f;
     private static final int ALCANCE_BAG_SQM = 4;
     private boolean localMorto = false;
+    // Outros players mortos (esperando renascer) - desenhados no quadro de morte.
+    private final java.util.Set<String> remotosMortos = new java.util.HashSet<>();
     private Table painelMorte;
     private static final float DURACAO_NUMERO_DANO = 0.85f;
 
@@ -838,6 +841,14 @@ public class WorldScreen extends ScreenAdapter {
                 socket.emitRaw("c", lista.toJson(JsonWriter.OutputType.json));
                 return true;
             }
+            @Override public boolean enviouCanal(String canal, String texto) {
+                if (!socket.isConnected()) return false;
+                socket.emitRaw("cc", GameSocket.obj(jw -> {
+                    jw.set("channel", canal);
+                    jw.set("msg", texto);
+                }));
+                return true;
+            }
         });
         chat.setVisivel(false);
 
@@ -1270,6 +1281,21 @@ public class WorldScreen extends ScreenAdapter {
             chat.adicionarMensagemLocal(nomeVisivel(nome), cor, texto);
             falas.put(nome, new Fala(nome, texto, cor));
         });
+        // Chat de idioma: {channel, name, msg (ja censurada), class}.
+        socket.on("cc", (nomeEvt, data) -> {
+            if (data == null || chat == null) return;
+            chat.adicionarMensagemCanal(data.getString("channel", ""), nomeVisivel(data.getString("name", "")),
+                ChatUI.corDaClasse(data.getString("class", "Knight")), data.getString("msg", ""));
+        });
+        // Alguem da area (ou eu) morreu pra um mob: aviso no chat Local.
+        socket.on("player_killed", (nomeEvt, data) -> {
+            if (data == null || chat == null) return;
+            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            String nomeMob = mob != null ? mob.nome : data.getString("mob_type", "monster");
+            chat.adicionarMensagemSistema(nomeVisivel(data.getString("name", "")) + " was killed by " + nomeMob + ".",
+                new Color(1f, 0.25f, 0.25f, 1f));
+        });
+
         // Aviso do servidor so' pra esse jogador (anti-spam/mute). "red" =
         // mute de 1 hora (spam ou palavrao demais).
         socket.on("chat_system", (nomeEvt, data) -> {
@@ -1451,6 +1477,7 @@ public class WorldScreen extends ScreenAdapter {
             remotos.remove(data.getString("name", ""));
             skinsJogadores.remove(data.getString("name", ""));
             vidaRemotos.remove(data.getString("name", ""));
+            remotosMortos.remove(data.getString("name", ""));
         });
 
         // Skins: confirmacao das minhas (depois do Equip na aba Vanity) e
@@ -1462,7 +1489,24 @@ public class WorldScreen extends ScreenAdapter {
         });
         // HP dos outros players (servidor.py::broadcast_hp) - so' pra cor do nome.
         socket.on("player_status_updated", (nomeEvt, data) -> {
-            if (data == null || !data.has("current_hp")) return;
+            if (data == null) return;
+            // Outro player morreu / renasceu: troca pro quadro de morte (ou volta).
+            if (data.has("is_dead")) {
+                String nomeMorto = data.getString("name", "");
+                if (data.getBoolean("is_dead", false)) {
+                    if (remotosMortos.add(nomeMorto)) {
+                        Jogador j = remotos.get(nomeMorto);
+                        if (j != null) j.movendo = false;
+                        float[] vida = vidaRemotos.get(nomeMorto);
+                        if (vida != null) vida[0] = 0f;
+                    }
+                } else if (remotosMortos.remove(nomeMorto)) {
+                    Jogador j = remotos.get(nomeMorto);
+                    // Fumaca de spawn onde ele renasceu (mesmo efeito do proprio respawn).
+                    if (j != null) efeitos.add(new Efeito(quadrosFumaca(), j.x, j.y));
+                }
+            }
+            if (!data.has("current_hp")) return;
             String nome = data.getString("name", "");
             float[] vida = vidaRemotos.get(nome);
             if (vida == null) vida = new float[]{1f, 1f};
@@ -1531,6 +1575,9 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null || !data.isArray() || data.size < 4) return;
             Jogador j = remotos.get(data.get(0).asString());
             if (j != null) {
+                // Morto nao anda: se mexeu, renasceu (o teleporte pro spawn
+                // chega pra area onde ele morreu, o is_dead=false so' pra nova).
+                remotosMortos.remove(j.nome);
                 float mx = conversor.rawParaMundoX(data.get(1).asFloat());
                 float my = conversor.rawParaMundoY(data.get(2).asFloat());
                 j.definirAlvo(mx, my, direcaoDoInt(data.get(3).asInt()));
@@ -1775,6 +1822,8 @@ public class WorldScreen extends ScreenAdapter {
         if (p.has("current_hp") && p.has("max_hp")) {
             vidaRemotos.put(nome, new float[]{p.getFloat("current_hp", 1f), p.getFloat("max_hp", 1f)});
         }
+        // Ja' entrou morto (morreu antes de eu chegar na area).
+        if (p.getBoolean("is_dead", false)) remotosMortos.add(nome);
     }
 
     /** Mantem o viewport da camera do tamanho real da tela (chamada todo
@@ -2213,6 +2262,7 @@ public class WorldScreen extends ScreenAdapter {
         a.andarBaixo = regioes(tex, FRAME_ANDAR_BAIXO);
         a.andarEsquerda = regioes(tex, FRAME_ANDAR_ESQUERDA);
         a.andarDireita = regioes(tex, FRAME_ANDAR_DIREITA);
+        if (tex.getRegionWidth() >= (FRAME_MORTE + 1) * FRAME_LARGURA) a.morte = regiao(tex, FRAME_MORTE);
         return a;
     }
 
@@ -2229,7 +2279,20 @@ public class WorldScreen extends ScreenAdapter {
      * "parado" e' sempre um corte limpo pro quadro idle, nunca um quadro de
      * andar fora de hora. */
     private TextureRegion quadroAtual(AnimacaoCorpo a, Jogador j) {
+        // Morto (eu ou outro player): quadro de morte da spritesheet. Camada de
+        // skin sem esse quadro devolve null e nao e' desenhada (ver desenharJogador).
+        if (estaMorto(j)) {
+            if (a.morte != null) return a.morte;
+            return a == animacaoBase ? a.idleBaixo : null;
+        }
         return quadroAtual(a, j.movendo, j.direcao, j.progresso());
+    }
+
+    private boolean estaMorto(Jogador j) {
+        // remotos.get(...) == j: NPC tambem e' um Jogador (npc.movimento) e nao
+        // pode pegar o estado de um player que por acaso tenha o mesmo nome.
+        if (j == local) return localMorto;
+        return remotos.get(j.nome) == j && remotosMortos.contains(j.nome);
     }
 
     private TextureRegion quadroAtual(AnimacaoCorpo a, boolean movendo, String direcao, float progresso) {
@@ -2288,6 +2351,7 @@ public class WorldScreen extends ScreenAdapter {
         // outra, cada uma com a cor escolhida na aba Vanity.
         for (CamadaSkin camada : camadas) {
             TextureRegion quadro = quadroAtual(camada.animacao, j);
+            if (quadro == null) continue; // camada sem quadro de morte
             batch.setColor(camada.cor);
             batch.draw(quadro, x, ancoraY, largura, quadro.getRegionHeight() * ESCALA_SPRITE);
         }
