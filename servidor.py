@@ -3354,6 +3354,8 @@ def handle_l(data):
         if d_int not in DIR_MAP or p.get('is_dead'): return
         if p.get('direction') == DIR_MAP[d_int]: return
         p['direction'] = DIR_MAP[d_int]
+        if os.getenv('DEBUG_VIRADA') == '1':
+            print(f"[VIRADA] {p.get('name')} -> {DIR_MAP[d_int]} (vistos por {len(_visto_por.get(sid, ()))})")
         # Vai no pacote de movimento como um "passo" pro mesmo SQM: quem ve o
         # player so' vira ele pro lado.
         marcar_movimento(sid, (p.get('pos_x', 0), p.get('pos_y', 0), d_int))
@@ -4437,6 +4439,11 @@ def carregar_mapa_do_servidor():
           f"(fp {grade['fp'][:8]}), {len(dados['mobs'])} mob(s), {len(dados['npcs'])} NPC(s), spawn {dados['spawn']}")
 
 carregar_mapa_do_servidor()
+
+# Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
+# confirmar qual versao esta rodando de verdade.
+VERSAO_SERVIDOR = "2026-10-03 visao+virada"
+print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR}")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(autosave_loop)
 socketio.start_background_task(loot_cleanup_loop)
