@@ -24,7 +24,7 @@ import com.badlogic.gdx.utils.Scaling;
  *   sombra (45,45,45) a direita/embaixo e 5px entre elas;
  *   XP: painel 262x34, borda 1px preta, fundo (14,14,14), icone a esquerda
  *   e "%" centralizado no painel todo.
- * Texto: Tahoma Bold branca com contorno preto de 1px.
+ * Texto: Tahoma Bold branca com contorno preto de 2px.
  * Todas as medidas sao em PIXEL DE TELA e convertidas pra unidade do stage
  * (px()), senao bordas de 1-2px saem com espessura quebrada.
  */
@@ -66,7 +66,7 @@ public final class HudVitais {
         pm.fill();
         pixel = new Texture(pm);
         pm.dispose();
-        fonte = UiSkin.gerarFonte("fonts/TAHOMAB0.TTF", 14, 1, escala);
+        fonte = gerarFonte(escala);
         Label.LabelStyle estilo = new Label.LabelStyle(fonte, Color.WHITE);
 
         hp = criarBarra(estilo, COR_HP, 314);
@@ -116,6 +116,25 @@ public final class HudVitais {
         stage.addActor(raiz);
         atualizar();
         definirXp(1, 0);
+    }
+
+    /** Tahoma Bold no tamanho da print, com contorno preto de 2px de tela
+     * (1px ficava fino demais). Gerada na resolucao real e reduzida pro stage. */
+    private static BitmapFont gerarFonte(float escala) {
+        com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator gerador =
+            new com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator(
+                com.badlogic.gdx.Gdx.files.internal("fonts/TAHOMAB0.TTF"));
+        com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter p =
+            new com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter();
+        p.size = Math.round(14 * escala);
+        p.borderWidth = 2;
+        p.borderColor = Color.BLACK;
+        p.minFilter = Texture.TextureFilter.Linear;
+        p.magFilter = Texture.TextureFilter.Linear;
+        BitmapFont f = gerador.generateFont(p);
+        f.getData().setScale(1f / escala);
+        gerador.dispose();
+        return f;
     }
 
     /** Pixels de tela -> unidades do stage. */

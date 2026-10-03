@@ -228,6 +228,7 @@ public class WorldScreen extends ScreenAdapter {
         final String texto;
         final boolean critico;
         boolean bloqueio = false;
+        Color cor = null; // null = vermelho do dano
         float tempo = 0f;
         NumeroDano(float x, float y, String texto, boolean critico) {
             this.x = x; this.y = y; this.texto = texto; this.critico = critico;
@@ -238,12 +239,19 @@ public class WorldScreen extends ScreenAdapter {
     /** Aviso subindo em cima de um player ("Level 8", "Magic 19") - segue o
      * player enquanto ele anda. */
     private static class TextoFlutuante {
-        final Jogador alvo;
+        final Jogador alvo;   // so' pra empilhar varios do mesmo player
+        final float x, y;     // posicao fixa: onde o player estava quando subiu
         final String texto;
         final Color cor;
         float tempo = 0f;
-        TextoFlutuante(Jogador alvo, String texto, Color cor) { this.alvo = alvo; this.texto = texto; this.cor = cor; }
+        TextoFlutuante(Jogador alvo, String texto, Color cor) {
+            this.alvo = alvo; this.x = alvo.x; this.y = alvo.y; this.texto = texto; this.cor = cor;
+        }
     }
+    // Fonte propria (gerada grande e reduzida) pros avisos de level/skill:
+    // escalar a fonte dos nomes pra cima deixava o texto borrado.
+    private BitmapFont fonteDestaque;
+    private static final float ESCALA_DESTAQUE = 1.5f; // em relacao ao nome
     private final List<TextoFlutuante> textosFlutuantes = new ArrayList<>();
     // Sobe por 1.2s, fica parado 5s (da' tempo de tirar print) e some em 0.5s.
     private static final float TEXTO_SUBIDA = 1.2f, TEXTO_PARADO = 5f, TEXTO_SUMINDO = 0.5f;
@@ -283,16 +291,19 @@ public class WorldScreen extends ScreenAdapter {
         final float x0, y0;
         final MobVisual alvo;   // persegue o mob (ele pode estar andando)
         final String efeitoHit;
+        NumeroDano numero;      // dano que aparece quando o projetil chega
         float tempo = 0f;
-        final float duracao;
+        // Tempo fixo (a velocidade cresce com a distancia): sempre chega logo,
+        // e so' entao aparecem o hit e o numero de dano.
+        final float duracao = DURACAO_PROJETIL;
         Projetil(TextureRegion regiao, float x0, float y0, MobVisual alvo, String efeitoHit) {
             this.regiao = regiao; this.x0 = x0; this.y0 = y0; this.alvo = alvo; this.efeitoHit = efeitoHit;
-            this.duracao = Math.max(0.12f, (float) Math.hypot(alvo.x - x0, alvo.y + 8f - y0) / 160f);
         }
         float x1() { return alvo.x; }
         float y1() { return alvo.y + 8f; }
     }
     private final List<Projetil> projeteis = new ArrayList<>();
+    private static final float DURACAO_PROJETIL = 0.12f;
 
     /** Bag de loot no chao (so' quem tem direito ao loot ve). */
     private static class BagChao {
@@ -586,6 +597,7 @@ public class WorldScreen extends ScreenAdapter {
         atlas = new TextureAtlas(Gdx.files.internal("graphics/graphics.atlas"));
         batch = new SpriteBatch();
         font = criarFonteNome();
+        fonteDestaque = criarFonteDestaque();
         spriteBase = atlas.findRegion("sprites/base/BaseSoul");
         animacaoBase = criarAnimacao(spriteBase);
 
@@ -854,6 +866,24 @@ public class WorldScreen extends ScreenAdapter {
      * (setScale NOME_ESCALA_BASE) so' pra nao borrar - essa escala fica fixa
      * pra sempre (ver comentario do campo acima), camera.combined cuida do
      * resto quando o zoom muda. */
+    /** Mesma Tahoma Bold dos nomes, gerada a 64px (2x) e reduzida pra 1.5x o
+     * tamanho do nome - reduzir textura fica nitido, ampliar borrava. */
+    private BitmapFont criarFonteDestaque() {
+        FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal("fonts/TAHOMAB0.TTF"));
+        FreeTypeFontGenerator.FreeTypeFontParameter parametros = new FreeTypeFontGenerator.FreeTypeFontParameter();
+        parametros.size = 64;
+        parametros.color = Color.WHITE;
+        parametros.borderWidth = 4;
+        parametros.borderColor = Color.BLACK;
+        parametros.minFilter = TextureFilter.Linear;
+        parametros.magFilter = TextureFilter.Linear;
+        BitmapFont fonte = gerador.generateFont(parametros);
+        fonte.getData().setScale(NOME_ESCALA_BASE * 32f / 64f * ESCALA_DESTAQUE);
+        fonte.setUseIntegerPositions(false);
+        gerador.dispose();
+        return fonte;
+    }
+
     private BitmapFont criarFonteNome() {
         FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal("fonts/TAHOMAB0.TTF"));
         FreeTypeFontGenerator.FreeTypeFontParameter parametros = new FreeTypeFontGenerator.FreeTypeFontParameter();
@@ -1199,15 +1229,18 @@ public class WorldScreen extends ScreenAdapter {
             mob.maxHp = Math.max(1f, data.getFloat("max_hp", mob.maxHp));
             mob.hp = Math.max(0f, data.getFloat("new_hp", mob.hp));
             boolean critico = data.getBoolean("is_crit", false);
-            numerosDano.add(new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (critico ? "!" : ""), critico));
+            NumeroDano numero = new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (critico ? "!" : ""), critico);
             // Efeito de hit; a distancia, primeiro o projetil sai do atacante.
             String efeito = data.getString("hit_type", "physical_hit");
             Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
             TextureRegion projetil = regiaoDoCaminho(data.getString("proj", ""));
             if ("Ranged".equals(data.getString("w_type", "")) && projetil != null && atacante != null) {
-                projeteis.add(new Projetil(projetil, atacante.x, atacante.y + 8f, mob, efeito));
+                Projetil pr = new Projetil(projetil, atacante.x, atacante.y + 8f, mob, efeito);
+                pr.numero = numero;
+                projeteis.add(pr);
             } else {
                 tocarEfeitoNoMob(efeito, mob);
+                numerosDano.add(numero);
             }
         });
         socket.on("player_damaged", (nomeEvt, data) -> {
@@ -1241,6 +1274,15 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
+        });
+        // XP ganha ao matar um mob: sobe em branco em cima do player, igual o dano.
+        socket.on("xp_gained", (nomeEvt, data) -> {
+            if (data == null) return;
+            int xp = data.getInt("amount", 0);
+            if (xp <= 0) return;
+            NumeroDano n = new NumeroDano(local.x, local.y + 4f, String.valueOf(xp), false);
+            n.cor = Color.WHITE;
+            numerosDano.add(n);
         });
         socket.on("loot_result", (nomeEvt, data) -> {
             if (data != null) janelaLoot.mostrar(data);
@@ -2427,6 +2469,11 @@ public class WorldScreen extends ScreenAdapter {
             if (pr.tempo >= pr.duracao) {
                 projeteis.remove(i);
                 tocarEfeitoNoMob(pr.efeitoHit, pr.alvo);
+                if (pr.numero != null) {
+                    // Numero no lugar onde o mob esta agora (ele pode ter andado).
+                    NumeroDano n = new NumeroDano(pr.alvo.x, pr.alvo.y, pr.numero.texto, pr.numero.critico);
+                    numerosDano.add(n);
+                }
             }
         }
         java.util.Iterator<BagChao> it = bags.values().iterator();
@@ -2612,8 +2659,8 @@ public class WorldScreen extends ScreenAdapter {
         new Color(0f, 0.85f, 0f, 1f),      // verde (cheio)
         new Color(0.95f, 0.9f, 0.1f, 1f),  // amarelo
         new Color(1f, 0.55f, 0f, 1f),      // laranja
-        new Color(1f, 0.35f, 0.35f, 1f),   // vermelho claro
-        new Color(0.6f, 0f, 0f, 1f),       // vermelho escuro (quase morto)
+        new Color(1f, 0f, 0f, 1f),         // vermelho puro
+        new Color(0.75f, 0f, 0f, 1f),      // vermelho escuro (quase morto)
     };
 
     /** Cor do nome/barra pela vida, com transicao suave entre as faixas. */
@@ -2639,17 +2686,14 @@ public class WorldScreen extends ScreenAdapter {
             float subida = 16f * (1f - (1f - ps) * (1f - ps)); // ease-out e para no topo
             float fim = TEXTO_SUBIDA + TEXTO_PARADO;
             float alfa = t.tempo < fim ? 1f : 1f - (t.tempo - fim) / TEXTO_SUMINDO;
-            float ancoraX = Math.round(t.alvo.x / camera.zoom) * camera.zoom;
-            float ancoraY = Math.round(t.alvo.y / camera.zoom) * camera.zoom;
-            // Dobro do tamanho do nome.
-            font.getData().setScale(NOME_ESCALA_BASE * 2f);
-            layout.setText(font, t.texto);
+            float ancoraX = Math.round(t.x / camera.zoom) * camera.zoom;
+            float ancoraY = Math.round(t.y / camera.zoom) * camera.zoom;
+            layout.setText(fonteDestaque, t.texto);
             float x = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
-            float y = Math.round((ancoraY + 34f + subida + ordem * 16f) / camera.zoom) * camera.zoom;
-            font.setColor(t.cor.r, t.cor.g, t.cor.b, Math.max(0f, alfa));
-            font.draw(batch, t.texto, x, y);
+            float y = Math.round((ancoraY + 30f + subida + ordem * 12f) / camera.zoom) * camera.zoom;
+            fonteDestaque.setColor(t.cor.r, t.cor.g, t.cor.b, Math.max(0f, alfa));
+            fonteDestaque.draw(batch, t.texto, x, y);
         }
-        font.getData().setScale(NOME_ESCALA_BASE);
         font.setColor(anterior);
     }
 
@@ -2663,7 +2707,8 @@ public class WorldScreen extends ScreenAdapter {
             layout.setText(font, n.texto);
             float x = Math.round((n.x - layout.width / 2f) / camera.zoom) * camera.zoom;
             float y = Math.round((n.y + 20f + subida) / camera.zoom) * camera.zoom;
-            Color cor = n.bloqueio ? new Color(0.55f, 0.8f, 1f, 1f) : new Color(1f, 0f, 0f, 1f); // vermelho puro
+            Color cor = n.cor != null ? new Color(n.cor)
+                : n.bloqueio ? new Color(0.55f, 0.8f, 1f, 1f) : new Color(1f, 0f, 0f, 1f); // vermelho puro
             cor.a = Math.max(0f, alfa);
             font.setColor(cor);
             // Critico: fonte ~2px maior (e o "!" no texto).
@@ -2765,6 +2810,7 @@ public class WorldScreen extends ScreenAdapter {
         mapa.dispose();
         batch.dispose();
         font.dispose();
+        fonteDestaque.dispose();
         pixelColisao.dispose();
         pixelBranco.dispose();
         hud.dispose();
