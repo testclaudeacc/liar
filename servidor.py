@@ -1816,13 +1816,29 @@ def delete_character():
     finally:
         if conn: db_pool.putconn(conn)
 
+# Conexoes simultaneas por IP (abrir centenas de sockets de um PC so' pra
+# derrubar o servidor). Familia/lan house atras do mesmo IP cabe folgado.
+CONEXOES_POR_IP_MAX = 8
+_conexoes_por_ip = {}
+_ip_da_conexao = {}
+
 @socketio.on('connect')
-def handle_connect(): pass
+def handle_connect():
+    ip = request.remote_addr or '?'
+    if _conexoes_por_ip.get(ip, 0) >= CONEXOES_POR_IP_MAX:
+        return False  # recusa a conexao
+    _conexoes_por_ip[ip] = _conexoes_por_ip.get(ip, 0) + 1
+    _ip_da_conexao[request.sid] = ip
 
 @socketio.on('disconnect')
 def handle_disconnect():
     sid = request.sid
     _baldes_eventos.pop(sid, None)
+    ip = _ip_da_conexao.pop(sid, None)
+    if ip is not None:
+        restante = _conexoes_por_ip.get(ip, 1) - 1
+        if restante > 0: _conexoes_por_ip[ip] = restante
+        else: _conexoes_por_ip.pop(ip, None)
     if sid in online_players:
         player = online_players[sid]
         p_name = player.get('name', 'Desconhecido')
@@ -3092,9 +3108,17 @@ def handle_m(data):
                 _corrigir_posicao(sid, p)
                 return
         grade_p = mapas_colisao.get(p.get('mapa'))
-        if grade_p is not None and int(p.get('floor', 1) or 1) == 1 and eh_parede(grade_p, destino_tile):
-            _corrigir_posicao(sid, p)
-            return
+        if grade_p is not None and int(p.get('floor', 1) or 1) == 1:
+            if eh_parede(grade_p, destino_tile):
+                _corrigir_posicao(sid, p)
+                return
+            # Cerca/corrimao (borda fina entre 2 SQMs): so' da' pra checar num
+            # passo de 1 SQM reto, que e' o normal.
+            if not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
+                o = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+                if abs(destino_tile[0] - o[0]) + abs(destino_tile[1] - o[1]) == 1 and borda_bloqueada(grade_p, o, destino_tile):
+                    _corrigir_posicao(sid, p)
+                    return
         x, y = centro_tile(destino_tile)
         andar_p = int(p.get('floor', 1) or 1)
         npc_no_caminho = any(int(npc.get('floor', 1)) == andar_p
