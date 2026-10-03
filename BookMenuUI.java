@@ -564,7 +564,7 @@ public final class BookMenuUI {
         if (equipadoPath != null && candidatoPath == null) {
             preencherBlocoStats(equipDetalhesEsquerda, equipadoPath, null);
             equipColunaEsquerda.add(separadorEquip()).growX().height(1).padTop(4).row();
-            equipColunaEsquerda.add(equipDetalhesEsquerda).growX().top().left().pad(6, 7, 6, 7).row();
+            equipColunaEsquerda.add(equipDetalhesEsquerda).growX().top().left().pad(10, 12, 10, 12).row();
         }
 
         // Direita: grade; com candidato -> botao Equip + detalhes comparando
@@ -577,7 +577,7 @@ public final class BookMenuUI {
             equipColunaDireita.add(equipButton).width(120).height(42).right().padRight(14).padBottom(8).row();
             equipColunaDireita.add(separadorEquip()).growX().height(1).row();
             preencherBlocoStats(equipDetalhesDireita, candidatoPath, atual == null ? "" : atual);
-            equipColunaDireita.add(equipDetalhesDireita).grow().top().left().pad(6, 7, 6, 7);
+            equipColunaDireita.add(equipDetalhesDireita).grow().top().left().pad(10, 12, 10, 12);
             equipButton.setDisabled(slotAlvo == null && selectedSlot.isEmpty());
         } else {
             equipColunaDireita.add(equipPainelGrade).grow().row();
@@ -624,20 +624,20 @@ public final class BookMenuUI {
     private void preencherBlocoStats(Table bloco, String itemPath, String compararCom) {
         bloco.clearChildren();
         bloco.top().left();
-        // Fonte "default" (com contorno preto) reduzida, linhas com altura fixa
-        // pra ficarem coladas.
-        Label nome = new Label(nomeExibicao(itemPath), skin, "default");
-        nome.setFontScale(0.75f);
-        bloco.add(nome).left().height(ALTURA_LINHA_STAT + 3f).padBottom(1).row();
+        // Fonte fina ("hud", sem contorno) reduzida; linhas na altura natural
+        // da fonte (sem sobrepor) e sem espaco extra entre elas.
+        Label nome = new Label(nomeExibicao(itemPath), skin, "hud");
+        nome.setFontScale(0.85f);
+        bloco.add(nome).left().padBottom(2).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
         if (dados == null) return;
         EquipStats base = compararCom == null ? null : ITEM_STATS.get(compararCom);
         boolean comparar = compararCom != null;
-        bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().height(ALTURA_LINHA_STAT).row();
+        bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
         // Vermelho = classe errada (o servidor pune quem equipa item de outra classe).
         boolean classeCerta = "All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass);
         bloco.add(linhaStat(dados.reqClass + " " + dados.tipo,
-            classeCerta ? COR_REQUISITO : Color.valueOf("ff4a4a"))).left().height(ALTURA_LINHA_STAT).row();
+            classeCerta ? COR_REQUISITO : Color.valueOf("ff4a4a"))).left().row();
         adicionarLinhaStat(bloco, "Attack", dados.bonusDamage, base == null ? 0 : base.bonusDamage, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Defense", dados.defense, base == null ? 0 : base.defense, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Stamina", dados.stamina, base == null ? 0 : base.stamina, comparar, COR_STAMINA);
@@ -656,14 +656,12 @@ public final class BookMenuUI {
             int diferenca = valor - anterior;
             texto += " (" + (diferenca >= 0 ? "+" : "") + diferenca + ")";
         }
-        bloco.add(linhaStat(texto, cor)).left().height(ALTURA_LINHA_STAT).row();
+        bloco.add(linhaStat(texto, cor)).left().row();
     }
 
-    private static final float ALTURA_LINHA_STAT = 14f;
-
     private Label linhaStat(String texto, Color cor) {
-        Label label = new Label(texto, skin, "default");
-        label.setFontScale(0.62f);
+        Label label = new Label(texto, skin, "hud");
+        label.setFontScale(0.72f);
         label.setColor(cor);
         return label;
     }
