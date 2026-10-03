@@ -556,7 +556,7 @@ public class ChatUI {
         contadorJogadores.setText(nomes.size() + " Player" + (nomes.size() == 1 ? "" : "s"));
         listaJogadoresBox.clearChildren();
         for (String nome : nomes) {
-            listaJogadoresBox.add(new Label(nome, skin)).left().padBottom(4).row();
+            listaJogadoresBox.add(new Label(nome, skin)).center().expandX().padBottom(4).row();
         }
     }
 

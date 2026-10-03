@@ -39,6 +39,11 @@ public final class HudVitais {
     private static final Color COR_XP = Color.valueOf("e8b020");
 
     private final float escala; // pixels de tela por unidade do stage
+    // Tudo aqui e' medido em pixels de tela (da print do PC); no celular, com
+    // tela de alta densidade, isso ficava pequeno demais - aumenta tudo junto.
+    private static final float FATOR_MOBILE = 1.7f;
+    private static final float FATOR = (com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
+        || com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS) ? FATOR_MOBILE : 1f;
     private final Texture pixel;
     private final BitmapFont fonte;
     private final Table raiz = new Table();
@@ -127,7 +132,7 @@ public final class HudVitais {
                 com.badlogic.gdx.Gdx.files.internal("fonts/TAHOMAB0.TTF"));
         com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter p =
             new com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter();
-        p.size = Math.round(14 * escala);
+        p.size = Math.round(14 * FATOR * escala);
         p.borderWidth = 2;
         p.borderColor = Color.BLACK;
         p.minFilter = Texture.TextureFilter.Linear;
@@ -140,7 +145,7 @@ public final class HudVitais {
 
     /** Pixels de tela -> unidades do stage. */
     private float px(float pixels) {
-        return pixels / escala;
+        return pixels * FATOR / escala;
     }
 
     private Drawable cor(Color c) {

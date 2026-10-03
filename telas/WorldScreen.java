@@ -99,6 +99,8 @@ public class WorldScreen extends ScreenAdapter {
     private final GameSocket socket;
     private MapaPropriedades.Luz luzJogador;
     private final List<MapaPropriedades.Luz> todasAsLuzes = new ArrayList<>();
+    private final List<MapaPropriedades.Luz> luzesDoFrame = new ArrayList<>();
+    private final Map<String, MapaPropriedades.Luz> luzesRemotos = new HashMap<>();
 
     private final float spawnX, spawnY;
     private final Jogador local;
@@ -278,6 +280,9 @@ public class WorldScreen extends ScreenAdapter {
     // Mob mirado (clique nele; clique de novo ou ESC tira). Ataca sozinho a
     // cada ~1s enquanto estiver no alcance (o servidor so' aceita 1 hit/s).
     private String alvoMob = null;
+    // Outro player clicado: so' o FriendTarget em volta do SQM dele, sem ataque.
+    private String amigoMarcado = null;
+    private TextureRegion regiaoAlvoAmigo;
     private float esperaAtaque = 0f;
     // Cadencia de ataque (servidor.py::ATAQUE_COOLDOWN_SEG = 2.385s, mesmo valor
     // pro player e pros mobs) + uma folga pra latencia.
@@ -305,6 +310,8 @@ public class WorldScreen extends ScreenAdapter {
     private static final float DURACAO_QUADRO_EFEITO = 0.05f;
     // Hit no mob/player: 0.05s por quadro passava rapido demais (a pedido do usuario).
     private static final float DURACAO_QUADRO_HIT = 0.1f;
+    // Hit fisico (mobs, ex: worm) e de flecha: um pouco mais rapido que os outros.
+    private static final float DURACAO_QUADRO_HIT_RAPIDO = 0.07f;
     private final List<Efeito> efeitos = new ArrayList<>();
     private final Map<String, TextureRegion[]> cacheEfeitos = new HashMap<>();
 
@@ -506,6 +513,19 @@ public class WorldScreen extends ScreenAdapter {
     private AnimacaoCorpo animacaoBase;
 
     /** Uma camada de skin (base/body/helm/acc) ja recortada + cor. */
+    /** Corpo de player que renasceu: fica no chao TEMPO_CADAVER_PLAYER
+     * segundos, igual o cadaver dos mobs. So' visual (ninguem colide com ele,
+     * da' pra passar por cima). */
+    private static class CadaverPlayer {
+        final float x, y;
+        final List<TextureRegion> quadros = new ArrayList<>();
+        final List<Color> cores = new ArrayList<>();
+        float restante = TEMPO_CADAVER_PLAYER;
+        CadaverPlayer(float x, float y) { this.x = x; this.y = y; }
+    }
+    private static final float TEMPO_CADAVER_PLAYER = 120f; // 2 minutos
+    private final List<CadaverPlayer> cadaveres = new ArrayList<>();
+
     private static class CamadaSkin {
         final AnimacaoCorpo animacao;
         final Color cor;
@@ -541,6 +561,9 @@ public class WorldScreen extends ScreenAdapter {
     // da tela) e a de baixo arredondada/afunilada.
     private TextureRegion texBotaoTopo, texBotaoTopoHover, texBotaoTopoClick;
     private TextureRegion iconeChat, iconeConfig, iconeMenu;
+    private TextureRegion iconeChatNovo;
+    private Image imagemIconeChat;
+    private boolean chatComNovidade = false;
     private TextureRegion iconeCheckOn, iconeCheckOff;
     private Table painelSettings, painelOptions;
     private SelectBox<String> botaoZoom;
@@ -663,6 +686,7 @@ public class WorldScreen extends ScreenAdapter {
         pixelBranco = new Texture(pmBranco);
         pmBranco.dispose();
         regiaoAlvo = atlas.findRegion("ui/slots/Target");
+        regiaoAlvoAmigo = atlas.findRegion("ui/slots/FriendTarget");
         regiaoTargetHit = atlas.findRegion("ui/items/HitHitbox");
         regiaoFlag = atlas.findRegion("ui/items/Flag");
         regiaoBag = atlas.findRegion("ui/currency/BasicBag");
@@ -697,7 +721,11 @@ public class WorldScreen extends ScreenAdapter {
                 float wy = coords.y;
                 
                 if (!localMorto && cliqueEmBag(wx, wy)) return true;
+                // Clique no proprio SQM nao faz nada (antes o sprite de um mob
+                // logo abaixo invadia o SQM do player e o clique desmirava ele).
+                if (tileX(wx) == tileX(local.x) && (int) Math.floor(wy / Jogador.TILE) == tileY(local.y)) return true;
                 if (!localMorto && cliqueEmMob(wx, wy)) return true;
+                if (cliqueEmJogador(wx, wy)) return true;
 
                 NPCVisual npcClicado = null;
                 for (NPCVisual npc : npcs.values()) {
@@ -753,6 +781,7 @@ public class WorldScreen extends ScreenAdapter {
                 if (keycode == Input.Keys.ESCAPE) {
                     // Janela de loot e alvo saem antes de qualquer outra coisa.
                     if (alvoMob != null) { alvoMob = null; return true; }
+                    if (amigoMarcado != null) { amigoMarcado = null; return true; }
                     // Fecha a interface ativa antes de abrir Settings.
                     if (dialogoNPC.isVisible()) dialogoNPC.fechar();
                     else if (chat.isVisivel()) alternarChat();
@@ -887,6 +916,11 @@ public class WorldScreen extends ScreenAdapter {
         barra.setFillParent(true);
         barra.top().right().pad(0, 0, 0, 20);
         botaoTopoChat = criarBotaoTopo(iconeChat, this::alternarChat);
+        imagemIconeChat = (Image) botaoTopoChat.getChildren().first();
+        // Icone de "mensagem nova" (chat fechado). Sem ele no atlas, usa o
+        // NotificationIcon no lugar.
+        iconeChatNovo = atlas.findRegion("ui/ChatButtonNotify");
+        if (iconeChatNovo == null) iconeChatNovo = atlas.findRegion("ui/NotificationIcon");
         barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).padRight(12);
         botaoTopoMenu = criarBotaoTopo(iconeMenu, this::alternarBookMenu);
         barra.add(botaoTopoMenu).size(TAMANHO_BOTAO_TOPO).padRight(12);
@@ -1007,6 +1041,14 @@ public class WorldScreen extends ScreenAdapter {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
         });
         return botao;
+    }
+
+    /** Mensagem de outro jogador chegou: com o chat fechado, troca o icone
+     * do botao pro de notificacao ate abrir o chat (ver render()). */
+    private void avisarMensagemNova(String remetente) {
+        if (remetente.equals(local.nome) || chat.isVisivel() || iconeChatNovo == null) return;
+        chatComNovidade = true;
+        imagemIconeChat.setDrawable(new TextureRegionDrawable(iconeChatNovo));
     }
 
     private void alternarChat() {
@@ -1279,6 +1321,7 @@ public class WorldScreen extends ScreenAdapter {
             Color cor = ChatUI.corDaClasse(data.size > 2 ? data.get(2).asString() : "Knight");
             if (nome == null || texto == null) return;
             chat.adicionarMensagemLocal(nomeVisivel(nome), cor, texto);
+            avisarMensagemNova(nome);
             falas.put(nome, new Fala(nome, texto, cor));
         });
         // Chat de idioma: {channel, name, msg (ja censurada), class}.
@@ -1286,6 +1329,7 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null || chat == null) return;
             chat.adicionarMensagemCanal(data.getString("channel", ""), nomeVisivel(data.getString("name", "")),
                 ChatUI.corDaClasse(data.getString("class", "Knight")), data.getString("msg", ""));
+            avisarMensagemNova(data.getString("name", ""));
         });
         // Alguem da area (ou eu) morreu pra um mob: aviso no chat Local.
         socket.on("player_killed", (nomeEvt, data) -> {
@@ -1478,6 +1522,7 @@ public class WorldScreen extends ScreenAdapter {
             skinsJogadores.remove(data.getString("name", ""));
             vidaRemotos.remove(data.getString("name", ""));
             remotosMortos.remove(data.getString("name", ""));
+            if (data.getString("name", "").equals(amigoMarcado)) amigoMarcado = null;
         });
 
         // Skins: confirmacao das minhas (depois do Equip na aba Vanity) e
@@ -1502,6 +1547,7 @@ public class WorldScreen extends ScreenAdapter {
                     }
                 } else if (remotosMortos.remove(nomeMorto)) {
                     Jogador j = remotos.get(nomeMorto);
+                    if (j != null) deixarCadaver(j);
                     // Fumaca de spawn onde ele renasceu (mesmo efeito do proprio respawn).
                     if (j != null) efeitos.add(new Efeito(quadrosFumaca(), j.x, j.y));
                 }
@@ -1577,7 +1623,7 @@ public class WorldScreen extends ScreenAdapter {
             if (j != null) {
                 // Morto nao anda: se mexeu, renasceu (o teleporte pro spawn
                 // chega pra area onde ele morreu, o is_dead=false so' pra nova).
-                remotosMortos.remove(j.nome);
+                if (remotosMortos.remove(j.nome)) deixarCadaver(j); // ainda no lugar da morte
                 float mx = conversor.rawParaMundoX(data.get(1).asFloat());
                 float my = conversor.rawParaMundoY(data.get(2).asFloat());
                 j.definirAlvo(mx, my, direcaoDoInt(data.get(3).asInt()));
@@ -1863,6 +1909,11 @@ public class WorldScreen extends ScreenAdapter {
             l.tempo += delta;
             if (l.tempo >= DURACAO_LOOT_FLUTUANTE) lootsFlutuantes.remove(i);
         }
+        for (int i = cadaveres.size() - 1; i >= 0; i--) {
+            CadaverPlayer c = cadaveres.get(i);
+            c.restante -= delta;
+            if (c.restante <= 0f) cadaveres.remove(i);
+        }
         java.util.Iterator<Fala> itFalas = falas.values().iterator();
         while (itFalas.hasNext()) {
             Fala f = itFalas.next();
@@ -1980,7 +2031,22 @@ public class WorldScreen extends ScreenAdapter {
         // O Godot usava light_offset Y de 22; com a escala pela metade, usamos 11.
         luzJogador.x = local.x;
         luzJogador.y = local.y + 11f;
-        iluminacao.renderizar(batch, camera, todasAsLuzes);
+        // Mesma luz pros outros players (antes so' o jogador local tinha).
+        // Lista separada a cada frame: os remotos entram/saem a qualquer hora.
+        luzesDoFrame.clear();
+        luzesDoFrame.addAll(todasAsLuzes);
+        for (Jogador j : remotos.values()) {
+            MapaPropriedades.Luz luz = luzesRemotos.get(j.nome);
+            if (luz == null) {
+                luz = new MapaPropriedades.Luz(j.x, j.y, luzJogador.cor, luzJogador.raio);
+                luzesRemotos.put(j.nome, luz);
+            }
+            luz.x = j.x;
+            luz.y = j.y + 11f;
+            luzesDoFrame.add(luz);
+        }
+        luzesRemotos.keySet().retainAll(remotos.keySet());
+        iluminacao.renderizar(batch, camera, luzesDoFrame);
 
         // Mundo inteiro desenhado DIRETO na tela real, num passo so' - igual
         // o Godot (Camera2D comum, sem viewport/buffer intermediario nenhum).
@@ -1993,6 +2059,7 @@ public class WorldScreen extends ScreenAdapter {
         // Chao primeiro: cadaveres e bags ficam sempre por baixo de quem passa.
         for (MobVisual mob : mobs.values()) if (mob.morto) desenharMob(mob);
         desenharBags();
+        desenharCadaveres();
         desenharEntidadesOrdenadas();
         desenharEfeitos();
         if (spawnSmokeTempo >= 0f) {
@@ -2061,11 +2128,17 @@ public class WorldScreen extends ScreenAdapter {
         if (chat.isVisivel()) {
             java.util.List<String> nomes = new java.util.ArrayList<>();
             nomes.add(nomeVisivel(local.nome));
-            for (String nome : remotos.keySet()) nomes.add(nomeVisivel(nome));
+            // So' quem esta na mesma area das mensagens do Local (chunk de
+            // 800px crus + os 8 vizinhos, igual servidor.py::emit_area).
+            for (Jogador j : remotos.values()) if (naMesmaArea(j)) nomes.add(nomeVisivel(j.nome));
             chat.atualizarJogadores(nomes);
         }
         atualizarVisibilidadeJoystick();
         atualizarVisibilidadeBotoesTopo();
+        if (chatComNovidade && chat.isVisivel()) {
+            chatComNovidade = false;
+            imagemIconeChat.setDrawable(new TextureRegionDrawable(iconeChat));
+        }
 
         uiStage.act(delta);
         uiStage.draw();
@@ -2342,6 +2415,10 @@ public class WorldScreen extends ScreenAdapter {
         float ancoraX = Math.round(j.x / camera.zoom) * camera.zoom;
         float ancoraY = Math.round(j.y / camera.zoom) * camera.zoom;
         float x = ancoraX - largura / 2f;
+        // FriendTarget (18x18) em volta do SQM do player marcado - mesmo lugar do Target dos mobs.
+        if (j != local && j.nome.equals(amigoMarcado) && regiaoAlvoAmigo != null) {
+            batch.draw(regiaoAlvoAmigo, ancoraX - regiaoAlvoAmigo.getRegionWidth() / 2f, ancoraY - 1f);
+        }
         List<CamadaSkin> camadas = skinsJogadores.get(j.nome);
         if (camadas == null || camadas.isEmpty()) {
             batch.draw(quadroBase, x, ancoraY, largura, altura);
@@ -2553,7 +2630,8 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion[] quadros = quadrosEfeito(nome);
         if (quadros == null) return null;
         Efeito e = new Efeito(quadros, x, y);
-        e.duracaoQuadro = DURACAO_QUADRO_HIT;
+        boolean rapido = !"Sword".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome); // Arrow ou Physical
+        e.duracaoQuadro = rapido ? DURACAO_QUADRO_HIT_RAPIDO : DURACAO_QUADRO_HIT;
         efeitos.add(e);
         return e;
     }
@@ -2597,13 +2675,46 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Clique num mob vivo: mira nele (ou tira a mira se ja era ele). */
     private boolean cliqueEmMob(float wx, float wy) {
+        // 1o o mob que esta no SQM clicado; so' depois o sprite (mais alto que
+        // o SQM) de algum mob - senao o sprite de um mob de baixo "rouba" o
+        // clique no SQM de cima.
+        int cx = tileX(wx), cy = (int) Math.floor(wy / Jogador.TILE);
+        for (MobVisual mob : mobs.values()) {
+            if (mob.morto || !mob.visivel) continue;
+            if (tileX(mob.x) == cx && tileY(mob.y) == cy) {
+                mirarMob(mob);
+                return true;
+            }
+        }
         for (MobVisual mob : mobs.values()) {
             if (mob.morto || !mob.visivel) continue;
             float largura = FRAME_LARGURA * ESCALA_SPRITE;
             float altura = mob.animacao.idleBaixo.getRegionHeight() * ESCALA_SPRITE;
             if (wx >= mob.x - largura / 2f && wx <= mob.x + largura / 2f && wy >= mob.y && wy <= mob.y + altura) {
-                alvoMob = mob.id.equals(alvoMob) ? null : mob.id;
-                esperaAtaque = Math.min(esperaAtaque, 0.1f);
+                mirarMob(mob);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void mirarMob(MobVisual mob) {
+        alvoMob = mob.id.equals(alvoMob) ? null : mob.id;
+        amigoMarcado = null; // um alvo por vez
+        esperaAtaque = Math.min(esperaAtaque, 0.1f);
+    }
+
+    /** Clique em outro player: nao ataca, so' marca o SQM dele com o
+     * FriendTarget (clicar de novo tira). */
+    private boolean cliqueEmJogador(float wx, float wy) {
+        int cx = tileX(wx), cy = (int) Math.floor(wy / Jogador.TILE);
+        for (Jogador j : remotos.values()) {
+            float altura = animacaoBase.idleBaixo.getRegionHeight() * ESCALA_SPRITE;
+            boolean noSqm = tileX(j.x) == cx && tileY(j.y) == cy;
+            boolean noSprite = wx >= j.x - FRAME_LARGURA / 2f && wx <= j.x + FRAME_LARGURA / 2f && wy >= j.y && wy <= j.y + altura;
+            if (noSqm || noSprite) {
+                amigoMarcado = j.nome.equals(amigoMarcado) ? null : j.nome;
+                if (amigoMarcado != null) alvoMob = null;
                 return true;
             }
         }
@@ -2800,6 +2911,39 @@ public class WorldScreen extends ScreenAdapter {
         }
     }
 
+    /** Guarda o quadro de morte (corpo + camadas de skin com as cores) de
+     * quem esta morto agora, onde ele esta. Chamar ANTES de tirar o estado
+     * de morto. */
+    private void deixarCadaver(Jogador j) {
+        CadaverPlayer c = new CadaverPlayer(j.x, j.y);
+        List<CamadaSkin> camadas = skinsJogadores.get(j.nome);
+        if (camadas == null || camadas.isEmpty()) {
+            c.quadros.add(animacaoBase.morte != null ? animacaoBase.morte : animacaoBase.idleBaixo);
+            c.cores.add(Color.WHITE);
+        } else {
+            for (CamadaSkin camada : camadas) {
+                if (camada.animacao.morte == null) continue;
+                c.quadros.add(camada.animacao.morte);
+                c.cores.add(camada.cor);
+            }
+        }
+        if (!c.quadros.isEmpty()) cadaveres.add(c);
+    }
+
+    private void desenharCadaveres() {
+        for (CadaverPlayer c : cadaveres) {
+            float ancoraX = Math.round(c.x / camera.zoom) * camera.zoom;
+            float ancoraY = Math.round(c.y / camera.zoom) * camera.zoom;
+            float largura = FRAME_LARGURA * ESCALA_SPRITE;
+            for (int i = 0; i < c.quadros.size(); i++) {
+                TextureRegion q = c.quadros.get(i);
+                batch.setColor(c.cores.get(i));
+                batch.draw(q, ancoraX - largura / 2f, ancoraY, largura, q.getRegionHeight() * ESCALA_SPRITE);
+            }
+        }
+        batch.setColor(Color.WHITE);
+    }
+
     private void desenharBags() {
         for (BagChao bag : bags.values()) {
             TextureRegion r = bag.dourada && regiaoBagDourada != null ? regiaoBagDourada : regiaoBag;
@@ -2862,6 +3006,7 @@ public class WorldScreen extends ScreenAdapter {
      * quando recebe is_dead=false; ver servidor.py::handle_update_status). */
     private void renascerLocal() {
         if (!localMorto) return;
+        deixarCadaver(local); // antes de sair do estado morto (usa o quadro de morte)
         localMorto = false;
         painelMorte.setVisible(false);
         local.x = spawnX;
@@ -3052,6 +3197,16 @@ public class WorldScreen extends ScreenAdapter {
         font.setColor(corDaVida(pct));
         font.draw(batch, nomeVisivel, nomeX, nomeY);
         font.setColor(anterior);
+    }
+
+    private static final float CHUNK_SIZE = 800f; // igual servidor.py::CHUNK_SIZE (coordenada crua)
+
+    private boolean naMesmaArea(Jogador j) {
+        int cxL = (int) Math.floor(conversor.mundoParaRawX(local.x) / CHUNK_SIZE);
+        int cyL = (int) Math.floor(conversor.mundoParaRawY(local.y) / CHUNK_SIZE);
+        int cx = (int) Math.floor(conversor.mundoParaRawX(j.x) / CHUNK_SIZE);
+        int cy = (int) Math.floor(conversor.mundoParaRawY(j.y) / CHUNK_SIZE);
+        return Math.abs(cx - cxL) <= 1 && Math.abs(cy - cyL) <= 1;
     }
 
     private void emitirCanalChat(String evento, String canal) {
