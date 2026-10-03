@@ -157,6 +157,13 @@ public class PainelJogadorUI {
     /** foto: ator que desenha o player (o mesmo sprite animado do jogo). */
     public void abrir(String nomeReal, String nomeExibido, Actor foto) {
         nomeAtual = nomeReal;
+        // A Martel (fonte do titulo) nao tem "?" - o nome escondido ("???",
+        // ver WorldScreen.nomeVisivel) saia em branco. Nesse caso usa a
+        // DejaVu (mesmo tamanho), que tem o simbolo.
+        Label.LabelStyle estiloNome = nomeExibido.indexOf('?') >= 0
+            ? new Label.LabelStyle(skin.getFont("simbolo-font"), Color.WHITE)
+            : skin.get("subtitulo", Label.LabelStyle.class);
+        nomeLabel.setStyle(estiloNome);
         nomeLabel.setText(nomeExibido);
         areaFoto.clearChildren();
         if (foto != null) areaFoto.add(foto).grow();
