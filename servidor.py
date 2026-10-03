@@ -94,6 +94,10 @@ PUNICAO_CLASSE_SPEED = 0.01
 
 online_players = {}
 players_by_name = {} # O(1) Lookup Table (Otimização CPU)
+# Chats extras do client (abas Portuguese/Spanish/...): canal -> sids dentro,
+# igual grupo. Local não entra aqui (é por área, ver 'c').
+CANAIS_CHAT = ('Portuguese', 'Spanish', 'English', 'Russian', 'Help')
+chat_channels = {canal: set() for canal in CANAIS_CHAT}
 active_mobs = {}
 active_npcs = {}
 save_queue = Queue() # Fila de Escrita Assíncrona
@@ -1551,6 +1555,7 @@ def handle_disconnect():
         _remover_do_party(sid, motivo="disconnected")
         _limpar_convites_de_party_pendentes(sid, p_name)
         _remover_do_trade(sid, motivo="disconnected")
+        _sair_de_todos_os_canais_chat(sid)
 
         _queue_save(player)
 
@@ -1786,6 +1791,40 @@ def handle_c(data):
         # a mensagem nem o balão.
         if room:
             emit_area('c', payload, room, skip_sid=sid)
+    except Exception: traceback.print_exc()
+
+def _emit_membros_canal(canal):
+    membros = chat_channels.get(canal, set())
+    nomes = sorted(online_players[s].get('name', '') for s in membros if s in online_players)
+    for s in membros:
+        socketio.emit('chat_members', {'channel': canal, 'names': nomes}, room=s)
+
+def _sair_de_todos_os_canais_chat(sid):
+    for canal, membros in chat_channels.items():
+        if sid in membros:
+            membros.discard(sid)
+            _emit_membros_canal(canal)
+
+@socketio.on('chat_join')
+def handle_chat_join(data):
+    try:
+        sid = request.sid
+        if sid not in online_players or not isinstance(data, dict): return
+        canal = data.get('channel')
+        if canal not in chat_channels: return
+        chat_channels[canal].add(sid)
+        _emit_membros_canal(canal)
+    except Exception: traceback.print_exc()
+
+@socketio.on('chat_leave')
+def handle_chat_leave(data):
+    try:
+        sid = request.sid
+        if not isinstance(data, dict): return
+        canal = data.get('channel')
+        if canal not in chat_channels or sid not in chat_channels[canal]: return
+        chat_channels[canal].discard(sid)
+        _emit_membros_canal(canal)
     except Exception: traceback.print_exc()
 
 @socketio.on('update_skins')

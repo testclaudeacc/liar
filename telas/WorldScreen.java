@@ -809,6 +809,10 @@ public class WorldScreen extends ScreenAdapter {
         uiStage.addActor(painelOptions);
 
         chat = new ChatUI(uiStage, skin, atlas, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), nomeVisivel(local.nome), local.classe);
+        chat.setOuvinteCanais(new ChatUI.OuvinteCanais() {
+            @Override public void entrou(String canal) { emitirCanalChat("chat_join", canal); }
+            @Override public void saiu(String canal) { emitirCanalChat("chat_leave", canal); }
+        });
         chat.setVisivel(false);
 
         texJoystickBase = atlas.findRegion("ui/Joystick");
@@ -1214,6 +1218,10 @@ public class WorldScreen extends ScreenAdapter {
                 sincronizacaoInicialRecebida = true;
                 callbackSincronizacaoInicial.run();
             }
+            // (Re)entrou no jogo: volta pros chats extras que estavam abertos
+            // (o servidor esquece os canais de quem desconecta). item_db so' vem
+            // no sync completo do join_game - nao na correcao de posicao.
+            if (chat != null && data.has("item_db")) for (String canal : chat.canaisAbertos()) emitirCanalChat("chat_join", canal);
         });
 
         socket.on("current_players", (nomeEvt, data) -> {
@@ -1224,6 +1232,16 @@ public class WorldScreen extends ScreenAdapter {
         });
 
         socket.on("player_joined", (nomeEvt, data) -> adicionarRemotoSeNovo(data));
+
+        // Membros de um chat extra (Portuguese/Spanish/...), igual grupo: o
+        // servidor manda a lista toda vez que alguem entra/sai do canal.
+        socket.on("chat_members", (nomeEvt, data) -> {
+            if (data == null || chat == null) return;
+            java.util.List<String> nomes = new java.util.ArrayList<>();
+            JsonValue lista = data.get("names");
+            if (lista != null) for (JsonValue n = lista.child; n != null; n = n.next) nomes.add(nomeVisivel(n.asString()));
+            chat.setMembrosDoCanal(data.getString("channel", ""), nomes);
+        });
 
         socket.on("npc_sync", (nomeEvt, data) -> {
             if (data != null && MAP_ID_SERVIDOR.equals(data.getString("map", MAP_ID_SERVIDOR))) {
@@ -2883,6 +2901,10 @@ public class WorldScreen extends ScreenAdapter {
         font.setColor(corDaVida(pct));
         font.draw(batch, nomeVisivel, nomeX, nomeY);
         font.setColor(anterior);
+    }
+
+    private void emitirCanalChat(String evento, String canal) {
+        socket.emitRaw(evento, GameSocket.obj(jw -> jw.set("channel", canal)));
     }
 
     private static String nomeVisivel(String nome) {

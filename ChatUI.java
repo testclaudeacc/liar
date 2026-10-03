@@ -60,7 +60,6 @@ public class ChatUI {
     private static final int ICONES_POR_LINHA = 3;
     private static final String ICONE_LOCAL = "ui/NotificationIcon";
     private static final Color COR_LOCAL = new Color(0.16f, 0.16f, 0.16f, 1f);
-    private static final Color COR_CANCELAR = new Color(0.85f, 0.33f, 0.33f, 1f); // vermelho claro
     // Icones de 16px em 3x; botao com folga em volta.
     private static final float TAMANHO_ICONE = 48f;
     private static final float TAMANHO_SLOT = 64f;
@@ -82,6 +81,18 @@ public class ChatUI {
      * na ordem que foram adicionadas) - LinkedHashMap preserva isso. */
     private final Map<String, Array<String>> mensagensPorAba = new LinkedHashMap<>();
     private final Map<String, TextButton.TextButtonStyle> cacheEstilos = new java.util.HashMap<>();
+    /** Quem esta em cada chat (lista da direita), igual membros de um grupo:
+     * Local = jogadores por perto (WorldScreen, todo frame); extras = membros
+     * do canal que o servidor manda (chat_members). */
+    private final Map<String, List<String>> membrosPorAba = new java.util.HashMap<>();
+
+    /** Avisa quem fala com o servidor (WorldScreen) quando o jogador entra/sai
+     * de um chat extra. Sem ouvinte (TesteGame) a lista fica so' com ele mesmo. */
+    public interface OuvinteCanais {
+        void entrou(String canal);
+        void saiu(String canal);
+    }
+    private OuvinteCanais ouvinteCanais;
     private String abaAtual = ABA_LOCAL;
     private final String nomeJogadorLocal;
     private final Color corJogadorLocal;
@@ -268,7 +279,8 @@ public class ChatUI {
             });
             adicionarNaGrade(popup, botao, n++);
         }
-        Button cancelar = criarBotaoIcone("ui/Negate", "Cancel", estiloSlot(COR_CANCELAR, false));
+        // Sem fundo/borda: so' o icone do Negate aparece.
+        Button cancelar = criarBotaoIcone("ui/Negate", "Cancel", estiloSemFundo());
         cancelar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { popupAdicionar.setVisible(false); }
         });
@@ -309,6 +321,14 @@ public class ChatUI {
     private static Color corDaAba(String nome) {
         TipoAba aba = tipoDaAba(nome);
         return aba != null ? aba.cor : COR_LOCAL;
+    }
+
+    /** Estilo vazio (sem up/over/down) - so' o conteudo do botao aparece. */
+    private TextButton.TextButtonStyle estiloSemFundo() {
+        TextButton.TextButtonStyle estilo = new TextButton.TextButtonStyle();
+        estilo.font = skin.getFont("botao-pequeno-font");
+        estilo.fontColor = Color.WHITE;
+        return estilo;
     }
 
     private static Color bordaEscura(Color fundo) {
@@ -354,10 +374,18 @@ public class ChatUI {
     }
 
     private void adicionarAba(String nome) {
-        if (!mensagensPorAba.containsKey(nome)) mensagensPorAba.put(nome, new Array<>());
+        if (!mensagensPorAba.containsKey(nome)) {
+            mensagensPorAba.put(nome, new Array<>());
+            // Ate o servidor responder, o grupo tem so' o proprio jogador.
+            List<String> soEu = new java.util.ArrayList<>();
+            soEu.add(nomeJogadorLocal);
+            membrosPorAba.put(nome, soEu);
+            if (ouvinteCanais != null) ouvinteCanais.entrou(nome);
+        }
         abaAtual = nome;
         reconstruirAbas();
         reconstruirLog();
+        reconstruirPainelJogadores();
     }
 
     /** Local nunca fecha (a pedido do usuario) - "-" so' tem efeito numa aba
@@ -365,15 +393,19 @@ public class ChatUI {
     private void fecharAbaAtual() {
         if (abaAtual.equals(ABA_LOCAL)) return;
         mensagensPorAba.remove(abaAtual);
+        membrosPorAba.remove(abaAtual);
+        if (ouvinteCanais != null) ouvinteCanais.saiu(abaAtual);
         abaAtual = ABA_LOCAL;
         reconstruirAbas();
         reconstruirLog();
+        reconstruirPainelJogadores();
     }
 
     private void trocarAba(String nome) {
         abaAtual = nome;
         reconstruirAbas();
         reconstruirLog();
+        reconstruirPainelJogadores();
     }
 
     private void reconstruirAbas() {
@@ -434,12 +466,37 @@ public class ChatUI {
         scrollLog.setScrollPercentY(100f);
     }
 
-    /** Lista de jogadores da direita - sempre mostra quem esta por perto
-     * agora, independente da aba de chat selecionada (igual o print de
-     * referencia: o cabecalho fica fixo em "Local"). Chamado todo frame
-     * enquanto o chat esta visivel (ver WorldScreen::render) - lista curta,
-     * custo desprezivel reconstruir. */
+    /** Jogadores por perto (aba Local). Chamado todo frame enquanto o chat
+     * esta visivel (ver WorldScreen::render) - lista curta, custo desprezivel;
+     * so' redesenha o painel se a aba Local estiver selecionada. */
     public void atualizarJogadores(List<String> nomes) {
+        membrosPorAba.put(ABA_LOCAL, nomes);
+        if (abaAtual.equals(ABA_LOCAL)) reconstruirPainelJogadores();
+    }
+
+    /** Membros de um chat extra, vindos do servidor (chat_members). Ignora
+     * canal que o jogador nao tem mais aberto. */
+    public void setMembrosDoCanal(String canal, List<String> nomes) {
+        if (!membrosPorAba.containsKey(canal)) return;
+        membrosPorAba.put(canal, nomes);
+        if (abaAtual.equals(canal)) reconstruirPainelJogadores();
+    }
+
+    /** Chats extras abertos agora (pra reentrar nos canais apos reconectar). */
+    public List<String> canaisAbertos() {
+        List<String> canais = new java.util.ArrayList<>();
+        for (String nome : mensagensPorAba.keySet()) if (!nome.equals(ABA_LOCAL)) canais.add(nome);
+        return canais;
+    }
+
+    public void setOuvinteCanais(OuvinteCanais ouvinte) {
+        this.ouvinteCanais = ouvinte;
+    }
+
+    /** Painel da direita: nome do chat selecionado + quantos/quem esta nele. */
+    private void reconstruirPainelJogadores() {
+        List<String> nomes = membrosPorAba.getOrDefault(abaAtual, java.util.Collections.emptyList());
+        cabecalhoJogadores.setText(abaAtual);
         contadorJogadores.setText(nomes.size() + " Player" + (nomes.size() == 1 ? "" : "s"));
         listaJogadoresBox.clearChildren();
         for (String nome : nomes) {
