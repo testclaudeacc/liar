@@ -277,11 +277,18 @@ public class WorldScreen extends ScreenAdapter {
         MobVisual mobAlvo;
         Jogador jogadorAlvo;
         float tempo = 0f;
+        // Hits usam DURACAO_QUADRO_HIT (mais lento); fumaca de spawn segue no ritmo antigo.
+        float duracaoQuadro = DURACAO_QUADRO_EFEITO;
+        boolean brilhoAzul = false; // hit de mana
         Efeito(TextureRegion[] quadros, float x, float y) { this.quadros = quadros; this.x = x; this.y = y; }
         float posX() { return mobAlvo != null ? mobAlvo.x : jogadorAlvo != null ? jogadorAlvo.x : x; }
         float posY() { return mobAlvo != null ? mobAlvo.y : jogadorAlvo != null ? jogadorAlvo.y : y; }
     }
     private static final float DURACAO_QUADRO_EFEITO = 0.05f;
+    // Hit no mob/player: 0.05s por quadro passava rapido demais (a pedido do usuario).
+    private static final float DURACAO_QUADRO_HIT = 0.1f;
+    // Brilho azul do projetil e do hit de mana (Mage).
+    private static final Color COR_BRILHO_MANA = new Color(0.35f, 0.6f, 1f, 1f);
     private final List<Efeito> efeitos = new ArrayList<>();
     private final Map<String, TextureRegion[]> cacheEfeitos = new HashMap<>();
 
@@ -299,6 +306,7 @@ public class WorldScreen extends ScreenAdapter {
         Projetil(TextureRegion regiao, float x0, float y0, MobVisual alvo, String efeitoHit) {
             this.regiao = regiao; this.x0 = x0; this.y0 = y0; this.alvo = alvo; this.efeitoHit = efeitoHit;
         }
+        boolean brilhoAzul() { return "Mana".equals(efeitoHit); }
         float x1() { return alvo.x; }
         float y1() { return alvo.y + 8f; }
     }
@@ -525,6 +533,9 @@ public class WorldScreen extends ScreenAdapter {
     // so' pra validar o layout/toque no mobile; ainda nao fala com o servidor
     // de verdade (ver ChatUI, sem mudanca nenhuma aqui).
     private ChatUI chat;
+    // Se o campo do chat estava focado no fim do frame anterior - ver o
+    // polling do ENTER em render() (evita refocar logo apos enviar).
+    private boolean chatDigitandoFrameAnterior;
     private BookMenuUI bookMenu;
     private DialogoNPCUI dialogoNPC;
     private NPCVisual npcEmDialogo;
@@ -1752,9 +1763,17 @@ public class WorldScreen extends ScreenAdapter {
 
         // Direto por polling (nao via InputProcessor/keyDown) - ver
         // comentario no keyDown(ENTER) do construtor pra entender o motivo.
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER) && chat.isVisivel() && !chat.estaDigitando()) {
+        // chatDigitandoFrameAnterior: os eventos de input rodam ANTES do
+        // render(), entao no frame em que o Enter envia a mensagem o
+        // TextFieldListener do ChatUI ja tirou o foco do campo e
+        // estaDigitando() volta false aqui - sem essa checagem o mesmo Enter
+        // refocava o campo na hora (enviava e continuava digitando, bug
+        // reportado pelo usuario).
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER) && chat.isVisivel()
+                && !chat.estaDigitando() && !chatDigitandoFrameAnterior) {
             chat.focarCampoTexto();
         }
+        chatDigitandoFrameAnterior = chat.estaDigitando();
 
         // !chat.isVisivel() trava o movimento com a JANELA do chat aberta,
         // nao so' enquanto se digita nela (a pedido do usuario - abrir o chat
@@ -2396,6 +2415,8 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion[] quadros = quadrosEfeito(nome);
         if (quadros == null) return null;
         Efeito e = new Efeito(quadros, x, y);
+        e.duracaoQuadro = DURACAO_QUADRO_HIT;
+        e.brilhoAzul = "Mana".equals(nome);
         efeitos.add(e);
         return e;
     }
@@ -2552,7 +2573,7 @@ public class WorldScreen extends ScreenAdapter {
         for (int i = efeitos.size() - 1; i >= 0; i--) {
             Efeito e = efeitos.get(i);
             e.tempo += delta;
-            if (e.tempo >= e.quadros.length * DURACAO_QUADRO_EFEITO) efeitos.remove(i);
+            if (e.tempo >= e.quadros.length * e.duracaoQuadro) efeitos.remove(i);
         }
         for (int i = projeteis.size() - 1; i >= 0; i--) {
             Projetil pr = projeteis.get(i);
@@ -2657,15 +2678,32 @@ public class WorldScreen extends ScreenAdapter {
             float y = pr.y0 + (pr.y1() - pr.y0) * t;
             float angulo = (float) Math.toDegrees(Math.atan2(pr.y1() - pr.y0, pr.x1() - pr.x0));
             float w = pr.regiao.getRegionWidth(), h = pr.regiao.getRegionHeight();
+            if (pr.brilhoAzul()) desenharBrilhoAzul(pr.regiao, x, y, angulo);
             batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, 1f, 1f, angulo);
         }
         for (Efeito e : efeitos) {
-            int quadro = Math.min(e.quadros.length - 1, (int) (e.tempo / DURACAO_QUADRO_EFEITO));
+            int quadro = Math.min(e.quadros.length - 1, (int) (e.tempo / e.duracaoQuadro));
             TextureRegion r = e.quadros[quadro];
             float ancoraX = Math.round(e.posX() / camera.zoom) * camera.zoom;
             float ancoraY = Math.round(e.posY() / camera.zoom) * camera.zoom;
+            if (e.brilhoAzul) desenharBrilhoAzul(r, ancoraX, ancoraY + r.getRegionHeight() / 2f, 0f);
             batch.draw(r, ancoraX - r.getRegionWidth() / 2f, ancoraY);
         }
+    }
+
+    /** Leve brilho azul: o proprio sprite, tingido de azul e um pouco maior,
+     * desenhado por baixo com blend aditivo (centrado em cx/cy). */
+    private void desenharBrilhoAzul(TextureRegion r, float cx, float cy, float angulo) {
+        float w = r.getRegionWidth(), h = r.getRegionHeight();
+        int srcAnterior = batch.getBlendSrcFunc(), dstAnterior = batch.getBlendDstFunc();
+        Color corAnterior = batch.getColor().cpy();
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+        batch.setColor(COR_BRILHO_MANA.r, COR_BRILHO_MANA.g, COR_BRILHO_MANA.b, 0.35f);
+        batch.draw(r, cx - w / 2f, cy - h / 2f, w / 2f, h / 2f, w, h, 1.6f, 1.6f, angulo);
+        batch.setColor(COR_BRILHO_MANA.r, COR_BRILHO_MANA.g, COR_BRILHO_MANA.b, 0.5f);
+        batch.draw(r, cx - w / 2f, cy - h / 2f, w / 2f, h / 2f, w, h, 1.2f, 1.2f, angulo);
+        batch.setBlendFunction(srcAnterior, dstAnterior);
+        batch.setColor(corAnterior);
     }
 
     // ---- Morte / renascer do player local ----
