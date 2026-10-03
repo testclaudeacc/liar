@@ -316,7 +316,7 @@ public class WorldScreen extends ScreenAdapter {
         }
     }
     private final Map<String, BagChao> bags = new LinkedHashMap<>();
-    private static final float TEMPO_BAG_VISIVEL = 120f; // servidor: LOOT_BAG_VISIVEL_SEG
+    private static final float TEMPO_BAG_VISIVEL = 300f; // 5 min (servidor: LOOT_BAG_VISIVEL_SEG = LOOT_EXPIRA_SEG)
 
     private TextureRegion regiaoAlvo, regiaoTargetHit, regiaoFlag, regiaoBag, regiaoBagDourada;
     private HudVitais hud;

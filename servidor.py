@@ -59,7 +59,7 @@ NPC_TICK_SECONDS = 0.1
 ground_loot = {}
 LOOT_EXPIRA_SEG = 300  
 # Quanto tempo a bag fica visível no chão (TEMPO_DESPAWN_SEG do loot_bag.gd).
-LOOT_BAG_VISIVEL_SEG = 120.0
+LOOT_BAG_VISIVEL_SEG = float(LOOT_EXPIRA_SEG)  # bag visivel enquanto existir (5 min)
 
 def rolar_loot(mob_type_id):
     drops = MOB_DB.get(mob_type_id, {}).get("drops", [])
