@@ -43,22 +43,31 @@ public class ChatUI {
 
     private static final int MAX_MENSAGENS = 60;
     private static final String ABA_LOCAL = "Local";
-    // Aba extra -> icone no atlas (Help usa a mesma bandeira do mob voltando pra casa).
-    private static final String[][] ABAS_ADICIONAVEIS = {
-        {"Portuguese", "ui/Brazil"},
-        {"Spanish", "ui/Spain"},
-        {"English", "ui/America"},
-        {"Russian", "ui/Russian"},
-        {"Help", "ui/items/Flag"},
+    /** Aba extra: icone no atlas + cor de fundo do slot (no "+" e embaixo). */
+    private static final class TipoAba {
+        final String nome, icone;
+        final Color cor;
+        TipoAba(String nome, String icone, Color cor) { this.nome = nome; this.icone = icone; this.cor = cor; }
+    }
+    // Help usa a mesma bandeira do mob voltando pra casa.
+    private static final TipoAba[] ABAS_ADICIONAVEIS = {
+        new TipoAba("Portuguese", "ui/Brazil", new Color(0.05f, 0.33f, 0.1f, 1f)),   // verde escuro
+        new TipoAba("Spanish", "ui/Spain", new Color(0.5f, 0.4f, 0.04f, 1f)),        // amarelo escuro
+        new TipoAba("English", "ui/America", new Color(0.07f, 0.15f, 0.45f, 1f)),    // azul escuro
+        new TipoAba("Russian", "ui/Russian", new Color(0.45f, 0.06f, 0.06f, 1f)),    // vermelho escuro
+        new TipoAba("Help", "ui/items/Flag", new Color(0.36f, 0.14f, 0.52f, 1f)),    // roxo
     };
     private static final int ICONES_POR_LINHA = 3;
-    private static final String ICONE_LOCAL = "ui/ChatButton";
+    private static final String ICONE_LOCAL = "ui/NotificationIcon";
+    private static final Color COR_LOCAL = new Color(0.16f, 0.16f, 0.16f, 1f);
+    private static final Color COR_CANCELAR = new Color(0.85f, 0.33f, 0.33f, 1f); // vermelho claro
+    // Icones de 16px em 3x; botao com folga em volta.
+    private static final float TAMANHO_ICONE = 48f;
+    private static final float TAMANHO_SLOT = 64f;
 
     private final Stage stage;
     private final Skin skin;
     private final TextureAtlas atlas; // pode ser null (TesteGame) - ai os botoes viram texto
-    // Slot escuro dos botoes de icone (a "cinza-popup" ficava clara demais).
-    private final TextButton.TextButtonStyle estiloSlot;
     private final Table janela;
     private final TextField campoTexto;
     private final Label logLabel;
@@ -72,6 +81,7 @@ public class ChatUI {
     /** Ordem de insercao importa (Local sempre primeiro, extras depois
      * na ordem que foram adicionadas) - LinkedHashMap preserva isso. */
     private final Map<String, Array<String>> mensagensPorAba = new LinkedHashMap<>();
+    private final Map<String, TextButton.TextButtonStyle> cacheEstilos = new java.util.HashMap<>();
     private String abaAtual = ABA_LOCAL;
     private final String nomeJogadorLocal;
     private final Color corJogadorLocal;
@@ -98,11 +108,6 @@ public class ChatUI {
         this.stage = stage;
         this.skin = skin;
         this.atlas = atlas;
-        estiloSlot = new TextButton.TextButtonStyle(skin.get("cinza-popup", TextButton.TextButtonStyle.class));
-        Color bordaSlot = new Color(0.4f, 0.4f, 0.4f, 1f);
-        estiloSlot.up = UiSkin.retangulo(new Color(0.16f, 0.16f, 0.16f, 1f), bordaSlot, 1);
-        estiloSlot.over = UiSkin.retangulo(new Color(0.24f, 0.24f, 0.24f, 1f), bordaSlot, 1);
-        estiloSlot.down = UiSkin.retangulo(new Color(0.1f, 0.1f, 0.1f, 1f), bordaSlot, 1);
         this.nomeJogadorLocal = nomeJogadorLocal;
         this.corJogadorLocal = corDaClasse(classeJogadorLocal);
         mensagensPorAba.put(ABA_LOCAL, new Array<>());
@@ -251,11 +256,10 @@ public class ChatUI {
         // enabled (Table vem childrenOnly): clique no fundo do painel entre os
         // icones nao pode "vazar" pra ancora e fechar a barra.
         popup.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
-        TextButton.TextButtonStyle estiloBotao = estiloSlot;
         int n = 0;
-        for (String[] aba : ABAS_ADICIONAVEIS) {
-            final String nome = aba[0];
-            Button botao = criarBotaoIcone(aba[1], nome, estiloBotao);
+        for (TipoAba aba : ABAS_ADICIONAVEIS) {
+            final String nome = aba.nome;
+            Button botao = criarBotaoIcone(aba.icone, nome, estiloSlot(aba.cor, false));
             botao.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     adicionarAba(nome);
@@ -264,7 +268,7 @@ public class ChatUI {
             });
             adicionarNaGrade(popup, botao, n++);
         }
-        Button cancelar = criarBotaoIcone("ui/Negate", "Cancel", estiloBotao);
+        Button cancelar = criarBotaoIcone("ui/Negate", "Cancel", estiloSlot(COR_CANCELAR, false));
         cancelar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { popupAdicionar.setVisible(false); }
         });
@@ -290,11 +294,39 @@ public class ChatUI {
         return false;
     }
 
-    /** Icone de cada aba (Local = balao de chat, extras = bandeira/Help). */
+    private static TipoAba tipoDaAba(String nome) {
+        for (TipoAba aba : ABAS_ADICIONAVEIS) if (aba.nome.equals(nome)) return aba;
+        return null;
+    }
+
+    /** Icone de cada aba (Local = NotificationIcon, extras = bandeira/Help). */
     private static String iconeDaAba(String nome) {
         if (ABA_LOCAL.equals(nome)) return ICONE_LOCAL;
-        for (String[] aba : ABAS_ADICIONAVEIS) if (aba[0].equals(nome)) return aba[1];
-        return null;
+        TipoAba aba = tipoDaAba(nome);
+        return aba != null ? aba.icone : null;
+    }
+
+    private static Color corDaAba(String nome) {
+        TipoAba aba = tipoDaAba(nome);
+        return aba != null ? aba.cor : COR_LOCAL;
+    }
+
+    /** Slot na cor da aba. Ativa (aba selecionada embaixo): fundo mais claro
+     * e borda branca grossa pra destacar. */
+    private TextButton.TextButtonStyle estiloSlot(Color cor, boolean ativa) {
+        // Cache: reconstruirAbas() roda a cada troca de aba e retangulo() cria textura nova.
+        String chave = cor.toString() + ativa;
+        TextButton.TextButtonStyle emCache = cacheEstilos.get(chave);
+        if (emCache != null) return emCache;
+        TextButton.TextButtonStyle estilo = new TextButton.TextButtonStyle(skin.get("cinza-popup", TextButton.TextButtonStyle.class));
+        Color fundo = ativa ? cor.cpy().lerp(Color.WHITE, 0.2f) : cor;
+        Color borda = ativa ? Color.WHITE : cor.cpy().lerp(Color.WHITE, 0.35f);
+        int espessura = ativa ? 2 : 1;
+        estilo.up = UiSkin.retangulo(fundo, borda, espessura);
+        estilo.over = UiSkin.retangulo(fundo.cpy().lerp(Color.WHITE, 0.12f), borda, espessura);
+        estilo.down = UiSkin.retangulo(fundo.cpy().mul(0.7f, 0.7f, 0.7f, 1f), borda, espessura);
+        cacheEstilos.put(chave, estilo);
+        return estilo;
     }
 
     /** Botao com o icone do atlas; sem atlas/icone (ex: TesteGame) vira texto. */
@@ -302,9 +334,7 @@ public class ChatUI {
         TextureRegion icone = atlas != null && caminhoIcone != null ? atlas.findRegion(caminhoIcone) : null;
         if (icone != null) {
             Button botao = new Button(estilo);
-            // 32px: icones de 16px em 2x e a Flag (32px) em 1x - escala
-            // inteira, sem pixel torto (atlas e' Nearest).
-            botao.add(new Image(icone)).size(32);
+            botao.add(new Image(icone)).size(TAMANHO_ICONE);
             return botao;
         }
         TextButton tb = new TextButton(textoReserva, estilo);
@@ -313,7 +343,7 @@ public class ChatUI {
     }
 
     private void adicionarNaGrade(Table popup, Button botao, int indice) {
-        com.badlogic.gdx.scenes.scene2d.ui.Cell<Button> celula = popup.add(botao).minWidth(56).height(56).pad(4);
+        com.badlogic.gdx.scenes.scene2d.ui.Cell<Button> celula = popup.add(botao).minWidth(TAMANHO_SLOT).height(TAMANHO_SLOT).pad(4);
         if (indice % ICONES_POR_LINHA == ICONES_POR_LINHA - 1) celula.row();
     }
 
@@ -344,14 +374,13 @@ public class ChatUI {
         linhaAbas.clearChildren();
         for (String nome : mensagensPorAba.keySet()) {
             boolean ativa = nome.equals(abaAtual);
-            // Icone em vez do nome; aba ativa no slot verde, as outras no escuro.
-            TextButton.TextButtonStyle estilo = ativa ? skin.get("verde-popup", TextButton.TextButtonStyle.class) : estiloSlot;
-            Button botao = criarBotaoIcone(iconeDaAba(nome), nome, estilo);
+            // Icone em vez do nome, no slot com a cor da aba.
+            Button botao = criarBotaoIcone(iconeDaAba(nome), nome, estiloSlot(corDaAba(nome), ativa));
             botao.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAba(nome); }
             });
             if (botao instanceof TextButton) ((TextButton) botao).getLabelCell().padLeft(10).padRight(10);
-            linhaAbas.add(botao).minWidth(56).height(56).padRight(6);
+            linhaAbas.add(botao).minWidth(TAMANHO_SLOT).height(TAMANHO_SLOT).padRight(6);
         }
     }
 
