@@ -141,7 +141,9 @@ SLOT_MUNICAO = "Hand"
 # Classes que atacam a distancia (o resto e' corpo a corpo) e o alcance delas.
 CLASSES_RANGED = ("Ranger", "Mage", "Bard")
 ALCANCE_LOOT_SQM = 4
-ALCANCE_RANGED_SQM = 6
+# Arma a distancia alcanca o mesmo raio em que o mob detecta o player
+# (DETECCAO_SQM, distancia em linha reta - circulo, nao quadrado).
+ALCANCE_RANGED_SQM = 5
 
 # Campos do ITEM_DB que o client usa pra exibir os itens (nome, tipo, level,
 # stats e slot) - mandado no sync_local_player, assim o client nao precisa
@@ -1836,7 +1838,7 @@ TROCAS_PALAVRAS = {
     "merda": "meleca", "merdas": "melecas", "puta": "fada", "putas": "fadas",
     "puto": "pato", "putos": "patos", "fdp": "fofo de pijama", "vsf": "vá ser feliz",
     "vsfd": "vá ser feliz demais", "tnc": "tomar no colo", "vtnc": "vai tomar no colo",
-    "foda-se": "tá né", "fodase": "tá né", "foda": "fofa", "foder": "fofar",
+    "foda-se": "tá né", "fodase": "tá né", "fds": "fim de semana", "foda": "fofa", "foder": "fofar",
     "fuder": "fofar", "fudido": "fofinho", "fodido": "fofinho", "cu": "bumbum",
     "cuzao": "bumbunzão", "cuzão": "bumbunzão", "buceta": "borboleta",
     "boceta": "borboleta", "bct": "borboleta", "pau": "pão", "pinto": "pudim",
@@ -2232,13 +2234,17 @@ def handle_hit_mob(data):
         mob_data = obter_ou_criar_mob(mob_id, mob_type_id, p.get('room'))
         if mob_data.get('hp', 1) <= 0: return
         # Alcance: corpo a corpo so' do SQM do lado (diagonal vale); a
-        # distancia ate ALCANCE_RANGED_SQM. +1 de folga pro passo em andamento.
-        if 'pos_x' in mob_data:
+        # distancia ate ALCANCE_RANGED_SQM em linha reta (igual a deteccao do
+        # mob). +1 SQM de folga pro passo em andamento. Mob sem posicao
+        # conhecida nao pode ser validado - nega o golpe em vez de liberar
+        # de qualquer distancia.
+        if 'pos_x' not in mob_data: return
+        if p.get('class_name') in CLASSES_RANGED:
+            if _dist_px(mob_data, p) > (ALCANCE_RANGED_SQM + 1) * TILE: return
+        else:
             tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
             tm = tile_do_mob(mob_data)
-            dist = max(abs(tp[0] - tm[0]), abs(tp[1] - tm[1]))
-            alcance = ALCANCE_RANGED_SQM if p.get('class_name') in CLASSES_RANGED else 1
-            if dist > alcance + 1: return
+            if max(abs(tp[0] - tm[0]), abs(tp[1] - tm[1])) > 2: return
         # Mesma regra do mob pro player: andar diferente, sem golpe (nem aggro).
         if int(p.get('floor', 1) or 1) != MOB_FLOOR: return
         mob_data['last_activity'] = now

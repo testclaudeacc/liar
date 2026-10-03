@@ -283,7 +283,9 @@ public class WorldScreen extends ScreenAdapter {
     private static final float INTERVALO_ATAQUE = 2.4f;
     // HP {atual, maximo} dos players remotos, pra cor do nome.
     private final Map<String, float[]> vidaRemotos = new HashMap<>();
-    private static final int ALCANCE_RANGED_SQM = 6; // igual servidor.py::ALCANCE_RANGED_SQM
+    // Igual servidor.py::ALCANCE_RANGED_SQM = DETECCAO_SQM: arma a distancia
+    // alcanca o mesmo raio (em linha reta) em que o mob detecta o player.
+    private static final int ALCANCE_RANGED_SQM = 5;
 
     /** Animacao de efeito (tira de quadros de 16px) tocando uma vez num ponto. */
     private static class Efeito {
@@ -2677,8 +2679,10 @@ public class WorldScreen extends ScreenAdapter {
             return;
         }
         if (localMorto || esperaAtaque > 0f || !socket.isConnected()) return;
-        int alcance = classeRanged() ? ALCANCE_RANGED_SQM : 1;
-        if (distanciaSqm(local.x, local.y, alvo.x, alvo.y) > alcance) return;
+        if (classeRanged()) {
+            float dx = local.x - alvo.x, dy = local.y - alvo.y;
+            if (dx * dx + dy * dy > (float) (ALCANCE_RANGED_SQM * Jogador.TILE) * (ALCANCE_RANGED_SQM * Jogador.TILE)) return;
+        } else if (distanciaSqm(local.x, local.y, alvo.x, alvo.y) > 1) return;
         String id = alvo.id;
         // "<tipo>_<x>_<y>": tipo e' tudo antes dos 2 ultimos "_" (pode ter "_", ex cave_spider).
         int ultimo = id.lastIndexOf('_');
