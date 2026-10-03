@@ -2,6 +2,8 @@ package com.teste.game.telas;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Button;
@@ -26,7 +28,11 @@ import java.util.Map;
 
 public final class BookMenuUI {
 
-    private static final float BOTAO_SIZE = 68f;
+    // Diametro do botao redondo das laterais + "aba" reta que liga o circulo
+    // ao painel (ver prints/tela desejada.png).
+    private static final float BOTAO_SIZE = 74f;
+    private static final float BOTAO_ABA = 8f;
+    private static final float COLUNA_LARGURA = BOTAO_SIZE + BOTAO_ABA;
     private static final float JANELA_LARGURA = 520f;
     private static final float JANELA_ALTURA = 410f;
     private static final int COLUNAS_INVENTARIO = 7;
@@ -82,13 +88,19 @@ public final class BookMenuUI {
     private BarraSkill barraNivel;
     private BarraSkill barraPrincipal;
     private BarraSkill barraDefesa;
-    private Table statusEsquerda;
-    private Table statusDireita;
+    private BarraSkill barraFome;
+    private final Map<String, Label> valoresStatus = new LinkedHashMap<>();
     private JsonValue ultimasSkills;
     private int nivelAtual = 1;
     private int expAtual = 0;
     private int killsAtual = 0;
-    private static final float LARGURA_BARRA_SKILL = 300f;
+    private static final float LARGURA_BARRA_SKILL = 285f;
+    private static final float ALTURA_BARRA_SKILL = 24f;
+    private static final float LARGURA_NOME_SKILL = 90f;
+    private static final float TAMANHO_ICONE_SKILL = 24f;
+    private static final float TAMANHO_ICONE_STATUS = 20f;
+    private static final float LARGURA_ROTULO_STATUS = 104f;
+    private static final float ALTURA_TOPO_SKILLS = 160f;
 
     public BookMenuUI(Stage stage, Skin skin, TextureAtlas atlas, GameSocket socket, String classeJogador) {
         this.skin = skin;
@@ -124,22 +136,23 @@ public final class BookMenuUI {
                 setOrigin(getWidth() / 2f, getHeight() / 2f);
             }
         };
-        Table leftTab = criarColuna(atlas, skin, new String[][]{
-            {"Spells", "ui/buttons/SpellsBtn"},
+        Table leftTab = criarColuna(atlas, new String[][]{
             {"Party", "ui/buttons/PartyBtn"},
             {"Friends", "ui/buttons/FriendsBtn"},
             {"Map", "ui/buttons/MapBtn"},
-            {"Rank", "ui/buttons/RankBtn"}
-        });
-        Table rightTab = criarColuna(atlas, skin, new String[][]{
-            {"Exit", "ui/buttons/CloseBtn"},
+            {"Rank", "ui/buttons/RankBtn"},
+            {"Exit", "ui/buttons/CloseBtn"}
+        }, true);
+        Table rightTab = criarColuna(atlas, new String[][]{
             {"Equip", "ui/buttons/EquipMenuBtn"},
             {"Bag", "ui/buttons/InventoryBtn"},
             {"Skills", "ui/buttons/SkillsBtn"},
-            {"Vanity", "ui/buttons/SkinsBtn"}
-        });
+            {"Vanity", "ui/buttons/SkinsBtn"},
+            {"Spells", "ui/buttons/SpellsBtn"}
+        }, false);
 
-        mainWindow.setBackground(skin.getDrawable("painel"));
+        mainWindow.setBackground(UiSkin.retangulo(
+            new Color(0.125f, 0.125f, 0.125f, 0.98f), UiSkin.COR_BORDA_PAINEL, 1));
         mainWindow.pad(14);
         mainWindow.top().left();
         tituloSecao = new Label("Bag", skin, "subtitulo");
@@ -154,9 +167,9 @@ public final class BookMenuUI {
         construirPaginaSkills(skin);
         mainWindow.add(bagPage).grow();
 
-        organizer.add(leftTab).width(BOTAO_SIZE).height(JANELA_ALTURA);
-        organizer.add(mainWindow).width(JANELA_LARGURA).height(JANELA_ALTURA).padLeft(3).padRight(3);
-        organizer.add(rightTab).width(BOTAO_SIZE).height(JANELA_ALTURA);
+        organizer.add(leftTab).width(COLUNA_LARGURA).height(JANELA_ALTURA);
+        organizer.add(mainWindow).width(JANELA_LARGURA).height(JANELA_ALTURA);
+        organizer.add(rightTab).width(COLUNA_LARGURA).height(JANELA_ALTURA);
         organizer.setTransform(true);
         boolean mobile = Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
             || Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
@@ -164,34 +177,38 @@ public final class BookMenuUI {
 
         root.setFillParent(true);
         root.center();
-        root.add(organizer).width(BOTAO_SIZE * 2f + JANELA_LARGURA + 6f)
+        root.add(organizer).width(COLUNA_LARGURA * 2f + JANELA_LARGURA)
             .height(JANELA_ALTURA);
         stage.addActor(root);
         root.setVisible(false);
         selecionarSecao(secaoAtual);
     }
 
-    private Table criarColuna(TextureAtlas atlas, Skin skin, String[][] secoes) {
+    private Table criarColuna(TextureAtlas atlas, String[][] secoes, boolean esquerda) {
         Table coluna = new Table();
         coluna.top();
-        for (String[] secao : secoes) {
+        float espaco = (JANELA_ALTURA - BOTAO_SIZE * secoes.length) / Math.max(1, secoes.length - 1);
+        for (int i = 0; i < secoes.length; i++) {
+            String[] secao = secoes[i];
             String nome = secao[0];
             Color cor = corDaSecao(nome);
             Button.ButtonStyle estilo = new Button.ButtonStyle();
-            estilo.up = skin.getDrawable("book-button");
-            estilo.over = UiSkin.retangulo(cor.cpy().mul(0.35f, 0.35f, 0.35f, 1f), cor, 1);
-            estilo.down = UiSkin.retangulo(cor.cpy().mul(0.55f, 0.55f, 0.55f, 1f), cor, 2);
-            estilo.checked = UiSkin.retangulo(cor.cpy().mul(0.48f, 0.48f, 0.48f, 1f), cor, 2);
+            estilo.up = botaoRedondo(cor.cpy().mul(0.22f, 0.22f, 0.22f, 1f),
+                cor.cpy().mul(0.1f, 0.1f, 0.1f, 1f), cor.cpy().mul(0.3f, 0.3f, 0.3f, 1f), esquerda);
+            estilo.over = botaoRedondo(cor.cpy().mul(0.32f, 0.32f, 0.32f, 1f),
+                cor.cpy().mul(0.16f, 0.16f, 0.16f, 1f), cor.cpy().mul(0.6f, 0.6f, 0.6f, 1f), esquerda);
+            estilo.down = botaoRedondo(cor.cpy().mul(0.45f, 0.45f, 0.45f, 1f),
+                cor.cpy().mul(0.22f, 0.22f, 0.22f, 1f), cor, esquerda);
+            estilo.checked = botaoRedondo(cor.cpy().mul(0.4f, 0.4f, 0.4f, 1f),
+                cor.cpy().mul(0.2f, 0.2f, 0.2f, 1f), cor, esquerda);
             estilo.checkedOver = estilo.checked;
 
             Button botao = new Button(estilo);
             Image icone = new Image(new TextureRegionDrawable(atlas.findRegion(secao[1])));
             icone.setScaling(Scaling.fit);
-            Label rotulo = new Label(nome, skin, "hud");
-            rotulo.setFontScale(0.58f);
-            rotulo.setAlignment(Align.center);
-            botao.add(icone).size(30f, 30f).padTop(3).row();
-            botao.add(rotulo).growX().center().padTop(1).padBottom(3);
+            // Centraliza o icone no circulo (a aba fica do lado do painel).
+            botao.add(icone).size(BOTAO_SIZE * 0.55f)
+                .padLeft(esquerda ? 0f : BOTAO_ABA).padRight(esquerda ? BOTAO_ABA : 0f);
             botao.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     if ("Exit".equals(nome)) {
@@ -202,9 +219,38 @@ public final class BookMenuUI {
                 }
             });
             botoes.put(nome, botao);
-            coluna.add(botao).size(BOTAO_SIZE).padBottom(3).row();
+            coluna.add(botao).width(COLUNA_LARGURA).height(BOTAO_SIZE)
+                .padBottom(i < secoes.length - 1 ? espaco : 0f).row();
         }
         return coluna;
+    }
+
+    /** Circulo com uma aba reta do lado do painel: borda, anel e miolo mais escuro. */
+    private static TextureRegionDrawable botaoRedondo(Color anel, Color miolo, Color borda, boolean esquerda) {
+        int altura = 128;
+        int aba = Math.round(altura * BOTAO_ABA / BOTAO_SIZE);
+        int largura = altura + aba;
+        int raio = altura / 2;
+        int centroX = esquerda ? raio : largura - raio;
+        int abaX = esquerda ? raio : 0;
+        int abaLargura = largura - raio;
+        int espessura = 3;
+        Pixmap pm = new Pixmap(largura, altura, Pixmap.Format.RGBA8888);
+        pm.setBlending(Pixmap.Blending.None);
+        pm.setColor(0, 0, 0, 0);
+        pm.fill();
+        pm.setColor(borda);
+        pm.fillCircle(centroX, raio, raio - 1);
+        pm.fillRectangle(abaX, 0, abaLargura, altura);
+        pm.setColor(anel);
+        pm.fillCircle(centroX, raio, raio - 1 - espessura);
+        pm.fillRectangle(esquerda ? abaX : 0, espessura, abaLargura, altura - 2 * espessura);
+        pm.setColor(miolo);
+        pm.fillCircle(centroX, raio, Math.round(raio * 0.8f));
+        Texture tex = new Texture(pm);
+        tex.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        pm.dispose();
+        return new TextureRegionDrawable(new com.badlogic.gdx.graphics.g2d.TextureRegion(tex));
     }
 
     private void construirPaginaBag(Skin skin) {
@@ -585,59 +631,80 @@ public final class BookMenuUI {
         }
     }
 
+    private String iconeSkillPrincipal() {
+        switch (classeJogador) {
+            case "Ranger": return "ui/FocusIcon";
+            case "Mage": return "ui/items/StarterStaff";
+            case "Bard": return "ui/MusicalityIcon";
+            // No .atlas a regiao esta grafada "MeeleIcon".
+            default: return atlas.findRegion("ui/MeeleIcon") != null ? "ui/MeeleIcon" : "ui/MeleeIcon";
+        }
+    }
+
     private static final class BarraSkill {
         final Label nivelLabel;
         final Label percentLabel;
         final Image preenchimento;
         final Table alinhador;
+        final boolean casasDecimais;
 
-        BarraSkill(Label nivelLabel, Label percentLabel, Image preenchimento, Table alinhador) {
+        BarraSkill(Label nivelLabel, Label percentLabel, Image preenchimento, Table alinhador, boolean casasDecimais) {
             this.nivelLabel = nivelLabel;
             this.percentLabel = percentLabel;
             this.preenchimento = preenchimento;
             this.alinhador = alinhador;
+            this.casasDecimais = casasDecimais;
         }
     }
 
-    // --- MUDANÇA: Adicionado parâmetro 'iconRegion' e espaçamento mais limpo
-    private BarraSkill criarBarraSkill(Table pai, String iconRegion, String nome, Color cor) {
-        Table linha = new Table();
-        
-        // Verifica e adiciona o ícone se ele existir
-        if (iconRegion != null && !iconRegion.isEmpty()) {
-            TextureAtlas.AtlasRegion region = atlas.findRegion(iconRegion);
-            if (region != null) {
-                linha.add(new Image(new TextureRegionDrawable(region))).size(16, 16).padRight(6);
-            }
+    /** Uma linha do topo: [nome][nivel] .... [icone][barra com %]. */
+    private BarraSkill criarBarraSkill(Table pai, String iconRegion, String nome, Color corTexto,
+                                       Color corBarra, Color corPercentual, boolean comNivel) {
+        Label nomeLabel = new Label(nome, skin, "hud");
+        nomeLabel.setColor(corTexto);
+        Label nivelLabel = null;
+        pai.add(nomeLabel).left().width(LARGURA_NOME_SKILL);
+        if (comNivel) {
+            nivelLabel = new Label("1", skin, "hud");
+            nivelLabel.setColor(corTexto);
+            pai.add(nivelLabel).left().expandX();
+        } else {
+            pai.add().expandX();
         }
-        
-        Label nomeLabel = new Label(nome, skin, "default");
-        nomeLabel.setColor(cor);
-        Label nivelLabel = new Label("Lv. 10", skin, "hud");
-        linha.add(nomeLabel).left().expandX();
-        linha.add(nivelLabel).right();
-        pai.add(linha).width(LARGURA_BARRA_SKILL).padBottom(2).row(); // Traz texto e barra para mais perto
+
+        TextureAtlas.AtlasRegion region = iconRegion == null ? null : atlas.findRegion(iconRegion);
+        if (region != null) {
+            Image icone = new Image(new TextureRegionDrawable(region));
+            icone.setScaling(Scaling.fit);
+            pai.add(icone).size(TAMANHO_ICONE_SKILL).padRight(8);
+        } else {
+            pai.add().size(TAMANHO_ICONE_SKILL).padRight(8);
+        }
 
         Stack pilha = new Stack();
         Table fundo = new Table();
-        fundo.setBackground(UiSkin.retangulo(new Color(0.05f, 0.05f, 0.06f, 1f), cor, 1));
+        fundo.setBackground(UiSkin.retangulo(new Color(0.055f, 0.055f, 0.055f, 1f),
+            new Color(0.2f, 0.2f, 0.2f, 1f), 1));
         pilha.add(fundo);
         Table alinhador = new Table();
-        alinhador.left();
-        Image preenchimento = criarPreenchimentoBarra(cor);
-        alinhador.add(preenchimento).size(0f, 16f);
+        alinhador.left().pad(1);
+        Image preenchimento = criarPreenchimentoBarra(corBarra);
+        alinhador.add(preenchimento).size(0f, ALTURA_BARRA_SKILL - 2f);
         pilha.add(alinhador);
-        Label percentLabel = new Label("0.00%", skin, "hud");
+        Label percentLabel = new Label("0%", skin, "hud");
+        percentLabel.setColor(corPercentual);
         percentLabel.setAlignment(Align.center);
         pilha.add(percentLabel);
-        
-        pai.add(pilha).width(LARGURA_BARRA_SKILL).height(16).padBottom(10).row(); // Espaçamento entre barras ajustado
+        pai.add(pilha).width(LARGURA_BARRA_SKILL).height(ALTURA_BARRA_SKILL).padBottom(10).row();
 
-        return new BarraSkill(nivelLabel, percentLabel, preenchimento, alinhador);
+        return new BarraSkill(nivelLabel, percentLabel, preenchimento, alinhador, comNivel);
     }
 
-    private static final Color COR_NIVEL = Color.valueOf("ffd54f");
+    private static final Color COR_NIVEL = Color.valueOf("ffeb3b");
+    private static final Color COR_BARRA_XP = Color.valueOf("f5b82e");
     private static final Color COR_DEFESA = Color.valueOf("6ab7ff");
+    private static final Color COR_FOME = Color.valueOf("f0a35a");
+    private static final Color COR_BARRA_FOME = Color.valueOf("8a4b2a");
 
     private static Color corSkillPrincipal(String chaveServidor) {
         if (chaveServidor == null) return Color.WHITE;
@@ -652,40 +719,50 @@ public final class BookMenuUI {
 
     private void construirPaginaSkills(Skin skin) {
         skillsPage.top().left();
-        skillsPage.pad(10);
         String[] principal = skillPrincipal();
+        Color corPrincipal = corSkillPrincipal(principal[0]);
 
         Table barras = new Table();
         barras.top().left();
-        barras.defaults().space(2); // Deixa as barras mais juntas (espaçamento reduzido)
+        barraNivel = criarBarraSkill(barras, "ui/XPIcon", "Level", COR_NIVEL, COR_BARRA_XP, Color.WHITE, true);
+        barraPrincipal = criarBarraSkill(barras, iconeSkillPrincipal(), principal[1], corPrincipal, corPrincipal, Color.WHITE, true);
+        barraDefesa = criarBarraSkill(barras, "ui/DefenseIcon", "Defense", COR_DEFESA, COR_DEFESA, Color.WHITE, true);
+        barraFome = criarBarraSkill(barras, "ui/HungerIcon", "Fullness", COR_FOME, COR_BARRA_FOME, COR_FOME, false);
 
-        // --- MUDANÇA: Passando nomes de ícones lógicos (se não existirem, não darão erro)
-        barraNivel = criarBarraSkill(barras, "ui/ClassIcon", "Level", COR_NIVEL);
-        barraPrincipal = criarBarraSkill(barras, "ui/" + principal[1] + "Icon", principal[1], corSkillPrincipal(principal[0]));
-        barraDefesa = criarBarraSkill(barras, "ui/DefenseIcon", "Defence", COR_DEFESA);
+        Image separador = criarPreenchimentoBarra(new Color(0.42f, 0.42f, 0.42f, 1f));
+
+        Table statusEsquerda = new Table();
+        statusEsquerda.top().left();
+        statusEsquerda.add(linhaStatus("ui/ClassIcon", "Class", "class")).left().row();
+        statusEsquerda.add(linhaStatus("ui/XPIcon", "Experience", "exp")).left().row();
+        statusEsquerda.add(linhaStatus("ui/NextLevelIcon", "Next Level", "next")).left().row();
+        statusEsquerda.add(linhaStatus("ui/CritIcon", "Crit Chance", "crit")).left().row();
+        statusEsquerda.add(linhaStatus("ui/BlockIcon", "Block Chance", "block")).left().row();
+        statusEsquerda.add(linhaStatus("ui/currency/BagIcon", "Capacity", "capacity")).left().row();
+
+        Table statusDireita = new Table();
+        statusDireita.top().left();
+        statusDireita.add(linhaStatus("ui/TotalXP", "Total EXP", "total_exp")).left().row();
+        statusDireita.add(linhaStatus("ui/TotalKills", "Total Kills", "total_kills")).left().row();
 
         Table status = new Table();
-        status.top();
-        statusEsquerda = new Table();
-        statusEsquerda.top().left();
-        statusDireita = new Table();
-        statusDireita.top().left();
-        
-        status.add(statusEsquerda).top().left().width(170).padRight(16);
-        status.add(statusDireita).top().left().width(170);
+        status.top().left();
+        status.add(statusEsquerda).top().left().expandX().fillX();
+        status.add(statusDireita).top().left().expandX().fillX();
 
-        skillsPage.add(barras).padBottom(15).row(); // Separa topo da base
-        skillsPage.add(status);
+        skillsPage.add(barras).growX().height(ALTURA_TOPO_SKILLS).top().left().padTop(4).row();
+        skillsPage.add(separador).growX().height(1).padBottom(12).row();
+        skillsPage.add(status).growX().top().left().padLeft(4).row();
+        skillsPage.add().grow();
         atualizarSkills(null, 1, 0, 0);
     }
 
     private Image criarPreenchimentoBarra(Color cor) {
-        com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(
-            1, 1, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pixmap.setColor(Color.WHITE);
         pixmap.fill();
         Image imagem = new Image(new TextureRegionDrawable(new com.badlogic.gdx.graphics.g2d.TextureRegion(
-            new com.badlogic.gdx.graphics.Texture(pixmap))));
+            new Texture(pixmap))));
         pixmap.dispose();
         imagem.setColor(cor);
         return imagem;
@@ -693,9 +770,11 @@ public final class BookMenuUI {
 
     private void atualizarBarra(BarraSkill barra, int nivel, float percentual) {
         float pct = Math.max(0f, Math.min(1f, percentual));
-        barra.nivelLabel.setText("Lv. " + nivel);
-        barra.percentLabel.setText(String.format("%.2f%%", pct * 100f));
-        barra.alinhador.getCell(barra.preenchimento).width(LARGURA_BARRA_SKILL * pct);
+        if (barra.nivelLabel != null) barra.nivelLabel.setText(String.valueOf(nivel));
+        barra.percentLabel.setText(barra.casasDecimais
+            ? String.format(java.util.Locale.US, "%.2f%%", pct * 100f)
+            : String.format(java.util.Locale.US, "%.0f%%", pct * 100f));
+        barra.alinhador.getCell(barra.preenchimento).width((LARGURA_BARRA_SKILL - 2f) * pct);
         barra.alinhador.invalidateHierarchy();
     }
 
@@ -726,6 +805,16 @@ public final class BookMenuUI {
         return String.format(java.util.Locale.US, "%,d", valor).replace(',', '.');
     }
 
+    private static String formatarPercentual(float valor) {
+        return (valor == Math.floor(valor)
+            ? String.valueOf((int) valor)
+            : String.format(java.util.Locale.US, "%.1f", valor)) + "%";
+    }
+
+    /**
+     * Campos opcionais lidos de "skills" (o servidor ainda nao manda todos):
+     * fullness/hunger (0-100), crit_chance, block_chance e total_exp.
+     */
     public void atualizarSkills(JsonValue skills, int level, int exp, int kills) {
         this.ultimasSkills = skills;
         this.nivelAtual = level;
@@ -750,33 +839,47 @@ public final class BookMenuUI {
         float pctDefesa = necessarioDefesa > 0 ? (float) hitsDefesa / necessarioDefesa : 0f;
         atualizarBarra(barraDefesa, nivelDefesa, pctDefesa);
 
-        // --- MUDANÇA: Passando ícones às Labels de status (base)
-        statusEsquerda.clearChildren();
-        statusEsquerda.add(linhaStatus("ui/ClassIcon", "Class", classeJogador)).left().row();
-        statusEsquerda.add(linhaStatus("ui/ExpIcon", "Experience", formatarNumero(exp))).left().row();
-        statusEsquerda.add(linhaStatus("ui/NextLevelIcon", "Next Level", formatarNumero(expProximo))).left();
+        float fullness = skills != null ? skills.getFloat("fullness", skills.getFloat("hunger", 0f)) : 0f;
+        atualizarBarra(barraFome, 0, fullness / 100f);
 
-        statusDireita.clearChildren();
-        statusDireita.add(linhaStatus("ui/CapacityIcon", "Capacity", String.format("%.0f / %.0f", capacityUsed, capacityMaximum))).left().row();
-        statusDireita.add(linhaStatus("ui/KillsIcon", "Kills", formatarNumero(kills))).left();
+        float crit = skills != null ? skills.getFloat("crit_chance", 10f) : 10f;
+        float block = skills != null ? skills.getFloat("block_chance", 10f) : 10f;
+        long totalExp = skills != null ? skills.getLong("total_exp", exp) : exp;
+
+        valoresStatus.get("class").setText(classeJogador);
+        valoresStatus.get("exp").setText(formatarNumero(exp));
+        valoresStatus.get("next").setText(formatarNumero(expProximo));
+        valoresStatus.get("crit").setText(formatarPercentual(crit));
+        valoresStatus.get("block").setText(formatarPercentual(block));
+        atualizarTextoCapacidade();
+        valoresStatus.get("total_exp").setText(formatarNumero(totalExp));
+        valoresStatus.get("total_kills").setText(formatarNumero(kills));
     }
 
-    // --- MUDANÇA: Atualizado para receber e montar o ícone na linha
-    private Table linhaStatus(String iconRegion, String rotulo, String valor) {
-        Table linha = new Table();
-        
-        // Verifica e adiciona o ícone se ele existir
-        if (iconRegion != null && !iconRegion.isEmpty()) {
-            TextureAtlas.AtlasRegion region = atlas.findRegion(iconRegion);
-            if (region != null) {
-                linha.add(new Image(new TextureRegionDrawable(region))).size(16, 16).padRight(6);
-            }
+    private void atualizarTextoCapacidade() {
+        Label capacidade = valoresStatus.get("capacity");
+        if (capacidade != null) {
+            capacidade.setText(String.format(java.util.Locale.US, "%.0f/%.0f", capacityUsed, capacityMaximum));
         }
-        
-        Label r = linhaStat(rotulo, COR_NIVEL);
-        Label v = linhaStat(valor, Color.WHITE);
-        linha.add(r).left().padRight(8).padBottom(4);
-        linha.add(v).left().expandX().padBottom(4);
+    }
+
+    /** [icone] Rotulo    valor - o valor fica alinhado numa coluna fixa. */
+    private Table linhaStatus(String iconRegion, String rotulo, String chave) {
+        Table linha = new Table();
+        TextureAtlas.AtlasRegion region = iconRegion == null ? null : atlas.findRegion(iconRegion);
+        if (region != null) {
+            Image icone = new Image(new TextureRegionDrawable(region));
+            icone.setScaling(Scaling.fit);
+            linha.add(icone).size(TAMANHO_ICONE_STATUS).padRight(8);
+        } else {
+            linha.add().size(TAMANHO_ICONE_STATUS).padRight(8);
+        }
+        Label r = new Label(rotulo, skin, "hud");
+        Label v = new Label("", skin, "hud");
+        linha.add(r).left().width(LARGURA_ROTULO_STATUS);
+        linha.add(v).left();
+        linha.padBottom(8);
+        valoresStatus.put(chave, v);
         return linha;
     }
 
@@ -1020,6 +1123,7 @@ public final class BookMenuUI {
         capacityUsed = usada;
         capacityMaximum = maxima;
         capacityLabel.setText(String.format("Capacity: %.1f / %.0f", usada, maxima));
+        atualizarTextoCapacidade();
     }
 
     private static final class InventoryItem {
@@ -1044,9 +1148,10 @@ public final class BookMenuUI {
         try {
             secaoAtual = secao;
             tituloSecao.setText(secao);
-            tituloSecao.setVisible(!"Bag".equals(secao));
+            boolean comTitulo = !"Bag".equals(secao) && !"Skills".equals(secao);
+            tituloSecao.setVisible(comTitulo);
             mainWindow.clearChildren();
-            if (!"Bag".equals(secao)) {
+            if (comTitulo) {
                 mainWindow.add(tituloSecao).growX().left().padBottom(9).row();
             }
             Table pagina = "Equip".equals(secao) ? equipPage : "Skills".equals(secao) ? skillsPage : bagPage;
