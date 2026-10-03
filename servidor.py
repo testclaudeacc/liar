@@ -121,18 +121,32 @@ def validate_item(item_path):
 SLOTS_VALIDOS = {"Helm", "Gloves", "Chest", "Boots", "Necklace", "Ring", "MainHand", "Hand"}
 
 ITEM_DB = {
-    "res://sprites/items/Sword.tres": {"req_class": "Knight", "bonus_damage": 100, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "cap": 5.0},
-    "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 5.0},
-    "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 5.0},
-    "res://sprites/items/Knight/Weapons/StarterSword.tres": {"req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 5.0},
-    "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 5.0},
-    "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "cap": 5.0},
-    "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 5, "cap": 5.0},
-    "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 5.0},
-    "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Sword.tres": {"name": "Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 100, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "cap": 5.0},
+    "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"name": "Wooden Flute", "type": "Flute", "req_level": 0, "req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 5.0},
+    "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"name": "Basic Music Sheet", "type": "Music Sheet", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 5.0},
+    "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 5.0},
+    "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 5.0},
+    "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "cap": 5.0},
+    "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 5, "cap": 5.0},
+    "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 5.0},
+    "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "max_stack": 9999, "cap": 0.1},
 }
 
 SLOT_MUNICAO = "Hand"
+
+# Campos do ITEM_DB que o client usa pra exibir os itens (nome, tipo, level,
+# stats e slot) - mandado no sync_local_player, assim o client nao precisa
+# de uma copia propria e o que aparece na tela e' sempre o valor real.
+CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
+                       "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo")
+
+def montar_item_db_cliente():
+    db = {}
+    for item_path, dados in ITEM_DB.items():
+        entrada = {k: dados[k] for k in CAMPOS_ITEM_CLIENTE if k in dados}
+        entrada["slot"] = slot_do_item(item_path)
+        db[item_path] = entrada
+    return db
 
 def slot_do_item(item_path):
     """Slot em que o item pode ser equipado (None = nao equipavel). Usa "slot"
@@ -1605,7 +1619,8 @@ def handle_join_game(data):
         online_players[sid] = data
         players_by_name[p_name] = sid
 
-        emit('sync_local_player', data, room=sid)
+        # item_db vai so' no payload (nao fica guardado em online_players).
+        emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente()}, room=sid)
 
         rooms_area = set(salas_vizinhas(room))
         dead_mobs = [m_id for m_id, m_data in active_mobs.items() if m_data.get('hp', 1) <= 0 and m_data.get('room') in rooms_area]

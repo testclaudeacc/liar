@@ -333,39 +333,42 @@ public final class BookMenuUI {
 
     // ===================== EQUIP =====================
 
+    /** Dados de um item vindos do ITEM_DB do servidor (ver carregarItemDb). */
     private static final class EquipStats {
-        final String nome, tipo;
+        final String nome, tipo, slot;
         final int reqLevel;
         final String reqClass;
         final int bonusDamage, defense, stamina, mana, fourthStatValue;
         final String fourthStatType;
 
-        EquipStats(String nome, String tipo, int reqLevel, String reqClass, int bonusDamage, int defense,
-                   int stamina, int mana, String fourthStatType, int fourthStatValue) {
-            this.nome = nome;
-            this.tipo = tipo;
-            this.reqLevel = reqLevel;
-            this.reqClass = reqClass;
-            this.bonusDamage = bonusDamage;
-            this.defense = defense;
-            this.stamina = stamina;
-            this.mana = mana;
-            this.fourthStatType = fourthStatType;
-            this.fourthStatValue = fourthStatValue;
+        EquipStats(JsonValue d) {
+            this.nome = d.getString("name", "");
+            this.tipo = d.getString("type", "");
+            this.slot = d.getString("slot", null);
+            this.reqLevel = d.getInt("req_level", 0);
+            this.reqClass = d.getString("req_class", "All");
+            this.bonusDamage = d.getInt("bonus_damage", 0);
+            this.defense = d.getInt("defense", 0);
+            this.stamina = d.getInt("stamina", 0);
+            this.mana = d.getInt("mana", 0);
+            this.fourthStatType = d.getString("fourth_stat_type", "");
+            this.fourthStatValue = d.getInt("fourth_stat_value", 0);
         }
     }
 
-    private static final Map<String, EquipStats> ITEM_STATS = new LinkedHashMap<>();
-    static {
-        ITEM_STATS.put("res://sprites/items/Sword.tres", new EquipStats("Sword", "Sword", 0, "Knight", 100, 0, 0, 0, "None", 0));
-        ITEM_STATS.put("res://sprites/items/Bard/Weapons/StarterFlute.tres", new EquipStats("Basic Flute", "Flute", 0, "Bard", 1, 0, 5, 5, "Musicality", 3));
-        ITEM_STATS.put("res://sprites/items/Bard/SecondHand/StarterSheet.tres", new EquipStats("Basic Music Sheet", "Music Sheet", 0, "Bard", 0, 0, 10, 10, "Musicality", 3));
-        ITEM_STATS.put("res://sprites/items/Knight/Weapons/StarterSword.tres", new EquipStats("Basic Sword", "Sword", 0, "Knight", 1, 5, 10, 0, "Melee", 5));
-        ITEM_STATS.put("res://sprites/items/Knight/SecondHand/StarterShield.tres", new EquipStats("Basic Shield", "Shield", 0, "Knight", 1, 5, 10, 0, "", 0));
-        ITEM_STATS.put("res://sprites/items/Mage/Weapons/StarterStaff.tres", new EquipStats("Basic Staff", "Staff", 0, "Mage", 1, 0, 0, 10, "Magic", 2));
-        ITEM_STATS.put("res://sprites/items/Mage/SecondHand/StarterBook.tres", new EquipStats("Apprentice Book", "Book", 0, "Mage", 0, 0, 0, 10, "Magic", 5));
-        ITEM_STATS.put("res://sprites/items/Ranger/Weapons/StarterBow.tres", new EquipStats("Basic Bow", "Bow", 0, "Ranger", 1, 0, 5, 0, "Focus", 5));
-        ITEM_STATS.put("res://sprites/items/Ranger/SecondHand/StarterArrow.tres", new EquipStats("Basic Arrow", "Arrow", 0, "Ranger", 0, 0, 0, 0, "Focus", 5));
+    private final Map<String, EquipStats> ITEM_STATS = new LinkedHashMap<>();
+
+    /** Recebe o item_db do servidor (sync_local_player) - nomes, tipos e stats dos itens. */
+    public void carregarItemDb(JsonValue db) {
+        if (db == null || !db.isObject()) return;
+        ITEM_STATS.clear();
+        for (JsonValue entrada = db.child; entrada != null; entrada = entrada.next) {
+            if (entrada.isObject()) ITEM_STATS.put(entrada.name, new EquipStats(entrada));
+        }
+        atualizarGrade();
+        atualizarGradeEquip();
+        atualizarDetalhesEquip();
+        atualizarDetalhes(itemSelecionado());
     }
 
     private static String regiaoSlotVazio(String slot) {
@@ -382,9 +385,12 @@ public final class BookMenuUI {
         }
     }
 
-    /** Slot onde o item entra, deduzido do caminho (null = nao e' equipavel/desconhecido). */
-    private static String slotDoItem(String caminho) {
+    /** Slot onde o item entra: o "slot" do item_db do servidor; sem ele, deduzido
+     *  do caminho (mesma regra de servidor.py::slot_do_item). null = nao equipavel. */
+    private String slotDoItem(String caminho) {
         if (caminho == null) return null;
+        EquipStats dados = ITEM_STATS.get(caminho);
+        if (dados != null && dados.slot != null && !dados.slot.isEmpty()) return dados.slot;
         if (caminho.contains("/Weapons/") || caminho.endsWith("/Sword.tres")) return "MainHand";
         if (caminho.contains("/SecondHand/")) return "Hand";
         String nome = caminho.substring(caminho.lastIndexOf('/') + 1).toLowerCase();
@@ -1154,7 +1160,7 @@ public final class BookMenuUI {
     private String nomeExibicao(String caminho) {
         if (caminho == null || caminho.isEmpty()) return "Unknown item";
         EquipStats dados = ITEM_STATS.get(caminho);
-        if (dados != null) return dados.nome;
+        if (dados != null && !dados.nome.isEmpty()) return dados.nome;
         String nome = caminho.substring(caminho.lastIndexOf('/') + 1);
         int extensao = nome.lastIndexOf('.');
         if (extensao >= 0) nome = nome.substring(0, extensao);

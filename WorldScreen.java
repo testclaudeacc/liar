@@ -879,10 +879,16 @@ public class WorldScreen extends ScreenAdapter {
             spawnSmokeY = local.y;
             spawnSmokeTempo = 0f;
             local.direcao = data.getString("direction", "down");
-            bookMenu.atualizarInventario(data.get("inventory"));
-            bookMenu.atualizarMoedas(data.getLong("currency", 0L));
-            bookMenu.atualizarEquipados(data.get("equipped_items"));
-            bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getInt("exp", 0), data.getInt("kills", 0));
+            // O servidor tambem manda sync_local_player PARCIAL (so' posicao,
+            // ao esbarrar num NPC) - sem esse if, inventario/moedas/skills
+            // eram zerados no client.
+            if (data.has("inventory")) {
+                bookMenu.carregarItemDb(data.get("item_db"));
+                bookMenu.atualizarInventario(data.get("inventory"));
+                bookMenu.atualizarMoedas(data.getLong("currency", 0L));
+                bookMenu.atualizarEquipados(data.get("equipped_items"));
+                bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getInt("exp", 0), data.getInt("kills", 0));
+            }
             JsonValue dialogosVistos = data.get("npc_dialogue_state");
             if (dialogosVistos != null) {
                 for (JsonValue entrada = dialogosVistos.child; entrada != null; entrada = entrada.next) {
