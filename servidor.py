@@ -3775,7 +3775,9 @@ def handle_invite_party(data):
             online_players[sid]['party_id'] = party_id
             party = parties[party_id]
             _emit_party_update(party_id)
-        if party['leader_sid'] != sid: return
+        if party['leader_sid'] != sid:
+            emit('party_invite_result', {'success': False, 'reason': 'not_leader', 'target_name': ''}, room=sid)
+            return
 
         target_name = str(data.get('target_name', '') if isinstance(data, dict) else '').strip()
 
@@ -3874,10 +3876,8 @@ def handle_kick_party_member(data):
     eh_self = (target_sid == sid)
     if not eh_self and party['leader_sid'] != sid:
         return
-    if eh_self and party['leader_sid'] == sid and len(party['members']) > 1:
-        # Líder tentando sair sozinho com outros membros na party ainda: sem
-        # fluxo de UI pra isso (ver plano) - rejeitado explicitamente.
-        return
+    # Líder saindo com gente na party: _remover_do_party passa a liderança
+    # pro próximo por ordem de entrada (X da própria linha na aba Party).
 
     _remover_do_party(target_sid, motivo="kicked" if not eh_self else "left")
 
@@ -4476,7 +4476,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-03 visao+virada"
+VERSAO_SERVIDOR = "2026-10-03 party+notificacoes"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR}")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(autosave_loop)

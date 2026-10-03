@@ -184,6 +184,7 @@ public final class BookMenuUI {
         construirPaginaSkills(skin);
         construirPaginaVanity(skin);
         construirPaginaFriends(skin);
+        construirPaginaParty(skin);
         mainWindow.add(bagPage).grow();
 
         organizer.add(leftTab).width(COLUNA_LARGURA).height(JANELA_ALTURA);
@@ -1510,6 +1511,232 @@ public final class BookMenuUI {
         trashButton.setDisabled(false);
     }
 
+    // ===================== PARTY =====================
+    // Igual o mock "tela desejada 3": lider sempre no topo (linha mais clara,
+    // icone Leader), depois os membros e, embaixo, os convites recebidos
+    // (com Confirm/Negate). Cada linha: bolinha online, nome, "Lv N", icone
+    // da classe e o X (lider expulsa os outros; cada um sai pelo X da propria
+    // linha). Rodape: bonus de XP da party (servidor.py::_calcular_bonus_percentual)
+    // e Create/Leave. Tudo validado no servidor (servidor.py, PARTY SYSTEM).
+
+    public static final class MembroParty {
+        public final String nome, classe;
+        public final int level;
+        MembroParty(String nome, String classe, int level) {
+            this.nome = nome;
+            this.classe = classe;
+            this.level = level;
+        }
+    }
+
+    public static final int PARTY_MAX = 6; // servidor.py::PARTY_MAX_SIZE
+
+    private final Table partyPage = new Table();
+    private final Table listaParty = new Table();
+    private Label bonusParty;
+    private TextButton botaoCriarParty;
+    private String liderParty = null; // null = sem party
+    private final List<MembroParty> membrosParty = new ArrayList<>();
+    private int bonusPartyPct = 0;
+    // Convites recebidos: quem convidou -> level dele.
+    private final Map<String, Integer> convitesParty = new LinkedHashMap<>();
+    private Runnable aoMudarParty;
+
+    private static final Color COR_LV = new Color(0.55f, 0.55f, 0.55f, 1f);
+    private static final Color COR_BONUS = Color.valueOf("f5e02a");
+
+    private void construirPaginaParty(Skin skin) {
+        partyPage.top();
+        listaParty.top();
+        com.badlogic.gdx.scenes.scene2d.ui.ScrollPane scroll = new com.badlogic.gdx.scenes.scene2d.ui.ScrollPane(listaParty, skin);
+        scroll.setFadeScrollBars(false);
+        scroll.setScrollingDisabled(true, false);
+        Table caixa = new Table();
+        caixa.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.2f, 0.2f, 0.2f, 1f), 1));
+        caixa.top();
+        caixa.add(scroll).grow().pad(4);
+
+        // Botao rosa do mock.
+        TextButton.TextButtonStyle estiloCriar = new TextButton.TextButtonStyle(skin.get("vermelho", TextButton.TextButtonStyle.class));
+        estiloCriar.font = skin.getFont("botao-pequeno-font");
+        Color rosa = Color.valueOf("ee1f5f"), rosaBorda = Color.valueOf("9c0f3a");
+        estiloCriar.up = UiSkin.retangulo(rosa, rosaBorda, 2);
+        estiloCriar.over = UiSkin.retangulo(rosa.cpy().lerp(Color.WHITE, 0.15f), rosaBorda, 2);
+        estiloCriar.down = UiSkin.retangulo(rosa.cpy().mul(0.75f, 0.75f, 0.75f, 1f), rosaBorda, 2);
+        botaoCriarParty = new TextButton("Create", estiloCriar);
+        botaoCriarParty.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                if (!socket.isConnected()) return;
+                if (liderParty == null) socket.emitRaw("create_party", "{}");
+                else sairDaParty();
+            }
+        });
+        bonusParty = new Label("", skin, "hud");
+        bonusParty.setFontScale(0.6f);
+        bonusParty.setColor(COR_BONUS);
+
+        Table rodape = new Table();
+        rodape.add(bonusParty).expandX().left().bottom();
+        rodape.add(botaoCriarParty).width(110).height(44);
+        partyPage.add(caixa).grow().row();
+        partyPage.add(rodape).growX().height(44).padTop(8);
+        reconstruirListaParty();
+    }
+
+    private void sairDaParty() {
+        if (liderParty == null || !socket.isConnected() || nomeLocal == null) return;
+        socket.emitRaw("kick_party_member", GameSocket.obj(w -> w.set("target_name", nomeLocal)));
+    }
+
+    private void reconstruirListaParty() {
+        listaParty.clearChildren();
+        boolean souLider = nomeLocal != null && nomeLocal.equals(liderParty);
+        // Lider primeiro, depois a ordem de entrada (a do servidor).
+        List<MembroParty> ordenados = new ArrayList<>(membrosParty);
+        ordenados.sort((a, b) -> a.nome.equals(liderParty) == b.nome.equals(liderParty) ? 0
+            : (a.nome.equals(liderParty) ? -1 : 1));
+        for (MembroParty m : ordenados) {
+            boolean lider = m.nome.equals(liderParty);
+            boolean eu = m.nome.equals(nomeLocal);
+            // X: o lider expulsa qualquer um; cada um sai pela propria linha.
+            Runnable acaoX = eu ? this::sairDaParty
+                : souLider ? () -> {
+                    if (socket.isConnected()) socket.emitRaw("kick_party_member", GameSocket.obj(w -> w.set("target_name", m.nome)));
+                } : null;
+            listaParty.add(linhaParty(m.nome, m.level, m.classe, lider, acaoX, null)).growX().height(40).padBottom(3).row();
+        }
+        for (Map.Entry<String, Integer> c : convitesParty.entrySet()) {
+            String quem = c.getKey();
+            listaParty.add(linhaParty(quem, c.getValue(), null, false,
+                () -> responderConviteParty(quem, false),
+                () -> responderConviteParty(quem, true))).growX().height(40).padBottom(3).row();
+        }
+        if (ordenados.isEmpty() && convitesParty.isEmpty()) {
+            Label vazio = new Label("You are not in a party.", skin, "hud");
+            vazio.setFontScale(0.6f);
+            listaParty.add(vazio).pad(10);
+        }
+        bonusParty.setText("Class EXP Bonus: " + bonusPartyPct + "%");
+        botaoCriarParty.setText(liderParty == null ? "Create" : "Leave");
+    }
+
+    /** classe null = linha de convite (sem bolinha/icone de classe, com Confirm). */
+    private Table linhaParty(String nome, int level, String classe, boolean lider, Runnable acaoX, Runnable acaoConfirmar) {
+        Table linha = new Table();
+        Color fundo = lider ? new Color(0.27f, 0.27f, 0.27f, 1f) : new Color(0.17f, 0.17f, 0.17f, 1f);
+        linha.setBackground(UiSkin.retangulo(fundo, new Color(0.12f, 0.12f, 0.12f, 1f), 1));
+        linha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        if (classe != null) linha.add(iconeAtlas("ui/OnlineIcon", 26f)).size(26f).padLeft(8).padRight(8);
+        Label rotulo = new Label(nome, skin, "hud");
+        rotulo.setFontScale(0.75f);
+        linha.add(rotulo).left().padLeft(classe != null ? 0 : 8);
+        Label lv = new Label("Lv " + level, skin, "hud");
+        lv.setFontScale(0.6f);
+        lv.setColor(COR_LV);
+        linha.add(lv).left().padLeft(16).expandX();
+        if (lider) linha.add(iconeAtlas("ui/party/Leader", 26f)).size(26f).padRight(4);
+        if (classe != null) linha.add(iconeAtlas(iconeClasse(classe), 26f)).size(26f).padRight(4);
+        if (acaoConfirmar != null) linha.add(botaoIconeParty("ui/Confirm", acaoConfirmar)).size(30f).padRight(2);
+        if (acaoX != null) linha.add(botaoIconeParty("ui/Negate", acaoX)).size(30f).padRight(6);
+        else linha.add().size(30f).padRight(6);
+        if (classe != null) {
+            linha.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+                @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                    if (aoClicarAmigo != null && !nome.equals(nomeLocal)) aoClicarAmigo.accept(nome);
+                }
+            });
+        }
+        return linha;
+    }
+
+    private Button botaoIconeParty(String regiao, Runnable acao) {
+        Button b = new Button(new Button.ButtonStyle());
+        b.add(iconeAtlas(regiao, 26f)).size(26f);
+        b.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                event.stop(); // nao abre a janela do player da linha
+                acao.run();
+            }
+        });
+        return b;
+    }
+
+    private void responderConviteParty(String quem, boolean aceitar) {
+        convitesParty.remove(quem);
+        if (socket.isConnected()) {
+            socket.emitRaw(aceitar ? "accept_party_invite" : "decline_party_invite",
+                GameSocket.obj(w -> w.set("inviter_name", quem)));
+        }
+        reconstruirListaParty();
+    }
+
+    /** Nome do proprio personagem (pra saber qual linha e' a minha). */
+    public void definirNomeLocal(String nome) {
+        nomeLocal = nome;
+        reconstruirListaParty();
+    }
+
+    /** party_update do servidor. */
+    public void atualizarParty(JsonValue dados) {
+        membrosParty.clear();
+        liderParty = null;
+        bonusPartyPct = 0;
+        if (dados != null) {
+            liderParty = dados.getString("leader_name", "");
+            if (liderParty.isEmpty()) liderParty = null;
+            bonusPartyPct = dados.getInt("bonus_percent", 0);
+            JsonValue lista = dados.get("members");
+            if (lista != null) {
+                for (JsonValue m = lista.child; m != null; m = m.next) {
+                    String nome = m.getString("name", "");
+                    if (nome.isEmpty()) continue;
+                    membrosParty.add(new MembroParty(nome, m.getString("class_name", "Knight"), m.getInt("level", 1)));
+                    convitesParty.remove(nome); // ja' esta comigo
+                }
+            }
+        }
+        reconstruirListaParty();
+        if (aoMudarParty != null) aoMudarParty.run();
+    }
+
+    /** party_disbanded: saiu/foi expulso/a party acabou. */
+    public void limparParty() {
+        membrosParty.clear();
+        liderParty = null;
+        bonusPartyPct = 0;
+        reconstruirListaParty();
+        if (aoMudarParty != null) aoMudarParty.run();
+    }
+
+    /** party_invite_received: vira uma linha com Confirm/Negate. */
+    public void adicionarConviteParty(String quem, int level) {
+        if (quem == null || quem.isEmpty()) return;
+        convitesParty.remove(quem);
+        convitesParty.put(quem, level);
+        reconstruirListaParty();
+    }
+
+    public void removerConviteParty(String quem) {
+        if (convitesParty.remove(quem) != null) reconstruirListaParty();
+    }
+
+    public String liderParty() { return liderParty; }
+
+    public List<MembroParty> membrosParty() { return membrosParty; }
+
+    public boolean estaNaParty(String nome) {
+        for (MembroParty m : membrosParty) if (m.nome.equals(nome)) return true;
+        return false;
+    }
+
+    public void definirAoMudarParty(Runnable r) { aoMudarParty = r; }
+
+    /** Abre o livro direto numa aba (ex: clicar na notificacao de convite). */
+    public void abrirSecao(String secao) {
+        setVisible(true);
+        selecionarSecao(secao);
+    }
+
     // ===================== FRIENDS =====================
     // Lista de amigos (servidor.py::get_friends_list): online primeiro, depois
     // ordem alfabetica. Cada linha: bolinha On/Off, nome e, na direita, os
@@ -1534,6 +1761,7 @@ public final class BookMenuUI {
     private Runnable aoMudarAmigos; // avisa quem mostra a janela do jogador
     private java.util.function.Consumer<String> aoClicarAmigo; // abre a janela do player
     private boolean modoRemover = false; // "Remove": o proximo clique numa linha remove
+    private String nomeLocal = null;
 
     private void construirPaginaFriends(Skin skin) {
         friendsPage.top();
@@ -1940,12 +2168,14 @@ public final class BookMenuUI {
             mainWindow.pad("Equip".equals(secao) || "Bag".equals(secao) || "Vanity".equals(secao) ? 1 : 14);
             if (comTitulo) {
                 // Friends: titulo centralizado (igual o mock "tela desejada 2").
-                tituloSecao.setAlignment("Friends".equals(secao) ? Align.center : Align.left);
+                tituloSecao.setAlignment("Friends".equals(secao) || "Party".equals(secao) ? Align.center : Align.left);
                 mainWindow.add(tituloSecao).growX().left().padBottom(9).row();
             }
             Table pagina = "Equip".equals(secao) ? equipPage : "Skills".equals(secao) ? skillsPage
-                : "Vanity".equals(secao) ? vanityPage : "Friends".equals(secao) ? friendsPage : bagPage;
+                : "Vanity".equals(secao) ? vanityPage : "Friends".equals(secao) ? friendsPage
+                : "Party".equals(secao) ? partyPage : bagPage;
             if ("Friends".equals(secao) && socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
+            if ("Party".equals(secao) && socket.isConnected()) socket.emitRaw("get_party_status", "{}");
             mainWindow.add(pagina).grow();
             actionBar.setVisible("Bag".equals(secao));
             for (Map.Entry<String, Button> entrada : botoes.entrySet()) {

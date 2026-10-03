@@ -55,6 +55,28 @@ public final class HudVitais {
     private final Table painelMunicao = new Table();
     private final Image iconeMunicao = new Image();
     private final Label textoMunicao;
+    // Notificacao (copia da barrinha de municao): fica embaixo dela, ou no
+    // lugar dela quando nao tem flecha. Uma por vez, com fila.
+    private final Table painelNotificacao = new Table();
+    private final Image iconeNotificacao = new Image();
+    private final Label textoNotificacao;
+    private final Table colunaInferior = new Table();
+    private final java.util.ArrayDeque<Notificacao> filaNotificacoes = new java.util.ArrayDeque<>();
+    private Notificacao notificacaoAtual;
+    private final TextureRegion iconeNotificacaoPadrao;
+    private static final float DURACAO_NOTIFICACAO = 5f;
+    private static final int MAX_FILA_NOTIFICACOES = 6;
+
+    private static final class Notificacao {
+        final String texto;
+        final Color cor;
+        final Runnable aoClicar;
+        Notificacao(String texto, Color cor, Runnable aoClicar) {
+            this.texto = texto;
+            this.cor = cor;
+            this.aoClicar = aoClicar;
+        }
+    }
     private float hpAtual = 1f, hpMax = 1f, mpAtual = 1f, mpMax = 1f;
 
     private static final class Barra {
@@ -138,7 +160,34 @@ public final class HudVitais {
         painelMunicao.pad(px(1));
         painelMunicao.add(internoMunicao).size(px(110), px(28));
         painelMunicao.setVisible(false);
-        raiz.add(painelMunicao).left().padTop(px(6));
+
+        // ---- Notificacao (amigo on/off, convite de party/trade, avisos) ----
+        TextureAtlas.AtlasRegion regNotif = atlas.findRegion("ui/ChatNotify");
+        iconeNotificacaoPadrao = regNotif;
+        iconeNotificacao.setScaling(Scaling.fit);
+        if (regNotif != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(regNotif));
+        textoNotificacao = new Label("", estilo);
+        Table internoNotif = new Table();
+        internoNotif.setBackground(cor(COR_MUNICAO));
+        internoNotif.left();
+        internoNotif.add(iconeNotificacao).size(px(24)).padLeft(px(4)).padRight(px(6));
+        internoNotif.add(textoNotificacao).left().expandX().padRight(px(8));
+        painelNotificacao.setBackground(cor(Color.BLACK));
+        painelNotificacao.pad(px(1));
+        painelNotificacao.add(internoNotif).minWidth(px(110)).height(px(28));
+        painelNotificacao.setVisible(false);
+        painelNotificacao.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        painelNotificacao.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                Notificacao n = notificacaoAtual;
+                proximaNotificacao();
+                if (n != null && n.aoClicar != null) n.aoClicar.run();
+            }
+        });
+
+        colunaInferior.left().top();
+        raiz.add(colunaInferior).left().padTop(px(6));
+        reorganizarInferior();
         // Sempre por baixo de qualquer outra tela (BookMenu, chat, settings...).
         stage.getRoot().addActorAt(0, raiz);
         atualizar();
@@ -240,11 +289,70 @@ public final class HudVitais {
     /** Flecha equipada: icone + quantidade. icone null = sem municao (esconde). */
     public void definirMunicao(TextureRegion icone, int quantidade) {
         boolean mostrar = icone != null;
-        painelMunicao.setVisible(mostrar);
+        if (painelMunicao.isVisible() != mostrar) {
+            painelMunicao.setVisible(mostrar);
+            reorganizarInferior();
+        }
         if (!mostrar) return;
         iconeMunicao.setDrawable(new TextureRegionDrawable(icone));
         textoMunicao.setText(String.valueOf(Math.max(0, quantidade)));
         textoMunicao.setColor(quantidade <= 0 ? new Color(1f, 0.35f, 0.35f, 1f) : Color.WHITE);
+    }
+
+    /** Municao e notificacao empilhadas; a que estiver escondida nao ocupa
+     * espaco (a notificacao sobe pro lugar da municao). */
+    private void reorganizarInferior() {
+        colunaInferior.clearChildren();
+        boolean municao = painelMunicao.isVisible();
+        if (municao) colunaInferior.add(painelMunicao).left().row();
+        if (painelNotificacao.isVisible()) {
+            colunaInferior.add(painelNotificacao).left().padTop(municao ? px(6) : 0f).row();
+        }
+    }
+
+    /** Notificacao curta (icone de chat + texto) por alguns segundos.
+     * aoClicar (pode ser null) roda ao clicar nela, ex: abrir a aba Party. */
+    public void notificar(String texto, Color cor, Runnable aoClicar) {
+        if (texto == null || texto.isEmpty()) return;
+        Notificacao n = new Notificacao(texto, cor != null ? cor : Color.WHITE, aoClicar);
+        if (notificacaoAtual == null) {
+            mostrarNotificacao(n);
+            return;
+        }
+        // Fila curta: se encher, descarta a mais antiga que esta esperando.
+        if (filaNotificacoes.size() >= MAX_FILA_NOTIFICACOES) filaNotificacoes.pollFirst();
+        filaNotificacoes.addLast(n);
+    }
+
+    public void notificar(String texto) { notificar(texto, null, null); }
+
+    private void mostrarNotificacao(Notificacao n) {
+        notificacaoAtual = n;
+        textoNotificacao.setText(n.texto);
+        textoNotificacao.setColor(n.cor);
+        if (iconeNotificacaoPadrao != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(iconeNotificacaoPadrao));
+        painelNotificacao.clearActions();
+        painelNotificacao.getColor().a = 1f;
+        painelNotificacao.setVisible(true);
+        reorganizarInferior();
+        // Com mais coisa na fila cada uma fica um pouco menos.
+        float duracao = filaNotificacoes.isEmpty() ? DURACAO_NOTIFICACAO : DURACAO_NOTIFICACAO * 0.6f;
+        painelNotificacao.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.sequence(
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.delay(duracao),
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.fadeOut(0.3f),
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.run(this::proximaNotificacao)));
+    }
+
+    private void proximaNotificacao() {
+        painelNotificacao.clearActions();
+        Notificacao proxima = filaNotificacoes.pollFirst();
+        if (proxima != null) {
+            mostrarNotificacao(proxima);
+            return;
+        }
+        notificacaoAtual = null;
+        painelNotificacao.setVisible(false);
+        reorganizarInferior();
     }
 
     public float hpAtual() { return hpAtual; }

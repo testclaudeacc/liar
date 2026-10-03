@@ -622,6 +622,7 @@ public class WorldScreen extends ScreenAdapter {
     // uma tela de verdade ainda (BookMenu nao foi portado), entao o proprio
     // clique no botao liga/desliga esse flag.
     private TextureRegion notifChat, notifConfig, notifMenu;
+    private TextureRegion iconeLiderParty, iconeMembroParty; // ui/party/PT_Crown / PT_Shield
     // Fumaca de spawn (sprites/SFXs/Spawn/Smoke.png, 7 quadros de 16px) -
     // toca uma vez so' (sem loop) na posicao de spawn assim que o mundo abre.
     private TextureRegion spawnSmokeTex;
@@ -696,6 +697,8 @@ public class WorldScreen extends ScreenAdapter {
         animacaoBase = criarAnimacao(spriteBase);
 
         notifChat = atlas.findRegion("sprites/notifications/Chat");
+        iconeLiderParty = atlas.findRegion("ui/party/PT_Crown");
+        iconeMembroParty = atlas.findRegion("ui/party/PT_Shield");
         notifConfig = atlas.findRegion("sprites/notifications/Settings");
         notifMenu = atlas.findRegion("sprites/notifications/Menu");
 
@@ -817,7 +820,6 @@ public class WorldScreen extends ScreenAdapter {
                 if (keycode == Input.Keys.ESCAPE) {
                     // Janela de loot e alvo saem antes de qualquer outra coisa.
                     if (painelJogador.isVisivel()) { painelJogador.fechar(); return true; }
-                    if (conviteParty != null) { responderConviteParty(false); return true; }
                     if (alvoMob != null) { alvoMob = null; return true; }
                     if (amigoMarcado != null) { amigoMarcado = null; return true; }
                     // Fecha a interface ativa antes de abrir Settings.
@@ -932,6 +934,7 @@ public class WorldScreen extends ScreenAdapter {
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
+        bookMenu.definirNomeLocal(local.nome);
         painelJogador = new PainelJogadorUI(uiStage, skin, atlas, new PainelJogadorUI.Ouvinte() {
             @Override public void alternarAmigo(String nome) {
                 socket.emitRaw("toggle_friend", GameSocket.obj(w -> w.set("friend_name", nome)));
@@ -1210,11 +1213,23 @@ public class WorldScreen extends ScreenAdapter {
         return -1f;
     }
 
+    // ---- Notificacoes (HudVitais.notificar) ----
+    private static final Color COR_NOTIF_ON = new Color(0.45f, 1f, 0.45f, 1f);
+    private static final Color COR_NOTIF_OFF = new Color(0.75f, 0.75f, 0.75f, 1f);
+    private static final Color COR_NOTIF_PARTY = Color.valueOf("f5e02a");
+    private static final Color COR_NOTIF_AVISO = new Color(1f, 0.35f, 0.35f, 1f);
+
+    /** Clique na notificacao de convite: abre o livro na aba Party. */
+    private void abrirAbaParty() {
+        fecharOutrasJanelas();
+        if (chat.isVisivel()) chat.setVisivel(false);
+        bookMenu.abrirSecao("Party");
+        atualizarVisibilidadeJoystick();
+    }
+
     // ---- Janela do jogador / ignorados / convite de party ----
     private PainelJogadorUI painelJogador;
     private final java.util.Set<String> ignorados = new java.util.HashSet<>();
-    private Table conviteParty;
-    private String quemConvidouParty;
 
     /** Botao de alvo do topo: com um player marcado, abre a janela dele. */
     private void abrirPainelDoAlvo() {
@@ -1272,47 +1287,6 @@ public class WorldScreen extends ScreenAdapter {
             prefs.putString(local.nome, String.join(",", ignorados));
             prefs.flush();
         } catch (Exception ignorado) { }
-    }
-
-    /** "X invited you to a party" com Accept/Decline (no meio da tela). */
-    private void mostrarConviteParty(String quem) {
-        if (conviteParty != null) conviteParty.remove();
-        quemConvidouParty = quem;
-        Table caixa = new Table();
-        caixa.setBackground(UiSkin.retangulo(new Color(0.1f, 0.1f, 0.1f, 0.97f), new Color(0.36f, 0.36f, 0.36f, 1f), 1));
-        caixa.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
-        caixa.pad(14);
-        Label texto = new Label(nomeVisivel(quem) + " invited you to a party.", skin, "hud");
-        texto.setFontScale(0.7f);
-        TextButton aceitar = new TextButton("Accept", skin, "verde-popup");
-        TextButton recusar = new TextButton("Decline", skin, "vermelho-popup");
-        aceitar.getLabel().setStyle(new Label.LabelStyle(skin.getFont("botao-pequeno-font"), Color.WHITE));
-        recusar.getLabel().setStyle(new Label.LabelStyle(skin.getFont("botao-pequeno-font"), Color.WHITE));
-        aceitar.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
-            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { responderConviteParty(true); }
-        });
-        recusar.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
-            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { responderConviteParty(false); }
-        });
-        caixa.add(texto).colspan(2).padBottom(12).row();
-        caixa.add(recusar).width(130).height(48).padRight(10);
-        caixa.add(aceitar).width(130).height(48);
-        conviteParty = new Table();
-        conviteParty.setFillParent(true);
-        conviteParty.center();
-        conviteParty.add(caixa);
-        uiStage.addActor(conviteParty);
-    }
-
-    private void responderConviteParty(boolean aceitar) {
-        if (conviteParty != null) conviteParty.remove();
-        conviteParty = null;
-        String quem = quemConvidouParty;
-        quemConvidouParty = null;
-        if (quem == null || !socket.isConnected()) return;
-        socket.emitRaw(aceitar ? "accept_party_invite" : "decline_party_invite",
-            GameSocket.obj(w -> w.set("inviter_name", quem)));
-        if (aceitar) chat.adicionarMensagemSistema("You joined " + nomeVisivel(quem) + "'s party.");
     }
 
     /** Sprite do alvo atual dentro do botao: o quadro de animacao de AGORA
@@ -1421,6 +1395,20 @@ public class WorldScreen extends ScreenAdapter {
         if (estado.contains("is_typing")) return notifChat;
         if (estado.contains("is_in_skins")) return notifMenu;
         return null;
+    }
+
+    // ---- Coroa/escudo da party: na altura do balao, mas a ESQUERDA do player ----
+    private static final float TAM_ICONE_PARTY = 10f;
+
+    private void desenharIconeParty(Jogador j) {
+        String lider = bookMenu.liderParty();
+        if (lider == null || iconeLiderParty == null || iconeMembroParty == null) return;
+        if (!bookMenu.estaNaParty(j.nome) || (j == local ? localMorto : estaMorto(j))) return;
+        TextureRegion icone = j.nome.equals(lider) ? iconeLiderParty : iconeMembroParty;
+        // Balao: x+2 a direita do centro; aqui o espelho dele.
+        float ix = Math.round(j.x / camera.zoom) * camera.zoom - 2f - TAM_ICONE_PARTY;
+        float iy = Math.round(j.y / camera.zoom) * camera.zoom + 8.5f;
+        batch.draw(icone, ix, iy, TAM_ICONE_PARTY, TAM_ICONE_PARTY);
     }
 
     /** Chamado todo frame: avisa o servidor so' quando algo abriu/fechou. */
@@ -1615,6 +1603,7 @@ public class WorldScreen extends ScreenAdapter {
             // eram zerados no client.
             if (data.has("inventory")) {
                 if (socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
+                if (socket.isConnected()) socket.emitRaw("get_party_status", "{}");
                 definirSkins(local.nome, data.get("skins"));
                 bookMenu.carregarSkins(data.get("skin_db"), data.get("skins"));
                 // HP/MP: -1 no banco = cheio.
@@ -1658,7 +1647,11 @@ public class WorldScreen extends ScreenAdapter {
 
         socket.on("player_joined", (nomeEvt, data) -> {
             adicionarRemotoSeNovo(data);
-            if (data != null) bookMenu.definirOnline(data.getString("name", ""), true);
+            if (data != null) {
+                String nome = data.getString("name", "");
+                if (bookMenu.amigo(nome) != null) hud.notificar(nome + " is online.", COR_NOTIF_ON, null);
+                bookMenu.definirOnline(nome, true);
+            }
         });
 
         // ---- Amigos (servidor.py::toggle_friend/get_friends_list/...) ----
@@ -1701,25 +1694,69 @@ public class WorldScreen extends ScreenAdapter {
                 socket.emitRaw("decline_party_invite", GameSocket.obj(w -> w.set("inviter_name", quem)));
                 return;
             }
-            mostrarConviteParty(quem);
+            // Vira uma linha (Confirm/Negate) na aba Party; a notificacao leva pra la'.
+            bookMenu.adicionarConviteParty(quem, data.getInt("inviter_level", 1));
+            hud.notificar(quem + " invited you to a party.", COR_NOTIF_PARTY, this::abrirAbaParty);
         });
         socket.on("party_invite_result", (nomeEvt, data) -> {
             if (data == null) return;
-            String alvo = nomeVisivel(data.getString("target_name", ""));
+            String alvo = data.getString("target_name", "");
             if (data.getBoolean("success", false)) {
-                chat.adicionarMensagemSistema("Party invite sent to " + alvo + ".");
+                hud.notificar("Party invite sent to " + alvo + ".");
                 return;
             }
             String motivo = data.getString("reason", "");
             String texto = "party_full".equals(motivo) ? "Your party is full."
                 : "offline".equals(motivo) || "not_found".equals(motivo) ? alvo + " is offline."
                 : "already_in_your_party".equals(motivo) ? alvo + " is already in your party."
-                : "already_in_party".equals(motivo) ? alvo + " is already in another party."
+                : "already_in_party".equals(motivo) ? alvo + " is already in a party."
+                : "not_leader".equals(motivo) ? "Only the party leader can invite."
                 : "Could not invite " + alvo + ".";
-            chat.adicionarMensagemSistema(texto);
+            hud.notificar(texto, COR_NOTIF_AVISO, null);
         });
         socket.on("party_invite_declined", (nomeEvt, data) -> {
-            if (data != null) chat.adicionarMensagemSistema(nomeVisivel(data.getString("target_name", "")) + " declined the party invite.");
+            if (data != null) hud.notificar(data.getString("target_name", "") + " declined the party invite.");
+        });
+        socket.on("party_update", (nomeEvt, data) -> {
+            if (data == null) return;
+            // Quem entrou/saiu (comparando com a party que eu ja' tinha).
+            String antigoLider = bookMenu.liderParty();
+            java.util.Set<String> antes = new java.util.HashSet<>();
+            for (BookMenuUI.MembroParty m : bookMenu.membrosParty()) antes.add(m.nome);
+            bookMenu.atualizarParty(data);
+            java.util.Set<String> depois = new java.util.HashSet<>();
+            for (BookMenuUI.MembroParty m : bookMenu.membrosParty()) depois.add(m.nome);
+            if (antigoLider == null) {
+                if (depois.size() > 1) hud.notificar("You joined " + bookMenu.liderParty() + "'s party.", COR_NOTIF_PARTY, this::abrirAbaParty);
+                else hud.notificar("Party created.", COR_NOTIF_PARTY, null);
+                return;
+            }
+            for (String n : depois) {
+                if (!antes.contains(n) && !n.equals(local.nome)) hud.notificar(n + " joined the party.", COR_NOTIF_PARTY, null);
+            }
+            for (String n : antes) {
+                if (!depois.contains(n)) hud.notificar(n + " left the party.");
+            }
+            String lider = bookMenu.liderParty();
+            if (lider != null && !lider.equals(antigoLider)) {
+                hud.notificar(lider.equals(local.nome) ? "You are now the party leader." : lider + " is now the party leader.",
+                    COR_NOTIF_PARTY, null);
+            }
+        });
+        socket.on("party_disbanded", (nomeEvt, data) -> {
+            boolean estava = bookMenu.liderParty() != null;
+            bookMenu.limparParty();
+            if (!estava || data == null) return;
+            String motivo = data.getString("reason", "");
+            if ("kicked".equals(motivo)) hud.notificar("You were removed from the party.", COR_NOTIF_AVISO, null);
+            else if ("left".equals(motivo)) hud.notificar("You left the party.");
+            else if ("auto_disband".equals(motivo)) hud.notificar("Your party was disbanded.");
+        });
+        socket.on("trade_invite_received", (nomeEvt, data) -> {
+            if (data == null) return;
+            String quem = data.getString("inviter_name", "");
+            if (ignorados.contains(quem)) return;
+            hud.notificar(quem + " wants to trade.", COR_NOTIF_PARTY, null);
         });
 
         // Chat Local: [nome, mensagem (ja censurada), classe] de quem esta na
@@ -1841,7 +1878,12 @@ public class WorldScreen extends ScreenAdapter {
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             // Flecha gasta (o servidor manda a quantidade restante a cada tiro).
             if (data.has("ammo_qty") && caminhoMunicao != null) {
+                int antes = quantidadeMunicao;
                 quantidadeMunicao = data.getInt("ammo_qty", quantidadeMunicao);
+                if (antes > 0 && quantidadeMunicao <= 0) {
+                    hud.notificar("Your arrows ran out!", COR_NOTIF_AVISO, null);
+                    avisouSemMunicao = true; // ja' avisou agora
+                }
                 hud.definirMunicao(bookMenu.iconeDoItem(caminhoMunicao), quantidadeMunicao);
                 bookMenu.definirQuantidadeEquipada(SLOT_MUNICAO, quantidadeMunicao);
             }
@@ -1949,6 +1991,9 @@ public class WorldScreen extends ScreenAdapter {
             remotos.remove(data.getString("name", ""));
             remotosForaDeVisao.remove(data.getString("name", ""));
             baloesRemotos.remove(data.getString("name", ""));
+            if (bookMenu.amigo(data.getString("name", "")) != null && !data.getString("name", "").equals(local.nome)) {
+                hud.notificar(data.getString("name", "") + " is offline.", COR_NOTIF_OFF, null);
+            }
             bookMenu.definirOnline(data.getString("name", ""), false);
             if (data.getString("name", "").equals(painelJogador.nomeAberto())) painelJogador.fechar();
             skinsJogadores.remove(data.getString("name", ""));
@@ -2597,6 +2642,8 @@ public class WorldScreen extends ScreenAdapter {
             float ny = local.y + 9.5f;
             batch.draw(notifAtual, nx, ny, notifAtual.getRegionWidth(), notifAtual.getRegionHeight());
         }
+        desenharIconeParty(local);
+        for (Jogador j : remotos.values()) desenharIconeParty(j);
         for (Jogador j : remotos.values()) {
             TextureRegion balao = balaoRemoto(j.nome);
             if (balao == null || estaMorto(j)) continue;
@@ -3498,6 +3545,7 @@ public class WorldScreen extends ScreenAdapter {
             if (!avisouSemMunicao) {
                 avisouSemMunicao = true;
                 chat.adicionarMensagemSistema("You have no arrows equipped.", new Color(1f, 0.25f, 0.25f, 1f));
+                hud.notificar("You have no arrows equipped.", COR_NOTIF_AVISO, null);
             }
             return;
         }
