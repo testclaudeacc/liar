@@ -705,6 +705,20 @@ public final class BookMenuUI {
         socket.emitRaw("unequip_item", payload);
     }
 
+    /** Numero de quantidade colado no canto inferior esquerdo do slot (Bag e
+     * Equip). O Label reserva espaco pro "pe" das letras (descent) embaixo -
+     * numero nao tem pe, entao sobrava um vao; o padBottom negativo desconta
+     * isso e o numero encosta na borda sem sair do slot. */
+    private void adicionarQuantidade(Table marcadores, int quantidade) {
+        final float escalaFonte = 0.6f;
+        Label rotulo = new Label(String.valueOf(quantidade), skin, "hud");
+        rotulo.setFontScale(escalaFonte);
+        rotulo.setColor(Color.WHITE);
+        rotulo.setAlignment(Align.bottomLeft);
+        float descent = rotulo.getStyle().font.getDescent() * escalaFonte; // negativo
+        marcadores.add(rotulo).left().bottom().padLeft(1f).padBottom(descent);
+    }
+
     /** Quantidade de um item equipado mudou (ex: flecha gasta, sync_vitals ammo_qty). */
     public void definirQuantidadeEquipada(String slot, int quantidade) {
         if (!equippedItemPaths.containsKey(slot)) return;
@@ -730,14 +744,12 @@ public final class BookMenuUI {
                 continue;
             }
             Table moldura = new Table();
-            moldura.add(icone).grow().pad(6);
+            moldura.add(icone).grow().pad(4); // +2 do pad da pilha = 6, igual os outros slots
             Table marcadores = new Table();
             marcadores.bottom().left();
-            Label quantidade = new Label(String.valueOf(qtd), skin, "hud");
-            quantidade.setFontScale(0.6f);
-            quantidade.setColor(Color.WHITE);
-            marcadores.add(quantidade).left().bottom().pad(2);
-            botao.add(new Stack(moldura, marcadores)).grow();
+            adicionarQuantidade(marcadores, qtd);
+            marcadores.add().expandX();
+            botao.add(new Stack(moldura, marcadores)).grow().pad(2);
         }
     }
 
@@ -1414,12 +1426,7 @@ public final class BookMenuUI {
                     // favorito (mesmo icone do botao) no inferior direito.
                     Table marcadores = new Table();
                     marcadores.bottom();
-                    if (item.quantity > 1) {
-                        Label quantidade = new Label(String.valueOf(item.quantity), skin, "hud");
-                        quantidade.setFontScale(0.6f);
-                        quantidade.setColor(Color.WHITE);
-                        marcadores.add(quantidade).left().bottom();
-                    }
+                    if (item.quantity > 1) adicionarQuantidade(marcadores, item.quantity);
                     marcadores.add().expandX();
                     if (item.favorite) {
                         Image estrela = new Image(new TextureRegionDrawable(atlas.findRegion("ui/Star")));

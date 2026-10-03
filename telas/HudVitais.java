@@ -37,7 +37,7 @@ public final class HudVitais {
     private static final Color COR_MP = new Color(96 / 255f, 153 / 255f, 1f, 1f);
     private static final Color COR_XP_FUNDO = new Color(14 / 255f, 14 / 255f, 14 / 255f, 1f);
     private static final Color COR_XP = Color.valueOf("e8b020");
-    private static final Color COR_MUNICAO = new Color(0.32f, 0.32f, 0.32f, 1f);
+    private static final Color COR_MUNICAO = new Color(0.15f, 0.15f, 0.15f, 1f); // cinza escuro
 
     private final float escala; // pixels de tela por unidade do stage
     // Tudo aqui e' medido em pixels de tela (da print do PC); no celular, com
@@ -158,7 +158,8 @@ public final class HudVitais {
         // o tamanho (2px pra 14px, igual o PC) - fixa em 2px, numa fonte
         // gerada bem maior na tela do celular, a letra parecia fina.
         p.size = Math.round(14 * FATOR_TEXTO * escala);
-        p.borderWidth = Math.max(2, Math.round(p.size / 7f));
+        // PC com borda um pouco mais fina (a pedido do usuario); mobile mantem.
+        p.borderWidth = MOBILE ? Math.max(2, Math.round(p.size / 7f)) : Math.max(1, Math.round(p.size / 10f));
         p.borderColor = Color.BLACK;
         p.minFilter = Texture.TextureFilter.Linear;
         p.magFilter = Texture.TextureFilter.Linear;
