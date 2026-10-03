@@ -190,6 +190,7 @@ public final class BookMenuUI {
         root.add(organizer).width(COLUNA_LARGURA * 2f + JANELA_LARGURA)
             .height(JANELA_ALTURA);
         stage.addActor(root);
+        registrarAtalhos(stage);
         root.setVisible(false);
         selecionarSecao(secaoAtual);
     }
@@ -623,18 +624,20 @@ public final class BookMenuUI {
     private void preencherBlocoStats(Table bloco, String itemPath, String compararCom) {
         bloco.clearChildren();
         bloco.top().left();
-        Label nome = new Label(nomeExibicao(itemPath), skin, "hud");
-        nome.setFontScale(0.95f);
-        bloco.add(nome).left().padBottom(2).row();
+        // Fonte "default" (com contorno preto) reduzida, linhas com altura fixa
+        // pra ficarem coladas.
+        Label nome = new Label(nomeExibicao(itemPath), skin, "default");
+        nome.setFontScale(0.75f);
+        bloco.add(nome).left().height(ALTURA_LINHA_STAT + 3f).padBottom(1).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
         if (dados == null) return;
         EquipStats base = compararCom == null ? null : ITEM_STATS.get(compararCom);
         boolean comparar = compararCom != null;
-        bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
+        bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().height(ALTURA_LINHA_STAT).row();
         // Vermelho = classe errada (o servidor pune quem equipa item de outra classe).
         boolean classeCerta = "All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass);
         bloco.add(linhaStat(dados.reqClass + " " + dados.tipo,
-            classeCerta ? COR_REQUISITO : Color.valueOf("ff4a4a"))).left().row();
+            classeCerta ? COR_REQUISITO : Color.valueOf("ff4a4a"))).left().height(ALTURA_LINHA_STAT).row();
         adicionarLinhaStat(bloco, "Attack", dados.bonusDamage, base == null ? 0 : base.bonusDamage, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Defense", dados.defense, base == null ? 0 : base.defense, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Stamina", dados.stamina, base == null ? 0 : base.stamina, comparar, COR_STAMINA);
@@ -653,12 +656,14 @@ public final class BookMenuUI {
             int diferenca = valor - anterior;
             texto += " (" + (diferenca >= 0 ? "+" : "") + diferenca + ")";
         }
-        bloco.add(linhaStat(texto, cor)).left().row();
+        bloco.add(linhaStat(texto, cor)).left().height(ALTURA_LINHA_STAT).row();
     }
 
+    private static final float ALTURA_LINHA_STAT = 14f;
+
     private Label linhaStat(String texto, Color cor) {
-        Label label = new Label(texto, skin, "hud");
-        label.setFontScale(0.8f);
+        Label label = new Label(texto, skin, "default");
+        label.setFontScale(0.62f);
         label.setColor(cor);
         return label;
     }
@@ -1295,20 +1300,37 @@ public final class BookMenuUI {
     };
 
     /**
-     * Chamado todo frame pelo WorldScreen.render() - por polling (como o ENTER
-     * do chat) porque o keyDown do InputProcessor pode ser engolido pelo uiStage.
-     * Cada tecla faz o mesmo que clicar no botao correspondente.
+     * Listener de CAPTURA no Stage: recebe a tecla antes de qualquer ator
+     * (mesmo com outro ator com foco de teclado), entao nao depende da ordem
+     * dos InputProcessors do WorldScreen. Ignora enquanto se digita num
+     * TextField visivel (ex: chat). Cada tecla = clicar no botao.
      */
-    public void processarAtalhos() {
-        if (!isVisible()) return;
-        for (int i = 0; i < ORDEM_ATALHOS.length; i++) {
-            for (int tecla : TECLAS_ATALHOS[i]) {
-                if (Gdx.input.isKeyJustPressed(tecla)) {
-                    acionarBotao(ORDEM_ATALHOS[i]);
-                    return;
+    private void registrarAtalhos(Stage stage) {
+        stage.addCaptureListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override
+            public boolean keyDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, int keycode) {
+                if (!isVisible() || digitandoEmCampo(stage)) return false;
+                for (int i = 0; i < ORDEM_ATALHOS.length; i++) {
+                    for (int tecla : TECLAS_ATALHOS[i]) {
+                        if (tecla == keycode) {
+                            acionarBotao(ORDEM_ATALHOS[i]);
+                            event.stop();
+                            return true;
+                        }
+                    }
                 }
+                return false;
             }
+        });
+    }
+
+    private static boolean digitandoEmCampo(Stage stage) {
+        com.badlogic.gdx.scenes.scene2d.Actor foco = stage.getKeyboardFocus();
+        if (!(foco instanceof com.badlogic.gdx.scenes.scene2d.ui.TextField)) return false;
+        for (com.badlogic.gdx.scenes.scene2d.Actor a = foco; a != null; a = a.getParent()) {
+            if (!a.isVisible()) return false;
         }
+        return foco.getStage() != null;
     }
 
     private void acionarBotao(String nome) {

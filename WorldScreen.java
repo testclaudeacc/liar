@@ -1225,12 +1225,6 @@ public class WorldScreen extends ScreenAdapter {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER) && chat.isVisivel() && !chat.estaDigitando()) {
             chat.focarCampoTexto();
         }
-        // Teclas 0-9 com o book menu aberto (ver BookMenuUI.processarAtalhos).
-        if (!chat.estaDigitando()) {
-            boolean estavaAberto = bookMenu.isVisible();
-            bookMenu.processarAtalhos();
-            if (estavaAberto && !bookMenu.isVisible()) atualizarVisibilidadeJoystick();
-        }
 
         // !chat.isVisivel() trava o movimento com a JANELA do chat aberta,
         // nao so' enquanto se digita nela (a pedido do usuario - abrir o chat
