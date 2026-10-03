@@ -234,6 +234,18 @@ public class WorldScreen extends ScreenAdapter {
     }
     private final List<NumeroDano> numerosDano = new ArrayList<>();
 
+    /** Aviso subindo em cima de um player ("Level 8", "Magic 19") - segue o
+     * player enquanto ele anda. */
+    private static class TextoFlutuante {
+        final Jogador alvo;
+        final String texto;
+        final Color cor;
+        float tempo = 0f;
+        TextoFlutuante(Jogador alvo, String texto, Color cor) { this.alvo = alvo; this.texto = texto; this.cor = cor; }
+    }
+    private final List<TextoFlutuante> textosFlutuantes = new ArrayList<>();
+    private static final float DURACAO_TEXTO_FLUTUANTE = 2.5f;
+
     // ---- Combate (alvo, ataque automatico, efeitos, loot, morte) ----
     // Mob mirado (clique nele; clique de novo ou ESC tira). Ataca sozinho a
     // cada ~1s enquanto estiver no alcance (o servidor so' aceita 1 hit/s).
@@ -1196,6 +1208,8 @@ public class WorldScreen extends ScreenAdapter {
                 vidaRemotos.put(alvo, new float[]{data.getFloat("new_hp", 1f), data.getFloat("max_hp", 1f)});
             }
             if (alvo.equals(local.nome)) {
+                // Levar dano treina defense (o servidor so' conta se o player esta lutando).
+                socket.emitRaw("register_skill_hit", GameSocket.obj(jw -> jw.set("skill", "defense")));
                 float hpNovo = data.getFloat("new_hp", hud.hpAtual());
                 hud.definir(hpNovo, data.getFloat("max_hp", -1f), -1f, -1f);
                 if (hpNovo <= 0f) morrerLocal();
@@ -1311,6 +1325,21 @@ public class WorldScreen extends ScreenAdapter {
             vida[0] = data.getFloat("current_hp", vida[0]);
             vida[1] = data.getFloat("max_hp", vida[1]);
             vidaRemotos.put(nome, vida);
+        });
+        // Subiu de level / de skill: texto subindo em cima do player (inclusive
+        // de outros players da area - o servidor manda pra area toda).
+        socket.on("player_leveled_up", (nomeEvt, data) -> {
+            if (data == null) return;
+            Jogador j = jogadorPorNome(data.getString("name", ""));
+            if (j != null) textosFlutuantes.add(new TextoFlutuante(j, "Level " + data.getInt("level", 0) + "!",
+                new Color(1f, 0.84f, 0.2f, 1f)));
+        });
+        socket.on("player_skill_leveled_up", (nomeEvt, data) -> {
+            if (data == null) return;
+            Jogador j = jogadorPorNome(data.getString("name", ""));
+            String skill = data.getString("skill_name", "");
+            if (j != null) textosFlutuantes.add(new TextoFlutuante(j,
+                nomeSkill(skill) + " " + data.getInt("new_level", 0) + "!", corSkill(skill)));
         });
         socket.on("player_skins_updated", (nomeEvt, data) -> {
             if (data == null) return;
@@ -1628,6 +1657,11 @@ public class WorldScreen extends ScreenAdapter {
         for (NPCVisual npc : npcs.values()) npc.movimento.atualizar(delta);
         for (MobVisual mob : mobs.values()) mob.atualizar(delta);
         atualizarCombate(delta);
+        for (int i = textosFlutuantes.size() - 1; i >= 0; i--) {
+            TextoFlutuante t = textosFlutuantes.get(i);
+            t.tempo += delta;
+            if (t.tempo >= DURACAO_TEXTO_FLUTUANTE) textosFlutuantes.remove(i);
+        }
         for (int i = numerosDano.size() - 1; i >= 0; i--) {
             NumeroDano n = numerosDano.get(i);
             n.tempo += delta;
@@ -1777,6 +1811,7 @@ public class WorldScreen extends ScreenAdapter {
         for (NPCVisual npc : npcs.values()) desenharNomeNPC(npc);
         for (MobVisual mob : mobs.values()) desenharNomeMob(mob);
         desenharNumerosDano();
+        desenharTextosFlutuantes();
         desenharBalaoInteracaoNPC(npcMaisProximoParaConversar());
         TextureRegion notifAtual = notificacaoAtual();
         if (notifAtual != null) {
@@ -2362,6 +2397,41 @@ public class WorldScreen extends ScreenAdapter {
             jw.set("proj", projetil);
         }));
         esperaAtaque = INTERVALO_ATAQUE;
+        // Progresso da skill principal da classe (o servidor conta e avisa o level up).
+        String skill = skillDaClasse();
+        socket.emitRaw("register_skill_hit", GameSocket.obj(jw -> jw.set("skill", skill)));
+    }
+
+    /** Chave da skill principal (igual servidor.py / BookMenuUI.skillPrincipal). */
+    private String skillDaClasse() {
+        switch (local.classe) {
+            case "Ranger": return "distance";
+            case "Mage": return "magic";
+            case "Bard": return "musicality";
+            default: return "melee";
+        }
+    }
+
+    private static String nomeSkill(String chave) {
+        switch (chave) {
+            case "distance": return "Distance";
+            case "magic": return "Magic";
+            case "musicality": return "Musicality";
+            case "melee": return "Melee";
+            case "defense": return "Defense";
+            default: return chave.isEmpty() ? "Skill" : Character.toUpperCase(chave.charAt(0)) + chave.substring(1);
+        }
+    }
+
+    /** Mesmas cores das skills no BookMenu. */
+    private static Color corSkill(String chave) {
+        switch (chave) {
+            case "magic": return Color.valueOf("a474d4");
+            case "distance": return Color.valueOf("00d084");
+            case "musicality": return Color.valueOf("ffa24e");
+            case "defense": return Color.valueOf("6ab7ff");
+            default: return Color.valueOf("cccccc");
+        }
     }
 
     private void desenharBags() {
@@ -2476,7 +2546,28 @@ public class WorldScreen extends ScreenAdapter {
         return new Color(0.75f, 0f, 0f, 1f);
     }
 
-    /** Dano subindo ~24px e sumindo no fim (mob.gd::exibir_numero_dano). */
+    /** "Level 8!" / "Magic 19!" subindo devagar em cima da cabeca e sumindo no fim. */
+    private void desenharTextosFlutuantes() {
+        Color anterior = new Color(font.getColor());
+        // Varios ao mesmo tempo no mesmo player (level + skill) empilham.
+        Map<Jogador, Integer> pilha = new HashMap<>();
+        for (TextoFlutuante t : textosFlutuantes) {
+            int ordem = pilha.merge(t.alvo, 1, Integer::sum) - 1;
+            float p = t.tempo / DURACAO_TEXTO_FLUTUANTE;
+            float subida = 16f * p;
+            float alfa = p < 0.7f ? 1f : 1f - (p - 0.7f) / 0.3f;
+            float ancoraX = Math.round(t.alvo.x / camera.zoom) * camera.zoom;
+            float ancoraY = Math.round(t.alvo.y / camera.zoom) * camera.zoom;
+            layout.setText(font, t.texto);
+            float x = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
+            float y = Math.round((ancoraY + 30f + subida + ordem * 9f) / camera.zoom) * camera.zoom;
+            font.setColor(t.cor.r, t.cor.g, t.cor.b, Math.max(0f, alfa));
+            font.draw(batch, t.texto, x, y);
+        }
+        font.setColor(anterior);
+    }
+
+    /** Dano subindo ~10px e sumindo no fim (mob.gd::exibir_numero_dano). */
     private void desenharNumerosDano() {
         Color anterior = new Color(font.getColor());
         for (NumeroDano n : numerosDano) {
