@@ -333,7 +333,7 @@ public class WorldScreen extends ScreenAdapter {
         void adicionar(TextureRegion icone, String texto, Color cor) { icones.add(icone); textos.add(texto); cores.add(cor); }
     }
     private final List<LootFlutuante> lootsFlutuantes = new ArrayList<>();
-    private static final float DURACAO_LOOT_FLUTUANTE = 2.5f;
+    private static final float DURACAO_LOOT_FLUTUANTE = 1.4f;
     private static final int ALCANCE_BAG_SQM = 4;
     private boolean localMorto = false;
     private Table painelMorte;
@@ -2515,7 +2515,7 @@ public class WorldScreen extends ScreenAdapter {
             float subida = 14f * (1f - (1f - t) * (1f - t));
             float alfa = Math.max(0f, t < 0.7f ? 1f : 1f - (t - 0.7f) / 0.3f);
             float ancoraX = Math.round(l.x / camera.zoom) * camera.zoom;
-            float y = Math.round((l.y + 22f + subida) / camera.zoom) * camera.zoom;
+            float y = Math.round((l.y + 12f + subida) / camera.zoom) * camera.zoom;
             int n = l.icones.size();
             float larguraTotal = n * tamanho + Math.max(0, n - 1) * espaco;
             float x = Math.round((ancoraX - larguraTotal / 2f) / camera.zoom) * camera.zoom;
