@@ -2425,59 +2425,61 @@ def handle_npc_dialogue_seen(data):
     except Exception:
         traceback.print_exc()
 
+# Troca de lugar: quem insiste em andar contra um player PARADO (afk num
+# corredor estreito, por exemplo) troca de SQM com ele. Regras: os dois vivos,
+# mesmo andar, colados (SQM do lado, sem diagonal), o alvo parado ha' pelo
+# menos SWAP_ALVO_PARADO_SEG (nao da' pra empurrar quem esta andando) e no
+# maximo 1 troca a cada SWAP_COOLDOWN_SEG por player.
+SWAP_ALVO_PARADO_SEG = 2.0
+SWAP_COOLDOWN_SEG = 1.5
+
 @socketio.on('swap_req')
 def handle_swap_req(data):
-    # Desligado: trocava de lugar com outro player a ate' 4 SQMs, sem o
-    # outro aceitar (empurrava/teleportava gente). O client atual nao usa.
-    return
     try:
         sid = request.sid
-        if sid not in online_players: return
+        if sid not in online_players or not isinstance(data, list) or len(data) < 2: return
         p = online_players[sid]
-        
-        target_name = str(data[0]) if len(data) > 0 else ""
-        d_int = int(data[1]) if len(data) > 1 else 0
-        
+        target_name = str(data[0])
+        d_int = int(data[1])
+        if d_int not in DIR_MAP: return
+
+        now = time.time()
+        if now - p.get('_ultimo_swap', 0) < SWAP_COOLDOWN_SEG: return
         target_sid = players_by_name.get(target_name)
-        if not target_sid or target_sid not in online_players: return
+        if not target_sid or target_sid == sid or target_sid not in online_players: return
         t_p = online_players[target_sid]
-        
-        px, py = float(p.get('pos_x', 0)), float(p.get('pos_y', 0))
-        tx, ty = float(t_p.get('pos_x', 0)), float(t_p.get('pos_y', 0))
-        if abs(px - tx) > 64 or abs(py - ty) > 64: return
-        
-        p['pos_x'], p['pos_y'] = tx, ty
-        t_p['pos_x'], t_p['pos_y'] = px, py
-        p['direction'] = DIR_MAP.get(d_int, 'down')
-        
+        if p.get('is_dead') or t_p.get('is_dead'): return
+        if int(p.get('floor', 1) or 1) != int(t_p.get('floor', 1) or 1): return
+        if now - t_p.get('last_move_time', 0) < SWAP_ALVO_PARADO_SEG: return
+
+        tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+        tt = tile_de(t_p.get('pos_x', 0), t_p.get('pos_y', 0))
+        if abs(tp[0] - tt[0]) + abs(tp[1] - tt[1]) != 1: return
+        p['_ultimo_swap'] = now
+
+        px, py = centro_tile(tp)
+        tx, ty = centro_tile(tt)
         opostos = {0: 1, 1: 0, 2: 3, 3: 2}
-        t_dir = DIR_MAP.get(opostos.get(d_int, 0), 'up')
-        t_p['direction'] = t_dir
-        
-        room_p = p.get('room')
-        room_t = t_p.get('room')
-        
-        payload = [
-            p['name'], tx, ty, d_int,
-            t_p['name'], px, py, opostos.get(d_int, 0)
-        ]
-        
-        emit('swap_exec', payload, room=room_p)
-        if room_t and room_t != room_p:
-            emit('swap_exec', payload, room=room_t)
-            
-        new_room_p = get_chunk(tx, ty, p.get('floor', 1))
-        if room_p != new_room_p:
-            leave_room(room_p, sid=sid)
-            join_room(new_room_p, sid=sid)
-            p['room'] = new_room_p
-            
-        new_room_t = get_chunk(px, py, t_p.get('floor', 1))
-        if room_t != new_room_t:
-            leave_room(room_t, sid=target_sid)
-            join_room(new_room_t, sid=target_sid)
-            t_p['room'] = new_room_t
-            
+        t_dint = opostos[d_int]
+        p['pos_x'], p['pos_y'], p['direction'] = tx, ty, DIR_MAP[d_int]
+        t_p['pos_x'], t_p['pos_y'], t_p['direction'] = px, py, DIR_MAP[t_dint]
+        # Conta como movimento dos dois (o balde de passos e o "parado ha'").
+        p['last_move_time'] = now
+        t_p['last_move_time'] = now
+
+        payload = [p['name'], tx, ty, d_int, t_p['name'], px, py, t_dint]
+        salas = set()
+        for quem_sid, quem, (nx, ny) in ((sid, p, (tx, ty)), (target_sid, t_p, (px, py))):
+            antiga = quem.get('room')
+            nova = get_chunk(nx, ny, quem.get('floor', 1))
+            if antiga: salas |= set(salas_vizinhas(antiga))
+            salas |= set(salas_vizinhas(nova))
+            if antiga != nova:
+                if antiga: leave_room(antiga, sid=quem_sid)
+                join_room(nova, sid=quem_sid)
+                quem['room'] = nova
+        for r in salas:
+            socketio.emit('swap_exec', payload, room=r)
     except Exception: traceback.print_exc()
 
 def _calcular_xp_por_participante(mob_data, xp_total):
@@ -3094,7 +3096,14 @@ def handle_m(data):
         mob_no_caminho = andar_p == MOB_FLOOR and any(
             o.get('hp', 1) > 0 and 'pos_x' in o and tile_do_mob(o) == destino_tile
             for _, o in (_mobs_perto(p['room']) if p.get('room') else active_mobs.items()))
-        if npc_no_caminho or mob_no_caminho:
+        # Outro player vivo no mesmo andar tambem bloqueia (pra passar por quem
+        # esta parado no caminho, o client pede troca de lugar: swap_req).
+        player_no_caminho = any(
+            o_sid != sid and not online_players[o_sid].get('is_dead')
+            and int(online_players[o_sid].get('floor', 1) or 1) == andar_p
+            and tile_de(online_players[o_sid].get('pos_x', 0), online_players[o_sid].get('pos_y', 0)) == destino_tile
+            for o_sid in (_sids_perto(p['room']) if p.get('room') else list(online_players.keys())))
+        if npc_no_caminho or mob_no_caminho or player_no_caminho:
             _corrigir_posicao(sid, p)
             return
         

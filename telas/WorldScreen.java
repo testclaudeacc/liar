@@ -1361,10 +1361,17 @@ public class WorldScreen extends ScreenAdapter {
                 // grid (ex: do tempo do TILE=32) deixava o player entre 2 SQMs.
                 local.x = conversor.rawParaMundoX(Jogador.snapCentroXCru(rawX));
                 local.y = conversor.rawParaMundoY(Jogador.snapBaseYCru(rawY));
+                // Correcao do servidor no meio de um passo: o passo em
+                // andamento nao pode continuar e levar o player de volta.
+                local.movendo = false;
             }
-            spawnSmokeX = local.x;
-            spawnSmokeY = local.y;
-            spawnSmokeTempo = 0f;
+            // Fumaca so' quando entra no jogo (sync completo), nao a cada
+            // correcao de posicao (passo recusado pelo servidor).
+            if (data.has("inventory")) {
+                spawnSmokeX = local.x;
+                spawnSmokeY = local.y;
+                spawnSmokeTempo = 0f;
+            }
             local.direcao = data.getString("direction", "down");
             // O servidor tambem manda sync_local_player PARCIAL (so' posicao,
             // ao esbarrar num NPC) - sem esse if, inventario/moedas/skills
@@ -1733,6 +1740,13 @@ public class WorldScreen extends ScreenAdapter {
 
         socket.on("trade_executed", (nomeEvt, data) -> {
             if (data != null) bookMenu.atualizarMoedas(data.getLong("new_currency", 0L));
+        });
+
+        // Troca de lugar aceita pelo servidor: [nomeA, xA, yA, dirA, nomeB, xB, yB, dirB].
+        socket.on("swap_exec", (nomeEvt, data) -> {
+            if (data == null || !data.isArray() || data.size < 8) return;
+            aplicarTroca(data.get(0).asString(), data.get(1).asFloat(), data.get(2).asFloat(), direcaoDoInt(data.get(3).asInt()));
+            aplicarTroca(data.get(4).asString(), data.get(5).asFloat(), data.get(6).asFloat(), direcaoDoInt(data.get(7).asInt()));
         });
 
         socket.on("m", (nomeEvt, data) -> {
@@ -2339,19 +2353,79 @@ public class WorldScreen extends ScreenAdapter {
         } else if (Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D) || joystick.isDireita()) {
             direcao = "right"; dx = Jogador.TILE;
         }
-        if (direcao == null) return;
+        if (direcao == null) {
+            tempoInsistindo = 0f;
+            return;
+        }
 
         float alvoX = local.x + dx;
         float alvoY = local.y + dy;
-        if (!colisao.ehParede(alvoX, alvoY)
+        boolean livre = !colisao.ehParede(alvoX, alvoY)
             && !colisao.movimentoBloqueado(local.x, local.y, alvoX, alvoY)
             && !npcOcupaTile(alvoX, alvoY)
-            && !mobOcupaTile(alvoX, alvoY)) {
+            && !mobOcupaTile(alvoX, alvoY);
+        Jogador noCaminho = livre ? jogadorOcupaTile(alvoX, alvoY) : null;
+        if (livre && noCaminho == null) {
+            tempoInsistindo = 0f;
             local.iniciarPasso(dx, dy, direcao);
             enviarMove(alvoX, alvoY, direcao);
-        } else {
-            local.direcao = direcao;
+            return;
         }
+        local.direcao = direcao;
+        // Outro player parado no caminho: insistindo (segurando a direcao
+        // contra ele) por TEMPO_INSISTIR_TROCA, pede pro servidor trocar de
+        // lugar (ele so' aceita se o outro estiver parado/afk ha' um tempo).
+        if (noCaminho == null || !noCaminho.nome.equals(alvoInsistindo)) {
+            alvoInsistindo = noCaminho != null ? noCaminho.nome : null;
+            tempoInsistindo = 0f;
+            return;
+        }
+        tempoInsistindo += Gdx.graphics.getDeltaTime();
+        if (tempoInsistindo >= TEMPO_INSISTIR_TROCA && socket.isConnected()) {
+            tempoInsistindo = 0f;
+            JsonValue lista = new JsonValue(JsonValue.ValueType.array);
+            lista.addChild(new JsonValue(noCaminho.nome));
+            lista.addChild(new JsonValue(intDaDirecao(direcao)));
+            socket.emitRaw("swap_req", lista.toJson(JsonWriter.OutputType.json));
+        }
+    }
+
+    // Troca de lugar com player parado no caminho (ver processarEntrada).
+    private static final float TEMPO_INSISTIR_TROCA = 1f;
+    private float tempoInsistindo = 0f;
+    private String alvoInsistindo = null;
+
+    /** Outro player vivo no SQM (morto nao bloqueia: o corpo e' atravessavel). */
+    private Jogador jogadorOcupaTile(float mundoX, float mundoY) {
+        int tileX = (int) Math.floor(mundoX / Jogador.TILE);
+        int tileY = (int) Math.floor((mundoY - 1f) / Jogador.TILE);
+        for (Jogador j : remotos.values()) {
+            if (remotosMortos.contains(j.nome)) continue;
+            float jx = j.posicaoSalvarX(), jy = j.posicaoSalvarY(); // pra onde ele esta indo
+            if ((int) Math.floor(jx / Jogador.TILE) == tileX && (int) Math.floor((jy - 1f) / Jogador.TILE) == tileY) return j;
+        }
+        return null;
+    }
+
+    /** Aplica a posicao que o servidor mandou (troca de lugar): anda 1 SQM se
+     * for do lado, senao teleporta. */
+    private void aplicarTroca(String nome, float rawX, float rawY, String direcao) {
+        float mx = conversor.rawParaMundoX(rawX);
+        float my = conversor.rawParaMundoY(rawY);
+        if (nome.equals(local.nome)) {
+            float dx = mx - local.x, dy = my - local.y;
+            if (!local.movendo && Math.abs(dx) + Math.abs(dy) <= Jogador.TILE + 0.5f) {
+                local.iniciarPasso(dx, dy, direcao);
+            } else {
+                local.x = mx;
+                local.y = my;
+                local.movendo = false;
+                local.direcao = direcao;
+            }
+            return;
+        }
+        Jogador j = remotos.get(nome);
+        if (j != null) j.definirAlvo(mx, my, direcao);
     }
 
     /** Mob vivo no SQM (onde esta ou pra onde esta indo) bloqueia o passo -
