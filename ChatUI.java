@@ -32,7 +32,7 @@ import java.util.Map;
  * mensagem + "+"/"-" no topo, log + lista de jogadores lado a lado no meio,
  * abas (Local/extras) + Close embaixo. So' Local existe de fabrica (sem
  * Trade nem Global, a pedido do usuario) - "+" abre uma barra de icones pra
- * adicionar uma aba extra (English/Portuguese/Spanish/Help), "-" fecha a aba
+ * adicionar uma aba extra (English/Portuguese/Spanish/Russian/Help), "-" fecha a aba
  * extra ATUAL (Local nunca fecha). Ainda nao fala com o servidor de
  * verdade (nenhuma das abas tem um canal de rede próprio ainda) - cada aba
  * so' guarda seu proprio log local, igual o ChatUI antigo (mesma ideia do
@@ -47,8 +47,10 @@ public class ChatUI {
         {"Portuguese", "ui/Brazil"},
         {"Spanish", "ui/Spain"},
         {"English", "ui/America"},
+        {"Russian", "ui/Russian"},
         {"Help", "ui/items/Flag"},
     };
+    private static final int ICONES_POR_LINHA = 3;
 
     private final Stage stage;
     private final Skin skin;
@@ -225,8 +227,9 @@ public class ChatUI {
         janela.setVisible(false);
     }
 
-    /** Barra retangular com 1 botao de icone por aba extra (bandeiras +
-     * Help), centralizada na tela. Clicar fora dela fecha. */
+    /** Painel com 1 botao de icone por aba extra (bandeiras + Help) e o
+     * Cancel (ui/Negate) por ultimo, 3 por linha, centralizado na tela.
+     * Clicar fora dele tambem fecha. */
     private Table criarPopupAdicionar() {
         Table popup = new Table();
         popup.setBackground(skin.getDrawable("popup-painel"));
@@ -235,28 +238,23 @@ public class ChatUI {
         // icones nao pode "vazar" pra ancora e fechar a barra.
         popup.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         TextButton.TextButtonStyle estiloBotao = skin.get("cinza-popup", TextButton.TextButtonStyle.class);
+        int n = 0;
         for (String[] aba : ABAS_ADICIONAVEIS) {
             final String nome = aba[0];
-            TextureRegion icone = atlas != null ? atlas.findRegion(aba[1]) : null;
-            Button botao;
-            if (icone != null) {
-                botao = new Button(estiloBotao);
-                // 32px: bandeiras de 16px em 2x e a Flag (32px) em 1x - escala
-                // inteira, sem pixel torto (atlas e' Nearest).
-                botao.add(new Image(icone)).size(32);
-            } else {
-                TextButton tb = new TextButton(nome, estiloBotao);
-                tb.getLabel().setStyle(new Label.LabelStyle(skin.getFont("botao-pequeno-font"), tb.getLabel().getStyle().fontColor));
-                botao = tb;
-            }
+            Button botao = criarBotaoIcone(aba[1], nome, estiloBotao);
             botao.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     adicionarAba(nome);
                     popupAdicionar.setVisible(false);
                 }
             });
-            popup.add(botao).minWidth(56).height(56).pad(0, 4, 0, 4);
+            adicionarNaGrade(popup, botao, n++);
         }
+        Button cancelar = criarBotaoIcone("ui/Negate", "Cancel", estiloBotao);
+        cancelar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { popupAdicionar.setVisible(false); }
+        });
+        adicionarNaGrade(popup, cancelar, n);
 
         Table ancora = new Table();
         ancora.setFillParent(true);
@@ -271,6 +269,26 @@ public class ChatUI {
         return ancora;
     }
 
+    /** Botao com o icone do atlas; sem atlas/icone (ex: TesteGame) vira texto. */
+    private Button criarBotaoIcone(String caminhoIcone, String textoReserva, TextButton.TextButtonStyle estilo) {
+        TextureRegion icone = atlas != null ? atlas.findRegion(caminhoIcone) : null;
+        if (icone != null) {
+            Button botao = new Button(estilo);
+            // 32px: icones de 16px em 2x e a Flag (32px) em 1x - escala
+            // inteira, sem pixel torto (atlas e' Nearest).
+            botao.add(new Image(icone)).size(32);
+            return botao;
+        }
+        TextButton tb = new TextButton(textoReserva, estilo);
+        tb.getLabel().setStyle(new Label.LabelStyle(skin.getFont("botao-pequeno-font"), tb.getLabel().getStyle().fontColor));
+        return tb;
+    }
+
+    private void adicionarNaGrade(Table popup, Button botao, int indice) {
+        com.badlogic.gdx.scenes.scene2d.ui.Cell<Button> celula = popup.add(botao).minWidth(56).height(56).pad(4);
+        if (indice % ICONES_POR_LINHA == ICONES_POR_LINHA - 1) celula.row();
+    }
+
     private void adicionarAba(String nome) {
         if (!mensagensPorAba.containsKey(nome)) mensagensPorAba.put(nome, new Array<>());
         abaAtual = nome;
@@ -279,7 +297,7 @@ public class ChatUI {
     }
 
     /** Local nunca fecha (a pedido do usuario) - "-" so' tem efeito numa aba
-     * extra (English/Portuguese/Spanish/Help) adicionada via "+". */
+     * extra (English/Portuguese/Spanish/Russian/Help) adicionada via "+". */
     private void fecharAbaAtual() {
         if (abaAtual.equals(ABA_LOCAL)) return;
         mensagensPorAba.remove(abaAtual);
