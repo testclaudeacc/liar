@@ -1453,7 +1453,9 @@ public class WorldScreen extends ScreenAdapter {
         String lider = bookMenu.liderParty();
         TextureRegion icone = null;
         if (lider != null && bookMenu.estaNaParty(j.nome)) icone = j.nome.equals(lider) ? iconeLiderParty : iconeMembroParty;
-        else if (j != local && convitesPartyEnviados.contains(j.nome)) icone = iconeConviteParty;
+        else if (j != local && (convitesPartyEnviados.contains(j.nome) || bookMenu.temConviteParty(j.nome))) {
+            icone = iconeConviteParty; // eu convidei ele, ou ele me convidou
+        }
         if (icone == null) return;
         // Balao: x+2 a direita do centro; aqui o espelho dele.
         // Centro vertical igual o do balao (y+9.5, ~8 de altura).
@@ -2121,6 +2123,7 @@ public class WorldScreen extends ScreenAdapter {
             baloesRemotos.remove(data.getString("name", ""));
             convitesTrade.remove(data.getString("name", ""));
             convitesPartyEnviados.remove(data.getString("name", ""));
+            bookMenu.removerConviteParty(data.getString("name", ""));
             if (bookMenu.amigo(data.getString("name", "")) != null && !data.getString("name", "").equals(local.nome)) {
                 hud.notificar(data.getString("name", "") + " is offline.", COR_NOTIF_OFF, null);
             }

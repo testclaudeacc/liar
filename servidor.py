@@ -3788,6 +3788,15 @@ def handle_invite_party(data):
     try:
         sid = request.sid
         if sid not in online_players: return
+        # Ele ja' tinha me convidado pra party dele: convidar de volta = aceitar
+        # (em vez de criar uma party nova).
+        alvo_nome = str(data.get('target_name', '') if isinstance(data, dict) else '').strip()
+        alvo_sid = players_by_name.get(alvo_nome)
+        if alvo_sid and alvo_sid in online_players and alvo_sid != sid:
+            party_dele, _pid_dele = _get_party(alvo_sid)
+            if party_dele and party_dele.get('pending_invites', {}).get(sid) == alvo_sid:
+                handle_accept_party_invite({'inviter_name': alvo_nome})
+                return
         party, party_id = _get_party(sid)
         if not party:
             # Convidar sem ter party (botao Party da janela do jogador): cria
@@ -4529,7 +4538,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-03 trade"
+VERSAO_SERVIDOR = "2026-10-03 trade v2"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR}")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(autosave_loop)

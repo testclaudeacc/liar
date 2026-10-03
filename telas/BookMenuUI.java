@@ -1585,6 +1585,7 @@ public final class BookMenuUI {
     private com.badlogic.gdx.scenes.scene2d.ui.TextField campoQtdTrade;
 
     private static final Color COR_TRADE_SELECIONADO = new Color(0.25f, 0.85f, 0.3f, 1f);
+    private static final boolean MOBILE_LIVRO = FONTE_STATS < 1f;
     // Moedas no trade: slot de cada uma (chave "$Nome" em tradeSelecao, valor
     // = quantas daquela moeda). Aparecem as que valem ate' a maior que o
     // player tem (com 20 silver aparece copper pra trocar 1 silver em 100).
@@ -1637,7 +1638,9 @@ public final class BookMenuUI {
             Table marcadores = new Table();
             marcadores.bottom();
             adicionarQuantidade(marcadores, (int) Math.min(Integer.MAX_VALUE, quantidade));
-            ((Label) marcadores.getChildren().peek()).setColor(corQtd);
+            Label numero = (Label) marcadores.getChildren().peek();
+            numero.setColor(corQtd);
+            if (MOBILE_LIVRO) numero.setFontScale(0.6f * 0.8f);
             marcadores.add().expandX();
             conteudo.add(marcadores);
         }
@@ -1794,6 +1797,7 @@ public final class BookMenuUI {
 
     /** Fecha as telas de trade (sem avisar o servidor) e volta o livro ao normal. */
     public void fecharTrade() {
+        fecharPopupQuantidade();
         if (!modoTrade) return;
         modoTrade = false;
         tradeOutro = null;
@@ -1874,7 +1878,9 @@ public final class BookMenuUI {
             Table marcadores = new Table();
             marcadores.bottom();
             adicionarQuantidade(marcadores, escolhida > 0 ? escolhida : quantidade);
-            if (escolhida > 0) ((Label) marcadores.getChildren().peek()).setColor(COR_TRADE_SELECIONADO);
+            Label numero = (Label) marcadores.getChildren().peek();
+            if (escolhida > 0) numero.setColor(COR_TRADE_SELECIONADO);
+            if (MOBILE_LIVRO) numero.setFontScale(0.6f * 0.8f);
             marcadores.add().expandX();
             conteudo.add(marcadores);
         }
@@ -1883,22 +1889,20 @@ public final class BookMenuUI {
 
     private void clicarMoedaTrade(int i) {
         String chave = PREFIXO_MOEDA + MOEDAS_TRADE[i];
-        if (tradeEnviado) {
-            tradeFoco = chave;
-            atualizarDetalhesTrade();
-            return;
-        }
-        boolean marcado = tradeSelecao.containsKey(chave);
-        if (!marcado) {
-            int max = maxMoeda(i, chave);
-            if (max <= 0) return;
-            // Comeca com o que ele tem daquela moeda (ou 1, se for pra trocar).
-            tradeSelecao.put(chave, (int) Math.max(1, Math.min(max, moedasTidas(i))));
-            tradeFoco = chave;
-        } else if (chave.equals(tradeFoco)) {
-            tradeSelecao.remove(chave);
-        } else {
-            tradeFoco = chave;
+        tradeFoco = chave;
+        if (!tradeEnviado) {
+            if (tradeSelecao.containsKey(chave)) {
+                tradeSelecao.remove(chave); // clicar no marcado desmarca direto
+            } else {
+                int max = maxMoeda(i, chave);
+                if (max > 0) {
+                    abrirPopupQuantidade(MOEDAS_TRADE[i] + " Coins", max, v -> {
+                        tradeSelecao.put(chave, v);
+                        atualizarGradeTrade();
+                        atualizarDetalhesTrade();
+                    });
+                }
+            }
         }
         atualizarGradeTrade();
         atualizarDetalhesTrade();
@@ -1914,54 +1918,111 @@ public final class BookMenuUI {
         nome.setColor(corMoeda(tipo));
         tradeDetalhes.add(nome).left().padBottom(1).row();
         tradeDetalhes.add(linhaStat("You have " + moedasTidas(i), Color.LIGHT_GRAY)).left().row();
-        if (!tradeSelecao.containsKey(chave) || tradeEnviado) return;
-        tradeDetalhes.add(linhaStat("Amount to trade:", COR_TRADE_SELECIONADO)).left().padTop(6).row();
-        campoQtdTrade = new com.badlogic.gdx.scenes.scene2d.ui.TextField(String.valueOf(tradeSelecao.get(chave)), skin);
-        campoQtdTrade.setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
-        campoQtdTrade.setMaxLength(9);
-        campoQtdTrade.setTextFieldListener((campo, c) -> {
-            String t = campo.getText();
+        if (tradeSelecao.containsKey(chave)) {
+            tradeDetalhes.add(linhaStat("Selected " + tradeSelecao.get(chave), COR_TRADE_SELECIONADO)).left().row();
+        }
+    }
+
+    // ---- Janelinha de quantidade (item com mais de 1 / moedas) ----
+    private Table popupQuantidade;
+
+    /** Pergunta quantos (1..max, so' numeros); Confirm chama aoConfirmar. */
+    private void abrirPopupQuantidade(String titulo, int max, java.util.function.IntConsumer aoConfirmar) {
+        fecharPopupQuantidade();
+        Stage stage = root.getStage();
+        if (stage == null) return;
+        Table caixa = new Table();
+        caixa.setBackground(UiSkin.retangulo(new Color(0.1f, 0.1f, 0.1f, 0.98f), new Color(0.4f, 0.4f, 0.4f, 1f), 1));
+        caixa.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        caixa.pad(14);
+        Label rotulo = new Label(titulo, skin, "hud");
+        rotulo.setFontScale(0.8f * FONTE_STATS);
+        Label limite = new Label("How many? (max " + max + ")", skin, "hud");
+        limite.setFontScale(0.65f * FONTE_STATS);
+        limite.setColor(Color.LIGHT_GRAY);
+        com.badlogic.gdx.scenes.scene2d.ui.TextField campo = new com.badlogic.gdx.scenes.scene2d.ui.TextField(String.valueOf(max), skin);
+        campo.setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
+        campo.setMaxLength(String.valueOf(max).length());
+        campo.setTextFieldListener((c, ch) -> {
+            String t = c.getText();
             if (t.isEmpty()) return;
-            int max = Math.max(1, maxMoeda(i, chave));
             int v;
             try { v = Integer.parseInt(t); } catch (NumberFormatException e) { v = max; }
-            int limitado = Math.max(1, Math.min(max, v));
-            if (limitado != v) {
-                campo.setText(String.valueOf(limitado));
-                campo.setCursorPosition(campo.getText().length());
+            int lim = Math.max(1, Math.min(max, v));
+            if (lim != v) {
+                c.setText(String.valueOf(lim));
+                c.setCursorPosition(c.getText().length());
             }
-            tradeSelecao.put(chave, limitado);
-            atualizarGradeTrade();
+            if (ch == '\n' || ch == '\r') confirmarPopup(c, max, aoConfirmar);
         });
-        TextButton max = new TextButton("Max", estiloBotaoTrade("default"));
-        max.addListener(new ChangeListener() {
+        TextButton botaoMax = new TextButton("Max", estiloBotaoTrade("default"));
+        botaoMax.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                int m = Math.max(1, maxMoeda(i, chave));
-                tradeSelecao.put(chave, m);
-                campoQtdTrade.setText(String.valueOf(m));
-                atualizarGradeTrade();
+                campo.setText(String.valueOf(max));
             }
         });
-        Table linhaQtd = new Table();
-        linhaQtd.add(campoQtdTrade).width(84).height(36).padRight(4);
-        linhaQtd.add(max).width(52).height(36);
-        tradeDetalhes.add(linhaQtd).left().padTop(2).row();
+        TextButton cancelar = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
+        TextButton confirmar = new TextButton("Confirm", estiloBotaoTrade("verde"));
+        cancelar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { fecharPopupQuantidade(); }
+        });
+        confirmar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                confirmarPopup(campo, max, aoConfirmar);
+            }
+        });
+        Table linhaCampo = new Table();
+        linhaCampo.add(campo).width(140).height(40).padRight(6);
+        linhaCampo.add(botaoMax).width(64).height(40);
+        Table linhaBotoes = new Table();
+        linhaBotoes.add(cancelar).width(110).height(44).padRight(10);
+        linhaBotoes.add(confirmar).width(110).height(44);
+        caixa.add(rotulo).padBottom(4).row();
+        caixa.add(limite).padBottom(10).row();
+        caixa.add(linhaCampo).padBottom(12).row();
+        caixa.add(linhaBotoes);
+
+        popupQuantidade = new Table();
+        popupQuantidade.setFillParent(true);
+        popupQuantidade.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled); // bloqueia o livro atras
+        popupQuantidade.setBackground(UiSkin.retangulo(new Color(0f, 0f, 0f, 0.45f), new Color(0f, 0f, 0f, 0.45f), 1));
+        popupQuantidade.center();
+        popupQuantidade.add(caixa);
+        stage.addActor(popupQuantidade);
+        stage.setKeyboardFocus(campo);
+        campo.selectAll();
+    }
+
+    private void confirmarPopup(com.badlogic.gdx.scenes.scene2d.ui.TextField campo, int max, java.util.function.IntConsumer aoConfirmar) {
+        int v;
+        try { v = Integer.parseInt(campo.getText()); } catch (NumberFormatException e) { v = max; }
+        v = Math.max(1, Math.min(max, v));
+        fecharPopupQuantidade();
+        aoConfirmar.accept(v);
+    }
+
+    private void fecharPopupQuantidade() {
+        if (popupQuantidade == null) return;
+        Stage stage = popupQuantidade.getStage();
+        if (stage != null) stage.setKeyboardFocus(null);
+        popupQuantidade.remove();
+        popupQuantidade = null;
     }
 
     private void clicarItemTrade(InventoryItem item) {
-        if (tradeEnviado) {
-            tradeFoco = item.instanceId;
-            atualizarDetalhesTrade();
-            return;
-        }
-        boolean marcado = tradeSelecao.containsKey(item.instanceId);
-        if (!marcado) {
-            tradeSelecao.put(item.instanceId, item.quantity);
-            tradeFoco = item.instanceId;
-        } else if (item.instanceId.equals(tradeFoco)) {
-            tradeSelecao.remove(item.instanceId);
-        } else {
-            tradeFoco = item.instanceId; // so' mostra (pra mudar a quantia)
+        tradeFoco = item.instanceId;
+        if (!tradeEnviado) {
+            if (tradeSelecao.containsKey(item.instanceId)) {
+                tradeSelecao.remove(item.instanceId); // clicar no marcado desmarca direto
+            } else if (item.quantity > 1) {
+                abrirPopupQuantidade(nomeExibicao(item.itemPath), item.quantity, v -> {
+                    tradeSelecao.put(item.instanceId, v);
+                    atualizarGradeTrade();
+                    atualizarDetalhesTrade();
+                });
+            } else {
+                tradeSelecao.put(item.instanceId, 1);
+            }
         }
         atualizarGradeTrade();
         atualizarDetalhesTrade();
@@ -1989,46 +2050,15 @@ public final class BookMenuUI {
             return;
         }
         preencherBlocoStats(tradeDetalhes, item.itemPath, null);
-        if (item.quantity > 1) {
-            tradeDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
-            if (tradeSelecao.containsKey(item.instanceId) && !tradeEnviado) {
-                // Quantia: so' numeros, de 1 ate o que tem.
-                tradeDetalhes.add(linhaStat("Amount to trade:", COR_TRADE_SELECIONADO)).left().padTop(6).row();
-                campoQtdTrade = new com.badlogic.gdx.scenes.scene2d.ui.TextField(
-                    String.valueOf(tradeSelecao.get(item.instanceId)), skin);
-                campoQtdTrade.setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
-                campoQtdTrade.setMaxLength(String.valueOf(item.quantity).length());
-                campoQtdTrade.setTextFieldListener((campo, c) -> {
-                    String t = campo.getText();
-                    if (t.isEmpty()) return;
-                    int v;
-                    try { v = Integer.parseInt(t); } catch (NumberFormatException e) { v = item.quantity; }
-                    int limitado = Math.max(1, Math.min(item.quantity, v));
-                    if (limitado != v) {
-                        campo.setText(String.valueOf(limitado));
-                        campo.setCursorPosition(campo.getText().length());
-                    }
-                    tradeSelecao.put(item.instanceId, limitado);
-                    atualizarGradeTrade();
-                });
-                TextButton max = new TextButton("Max", estiloBotaoTrade("default"));
-                max.addListener(new ChangeListener() {
-                    @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                        tradeSelecao.put(item.instanceId, item.quantity);
-                        campoQtdTrade.setText(String.valueOf(item.quantity));
-                        atualizarGradeTrade();
-                    }
-                });
-                Table linhaQtd = new Table();
-                linhaQtd.add(campoQtdTrade).width(64).height(36).padRight(4);
-                linhaQtd.add(max).width(52).height(36);
-                tradeDetalhes.add(linhaQtd).left().padTop(2).row();
-            }
+        if (item.quantity > 1) tradeDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
+        if (tradeSelecao.containsKey(item.instanceId) && item.quantity > 1) {
+            tradeDetalhes.add(linhaStat("Selected " + tradeSelecao.get(item.instanceId), COR_TRADE_SELECIONADO)).left().row();
         }
     }
 
     private void enviarOfertaTrade() {
         if (tradeEnviado || !socket.isConnected()) return;
+        fecharPopupQuantidade();
         // Campo vazio na hora de mandar: vale a quantia que ja' estava.
         String payload = GameSocket.obj(w -> {
             w.array("items");
@@ -2378,6 +2408,9 @@ public final class BookMenuUI {
     }
 
     public String liderParty() { return liderParty; }
+
+    /** Ele me convidou pra party (convite ainda pendente). */
+    public boolean temConviteParty(String nome) { return convitesParty.containsKey(nome); }
 
     public List<MembroParty> membrosParty() { return membrosParty; }
 

@@ -113,10 +113,15 @@ public class UiSkin {
         // caractere que no Godot nesse mesmo tamanho nominal - 24 ainda
         // vazava do botao de 200px, 20 coube (achado testando ao vivo).
         BitmapFont fonteBotaoPequeno = gerarFonte(FONTE_GUI, 18, 2, escala);
+        fonteBotaoPequeno.setUseIntegerPositions(false); // idem fonteHud (livro ampliado no celular)
         // FPS/ms do WorldScreen - sem contorno (borda=0) a pedido do usuario,
         // que achava o texto de debug com a borda preta pesada demais pra um
         // numero pequeno no canto da tela.
         BitmapFont fonteHud = gerarFonte("fonts/dejavu-sans.condensed.ttf", 18, 0, escala);
+        // Posicao de letra fracionaria: com o livro ampliado (escala 1.2 no
+        // celular) e fontScale < 1, arredondar cada letra pro inteiro fazia
+        // letras da mesma palavra subirem/descerem.
+        fonteHud.setUseIntegerPositions(false);
         skin.add("hud-font", fonteHud);
         skin.add("hud", new Label.LabelStyle(fonteHud, Color.WHITE));
         // Log do chat - sem contorno (fundo escuro + texto branco ja tem
