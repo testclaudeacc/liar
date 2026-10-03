@@ -1,0 +1,7 @@
+# Gerados pelo servidor (segredos/estado local, nunca versionar)
+segredo_sessao.key
+chat_mutes.json
+conteudo_mapas.json
+mapas_colisao.json
+.env
+__pycache__/

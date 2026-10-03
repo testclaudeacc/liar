@@ -4,17 +4,19 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Preferences;
 
 /** Porta de start_screen.gd::save_session()/load_session() - usa Preferences
- * (SharedPreferences no Android, arquivo local no desktop) em vez de um
- * arquivo JSON proprio, mas guarda os mesmos 3 campos. */
+ * (SharedPreferences no Android, arquivo local no desktop). Guarda o TOKEN de
+ * sessao que o servidor devolve no login (nunca mais a senha em texto puro:
+ * qualquer um com acesso ao arquivo/aparelho lia a senha da conta). */
 public class Sessao {
 
     private static final String NOME = "inverted_realms_session";
 
-    public static void salvar(int userId, String email, String password) {
+    public static void salvar(int userId, String email, String token) {
         Preferences prefs = Gdx.app.getPreferences(NOME);
         prefs.putInteger("user_id", userId);
         prefs.putString("email", email);
-        prefs.putString("password", password);
+        prefs.putString("token", token == null ? "" : token);
+        prefs.remove("password"); // versoes antigas guardavam a senha aqui
         prefs.flush();
     }
 
@@ -31,7 +33,7 @@ public class Sessao {
         return Gdx.app.getPreferences(NOME).getString("email", "");
     }
 
-    public static String passwordSalva() {
-        return Gdx.app.getPreferences(NOME).getString("password", "");
+    public static String tokenSalvo() {
+        return Gdx.app.getPreferences(NOME).getString("token", "");
     }
 }

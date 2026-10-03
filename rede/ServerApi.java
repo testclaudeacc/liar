@@ -61,7 +61,10 @@ public class ServerApi {
     }
 
     public static void getCharacters(int userId, ApiCallback callback) {
-        String body = json(w -> w.set("user_id", userId));
+        String body = json(w -> {
+            w.set("user_id", userId);
+            w.set("token", Sessao.tokenSalvo());
+        });
         post("/get_characters", body, callback);
     }
 
@@ -70,6 +73,7 @@ public class ServerApi {
             w.set("user_id", userId);
             w.set("name", name);
             w.set("class_name", className);
+            w.set("token", Sessao.tokenSalvo());
         });
         post("/create_character", body, callback);
     }
@@ -79,6 +83,7 @@ public class ServerApi {
             w.set("user_id", userId);
             w.set("name", name);
             w.set("password", password);
+            w.set("token", Sessao.tokenSalvo());
         });
         post("/delete_character", body, callback);
     }

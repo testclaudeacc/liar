@@ -49,6 +49,8 @@ public class AuthScreen extends ScreenAdapter {
     // tocar em nenhuma constante de tamanho individual pelo resto do arquivo.
     private static final float MUNDO_VIRTUAL_LARGURA = 960f;
     private static final float MUNDO_VIRTUAL_ALTURA = 540f;
+    private static final Pattern NOME_PERSONAGEM_REGEX =
+        Pattern.compile("^[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF][A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF0-9 ]*$");
     private static final Pattern EMAIL_REGEX = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
 
     private static final String[] BANNED_NAMES = {
@@ -568,7 +570,7 @@ public class AuthScreen extends ScreenAdapter {
                         if (statusCode == 200 && body != null && body.has("user_id")) {
                             currentUserId = body.getInt("user_id");
                             atualizarLogout();
-                            Sessao.salvar(currentUserId, body.getString("email", em), pw);
+                            Sessao.salvar(currentUserId, body.getString("email", em), body.getString("token", ""));
                             fetchCharacters();
                         } else {
                             telaErro("Invalid email or password.", AuthScreen.this::telaLogin);
@@ -644,7 +646,7 @@ public class AuthScreen extends ScreenAdapter {
                             if (body != null && body.has("user_id")) {
                                 currentUserId = body.getInt("user_id");
                                 atualizarLogout();
-                                Sessao.salvar(currentUserId, body.getString("email", em), pw);
+                                Sessao.salvar(currentUserId, body.getString("email", em), body.getString("token", ""));
                             }
                             telaErro("Account created successfully!", AuthScreen.this::fetchCharacters);
                         } else {
@@ -769,6 +771,12 @@ public class AuthScreen extends ScreenAdapter {
                     }
                     currentSlotIndex = Math.max(0, Math.min(currentSlotIndex, MAX_SLOTS - 1));
                     telaSelecaoPersonagem();
+                } else if (statusCode == 401) {
+                    // Token vencido/invalido (ou senha trocada): pede login de novo.
+                    Sessao.limpar();
+                    currentUserId = -1;
+                    atualizarLogout();
+                    telaErro("Session expired. Please log in again.", AuthScreen.this::telaLogin);
                 } else {
                     telaErro("Failed to load characters.", AuthScreen.this::telaMenuPrincipal);
                 }
@@ -1265,6 +1273,10 @@ public class AuthScreen extends ScreenAdapter {
     private String validarNome(String texto) {
         if (texto.length() < 3 || texto.length() > 12) {
             return "Name must be between 3 and 12 characters.";
+        }
+        // Mesma regra do servidor (servidor.py::RE_NOME_PERSONAGEM).
+        if (!NOME_PERSONAGEM_REGEX.matcher(texto).matches() || texto.contains("  ")) {
+            return "Use only letters, numbers and spaces.";
         }
         String lower = texto.toLowerCase();
         for (String banido : BANNED_NAMES) {

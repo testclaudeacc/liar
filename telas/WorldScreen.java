@@ -1774,6 +1774,12 @@ public class WorldScreen extends ScreenAdapter {
         String payload = GameSocket.obj(w -> {
             w.set("map", MAP_ID_SERVIDOR);
             w.set("fp", colisao.fingerprint());
+            // Spawn do mapa (cru): o servidor guarda e usa pra (re)nascer -
+            // o client nao escolhe mais onde renasce.
+            w.array("spawn");
+            w.value(conversor.mundoParaRawX(spawnX));
+            w.value(conversor.mundoParaRawY(spawnY));
+            w.pop();
             w.array("mobs");
             for (MapaPropriedades.MobSpawn spawn : mapa.propriedades.mobSpawns) {
                 w.object();

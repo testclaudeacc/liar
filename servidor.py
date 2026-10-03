@@ -21,6 +21,9 @@ import traceback
 import time
 import math
 import uuid
+import hmac
+import hashlib
+import secrets
 import base64
 import heapq
 from email.mime.text import MIMEText
@@ -461,6 +464,136 @@ socketio = SocketIO(
     app, cors_allowed_origins="*", ping_interval=10, 
     ping_timeout=15, async_mode='eventlet'
 )
+
+# =========================================================================
+# SEGURANCA: sessao (token), limite de tentativas e validacoes
+# =========================================================================
+
+# Segredo que assina os tokens de sessao. Vem do .env (SECRET_KEY) ou, sem
+# ele, e' gerado uma vez e salvo do lado do servidor - sobrevive a reinicios,
+# entao ninguem precisa logar de novo so' porque o servidor reiniciou.
+_ARQUIVO_SEGREDO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'segredo_sessao.key')
+
+def _carregar_segredo():
+    s = os.getenv('SECRET_KEY')
+    if s: return s.encode()
+    try:
+        with open(_ARQUIVO_SEGREDO, 'r') as f:
+            return f.read().strip().encode()
+    except FileNotFoundError:
+        novo = secrets.token_hex(32)
+        with open(_ARQUIVO_SEGREDO, 'w') as f:
+            f.write(novo)
+        try: os.chmod(_ARQUIVO_SEGREDO, 0o600)
+        except Exception: pass
+        return novo.encode()
+
+SEGREDO_SESSAO = _carregar_segredo()
+TOKEN_VALIDADE_SEG = 30 * 24 * 3600  # 30 dias
+
+def _assinar(texto):
+    return hmac.new(SEGREDO_SESSAO, texto.encode(), hashlib.sha256).hexdigest()
+
+def _versao_senha(hash_senha):
+    # Entra na assinatura: trocar a senha invalida todos os tokens antigos.
+    return hashlib.sha256((hash_senha or '').encode()).hexdigest()[:16]
+
+def gerar_token(user_id, hash_senha):
+    exp = int(time.time()) + TOKEN_VALIDADE_SEG
+    base = f"{int(user_id)}.{exp}.{_versao_senha(hash_senha)}"
+    return f"{int(user_id)}.{exp}.{_assinar(base)}"
+
+def token_valido(cursor, user_id, token):
+    """O token prova que quem pede ja' fez login nessa conta (o user_id que o
+    client manda nao vale nada sozinho - qualquer um pode digitar outro)."""
+    try:
+        uid_txt, exp_txt, assinatura = str(token).split('.')
+        uid, exp = int(uid_txt), int(exp_txt)
+        if uid != int(user_id) or exp < time.time(): return False
+    except (ValueError, TypeError):
+        return False
+    cursor.execute("SELECT password FROM users WHERE id = %s", (uid,))
+    row = cursor.fetchone()
+    if not row: return False
+    base = f"{uid}.{exp}.{_versao_senha(row[0])}"
+    return hmac.compare_digest(_assinar(base), assinatura)
+
+# ---- Limite de tentativas (HTTP) ----
+# chave -> timestamps recentes. Barra forca bruta de senha/codigo e spam de
+# cadastro. Em memoria (zera ao reiniciar o servidor, tudo bem).
+_tentativas = {}
+
+def _limite_excedido(chave, maximo, janela_seg):
+    agora = time.time()
+    lista = [t for t in _tentativas.get(chave, []) if agora - t < janela_seg]
+    if len(lista) >= maximo:
+        _tentativas[chave] = lista
+        return True
+    lista.append(agora)
+    _tentativas[chave] = lista
+    return False
+
+def _ip():
+    # Atras de proxy (nginx/cloudflare), configure o proxy pra mandar o IP
+    # real e troque isto por request.headers['X-Forwarded-For'].
+    return request.remote_addr or '?'
+
+def _resposta_limite():
+    return jsonify({"erro": "Too many attempts. Wait a few minutes and try again."}), 429
+
+def _erro_interno(e):
+    # Nunca devolve a mensagem da excecao pro client (vazava detalhes do banco).
+    traceback.print_exc()
+    return jsonify({"erro": "Server error."}), 500
+
+def _json_requisicao():
+    dados = request.get_json(silent=True)
+    return dados if isinstance(dados, dict) else {}
+
+RE_EMAIL = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+# Letra no comeco; letras (com acento), numeros e espaco simples; 3 a 12.
+RE_NOME_PERSONAGEM = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ0-9 ]{2,11}$")
+CLASSES_VALIDAS = ("Knight", "Ranger", "Mage", "Bard")
+SENHA_MIN, SENHA_MAX = 5, 128
+
+# ---- Limite de eventos por conexao (socket) ----
+# Cada conexao tem um "balde" de eventos: rajada de ate EVENTOS_RAJADA,
+# recarregando EVENTOS_POR_SEG por segundo. Passou disso o evento e'
+# descartado; quem continua inundando muito acima disso e' desconectado.
+EVENTOS_POR_SEG = 30.0
+EVENTOS_RAJADA = 60.0
+EVENTOS_DESCARTADOS_MAX = 300
+_baldes_eventos = {}
+_on_original = socketio.on
+
+def _socketio_on_com_limite(evento, *args, **kwargs):
+    decorador_original = _on_original(evento, *args, **kwargs)
+    if evento in ('connect', 'disconnect'):
+        return decorador_original
+    def decorador(funcao):
+        def com_limite(*f_args, **f_kwargs):
+            sid = request.sid
+            agora = time.time()
+            balde = _baldes_eventos.get(sid)
+            if balde is None:
+                balde = _baldes_eventos[sid] = [EVENTOS_RAJADA, agora, 0]
+            balde[0] = min(EVENTOS_RAJADA, balde[0] + (agora - balde[1]) * EVENTOS_POR_SEG)
+            balde[1] = agora
+            if balde[0] < 1.0:
+                balde[2] += 1
+                if balde[2] >= EVENTOS_DESCARTADOS_MAX:
+                    print(f"[SEGURANCA] {sid} desconectado por flood de eventos")
+                    try: socketio.server.disconnect(sid, namespace='/')
+                    except Exception: pass
+                return None
+            balde[0] -= 1.0
+            balde[2] = max(0, balde[2] - 1)
+            return funcao(*f_args, **f_kwargs)
+        com_limite.__name__ = funcao.__name__
+        return decorador_original(com_limite)
+    return decorador
+
+socketio.on = _socketio_on_com_limite
 
 # Bloqueio de nomes de personagem via substring (name.lower() contém algum
 # destes) - cobre (1) tentativa de se passar por staff/sistema e (2) nomes
@@ -1140,6 +1273,7 @@ def _mob_atacar(mob_id, m, target_sid, now):
     hp_atual = max(0.0, hp_atual - dano_final)
     target_player['current_hp'] = hp_atual
     target_player['_ultimo_hp_broadcast'] = [hp_atual, max_hp_alvo]
+    target_player['last_hit_by_mob'] = now  # libera o treino de defense (register_skill_hit)
 
     emit_area('player_damaged', {'target_player': target_name, 'damage': dano_final, 'new_hp': hp_atual,
                                  'max_hp': max_hp_alvo, 'hit_type': m.get('hit_effect', 'physical_hit'),
@@ -1476,16 +1610,20 @@ def ping(): return jsonify({"status": "online"}), 200
 
 @app.route('/check_version', methods=['POST'])
 def check_version():
-    dados = request.get_json()
+    dados = _json_requisicao()
     if dados.get('version', '') == SERVER_VERSION: return jsonify({"valid": True, "mensagem": "Version OK."}), 200
     return jsonify({"valid": False, "erro": "Client out of date."}), 426
 
 @app.route('/register', methods=['POST'])
 def register():
-    dados = request.get_json()
-    if not dados or not dados.get('email') or not dados.get('password'): return jsonify({"erro": "Missing fields"}), 400
-    email = dados.get('email').strip().lower()
-    hashed_password = generate_password_hash(dados.get('password'))
+    dados = _json_requisicao()
+    email = str(dados.get('email') or '').strip().lower()
+    senha = str(dados.get('password') or '')
+    if not email or not senha: return jsonify({"erro": "Missing fields"}), 400
+    if len(email) > 254 or not RE_EMAIL.match(email): return jsonify({"erro": "Invalid email."}), 400
+    if not (SENHA_MIN <= len(senha) <= SENHA_MAX): return jsonify({"erro": "Invalid password."}), 400
+    if _limite_excedido(('register', _ip()), 5, 3600): return _resposta_limite()
+    hashed_password = generate_password_hash(senha)
     conn = None
     try:
         conn = db_pool.getconn()
@@ -1493,38 +1631,49 @@ def register():
         c.execute("INSERT INTO users (email, password) VALUES (%s, %s) RETURNING id", (email, hashed_password))
         new_user_id = c.fetchone()[0]
         conn.commit()
-        return jsonify({"mensagem": "Account created!", "user_id": new_user_id, "email": email}), 201
-    except psycopg2.IntegrityError: 
+        return jsonify({"mensagem": "Account created!", "user_id": new_user_id, "email": email,
+                        "token": gerar_token(new_user_id, hashed_password)}), 201
+    except psycopg2.IntegrityError:
         if conn: conn.rollback()
         return jsonify({"erro": "Email in use."}), 409
-    except Exception as e: return jsonify({"erro": str(e)}), 500
+    except Exception as e: return _erro_interno(e)
     finally:
         if conn: db_pool.putconn(conn)
 
 @app.route('/login', methods=['POST'])
 def login():
-    dados = request.get_json()
-    if not dados or not dados.get('email') or not dados.get('password'): return jsonify({"erro": "Missing fields"}), 400
-    email = dados.get('email').strip().lower()
+    dados = _json_requisicao()
+    email = str(dados.get('email') or '').strip().lower()
+    senha = str(dados.get('password') or '')
+    if not email or not senha: return jsonify({"erro": "Missing fields"}), 400
+    # Forca bruta: por IP e por conta.
+    if _limite_excedido(('login_ip', _ip()), 20, 300) or _limite_excedido(('login_email', email), 10, 300):
+        return _resposta_limite()
     conn = None
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
         c.execute("SELECT id, password FROM users WHERE email = %s", (email,))
         user = c.fetchone()
-        if user and check_password_hash(user[1], dados.get('password')):
-            return jsonify({"mensagem": "Login ok!", "user_id": user[0], "email": email}), 200
+        if user and check_password_hash(user[1], senha):
+            return jsonify({"mensagem": "Login ok!", "user_id": user[0], "email": email,
+                            "token": gerar_token(user[0], user[1])}), 200
         return jsonify({"erro": "Invalid credentials."}), 401
-    except Exception as e: return jsonify({"erro": str(e)}), 500
+    except Exception as e: return _erro_interno(e)
     finally:
         if conn: db_pool.putconn(conn)
 
+RESET_TENTATIVAS_MAX = 5  # codigo errado 5x: o codigo e' anulado (precisa pedir outro)
+_reset_erros = {}
+
 @app.route('/forgot-password', methods=['POST'])
 def forgot_password():
-    dados = request.get_json()
-    if not dados or not dados.get('email'): return jsonify({"erro": "Missing fields"}), 400
-    email = dados.get('email').strip().lower()
-    codigo = f"{random.randint(0, 999999):06d}"
+    dados = _json_requisicao()
+    email = str(dados.get('email') or '').strip().lower()
+    if not email: return jsonify({"erro": "Missing fields"}), 400
+    if _limite_excedido(('forgot_ip', _ip()), 10, 3600) or _limite_excedido(('forgot_email', email), 3, 900):
+        return _resposta_limite()
+    codigo = f"{secrets.randbelow(1_000_000):06d}"
     conn = None
     try:
         conn = db_pool.getconn()
@@ -1536,76 +1685,95 @@ def forgot_password():
             conn.rollback()
             return jsonify({"erro": "Email not found."}), 404
         conn.commit()
+        _reset_erros.pop(email, None)
         enviar_codigo_reset(email, codigo)
         return jsonify({"mensagem": "Code sent."}), 200
     except Exception as e:
         if conn: conn.rollback()
-        return jsonify({"erro": str(e)}), 500
+        return _erro_interno(e)
     finally:
         if conn: db_pool.putconn(conn)
 
 @app.route('/reset-password', methods=['POST'])
 def reset_password():
-    dados = request.get_json()
-    if not dados or not dados.get('email') or not dados.get('code') or not dados.get('new_password'):
+    dados = _json_requisicao()
+    email = str(dados.get('email') or '').strip().lower()
+    code = str(dados.get('code') or '').strip()
+    nova = str(dados.get('new_password') or '')
+    if not email or not code or not nova:
         return jsonify({"erro": "Missing fields"}), 400
-    email = dados.get('email').strip().lower()
-    code = dados.get('code').strip()
-    hashed_password = generate_password_hash(dados.get('new_password'))
+    if not (SENHA_MIN <= len(nova) <= SENHA_MAX): return jsonify({"erro": "Invalid password."}), 400
+    if _limite_excedido(('reset_ip', _ip()), 20, 900): return _resposta_limite()
     conn = None
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
         c.execute("SELECT reset_code, reset_code_expires FROM users WHERE email = %s", (email,))
         user = c.fetchone()
-        if not user or user[0] != code or user[1] is None or user[1] < time.time():
+        if not user or user[0] is None or user[1] is None or user[1] < time.time() \
+                or not hmac.compare_digest(str(user[0]), code):
+            # Codigo de 6 digitos: sem esse limite dava pra testar todos.
+            erros = _reset_erros.get(email, 0) + 1
+            _reset_erros[email] = erros
+            if user and erros >= RESET_TENTATIVAS_MAX:
+                c.execute("UPDATE users SET reset_code = NULL, reset_code_expires = NULL WHERE email = %s", (email,))
+                conn.commit()
+                _reset_erros.pop(email, None)
             return jsonify({"erro": "Invalid or expired code."}), 400
         c.execute("UPDATE users SET password = %s, reset_code = NULL, reset_code_expires = NULL WHERE email = %s",
-                   (hashed_password, email))
+                   (generate_password_hash(nova), email))
         conn.commit()
+        _reset_erros.pop(email, None)
         return jsonify({"mensagem": "Password updated."}), 200
     except Exception as e:
         if conn: conn.rollback()
-        return jsonify({"erro": str(e)}), 500
+        return _erro_interno(e)
     finally:
         if conn: db_pool.putconn(conn)
 
 @app.route('/create_character', methods=['POST'])
 def create_character():
-    dados = request.get_json()
+    dados = _json_requisicao()
     user_id = dados.get('user_id')
-    name = dados.get('name', '').strip()
-    class_name = dados.get('class_name', '').strip()
+    name = str(dados.get('name') or '').strip()
+    class_name = str(dados.get('class_name') or '').strip()
     if not user_id or not name or not class_name: return jsonify({"erro": "Missing fields."}), 400
+    if class_name not in CLASSES_VALIDAS: return jsonify({"erro": "Invalid class."}), 400
+    if not RE_NOME_PERSONAGEM.match(name) or "  " in name: return jsonify({"erro": "Invalid name."}), 400
     if any(banned in name.lower() for banned in BANNED_NAMES): return jsonify({"erro": "Inappropriate name."}), 403
+    if _limite_excedido(('create_char', _ip()), 20, 600): return _resposta_limite()
     conn = None
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
+        if not token_valido(c, user_id, dados.get('token')): return jsonify({"erro": "Session expired."}), 401
         c.execute("SELECT COUNT(*) FROM characters WHERE user_id = %s", (user_id,))
         if c.fetchone()[0] >= 4: return jsonify({"erro": "No character slots."}), 403
         inventory_inicial, equipped_inicial = montar_kit_inicial(class_name)
-        
-        query = """INSERT INTO characters (user_id, name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, current_hp, current_mp, currency) 
+
+        query = """INSERT INTO characters (user_id, name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, current_hp, current_mp, currency)
                    VALUES (%s, %s, %s, 1, 0, -1, -1, 'down', '{}', 1, %s, %s, '{}', -1, -1, 0)"""
         c.execute(query, (user_id, name, class_name, json.dumps(inventory_inicial), json.dumps(equipped_inicial)))
         conn.commit()
         return jsonify({"mensagem": "Character created!"}), 201
-    except psycopg2.IntegrityError: 
+    except psycopg2.IntegrityError:
         if conn: conn.rollback()
         return jsonify({"erro": "Name taken."}), 409
-    except Exception as e: return jsonify({"erro": str(e)}), 500
+    except Exception as e: return _erro_interno(e)
     finally:
         if conn: db_pool.putconn(conn)
 
 @app.route('/get_characters', methods=['POST'])
 def get_characters():
-    user_id = request.get_json().get('user_id')
+    dados = _json_requisicao()
+    user_id = dados.get('user_id')
     if not user_id: return jsonify({"erro": "Missing ID."}), 400
     conn = None
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
+        # Sem token valido, qualquer um via os personagens de qualquer conta.
+        if not token_valido(c, user_id, dados.get('token')): return jsonify({"erro": "Session expired."}), 401
         c.execute("SELECT name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, time_played FROM characters WHERE user_id = %s ORDER BY id ASC", (user_id,))
         char_list = []
         for row in c.fetchall():
@@ -1622,25 +1790,29 @@ def get_characters():
                 "time_played": row[12] if row[12] else 0
             })
         return jsonify({"characters": char_list}), 200
-    except Exception as e: return jsonify({"erro": str(e)}), 500
+    except Exception as e: return _erro_interno(e)
     finally:
         if conn: db_pool.putconn(conn)
 
 @app.route('/delete_character', methods=['POST'])
 def delete_character():
-    dados = request.get_json()
+    dados = _json_requisicao()
     if not dados.get('user_id') or not dados.get('name') or not dados.get('password'): return jsonify({"erro": "Missing fields."}), 400
+    if _limite_excedido(('delete_char', _ip()), 10, 600): return _resposta_limite()
     conn = None
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
+        if not token_valido(c, dados['user_id'], dados.get('token')): return jsonify({"erro": "Session expired."}), 401
         c.execute("SELECT password FROM users WHERE id = %s", (dados['user_id'],))
         user = c.fetchone()
-        if not user or not check_password_hash(user[0], dados['password']): return jsonify({"erro": "Wrong pass."}), 401
-        c.execute("DELETE FROM characters WHERE user_id = %s AND name = %s", (dados['user_id'], dados['name']))
+        if not user or not check_password_hash(user[0], str(dados['password'])): return jsonify({"erro": "Wrong pass."}), 401
+        # Personagem online nao pode ser apagado (ficava "fantasma" no mundo).
+        if str(dados['name']) in players_by_name: return jsonify({"erro": "Character is online."}), 409
+        c.execute("DELETE FROM characters WHERE user_id = %s AND name = %s", (dados['user_id'], str(dados['name'])))
         conn.commit()
         return jsonify({"mensagem": "Deleted!"}), 200
-    except Exception as e: return jsonify({"erro": str(e)}), 500
+    except Exception as e: return _erro_interno(e)
     finally:
         if conn: db_pool.putconn(conn)
 
@@ -1650,6 +1822,7 @@ def handle_connect(): pass
 @socketio.on('disconnect')
 def handle_disconnect():
     sid = request.sid
+    _baldes_eventos.pop(sid, None)
     if sid in online_players:
         player = online_players[sid]
         p_name = player.get('name', 'Desconhecido')
@@ -1669,20 +1842,12 @@ def handle_disconnect():
 
 @socketio.on('save_position')
 def handle_save_position(data):
+    # Salva a posicao que o SERVIDOR conhece (validada passo a passo no 'm').
+    # Antes gravava o x/y que o client mandasse: dava pra se teleportar pra
+    # qualquer lugar do mapa saindo e entrando de novo.
     sid = request.sid
     player = online_players.get(sid)
-    if not player or not isinstance(data, dict): return
-    try:
-        pos_x = float(data['x'])
-        pos_y = float(data['y'])
-    except (KeyError, TypeError, ValueError):
-        return
-    if not (abs(pos_x) < 100000000 and abs(pos_y) < 100000000): return
-    pos_x, pos_y = encaixar_no_tile(pos_x, pos_y)
-    direction = data.get('direction', player.get('direction', 'down'))
-    if direction not in ('up', 'down', 'left', 'right'):
-        direction = player.get('direction', 'down')
-    player['pos_x'], player['pos_y'], player['direction'] = pos_x, pos_y, direction
+    if not player: return
     _queue_save(player, position_ack_sid=sid)
 
 # ---------------------------------------------------------------------------
@@ -1794,6 +1959,14 @@ def handle_join_game(data):
         if not p_name or not user_id or user_id == -1: return
         conn = db_pool.getconn()
         c = conn.cursor()
+        # Prova de login: sem isso, mandar o user_id + nome de outra pessoa
+        # entrava no personagem dela.
+        if not token_valido(c, user_id, data.get('token')):
+            emit('force_disconnect', {"reason": "Session expired. Please log in again."}, room=sid)
+            return
+        # So' guarda o que o servidor mesmo vai usar (o resto do payload do
+        # client nao entra no estado do player).
+        data = {'user_id': user_id, 'name': p_name, 'skins': data.get('skins')}
         c.execute("SELECT class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, kills, current_hp, current_mp, currency, time_played, npc_dialogue_state FROM characters WHERE user_id = %s AND name = %s", (user_id, p_name))
         row = c.fetchone()
 
@@ -2240,8 +2413,10 @@ def handle_npc_dialogue_seen(data):
         if sid not in online_players: return
         p = online_players[sid]
 
-        npc_id = str(data.get('npc_id', '')).strip()
+        npc_id = str(data.get('npc_id', '') if isinstance(data, dict) else '').strip()[:64]
         if not npc_id: return
+        # So' NPCs que existem (senao dava pra encher o banco com ids falsos).
+        if npc_id.lower() not in NPC_DB: return
 
         if not isinstance(p.get('npc_dialogue_state'), dict):
             p['npc_dialogue_state'] = {}
@@ -2252,6 +2427,9 @@ def handle_npc_dialogue_seen(data):
 
 @socketio.on('swap_req')
 def handle_swap_req(data):
+    # Desligado: trocava de lugar com outro player a ate' 4 SQMs, sem o
+    # outro aceitar (empurrava/teleportava gente). O client atual nao usa.
+    return
     try:
         sid = request.sid
         if sid not in online_players: return
@@ -2368,6 +2546,7 @@ def handle_hit_mob(data):
         proj = str(data.get('proj', ''))
         if not (proj.startswith('res://') and proj.endswith(('.tres', '.res', '.png')) and '..' not in proj and '::' not in proj): proj = ''
 
+        if p.get('is_dead'): return
         now = time.time()
         # Pequena folga (0.1s) pra latencia: o client manda a cada ~2.4s.
         if now - p.get('last_attack_time', 0) < ATAQUE_COOLDOWN_SEG - 0.1: return
@@ -2378,8 +2557,10 @@ def handle_hit_mob(data):
             emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(p.get('inventory', [])), 'equipped_items': p.get('equipped_items', {})}, room=sid)
             return
         
-        mob_data = obter_ou_criar_mob(mob_id, mob_type_id, p.get('room'))
-        if mob_data.get('hp', 1) <= 0: return
+        # So' mobs que o servidor ja' conhece. Antes um id inventado criava um
+        # mob novo (de qualquer tipo) do lado do player: XP/loot de graca.
+        mob_data = active_mobs.get(mob_id)
+        if mob_data is None or mob_data.get('hp', 1) <= 0: return
         # Alcance: corpo a corpo so' do SQM do lado (diagonal vale); a
         # distancia ate ALCANCE_RANGED_SQM em linha reta (igual a deteccao do
         # mob). +1 SQM de folga pro passo em andamento. Mob sem posicao
@@ -2395,6 +2576,7 @@ def handle_hit_mob(data):
         # Mesma regra do mob pro player: andar diferente, sem golpe (nem aggro).
         if int(p.get('floor', 1) or 1) != MOB_FLOOR: return
         mob_data['last_activity'] = now
+        p['last_successful_hit'] = now  # libera o treino da skill da classe
         mob_focar_agressor(mob_id, mob_data, sid)
 
         skills = p.get('skills', {})
@@ -2512,6 +2694,64 @@ def handle_mob_attack(data): return
 # O client manda a lista de mobs da cena (id/tipo/velocidade/cooldown/efeito)
 # e a impressão digital do mapa. Se o servidor ainda não tem a grade de
 # colisão desse mapa (ou o mapa mudou), pede pro client escanear e mandar.
+# ---- Conteudo do mapa travado no servidor ----
+# O servidor nao le o .tmx: quem manda a lista de mobs/NPCs, o spawn e a
+# grade de colisao e' o client. Sem trava, um client modificado criava mobs
+# falsos do lado dele, mudava respawn/velocidade dos mobs, apagava paredes da
+# grade etc. Agora o 1o registro de cada mapa (ou um de conta admin, quando o
+# mapa muda) fica salvo aqui e vale pra todo mundo; o que os outros clients
+# mandarem e' ignorado.
+#
+# Pra atualizar o mapa depois de mudar o World.tmx: coloque o id da sua conta
+# em ADMIN_USER_IDS no .env (ex: ADMIN_USER_IDS=1) e entre no jogo uma vez -
+# OU apague conteudo_mapas.json + mapas_colisao.json antes de reiniciar.
+CONTEUDO_MAPAS_ARQUIVO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'conteudo_mapas.json')
+ADMIN_USER_IDS = {x.strip() for x in os.getenv('ADMIN_USER_IDS', '').split(',') if x.strip()}
+SPAWN_PADRAO_RAW = (304.0, 176.0)  # igual WorldScreen.SPAWN_RAW_X/Y
+conteudo_mapas = {}
+
+def _carregar_conteudo_mapas():
+    global conteudo_mapas
+    try:
+        with open(CONTEUDO_MAPAS_ARQUIVO, 'r') as f:
+            conteudo_mapas = json.load(f)
+    except FileNotFoundError:
+        pass
+    except Exception:
+        traceback.print_exc()
+
+def _salvar_conteudo_mapas():
+    try:
+        with open(CONTEUDO_MAPAS_ARQUIVO, 'w') as f:
+            json.dump(conteudo_mapas, f)
+    except Exception:
+        traceback.print_exc()
+
+_carregar_conteudo_mapas()
+
+def _eh_admin(p):
+    return str(p.get('user_id')) in ADMIN_USER_IDS
+
+def _spawn_do_player(p):
+    """Onde o player (re)nasce: spawn salvo do mapa dele, ou o padrao."""
+    conteudo = conteudo_mapas.get(p.get('mapa')) if p.get('mapa') else None
+    if conteudo is None and len(conteudo_mapas) == 1:
+        conteudo = next(iter(conteudo_mapas.values()))
+    spawn = conteudo.get('spawn') if conteudo else None
+    if isinstance(spawn, list) and len(spawn) == 2:
+        return encaixar_no_tile(float(spawn[0]), float(spawn[1]))
+    return encaixar_no_tile(*SPAWN_PADRAO_RAW)
+
+_CAMPOS_MOB_MAPA = ('id', 'type', 'spawn_range', 'respawn_time', 'speed', 'cooldown', 'hit')
+_CAMPOS_NPC_MAPA = ('id', 'npc_id', 'x', 'y', 'floor')
+
+def _so_campos(lista, campos, limite):
+    saida = []
+    for item in (lista or [])[:limite] if isinstance(lista, list) else []:
+        if isinstance(item, dict):
+            saida.append({k: item[k] for k in campos if k in item and isinstance(item[k], (str, int, float))})
+    return saida
+
 @socketio.on('register_map')
 def handle_register_map(data):
     try:
@@ -2520,7 +2760,37 @@ def handle_register_map(data):
         map_id = str(data.get('map', ''))[:200]
         fp = str(data.get('fp', ''))[:64]
         if not map_id: return
-        for info in (data.get('mobs') or [])[:2000]:
+        p_reg = online_players[sid]
+        p_reg['mapa'] = map_id
+        admin = _eh_admin(p_reg)
+
+        guardado = conteudo_mapas.get(map_id)
+        if guardado is None or (admin and guardado.get('fp') != fp):
+            spawn = data.get('spawn')
+            try:
+                spawn = [float(spawn[0]), float(spawn[1])] if isinstance(spawn, list) and len(spawn) == 2 \
+                    and all(math.isfinite(float(v)) and abs(float(v)) < 100000000 for v in spawn) else None
+            except (TypeError, ValueError):
+                spawn = None
+            guardado = {'fp': fp, 'mobs': _so_campos(data.get('mobs'), _CAMPOS_MOB_MAPA, 2000),
+                        'npcs': _so_campos(data.get('npcs'), _CAMPOS_NPC_MAPA, 256), 'spawn': spawn}
+            conteudo_mapas[map_id] = guardado
+            _salvar_conteudo_mapas()
+            print(f"[MAPA] Conteudo de '{map_id}' salvo ({'admin' if admin else 'primeiro registro'}): "
+                  f"{len(guardado['mobs'])} mob(s), {len(guardado['npcs'])} NPC(s)")
+        elif guardado.get('fp') != fp:
+            print(f"[MAPA] Client com versao diferente de '{map_id}' ignorado (so' admin atualiza o mapa)")
+
+        # Personagem novo (sem posicao salva): comeca no spawn do servidor.
+        if p_reg.get('pos_x') == -1 and p_reg.get('pos_y') == -1:
+            p_reg['pos_x'], p_reg['pos_y'] = _spawn_do_player(p_reg)
+            nova_sala = get_chunk(p_reg['pos_x'], p_reg['pos_y'], 1)
+            if p_reg.get('room') != nova_sala:
+                if p_reg.get('room'): leave_room(p_reg['room'])
+                join_room(nova_sala)
+                p_reg['room'] = nova_sala
+
+        for info in guardado['mobs']:
             if not isinstance(info, dict): continue
             mob_id = str(info.get('id', ''))[:120]
             if not mob_id or spawn_do_mob_id(mob_id) is None: continue
@@ -2545,12 +2815,13 @@ def handle_register_map(data):
             except (TypeError, ValueError): pass
             hit = str(info.get('hit', 'physical_hit'))[:200]
             if hit and not hit.startswith('res://'): m['hit_effect'] = hit
-        mobs_do_mapa = [i for i in (data.get('mobs') or []) if isinstance(i, dict)]
-        print(f"[MOBS] register_map '{map_id}': {len(mobs_do_mapa)} mob(s) recebido(s) do client, "
+        print(f"[MOBS] register_map '{map_id}': {len(guardado['mobs'])} mob(s) no mapa, "
               f"{len(active_mobs)} ativo(s) no servidor")
-        _registrar_npcs_do_mapa(map_id, data.get('npcs'), sid)
+        _registrar_npcs_do_mapa(map_id, guardado['npcs'], sid)
         grade = mapas_colisao.get(map_id)
-        if grade is None or grade.get('fp') != fp:
+        # Grade de colisao: so' pede se ainda nao tem nenhuma, ou se e' um
+        # admin com versao nova do mapa (ver handle_map_grid).
+        if grade is None or (admin and grade.get('fp') != fp):
             emit('need_map_grid', {'map': map_id}, room=sid)
         # Estado atual dos mobs (HP/posição/flag/morte) pra quem acabou de
         # entrar: no join eles ainda podiam não estar registrados.
@@ -2572,6 +2843,9 @@ def handle_map_grid(data):
         fp = str(data.get('fp', ''))[:64]
         atual = mapas_colisao.get(map_id)
         if atual is not None and atual.get('fp') == fp: return  # já tenho essa versão
+        # Grade ja' existe: so' admin troca (senao um client modificado
+        # apagava as paredes do mapa pros mobs/validacao de movimento).
+        if atual is not None and not _eh_admin(online_players[sid]): return
         bits = base64.b64decode(str(data.get('bits', '')))
         if len(bits) < (w * h + 7) // 8: return
         # bits_leste/bits_baixo (bordas finas) sao opcionais - um client Godot
@@ -2614,6 +2888,7 @@ def handle_collect_loot(data):
         if sid not in online_players: return
         p = online_players[sid]
 
+        if p.get('is_dead'): return
         loot_id = str(data.get('loot_id', ''))
         loot = ground_loot.get(loot_id)
 
@@ -2695,16 +2970,29 @@ def handle_collect_loot(data):
                 if s and s != sid: emit('loot_taken', {'loot_id': loot_id}, room=s)
     except Exception: traceback.print_exc()
 
+SKILL_DA_CLASSE = {'Knight': 'melee', 'Ranger': 'distance', 'Mage': 'magic', 'Bard': 'musicality'}
+SKILL_JANELA_ACAO_SEG = 4.0
+
 @socketio.on('register_skill_hit')
 def handle_skill_hit(data):
     try:
         sid = request.sid
         if sid not in online_players: return
         
-        skill_name = data.get('skill')
+        skill_name = data.get('skill') if isinstance(data, dict) else None
         p = online_players[sid]
         
         now = time.time()
+        # So' treina skill de verdade: a da propria classe logo depois de um
+        # golpe valido num mob, ou defense logo depois de apanhar de um mob.
+        # Antes qualquer nome de skill era aceito a cada 1.8s sem fazer nada
+        # (subia Magic de Knight parado, e enchia o banco de skills falsas).
+        if skill_name == 'defense':
+            if now - p.get('last_hit_by_mob', 0) > SKILL_JANELA_ACAO_SEG: return
+        elif skill_name == SKILL_DA_CLASSE.get(p.get('class_name', 'Knight')):
+            if now - p.get('last_successful_hit', 0) > SKILL_JANELA_ACAO_SEG: return
+        else:
+            return
         cooldown_time = 1.8
         last_hit = p['last_skill_hit'].get(skill_name, 0)
         
@@ -2743,6 +3031,13 @@ def handle_skill_hit(data):
     except Exception: pass
 
 MOVE_BALDE_MAX = 4.0
+
+def _corrigir_posicao(sid, p):
+    # Puxa o client de volta pra posicao que o servidor considera valida.
+    emit('sync_local_player', {
+        'pos_x': p.get('pos_x', -1), 'pos_y': p.get('pos_y', -1),
+        'direction': p.get('direction', 'down')
+    }, room=sid)
 MOVE_RECARGA_POR_SEG = 4.0
 
 @socketio.on('m')
@@ -2763,14 +3058,34 @@ def handle_m(data):
         balde = min(MOVE_BALDE_MAX, p.get('_move_balde', MOVE_BALDE_MAX) + (now - p.get('last_move_time', now)) * MOVE_RECARGA_POR_SEG)
         p['last_move_time'] = now
         if balde < 1.0:
+            # Andando rapido demais (speed hack): o passo nao vale e o client
+            # e' puxado de volta pra posicao do servidor.
             p['_move_balde'] = balde
+            _corrigir_posicao(sid, p)
             return
         p['_move_balde'] = balde - 1.0
         
         if isinstance(data[0], str): x, y, d_int = float(data[1]), float(data[2]), int(data[3])
         else: x, y, d_int = float(data[0]), float(data[1]), int(data[2])
+        if not (math.isfinite(x) and math.isfinite(y)): return
 
         destino_tile = tile_de(x, y)
+        # Morto nao anda; passo tem que ser pro SQM do lado (folga de 1 SQM a
+        # mais pra latencia) e nao pode ser parede. Antes o servidor aceitava
+        # qualquer x/y: teleporte pra qualquer lugar do mapa.
+        if p.get('is_dead'):
+            _corrigir_posicao(sid, p)
+            return
+        if not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
+            origem_p = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+            if max(abs(destino_tile[0] - origem_p[0]), abs(destino_tile[1] - origem_p[1])) > 2:
+                _corrigir_posicao(sid, p)
+                return
+        grade_p = mapas_colisao.get(p.get('mapa'))
+        if grade_p is not None and int(p.get('floor', 1) or 1) == 1 and eh_parede(grade_p, destino_tile):
+            _corrigir_posicao(sid, p)
+            return
+        x, y = centro_tile(destino_tile)
         andar_p = int(p.get('floor', 1) or 1)
         npc_no_caminho = any(int(npc.get('floor', 1)) == andar_p
                              and tile_de(npc.get('pos_x', 0), npc.get('pos_y', 0)) == destino_tile
@@ -2780,10 +3095,7 @@ def handle_m(data):
             o.get('hp', 1) > 0 and 'pos_x' in o and tile_do_mob(o) == destino_tile
             for _, o in (_mobs_perto(p['room']) if p.get('room') else active_mobs.items()))
         if npc_no_caminho or mob_no_caminho:
-            emit('sync_local_player', {
-                'pos_x': p.get('pos_x', -1), 'pos_y': p.get('pos_y', -1),
-                'direction': p.get('direction', 'down')
-            }, room=sid)
+            _corrigir_posicao(sid, p)
             return
         
         p['pos_x'], p['pos_y'], p['direction'] = x, y, DIR_MAP.get(d_int, 'down')
@@ -2816,10 +3128,12 @@ def handle_l(data):
         p = online_players[sid]
         p_name = p.get('name', '')
         if not p_name or not isinstance(data, list) or len(data) < 3: return
-        if isinstance(data[0], str): d_int, x, y = float(data[1]), float(data[2]), float(data[3])
-        else: d_int, x, y = int(data[0]), float(data[1]), float(data[2])
-        
-        p['direction'], p['pos_x'], p['pos_y'] = DIR_MAP.get(d_int, 'down'), x, y
+        if isinstance(data[0], str): d_int = int(float(data[1]))
+        else: d_int = int(data[0])
+        # So' vira (olhar pra um lado). O x/y do client e' ignorado: antes
+        # isso tambem movia o player pra qualquer lugar (teleporte).
+        x, y = p.get('pos_x', 0), p.get('pos_y', 0)
+        p['direction'] = DIR_MAP.get(d_int, 'down')
         old_room = p.get('room')
         floor = p.get('floor', 1)
         new_room = get_chunk(x, y, floor)
@@ -2844,9 +3158,26 @@ def handle_request_area_sync(data):
         if sid not in online_players: return
         p = online_players[sid]
         
-        x = float(data.get('x', p.get('pos_x', 0)))
-        y = float(data.get('y', p.get('pos_y', 0)))
-        floor = int(data.get('floor', p.get('floor', 1)))
+        # Antes o client escolhia qualquer x/y/andar (teleporte livre). Agora:
+        # morto -> vai pro spawn do mapa (respawn); vivo -> so' aceita um
+        # ajuste pequeno (ate' 2 SQMs) da posicao que o servidor ja' conhece.
+        if p.get('is_dead'):
+            x, y = _spawn_do_player(p)
+            floor = 1
+        else:
+            try:
+                x = float(data.get('x', p.get('pos_x', 0)))
+                y = float(data.get('y', p.get('pos_y', 0)))
+            except (TypeError, ValueError):
+                return
+            atual = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+            pedido = tile_de(x, y)
+            if not (math.isfinite(x) and math.isfinite(y)) or \
+                    max(abs(pedido[0] - atual[0]), abs(pedido[1] - atual[1])) > 2:
+                x, y = p.get('pos_x', 0), p.get('pos_y', 0)
+            else:
+                x, y = centro_tile(pedido)
+            floor = int(p.get('floor', 1) or 1)
         
         new_room = get_chunk(x, y, floor)
         old_room = p.get('room')
@@ -2899,6 +3230,10 @@ def handle_equip_item(data):
         if alvo is None: return  
         # Item so' entra no slot dele (ex: arma nao vai no Helm).
         if slot_do_item(alvo.get('item')) != slot: return
+        # Level minimo do item (antes nao era checado no servidor).
+        try:
+            if int(obter_dados_item(alvo.get('item')).get('req_level', 0) or 0) > int(p.get('level', 1) or 1): return
+        except (TypeError, ValueError): return
         equipados = p.get('equipped_items', {})
         anterior = equipados.get(slot)
 
@@ -2971,6 +3306,7 @@ def handle_delete_items(data):
         p = online_players[sid]
         instance_ids = data.get('instance_ids', [])
         if not isinstance(instance_ids, list): return
+        instance_ids = instance_ids[:500]
         inventario = p.get('inventory', [])
         ids_validos = set()
         for raw_id in instance_ids:
@@ -2985,7 +3321,9 @@ def handle_delete_items(data):
         emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
     except Exception: traceback.print_exc()
 
-CHAVES_UPDATE_STATUS_PERMITIDAS = {'floor', 'is_typing', 'is_in_settings', 'is_in_skins', 'current_hp', 'current_mp', 'custom_z', 'is_dead'}
+# 'floor' saiu: trocar de andar pelo client deixava o player "invisivel" pros
+# mobs (eles so' atacam no andar 1). O client atual nao troca de andar.
+CHAVES_UPDATE_STATUS_PERMITIDAS = {'is_typing', 'is_in_settings', 'is_in_skins', 'current_hp', 'current_mp', 'custom_z', 'is_dead'}
 
 @socketio.on('update_status')
 def handle_update_status(data):
@@ -3017,11 +3355,24 @@ def handle_update_status(data):
                 try: hp_servidor = float(p.get('current_hp', -1))
                 except (TypeError, ValueError): hp_servidor = -1.0
                 if hp_servidor >= 0: value = min(value, hp_servidor)
+            else:
+                # Mesma regra pro MP: o client so' pode BAIXAR.
+                try: mp_servidor = float(p.get('current_mp', -1))
+                except (TypeError, ValueError): mp_servidor = -1.0
+                if mp_servidor >= 0: value = min(value, mp_servidor)
+        elif key in ('is_typing', 'is_in_settings', 'is_in_skins'):
+            value = bool(value)
+        elif key == 'custom_z':
+            try: value = max(-100.0, min(100.0, float(value)))
+            except (TypeError, ValueError): return
 
         if key == 'is_dead':
             value = bool(value)
-            if value == bool(p.get('is_dead')) and not value:
-                return
+            # Quem decide a morte e' o servidor. Antes o client podia mandar
+            # is_dead=true e depois false: renascia com HP/MP cheios na hora,
+            # em qualquer lugar (cura infinita).
+            if value: return
+            if not p.get('is_dead'): return
             if value:
                 p['current_hp'] = 0.0
             else:
@@ -3030,6 +3381,17 @@ def handle_update_status(data):
                 max_hp_r, max_mp_r = calcular_max_vitais(p)
                 p['current_hp'] = max_hp_r
                 p['current_mp'] = max_mp_r
+                # Renasce SEMPRE no spawn (normalmente o request_area_sync ja'
+                # levou pra la'; isso cobre um client que pulou essa etapa).
+                sx, sy = _spawn_do_player(p)
+                if (p.get('pos_x'), p.get('pos_y')) != (sx, sy):
+                    p['pos_x'], p['pos_y'], p['floor'] = sx, sy, 1
+                    nova_sala = get_chunk(sx, sy, 1)
+                    if p.get('room') != nova_sala:
+                        if p.get('room'): leave_room(p['room'])
+                        join_room(nova_sala)
+                        p['room'] = nova_sala
+                    _corrigir_posicao(sid, p)
 
         p[key] = value
         if key == 'floor':
@@ -3052,8 +3414,9 @@ def handle_update_status(data):
 def handle_save_floor(data):
     try:
         sid = request.sid
-        if sid in online_players:
-            online_players[sid]['floor'] = int(data.get('floor', 1))
+        # Ignorado (ver CHAVES_UPDATE_STATUS_PERMITIDAS): o andar nao pode vir
+        # do client, senao da' pra ficar fora do alcance dos mobs.
+        return
     except Exception: pass
 
 # --- PARTY SYSTEM ---
@@ -3307,7 +3670,9 @@ def _validar_oferta(sid, offer):
     inventario = p.get('inventory', [])
     vistos = set()
     itens_validados = []
-    for entrada in offer.get('items', []):
+    itens_oferta = offer.get('items', [])
+    if not isinstance(itens_oferta, list) or len(itens_oferta) > 50: return None
+    for entrada in itens_oferta:
         if not isinstance(entrada, dict): continue
         instance_id = str(entrada.get('instance_id', ''))
         if not instance_id or instance_id in vistos: return None

@@ -77,7 +77,9 @@ public class InvertedRealmsGame extends Game {
         socket.on("force_disconnect", (nomeEvt, data) -> {
             desconexaoEsperada = true;
             socket.disconnect();
-            setScreen(new AuthScreen(InvertedRealmsGame.this::entrarNoMundo, "Someone logged in your account."));
+            String motivo = data != null ? data.getString("reason", "") : "";
+            if (motivo.isEmpty()) motivo = "Someone logged in your account.";
+            setScreen(new AuthScreen(InvertedRealmsGame.this::entrarNoMundo, motivo));
         });
         socket.setConnectionListener(new GameSocket.ConnectionListener() {
             @Override
@@ -101,6 +103,9 @@ public class InvertedRealmsGame extends Game {
                     mundo.definirCallbackSincronizacaoInicial(() -> setScreen(mundo));
                     String payload = GameSocket.obj(w -> {
                         w.set("user_id", userId);
+                        // Prova de login (servidor.py::token_valido) - sem
+                        // ele o servidor recusa entrar no personagem.
+                        w.set("token", com.teste.game.rede.Sessao.tokenSalvo());
                         w.set("name", personagem.name);
                         w.object("skins");
                         w.pop();
