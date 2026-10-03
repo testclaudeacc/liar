@@ -375,6 +375,7 @@ public class WorldScreen extends ScreenAdapter {
     private final Map<String, MobVisual> mobs = new LinkedHashMap<>();
     // Cadaver some depois disso (servidor: MOB_DESPAWN_CORPO_SEG).
     private static final float TEMPO_CORPO_MOB = 60f;
+    private static final float FADE_CORPO = 2f; // segundos ficando transparente antes de sumir
     private static final int FRAME_MORTE = 10;
     private Texture pixelBranco;
 
@@ -1504,6 +1505,9 @@ public class WorldScreen extends ScreenAdapter {
             float mx = conversor.rawParaMundoX(data.getFloat("pos_x", 0f));
             float my = conversor.rawParaMundoY(data.getFloat("pos_y", 0f));
             avisosSpawn.add(new AvisoSpawn(mx, my, Math.max(1f, data.getFloat("seconds", 6f))));
+            // O cadaver desse mob comeca a sumir (transparente) assim que o aviso aparece.
+            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            if (mob != null && mob.morto && mob.tempoCorpo > FADE_CORPO) mob.tempoCorpo = FADE_CORPO;
         });
         socket.on("mob_respawn", (nomeEvt, data) -> {
             if (data == null) return;
@@ -2592,7 +2596,15 @@ public class WorldScreen extends ScreenAdapter {
         if (!mob.morto && mob.id.equals(alvoMob) && regiaoAlvo != null) {
             batch.draw(regiaoAlvo, ancoraX - regiaoAlvo.getRegionWidth() / 2f, ancoraY - 1f);
         }
-        batch.draw(quadro, x, ancoraY, largura, altura);
+        if (mob.morto) {
+            // Cadaver some aos poucos nos ultimos FADE_CORPO segundos (inclusive
+            // quando o SpawnWarning encurta o tempo dele, ver mob_spawn_warning).
+            batch.setColor(1f, 1f, 1f, Math.min(1f, mob.tempoCorpo / FADE_CORPO));
+            batch.draw(quadro, x, ancoraY, largura, altura);
+            batch.setColor(Color.WHITE);
+        } else {
+            batch.draw(quadro, x, ancoraY, largura, altura);
+        }
         if (!mob.morto && mob.tempoTargetHit > 0f && regiaoTargetHit != null) {
             batch.draw(regiaoTargetHit, ancoraX - regiaoTargetHit.getRegionWidth() / 2f, ancoraY);
         }
