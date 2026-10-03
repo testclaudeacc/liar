@@ -331,8 +331,10 @@ public class WorldScreen extends ScreenAdapter {
             spawnMapa = mapa.propriedades.spawns.values().iterator().next();
         }
         if (spawnMapa != null) {
-            spawnX = spawnMapa.x;
-            spawnY = spawnMapa.y;
+            // SpawnPoint do mapa tambem encaixado no SQM (ida e volta pelo
+            // espaco cru, onde o snap e' definido).
+            spawnX = conversor.rawParaMundoX(Jogador.snapCentroXCru(conversor.mundoParaRawX(spawnMapa.x)));
+            spawnY = conversor.rawParaMundoY(Jogador.snapBaseYCru(conversor.mundoParaRawY(spawnMapa.y)));
         } else {
             // Mesma conta de player.gd::snap_to_tile_center - X centraliza no
             // tile, Y ancora no fundo dele (pes do personagem), feita no
@@ -872,8 +874,10 @@ public class WorldScreen extends ScreenAdapter {
             float rawX = data.getFloat("pos_x", -1f);
             float rawY = data.getFloat("pos_y", -1f);
             if (rawX != -1f && rawY != -1f) {
-                local.x = conversor.rawParaMundoX(rawX);
-                local.y = conversor.rawParaMundoY(rawY);
+                // Encaixa no SQM (mesmo snap do spawn) - posicao salva fora do
+                // grid (ex: do tempo do TILE=32) deixava o player entre 2 SQMs.
+                local.x = conversor.rawParaMundoX(Jogador.snapCentroXCru(rawX));
+                local.y = conversor.rawParaMundoY(Jogador.snapBaseYCru(rawY));
             }
             spawnSmokeX = local.x;
             spawnSmokeY = local.y;

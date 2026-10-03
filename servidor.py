@@ -589,6 +589,13 @@ def tile_de(x, y):
 def centro_tile(t):
     return (t[0] * TILE + TILE / 2.0, t[1] * TILE + float(TILE))
 
+def encaixar_no_tile(x, y):
+    """Leva (x, y) pro centro/pe do SQM em que cai. Posicoes salvas antes do
+    TILE mudar de 32 pra 16 tinham X em 16+32k - exatamente na divisa entre 2
+    SQMs do grid novo (player nascia "no meio de 2 SQMs"). (-1, -1) = sem posicao."""
+    if x == -1 and y == -1: return x, y
+    return centro_tile(tile_de(x, y))
+
 def _bits_vazios(w, h):
     return bytes((w * h + 7) // 8)
 
@@ -1536,6 +1543,7 @@ def handle_save_position(data):
     except (KeyError, TypeError, ValueError):
         return
     if not (abs(pos_x) < 100000000 and abs(pos_y) < 100000000): return
+    pos_x, pos_y = encaixar_no_tile(pos_x, pos_y)
     direction = data.get('direction', player.get('direction', 'down'))
     if direction not in ('up', 'down', 'left', 'right'):
         direction = player.get('direction', 'down')
@@ -1579,6 +1587,7 @@ def handle_join_game(data):
 
         data['name'] = p_name; data['class_name'] = row[0]; data['level'] = row[1]; data['exp'] = row[2] if row[2] is not None else 0
         data['pos_x'] = row[3] if row[3] is not None else -1; data['pos_y'] = row[4] if row[4] is not None else -1
+        data['pos_x'], data['pos_y'] = encaixar_no_tile(data['pos_x'], data['pos_y'])
         data['direction'] = row[5]; data['skins'] = skins_do_join(data.get('skins'), real_skins); data['floor'] = row[7] if row[7] is not None else 1
         data['inventory'] = ordenar_favoritos_primeiro(real_inventory); data['equipped_items'] = real_equipped
         data['skills'] = real_skills; data['kills'] = row[11] if row[11] is not None else 0
