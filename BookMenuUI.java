@@ -61,7 +61,11 @@ public final class BookMenuUI {
     private Table actionButtons;
     private Table deleteConfirmation;
     private Table actionBar;
-    private boolean confirmandoExclusao = false;
+    // Modo de exclusao: clicar nos itens marca/desmarca (ids aqui) e
+    // Confirm manda todos de uma vez pro servidor (delete_items).
+    private boolean modoExclusao = false;
+    private final java.util.Set<String> idsParaExcluir = new java.util.LinkedHashSet<>();
+    private com.badlogic.gdx.scenes.scene2d.ui.Cell<Label> celulaStatus;
     private int selectedItem = -1;
     private String selectedInstanceId = "";
     private long currencyTotal;
@@ -133,6 +137,9 @@ public final class BookMenuUI {
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
         skin.add("bag-slot-selected", UiSkin.retangulo(
             new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.95f, 0.65f, 0.24f, 1f), 2),
+            com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
+        skin.add("bag-slot-delete", UiSkin.retangulo(
+            new Color(0.24f, 0.05f, 0.05f, 1f), new Color(0.9f, 0.35f, 0.35f, 1f), 2),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
         skin.add("bag-detail", UiSkin.retangulo(
             new Color(0.025f, 0.028f, 0.03f, 1f), new Color(0.12f, 0.13f, 0.14f, 1f), 1),
@@ -261,28 +268,28 @@ public final class BookMenuUI {
         inventoryGrid.top().left();
         bagDetalhes.top().left();
 
-        // Favoritar/lixeira (ou confirmar/cancelar a exclusao) no rodape da coluna esquerda.
+        // Favoritar/lixeira no rodape da coluna esquerda; no modo de exclusao
+        // viram cancelar (Negate) / confirmar (Confirm).
         actionButtons = new Table();
-        favoriteButton = criarBotaoAcao("ui/Star", new Color(0.16f, 0.16f, 0.04f, 1f),
-            new Color(0.32f, 0.32f, 0.1f, 1f), () -> alternarFavorito());
-        trashButton = criarBotaoAcao("ui/Trash", new Color(0.18f, 0.05f, 0.05f, 1f),
-            new Color(0.38f, 0.1f, 0.1f, 1f), () -> iniciarExclusao());
+        favoriteButton = criarBotaoAcao("ui/Star", new Color(0.42f, 0.35f, 0.04f, 1f),
+            new Color(0.72f, 0.6f, 0.1f, 1f), () -> alternarFavorito());
+        trashButton = criarBotaoAcao("ui/Trash", new Color(0.3f, 0.05f, 0.05f, 1f),
+            new Color(0.52f, 0.1f, 0.1f, 1f), () -> iniciarExclusao());
         actionButtons.add(favoriteButton).size(TAM_BOTAO_ACAO).padRight(10);
         actionButtons.add(trashButton).size(TAM_BOTAO_ACAO);
         deleteConfirmation = new Table();
-        Button confirmar = criarBotaoAcao("ui/Confirm", new Color(0.05f, 0.18f, 0.05f, 1f),
-            new Color(0.12f, 0.4f, 0.12f, 1f), () -> confirmarExclusao());
-        Button cancelar = criarBotaoAcao("ui/Negate", new Color(0.18f, 0.05f, 0.05f, 1f),
-            new Color(0.38f, 0.1f, 0.1f, 1f), () -> cancelarExclusao());
-        deleteConfirmation.add(confirmar).size(TAM_BOTAO_ACAO).padRight(10);
-        deleteConfirmation.add(cancelar).size(TAM_BOTAO_ACAO);
+        Button cancelar = criarBotaoAcao("ui/Negate", new Color(0.26f, 0.04f, 0.04f, 1f),
+            new Color(0.42f, 0.08f, 0.08f, 1f), () -> cancelarExclusao());
+        Button confirmar = criarBotaoAcao("ui/Confirm", new Color(0.04f, 0.2f, 0.04f, 1f),
+            new Color(0.08f, 0.36f, 0.08f, 1f), () -> confirmarExclusao());
+        deleteConfirmation.add(cancelar).size(TAM_BOTAO_ACAO).padRight(10);
+        deleteConfirmation.add(confirmar).size(TAM_BOTAO_ACAO);
         deleteConfirmation.setVisible(false);
         Stack botoesAcao = new Stack(actionButtons, deleteConfirmation);
 
-        actionStatus.setFontScale(0.62f);
+        actionStatus.setFontScale(0.72f);
         actionStatus.setAlignment(Align.center);
         actionBar = new Table();
-        actionBar.add(actionStatus).growX().center().padBottom(3).row();
         actionBar.add(botoesAcao).center();
 
         Table colunaEsquerda = new Table();
@@ -290,6 +297,9 @@ public final class BookMenuUI {
         colunaEsquerda.setBackground(UiSkin.retangulo(
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
         colunaEsquerda.add(bagDetalhes).grow().top().left().pad(8, 8, 8, 8).row();
+        // "N Items Selected" - so' ocupa altura no modo de exclusao.
+        celulaStatus = colunaEsquerda.add(actionStatus).growX().center().height(0f).padBottom(0f);
+        colunaEsquerda.row();
         colunaEsquerda.add(separadorEquip()).growX().height(1).row();
         colunaEsquerda.add(actionBar).growX().pad(4, 4, 5, 4);
 
@@ -1003,8 +1013,14 @@ public final class BookMenuUI {
             estilo.down = skinDrawable("bag-slot-selected");
             estilo.checked = skinDrawable("bag-slot-selected");
             estilo.checkedOver = estilo.checked;
+            InventoryItem itemSlot = i < inventoryItems.size() ? inventoryItems.get(i) : null;
+            if (modoExclusao && itemSlot != null && idsParaExcluir.contains(itemSlot.instanceId)) {
+                estilo.up = estilo.over = estilo.down = skinDrawable("bag-slot-delete");
+                estilo.checked = estilo.checkedOver = estilo.up;
+            }
             Button slot = new Button(estilo);
-            slot.setChecked(i == selectedItem);
+            slot.setProgrammaticChangeEvents(false);
+            slot.setChecked(!modoExclusao && i == selectedItem);
             if (i < inventoryItems.size()) {
                 InventoryItem item = inventoryItems.get(i);
                 Stack conteudo = new Stack();
@@ -1015,17 +1031,21 @@ public final class BookMenuUI {
                     conteudo.add(icone);
                 }
                 if (item.quantity > 1 || item.favorite) {
+                    // Quantidade no canto inferior esquerdo, estrelinha de
+                    // favorito (mesmo icone do botao) no inferior direito.
                     Table marcadores = new Table();
-                    marcadores.bottom().right();
-                    if (item.favorite) {
-                        Label favorito = new Label("F", skin, "hud");
-                        favorito.setColor(new Color(1f, 0.82f, 0.24f, 1f));
-                        marcadores.add(favorito).left().expandX();
-                    }
+                    marcadores.bottom();
                     if (item.quantity > 1) {
                         Label quantidade = new Label(String.valueOf(item.quantity), skin, "hud");
+                        quantidade.setFontScale(0.6f);
                         quantidade.setColor(Color.WHITE);
-                        marcadores.add(quantidade).right();
+                        marcadores.add(quantidade).left().bottom();
+                    }
+                    marcadores.add().expandX();
+                    if (item.favorite) {
+                        Image estrela = new Image(new TextureRegionDrawable(atlas.findRegion("ui/Star")));
+                        estrela.setScaling(Scaling.fit);
+                        marcadores.add(estrela).size(11f).right().bottom();
                     }
                     conteudo.add(marcadores);
                 }
@@ -1033,6 +1053,10 @@ public final class BookMenuUI {
             }
             slot.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    if (modoExclusao) {
+                        alternarMarcaExclusao(indice);
+                        return;
+                    }
                     if (indice >= inventoryItems.size()) {
                         selectedItem = -1;
                         selectedInstanceId = "";
@@ -1076,11 +1100,15 @@ public final class BookMenuUI {
     }
 
     private void atualizarDetalhes(InventoryItem item) {
+        if (modoExclusao) {
+            // No modo de exclusao a coluna fica so' com o "N Items Selected".
+            bagDetalhes.clearChildren();
+            return;
+        }
         if (item == null) {
             bagDetalhes.clearChildren();
-            actionStatus.setText("");
             favoriteButton.setDisabled(true);
-            trashButton.setDisabled(true);
+            trashButton.setDisabled(inventoryItems.isEmpty());
             return;
         }
         // Mesmos detalhes da aba Equip; equipamento compara com o que esta no slot dele.
@@ -1090,10 +1118,8 @@ public final class BookMenuUI {
             ITEM_STATS.containsKey(item.itemPath) ? (equipado == null ? "" : equipado) : null);
         if (item.quantity > 1) bagDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
         if (item.favorite) bagDetalhes.add(linhaStat("Favorite", new Color(1f, 0.82f, 0.24f, 1f))).left().row();
-        actionStatus.setText("");
         favoriteButton.setDisabled(item.instanceId.isEmpty());
-        trashButton.setDisabled(item.instanceId.isEmpty() || item.favorite);
-        cancelarExclusao();
+        trashButton.setDisabled(false);
     }
 
     private Button criarBotaoAcao(String regiao, Color fundo, Color borda, Runnable acao) {
@@ -1122,35 +1148,69 @@ public final class BookMenuUI {
     }
 
     private void iniciarExclusao() {
-        InventoryItem item = itemSelecionado();
-        if (item == null || item.favorite || item.instanceId.isEmpty()) return;
-        confirmandoExclusao = true;
-        actionStatus.setText("Delete this item?");
+        if (modoExclusao) {
+            cancelarExclusao();
+            return;
+        }
+        modoExclusao = true;
+        idsParaExcluir.clear();
+        selectedItem = -1;
+        selectedInstanceId = "";
+        bagDetalhes.clearChildren();
         actionButtons.setVisible(false);
         deleteConfirmation.setVisible(true);
+        atualizarStatusExclusao();
+        atualizarGrade();
+    }
+
+    private void alternarMarcaExclusao(int indice) {
+        if (indice < 0 || indice >= inventoryItems.size()) return;
+        InventoryItem item = inventoryItems.get(indice);
+        // Favoritos nao podem ser apagados (o servidor tambem recusa).
+        if (item.favorite || item.instanceId.isEmpty()) return;
+        if (!idsParaExcluir.remove(item.instanceId)) idsParaExcluir.add(item.instanceId);
+        atualizarStatusExclusao();
+        atualizarGrade();
+    }
+
+    private void atualizarStatusExclusao() {
+        if (celulaStatus == null) return;
+        if (modoExclusao) {
+            int n = idsParaExcluir.size();
+            actionStatus.setText(n + (n == 1 ? " Item Selected" : " Items Selected"));
+            celulaStatus.height(actionStatus.getPrefHeight()).padBottom(5f);
+        } else {
+            actionStatus.setText("");
+            celulaStatus.height(0f).padBottom(0f);
+        }
+        actionStatus.invalidateHierarchy();
     }
 
     private void confirmarExclusao() {
-        InventoryItem item = itemSelecionado();
-        if (!confirmandoExclusao || item == null || item.favorite || item.instanceId.isEmpty() || !socket.isConnected()) return;
-        String payload = GameSocket.obj(w -> {
-            w.array("instance_ids");
-            w.value(item.instanceId);
-            w.pop();
-        });
-        socket.emitRaw("delete_items", payload);
-        selectedItem = -1;
-        selectedInstanceId = "";
-        atualizarDetalhes(null);
-        confirmandoExclusao = false;
-        actionStatus.setText("Deleting...");
-        deleteConfirmation.setVisible(false);
+        if (!modoExclusao) return;
+        if (!idsParaExcluir.isEmpty() && socket.isConnected()) {
+            List<String> ids = new ArrayList<>(idsParaExcluir);
+            String payload = GameSocket.obj(w -> {
+                w.array("instance_ids");
+                for (String id : ids) w.value(id);
+                w.pop();
+            });
+            socket.emitRaw("delete_items", payload);
+        }
+        cancelarExclusao();
     }
 
     private void cancelarExclusao() {
-        confirmandoExclusao = false;
+        boolean estava = modoExclusao;
+        modoExclusao = false;
+        idsParaExcluir.clear();
         if (actionButtons != null) actionButtons.setVisible(true);
         if (deleteConfirmation != null) deleteConfirmation.setVisible(false);
+        atualizarStatusExclusao();
+        if (estava) {
+            atualizarGrade();
+            atualizarDetalhes(itemSelecionado());
+        }
     }
 
     private InventoryItem itemSelecionado() {
@@ -1170,6 +1230,7 @@ public final class BookMenuUI {
 
     public void atualizarInventario(JsonValue dados) {
         inventoryItems.clear();
+        java.util.Set<String> idsAtuais = new java.util.HashSet<>();
         if (dados != null && dados.isArray()) {
             for (JsonValue entrada = dados.child; entrada != null; entrada = entrada.next) {
                 if (!entrada.isObject()) continue;
@@ -1177,8 +1238,11 @@ public final class BookMenuUI {
                 if (caminho.isEmpty()) continue;
                 inventoryItems.add(new InventoryItem(entrada.getString("id", ""), caminho,
                     Math.max(1, entrada.getInt("qty", 1)), entrada.getBoolean("favorite", false)));
+                idsAtuais.add(entrada.getString("id", ""));
             }
         }
+        idsParaExcluir.retainAll(idsAtuais);
+        atualizarStatusExclusao();
         selectedItem = -1;
         if (!selectedInstanceId.isEmpty()) {
             for (int i = 0; i < inventoryItems.size(); i++) {
@@ -1258,6 +1322,7 @@ public final class BookMenuUI {
             tituloSecao.setText(secao);
             boolean comTitulo = !"Bag".equals(secao) && !"Skills".equals(secao) && !"Equip".equals(secao);
             tituloSecao.setVisible(comTitulo);
+            if (!"Bag".equals(secao)) cancelarExclusao();
             mainWindow.clearChildren();
             // Equip ocupa o painel inteiro (colunas encostam na borda).
             mainWindow.pad("Equip".equals(secao) || "Bag".equals(secao) ? 1 : 14);
@@ -1353,10 +1418,11 @@ public final class BookMenuUI {
     }
 
     public void alternar() {
-        root.setVisible(!root.isVisible());
+        setVisible(!root.isVisible());
     }
 
     public void setVisible(boolean visible) {
+        if (!visible) cancelarExclusao();
         root.setVisible(visible);
     }
 
