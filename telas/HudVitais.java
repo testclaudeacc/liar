@@ -102,7 +102,7 @@ public final class HudVitais {
         pixel = new Texture(pm);
         pm.dispose();
         fonte = gerarFonte(escala, 14, false);
-        fonteNotificacao = gerarFonte(escala, 12, true);
+        fonteNotificacao = gerarFonte(escala, 11, true);
         Label.LabelStyle estilo = new Label.LabelStyle(fonte, Color.WHITE);
 
         hp = criarBarra(estilo, COR_HP, 314);
@@ -210,7 +210,9 @@ public final class HudVitais {
         // gerada bem maior na tela do celular, a letra parecia fina.
         p.size = Math.round(tamanho * FATOR_TEXTO * escala);
         // PC com borda um pouco mais fina (a pedido do usuario); mobile mantem.
-        p.borderWidth = contornoFino ? Math.max(1, Math.round(p.size / (MOBILE ? 12f : 16f)))
+        // Notificacao: contorno de 1px de verdade (proporcional ao tamanho
+        // dava o mesmo 2px da fonte das barras e nao mudava nada).
+        p.borderWidth = contornoFino ? (MOBILE ? Math.max(1, Math.round(p.size / 14f)) : 1)
             : MOBILE ? Math.max(2, Math.round(p.size / 7f)) : Math.max(1, Math.round(p.size / 10f));
         p.borderColor = Color.BLACK;
         p.minFilter = Texture.TextureFilter.Linear;
@@ -332,7 +334,7 @@ public final class HudVitais {
     private void mostrarNotificacao(Notificacao n) {
         notificacaoAtual = n;
         textoNotificacao.setText(n.texto);
-        textoNotificacao.setColor(n.cor);
+        textoNotificacao.setColor(Color.WHITE); // todas brancas
         if (iconeNotificacaoPadrao != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(iconeNotificacaoPadrao));
         painelNotificacao.clearActions();
         painelNotificacao.getColor().a = 1f;

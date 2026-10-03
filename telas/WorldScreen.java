@@ -1413,7 +1413,7 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     // ---- Coroa/escudo da party: na altura do balao, mas a ESQUERDA do player ----
-    private static final float TAM_ICONE_PARTY = 16f;
+    private static final float TAM_ICONE_PARTY = 20f;
 
     private void desenharIconeParty(Jogador j) {
         String lider = bookMenu.liderParty();
@@ -1422,7 +1422,8 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion icone = j.nome.equals(lider) ? iconeLiderParty : iconeMembroParty;
         // Balao: x+2 a direita do centro; aqui o espelho dele.
         // Centro vertical igual o do balao (y+9.5, ~8 de altura).
-        float ix = Math.round(j.x / camera.zoom) * camera.zoom - 5f - TAM_ICONE_PARTY;
+        // Encostado no lado esquerdo do corpo (o desenho tem sobra transparente).
+        float ix = Math.round(j.x / camera.zoom) * camera.zoom + 1f - TAM_ICONE_PARTY;
         float iy = Math.round(j.y / camera.zoom) * camera.zoom + 13.5f - TAM_ICONE_PARTY / 2f;
         batch.draw(icone, ix, iy, TAM_ICONE_PARTY, TAM_ICONE_PARTY);
     }

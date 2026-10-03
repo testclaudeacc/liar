@@ -1341,7 +1341,7 @@ public final class BookMenuUI {
     // mesma ordem do mundo (WorldScreen.FRAME_ANDAR_*). Baixo, esquerda,
     // direita, cima.
     private static final int[][] ANDAR_PREVIEW = {{4, 5}, {7, 6}, {9, 8}, {1, 2}};
-    private static final float TEMPO_QUADRO_PREVIEW = 0.22f;
+    private static final float TEMPO_QUADRO_PREVIEW = 0.45f;
 
     /** Camada do preview trocando de quadro sozinha. Todas comecam juntas
      * (tempo global), entao as camadas ficam sincronizadas. */
