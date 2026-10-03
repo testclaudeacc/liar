@@ -74,8 +74,8 @@ public final class BookMenuUI {
     private static final String[][] SLOTS_EQUIP = {
         {null, "Helm", "Necklace"}, {"MainHand", "Chest", "Hand"}, {"Gloves", "Boots", "Ring"}
     };
-    private static final float SLOT_EQUIP = 55f;
-    private static final float COLUNA_EQUIP = 176f;
+    private static final float SLOT_EQUIP = 54f;
+    private static final float COLUNA_EQUIP = 180f;
     private static final float ALTURA_GRADE_EQUIP = 216f;
     private static final int COLUNAS_EQUIP = 5;
     private final Map<String, Button> equipSlotButtons = new LinkedHashMap<>();
@@ -424,7 +424,7 @@ public final class BookMenuUI {
                     slots.add().size(SLOT_EQUIP).pad(1.5f);
                     continue;
                 }
-                Button botao = new Button(estiloSlotEquip());
+                Button botao = novoBotaoSlotEquip();
                 botao.addListener(new ChangeListener() {
                     @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                         selecionarSlotEquip(nomeSlot);
@@ -484,6 +484,14 @@ public final class BookMenuUI {
         atualizarDetalhesEquip();
     }
 
+    /** Botao de slot da aba Equip. setChecked() feito pelo codigo NAO dispara
+     *  ChangeListener (senao o listener chama a atualizacao de novo, em loop). */
+    private Button novoBotaoSlotEquip() {
+        Button novo = new Button(estiloSlotEquip());
+        novo.setProgrammaticChangeEvents(false);
+        return novo;
+    }
+
     private Button.ButtonStyle estiloSlotEquip() {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
         estilo.up = skin.getDrawable("equip-slot");
@@ -505,11 +513,15 @@ public final class BookMenuUI {
         equipCandidatos.clear();
         for (int i = 0; i < inventoryItems.size(); i++) {
             String caminho = inventoryItems.get(i).itemPath;
-            if (slotDoItem(caminho) != null || ITEM_STATS.containsKey(caminho)) equipCandidatos.add(i);
+            String slotItem = slotDoItem(caminho);
+            if (slotItem == null && !ITEM_STATS.containsKey(caminho)) continue;
+            // Filtro: com um slot selecionado, so' mostra o que entra nele.
+            if (!selectedSlot.isEmpty() && !selectedSlot.equals(slotItem)) continue;
+            equipCandidatos.add(i);
         }
         equipItemGrid.clearChildren();
         if (equipCandidatos.isEmpty()) {
-            Button vazio = new Button(estiloSlotEquip());
+            Button vazio = novoBotaoSlotEquip();
             vazio.setDisabled(true);
             equipItemGrid.add(vazio).size(SLOT_EQUIP).pad(1.5f);
             return;
@@ -517,7 +529,7 @@ public final class BookMenuUI {
         for (int n = 0; n < equipCandidatos.size(); n++) {
             final int indice = equipCandidatos.get(n);
             InventoryItem item = inventoryItems.get(indice);
-            Button slotBtn = new Button(estiloSlotEquip());
+            Button slotBtn = novoBotaoSlotEquip();
             slotBtn.setChecked(indice == selectedEquipCandidate);
             TextureAtlas.AtlasRegion textura = iconeDoItem(item.itemPath);
             if (textura != null) {
@@ -528,7 +540,6 @@ public final class BookMenuUI {
             slotBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     selectedEquipCandidate = (selectedEquipCandidate == indice) ? -1 : indice;
-                    selectedSlot = "";
                     atualizarGradeEquip();
                     atualizarDetalhesEquip();
                 }
@@ -545,12 +556,15 @@ public final class BookMenuUI {
         String equipadoPath = selectedSlot.isEmpty() ? null : equippedItemPaths.get(selectedSlot);
         String candidatoPath = selectedEquipCandidate >= 0 && selectedEquipCandidate < inventoryItems.size()
             ? inventoryItems.get(selectedEquipCandidate).itemPath : null;
-        if (candidatoPath == null) selectedEquipCandidate = -1;
+        if (candidatoPath == null || !equipCandidatos.contains(selectedEquipCandidate)) {
+            candidatoPath = null;
+            selectedEquipCandidate = -1;
+        }
 
         // Esquerda: detalhes do item equipado no slot selecionado.
         equipColunaEsquerda.clearChildren();
         equipColunaEsquerda.add(equipSlotsTabela).top().left().pad(4).row();
-        if (equipadoPath != null) {
+        if (equipadoPath != null && candidatoPath == null) {
             preencherBlocoStats(equipDetalhesEsquerda, equipadoPath, null);
             equipColunaEsquerda.add(separadorEquip()).growX().height(1).padTop(4).row();
             equipColunaEsquerda.add(equipDetalhesEsquerda).growX().top().left().pad(6, 7, 6, 7).row();
@@ -621,7 +635,10 @@ public final class BookMenuUI {
         EquipStats base = compararCom == null ? null : ITEM_STATS.get(compararCom);
         boolean comparar = compararCom != null;
         bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
-        bloco.add(linhaStat(dados.reqClass + " " + dados.tipo, COR_REQUISITO)).left().row();
+        // Vermelho = classe errada (o servidor pune quem equipa item de outra classe).
+        boolean classeCerta = "All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass);
+        bloco.add(linhaStat(dados.reqClass + " " + dados.tipo,
+            classeCerta ? COR_REQUISITO : Color.valueOf("ff4a4a"))).left().row();
         adicionarLinhaStat(bloco, "Attack", dados.bonusDamage, base == null ? 0 : base.bonusDamage, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Defense", dados.defense, base == null ? 0 : base.defense, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Stamina", dados.stamina, base == null ? 0 : base.stamina, comparar, COR_STAMINA);
