@@ -327,6 +327,7 @@ public class WorldScreen extends ScreenAdapter {
         final List<TextureRegion> icones = new ArrayList<>();
         final List<String> textos = new ArrayList<>();
         final List<Color> cores = new ArrayList<>();
+        boolean semCapacidade = false;
         float tempo = 0f;
         LootFlutuante(float x, float y) { this.x = x; this.y = y; }
         void adicionar(TextureRegion icone, String texto, Color cor) { icones.add(icone); textos.add(texto); cores.add(cor); }
@@ -2481,44 +2482,67 @@ public class WorldScreen extends ScreenAdapter {
             }
         }
         for (Map.Entry<String, Integer> e : contagem.entrySet()) {
-            loot.adicionar(bookMenu.iconeDoItem(e.getKey()), "x" + e.getValue(), Color.WHITE);
+            loot.adicionar(bookMenu.iconeDoItem(e.getKey()), e.getValue() > 1 ? String.valueOf(e.getValue()) : "", Color.WHITE);
         }
         long moedas = data.getLong("currency_gained", 0L);
         long[] valores = {moedas / 1_000_000L, (moedas % 1_000_000L) / 10_000L, (moedas % 10_000L) / 100L, moedas % 100L};
         String[] tipos = {"Platinum", "Gold", "Silver", "Copper"};
         for (int i = 0; i < tipos.length; i++) {
-            if (valores[i] > 0) loot.adicionar(atlas.findRegion("ui/currency/" + tipos[i]), "+" + valores[i], Color.WHITE);
+            if (valores[i] > 0) loot.adicionar(atlas.findRegion("ui/currency/" + tipos[i]), String.valueOf(valores[i]), corMoeda(tipos[i]));
         }
-        if (data.getBoolean("cap_bloqueado", false)) {
-            loot.adicionar(null, "Not enough capacity", new Color(1f, 0.3f, 0.3f, 1f));
-        }
-        if (!loot.textos.isEmpty()) lootsFlutuantes.add(loot);
+        if (data.getBoolean("cap_bloqueado", false)) loot.semCapacidade = true;
+        if (!loot.textos.isEmpty() || loot.semCapacidade) lootsFlutuantes.add(loot);
     }
 
+    /** Cor da quantidade por tipo de moeda. */
+    private static Color corMoeda(String tipo) {
+        switch (tipo) {
+            case "Copper": return Color.valueOf("ff8a3d");   // laranja
+            case "Silver": return Color.valueOf("a9bcd6");   // cinza azulado
+            case "Gold": return Color.valueOf("ffd34e");     // amarelo
+            case "Platinum": return Color.valueOf("e4e4e4"); // cinza claro
+            default: return Color.WHITE;
+        }
+    }
+
+    /** Icones lado a lado em cima do player, cada um com a quantidade no
+     * canto inferior direito (na cor da moeda; branca pra item). */
     private void desenharLootsFlutuantes() {
         Color anterior = new Color(font.getColor());
+        final float tamanho = 12f, espaco = 2f;
         for (LootFlutuante l : lootsFlutuantes) {
             float t = l.tempo / DURACAO_LOOT_FLUTUANTE;
             float subida = 14f * (1f - (1f - t) * (1f - t));
-            float alfa = t < 0.7f ? 1f : 1f - (t - 0.7f) / 0.3f;
+            float alfa = Math.max(0f, t < 0.7f ? 1f : 1f - (t - 0.7f) / 0.3f);
             float ancoraX = Math.round(l.x / camera.zoom) * camera.zoom;
-            float base = l.y + 26f + subida;
-            for (int i = 0; i < l.textos.size(); i++) {
-                // Linhas de baixo pra cima (a primeira fica embaixo).
-                float y = Math.round((base + i * 9f) / camera.zoom) * camera.zoom;
+            float y = Math.round((l.y + 22f + subida) / camera.zoom) * camera.zoom;
+            int n = l.icones.size();
+            float larguraTotal = n * tamanho + Math.max(0, n - 1) * espaco;
+            float x = Math.round((ancoraX - larguraTotal / 2f) / camera.zoom) * camera.zoom;
+            font.getData().setScale(NOME_ESCALA_BASE * 0.8f);
+            for (int i = 0; i < n; i++) {
+                float xi = x + i * (tamanho + espaco);
                 TextureRegion icone = l.icones.get(i);
-                layout.setText(font, l.textos.get(i));
-                float tamanhoIcone = icone != null ? 8f : 0f;
-                float largura = tamanhoIcone + (icone != null ? 1f : 0f) + layout.width;
-                float x = Math.round((ancoraX - largura / 2f) / camera.zoom) * camera.zoom;
                 if (icone != null) {
-                    batch.setColor(1f, 1f, 1f, Math.max(0f, alfa));
-                    batch.draw(icone, x, y - tamanhoIcone + 1f, tamanhoIcone, tamanhoIcone);
+                    batch.setColor(1f, 1f, 1f, alfa);
+                    batch.draw(icone, xi, y, tamanho, tamanho);
                     batch.setColor(Color.WHITE);
                 }
-                Color c = l.cores.get(i);
-                font.setColor(c.r, c.g, c.b, Math.max(0f, alfa));
-                font.draw(batch, l.textos.get(i), x + largura - layout.width, y);
+                String qtd = l.textos.get(i);
+                if (!qtd.isEmpty()) {
+                    layout.setText(font, qtd);
+                    Color c = l.cores.get(i);
+                    font.setColor(c.r, c.g, c.b, alfa);
+                    // Canto inferior direito do icone.
+                    font.draw(batch, qtd, xi + tamanho - layout.width + 1f, y + layout.height - 1f);
+                }
+            }
+            font.getData().setScale(NOME_ESCALA_BASE);
+            if (l.semCapacidade) {
+                layout.setText(font, "Not enough capacity");
+                font.setColor(1f, 0.3f, 0.3f, alfa);
+                font.draw(batch, "Not enough capacity",
+                    Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom, y + tamanho + 8f);
             }
         }
         font.setColor(anterior);
