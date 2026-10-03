@@ -287,7 +287,7 @@ public final class BookMenuUI {
         deleteConfirmation.setVisible(false);
         Stack botoesAcao = new Stack(actionButtons, deleteConfirmation);
 
-        actionStatus.setFontScale(0.72f);
+        actionStatus.setFontScale(0.6f);
         actionStatus.setAlignment(Align.center);
         actionBar = new Table();
         actionBar.add(botoesAcao).center();
@@ -1021,6 +1021,8 @@ public final class BookMenuUI {
             Button slot = new Button(estilo);
             slot.setProgrammaticChangeEvents(false);
             slot.setChecked(!modoExclusao && i == selectedItem);
+            // No modo de exclusao favoritos nao reagem ao clique (nem visualmente).
+            if (modoExclusao && itemSlot != null && itemSlot.favorite) slot.setDisabled(true);
             if (i < inventoryItems.size()) {
                 InventoryItem item = inventoryItems.get(i);
                 Stack conteudo = new Stack();
@@ -1028,7 +1030,11 @@ public final class BookMenuUI {
                 if (textura != null) {
                     Image icone = new Image(new TextureRegionDrawable(textura));
                     icone.setScaling(Scaling.fit);
-                    conteudo.add(icone);
+                    // Icone com margem propria; os marcadores (estrela/quantidade)
+                    // ficam colados no canto, so' dentro da borda do slot.
+                    Table moldura = new Table();
+                    moldura.add(icone).grow().pad(3);
+                    conteudo.add(moldura);
                 }
                 if (item.quantity > 1 || item.favorite) {
                     // Quantidade no canto inferior esquerdo, estrelinha de
@@ -1045,11 +1051,11 @@ public final class BookMenuUI {
                     if (item.favorite) {
                         Image estrela = new Image(new TextureRegionDrawable(atlas.findRegion("ui/Star")));
                         estrela.setScaling(Scaling.fit);
-                        marcadores.add(estrela).size(11f).right().bottom();
+                        marcadores.add(estrela).size(16f).right().bottom();
                     }
                     conteudo.add(marcadores);
                 }
-                slot.add(conteudo).grow().pad(4);
+                slot.add(conteudo).grow().pad(2);
             }
             slot.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
