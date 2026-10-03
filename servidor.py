@@ -1550,6 +1550,80 @@ def handle_save_position(data):
     player['pos_x'], player['pos_y'], player['direction'] = pos_x, pos_y, direction
     _queue_save(player, position_ack_sid=sid)
 
+# ---------------------------------------------------------------------------
+# SKINS (aparencia). Catalogo do que cada categoria aceita e quais classes
+# podem usar. "caminho" = res://<regiao do atlas>.png; o client recorta a
+# regiao "sprites/..." do graphics.atlas tirando o res:// e a extensao.
+# classes=None -> qualquer classe. Pra adicionar uma skin: PNG no atlas +
+# uma linha aqui (o client monta a tela de Vanity a partir disso).
+# ---------------------------------------------------------------------------
+CATEGORIAS_SKIN = ('base', 'body', 'helm', 'acc')
+# Categorias que podem ficar vazias (sem nada desenhado por cima).
+CATEGORIAS_SKIN_OPCIONAIS = ('body', 'helm', 'acc')
+
+def _skin(caminho, nome, classes=None):
+    return {"caminho": "res://" + caminho + ".png", "nome": nome, "classes": classes}
+
+SKIN_DB = {
+    "base": [
+        _skin("sprites/base/BaseSoul", "Soul"),
+        _skin("sprites/base/Base", "Human"),
+    ],
+    "body": [
+        _skin("sprites/body/Knight", "Knight Outfit", ["Knight"]),
+        _skin("sprites/body/Mage", "Mage Outfit", ["Mage"]),
+        _skin("sprites/body/Ranger", "Ranger Outfit", ["Ranger"]),
+        _skin("sprites/body/Bard", "Bard Outfit", ["Bard"]),
+        _skin("sprites/equip_previews/Bard-Manto", "Bard Mantle", ["Bard"]),
+    ],
+    "helm": [
+        _skin("sprites/hair/MascHair1", "Hair 1"), _skin("sprites/hair/MascHair2", "Hair 2"),
+        _skin("sprites/hair/MascHair3", "Hair 3"), _skin("sprites/hair/MascHair4", "Hair 4"),
+        _skin("sprites/hair/MascHair5", "Hair 5"), _skin("sprites/hair/FemHair1", "Hair 6"),
+        _skin("sprites/hair/FemHair2", "Hair 7"), _skin("sprites/hair/FemHair3", "Hair 8"),
+        _skin("sprites/hair/FemHair4", "Hair 9"), _skin("sprites/hair/FemHair5", "Hair 10"),
+        _skin("sprites/equip_previews/Knight_Inicial_Helm", "Knight Helm", ["Knight"]),
+        _skin("sprites/equip_previews/Mage_Inicial_Helm", "Mage Hat", ["Mage"]),
+        _skin("sprites/equip_previews/Ranger_Inicial_Helm", "Ranger Hood", ["Ranger"]),
+        _skin("sprites/equip_previews/Bard_Inicial_Helm", "Bard Cap", ["Bard"]),
+        _skin("sprites/equip_previews/Bard-Hat", "Bard Hat", ["Bard"]),
+    ],
+    "acc": [
+        _skin("sprites/equip_previews/Bard-Alaude", "Lute", ["Bard"]),
+    ],
+}
+
+def _skin_por_caminho(categoria, caminho):
+    for s in SKIN_DB.get(categoria, []):
+        if s["caminho"] == caminho: return s
+    return None
+
+def _cor_skin_valida(cor):
+    cor = str(cor or '').lower().lstrip('#')
+    if len(cor) == 6: cor += 'ff'
+    if len(cor) != 8 or any(ch not in '0123456789abcdef' for ch in cor): return 'ffffffff'
+    return cor
+
+def validar_skins(skins, class_name):
+    """So' deixa passar skins do catalogo, de categorias conhecidas, que a
+    classe do player pode usar; cor vira hex rrggbbaa. Nome vem do catalogo."""
+    if not isinstance(skins, dict): return {}
+    limpo = {}
+    for cat in CATEGORIAS_SKIN:
+        item = skins.get(cat)
+        if not isinstance(item, dict): continue
+        s = _skin_por_caminho(cat, str(item.get('caminho', '')))
+        if s is None: continue
+        if s["classes"] is not None and class_name not in s["classes"]: continue
+        limpo[cat] = {'nome': s["nome"], 'caminho': s["caminho"], 'cor': _cor_skin_valida(item.get('cor'))}
+    return limpo
+
+def montar_skin_db_cliente(class_name):
+    """Catalogo filtrado pra classe do player (o client so' mostra o que pode usar)."""
+    return {cat: [{"caminho": s["caminho"], "nome": s["nome"]} for s in lista
+                  if s["classes"] is None or class_name in s["classes"]]
+            for cat, lista in SKIN_DB.items()}
+
 def skins_do_join(skins_client, skins_banco):
     # A skin que o client está usando (vem no join_game) é a que os outros
     # têm que ver; a do banco pode estar vazia/velha. Só aceita o formato
@@ -1588,7 +1662,7 @@ def handle_join_game(data):
         data['name'] = p_name; data['class_name'] = row[0]; data['level'] = row[1]; data['exp'] = row[2] if row[2] is not None else 0
         data['pos_x'] = row[3] if row[3] is not None else -1; data['pos_y'] = row[4] if row[4] is not None else -1
         data['pos_x'], data['pos_y'] = encaixar_no_tile(data['pos_x'], data['pos_y'])
-        data['direction'] = row[5]; data['skins'] = skins_do_join(data.get('skins'), real_skins); data['floor'] = row[7] if row[7] is not None else 1
+        data['direction'] = row[5]; data['skins'] = validar_skins(skins_do_join(data.get('skins'), real_skins), row[0]); data['floor'] = row[7] if row[7] is not None else 1
         data['inventory'] = ordenar_favoritos_primeiro(real_inventory); data['equipped_items'] = real_equipped
         data['skills'] = real_skills; data['kills'] = row[11] if row[11] is not None else 0
         data['current_hp'] = row[12] if row[12] is not None else -1; data['current_mp'] = row[13] if row[13] is not None else -1
@@ -1629,7 +1703,8 @@ def handle_join_game(data):
         players_by_name[p_name] = sid
 
         # item_db vai so' no payload (nao fica guardado em online_players).
-        emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente()}, room=sid)
+        emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente(),
+                                   'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
 
         rooms_area = set(salas_vizinhas(room))
         dead_mobs = [m_id for m_id, m_data in active_mobs.items() if m_data.get('hp', 1) <= 0 and m_data.get('room') in rooms_area]
@@ -1681,13 +1756,16 @@ def handle_update_skins(data):
         if sid not in online_players: return
         p = online_players[sid]
         
-        skins = data.get('skins', {})
+        # Valida contra SKIN_DB + classe (antes salvava/repassava qualquer coisa).
+        skins = validar_skins(data.get('skins', {}) if isinstance(data, dict) else {}, p.get('class_name'))
         p['skins'] = skins
         _queue_save(p)
-        
+        # Confirma pro proprio player o que ficou valendo de verdade.
+        emit('skins_synced', {"skins": skins}, room=sid)
+
         room = p.get('room')
         if room:
-            emit('player_skins_updated', {"name": p.get('name'), "skins": skins}, broadcast=True, include_self=False)
+            emit_area('player_skins_updated', {"name": p.get('name'), "skins": skins}, room, skip_sid=sid)
     except Exception: 
         import traceback
         traceback.print_exc()   

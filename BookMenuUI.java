@@ -50,6 +50,7 @@ public final class BookMenuUI {
     private final Table bagPage = new Table();
     private final Table equipPage = new Table();
     private final Table skillsPage = new Table();
+    private final Table vanityPage = new Table();
     private final Table inventoryGrid = new Table();
     private final Table bagDetalhes = new Table();
     private final Label capacityLabel;
@@ -178,6 +179,7 @@ public final class BookMenuUI {
         construirPaginaEquip(skin);
         atualizarEquipados(null);
         construirPaginaSkills(skin);
+        construirPaginaVanity(skin);
         mainWindow.add(bagPage).grow();
 
         organizer.add(leftTab).width(COLUNA_LARGURA).height(JANELA_ALTURA);
@@ -992,6 +994,305 @@ public final class BookMenuUI {
         return linha;
     }
 
+    // ===================== VANITY (skins) =====================
+    // Abas na ordem da print (roupa, cabeca, acessorio, pele). Catalogo vem do
+    // servidor (skin_db no sync_local_player, ja filtrado pela classe); o que
+    // vale de verdade e' confirmado pelo servidor em skins_synced.
+    private static final String[] CATEGORIAS_VANITY = {"body", "helm", "acc", "base"};
+    private static final float COLUNA_VANITY = 200f;
+    private static final float ESCALA_PREVIEW = 3.5f;
+    private final Map<String, List<String[]>> skinDb = new LinkedHashMap<>(); // cat -> {caminho, nome}
+    private final Map<String, String[]> skinsEquipadas = new LinkedHashMap<>(); // cat -> {caminho, cor}
+    private final Map<String, String[]> skinsRascunho = new LinkedHashMap<>();
+    private String categoriaVanity = "body";
+    private final Table vanityAbas = new Table();
+    private final Table vanityOpcoes = new Table();
+    private final Table vanityCores = new Table();
+    private final Table vanityPreview = new Table();
+    private static final List<Color> PALETA = criarPaleta();
+
+    private static List<Color> criarPaleta() {
+        List<Color> cores = new ArrayList<>();
+        // Branco -> cinza escuro
+        for (int i = 0; i < 8; i++) {
+            float v = 1f - i * 0.1f;
+            cores.add(new Color(v, v, v, 1f));
+        }
+        // Tons de pele/marrom
+        for (String h : new String[]{"ffe0bd", "f1c27d", "e0ac69", "c68642", "8d5524", "6b4a3e", "5c3a1e", "3b2414"}) {
+            cores.add(Color.valueOf(h));
+        }
+        // Arco-iris (6 linhas de 8)
+        for (int i = 0; i < 48; i++) {
+            Color c = new Color();
+            c.fromHsv(i * (360f / 48f), 0.88f, 0.94f);
+            c.a = 1f;
+            cores.add(c);
+        }
+        // Versoes escuras
+        for (int i = 0; i < 8; i++) {
+            Color c = new Color();
+            c.fromHsv(i * 45f, 0.85f, 0.45f);
+            c.a = 1f;
+            cores.add(c);
+        }
+        return cores;
+    }
+
+    private void construirPaginaVanity(Skin skin) {
+        skin.add("vanity-selected", UiSkin.retangulo(
+            new Color(0.15f, 0.15f, 0.15f, 1f), new Color(0.1f, 0.9f, 0.1f, 1f), 2),
+            com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
+
+        // Esquerda: abas de categoria, preview em 4 direcoes, Equip/Reset.
+        vanityAbas.top().left();
+        vanityPreview.setBackground(UiSkin.retangulo(
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.22f, 0.22f, 0.22f, 1f), 1));
+
+        TextButton.TextButtonStyle estiloBotao = new TextButton.TextButtonStyle(
+            skin.get("default", TextButton.TextButtonStyle.class));
+        estiloBotao.font = skin.getFont("botao-pequeno-font");
+        TextButton equipar = new TextButton("Equip", estiloBotao);
+        equipar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                equiparSkins();
+            }
+        });
+        TextButton resetar = new TextButton("Reset", estiloBotao);
+        resetar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                copiarSkins(skinsEquipadas, skinsRascunho);
+                atualizarVanity();
+            }
+        });
+        Table botoesVanity = new Table();
+        botoesVanity.add(equipar).growX().height(36).padRight(6);
+        botoesVanity.add(resetar).growX().height(36);
+
+        Table colunaEsquerda = new Table();
+        colunaEsquerda.top().left();
+        colunaEsquerda.setBackground(UiSkin.retangulo(
+            new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        colunaEsquerda.add(vanityAbas).left().pad(8, 6, 0, 6).row();
+        colunaEsquerda.add().grow().row();
+        colunaEsquerda.add(vanityPreview).growX().height(150).pad(0, 8, 6, 8).row();
+        colunaEsquerda.add(botoesVanity).growX().pad(0, 8, 8, 8);
+
+        // Direita: opcoes da categoria (em cima) e paleta de cores (embaixo).
+        vanityOpcoes.top().left();
+        ScrollPane scrollOpcoes = new ScrollPane(vanityOpcoes, skin);
+        scrollOpcoes.setFadeScrollBars(false);
+        scrollOpcoes.setScrollingDisabled(true, false);
+        scrollOpcoes.setOverscroll(false, false);
+        vanityCores.top().left();
+        ScrollPane scrollCores = new ScrollPane(vanityCores, skin);
+        scrollCores.setFadeScrollBars(false);
+        scrollCores.setScrollingDisabled(true, false);
+        scrollCores.setOverscroll(false, false);
+
+        Table colunaDireita = new Table();
+        colunaDireita.top().left();
+        colunaDireita.setBackground(UiSkin.retangulo(
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
+        colunaDireita.add(scrollOpcoes).growX().height(176).pad(10, 10, 6, 10).row();
+        colunaDireita.add(separadorEquip()).growX().height(1).row();
+        colunaDireita.add(scrollCores).grow().pad(6, 10, 8, 10);
+
+        vanityPage.add(colunaEsquerda).width(COLUNA_VANITY).growY();
+        vanityPage.add(colunaDireita).grow();
+        atualizarVanity();
+    }
+
+    /** Catalogo (skin_db) + skins atuais, ambos vindos do sync_local_player. */
+    public void carregarSkins(JsonValue db, JsonValue skins) {
+        if (db != null && db.isObject()) {
+            skinDb.clear();
+            for (JsonValue cat = db.child; cat != null; cat = cat.next) {
+                List<String[]> opcoes = new ArrayList<>();
+                for (JsonValue op = cat.child; op != null; op = op.next) {
+                    opcoes.add(new String[]{op.getString("caminho", ""), op.getString("nome", "")});
+                }
+                skinDb.put(cat.name, opcoes);
+            }
+        }
+        atualizarSkinsEquipadas(skins);
+    }
+
+    /** Skins confirmadas pelo servidor (login ou skins_synced). */
+    public void atualizarSkinsEquipadas(JsonValue skins) {
+        skinsEquipadas.clear();
+        for (String cat : SkinsUtil.ORDEM_CAMADAS) {
+            String caminho = SkinsUtil.caminho(skins, cat);
+            if (caminho != null && !caminho.isEmpty()) {
+                skinsEquipadas.put(cat, new String[]{caminho, SkinsUtil.corHex(skins, cat)});
+            }
+        }
+        copiarSkins(skinsEquipadas, skinsRascunho);
+        atualizarVanity();
+    }
+
+    private static void copiarSkins(Map<String, String[]> de, Map<String, String[]> para) {
+        para.clear();
+        for (Map.Entry<String, String[]> e : de.entrySet()) para.put(e.getKey(), e.getValue().clone());
+    }
+
+    private void atualizarVanity() {
+        montarAbasVanity();
+        montarOpcoesVanity();
+        montarCoresVanity();
+        montarPreviewVanity();
+    }
+
+    private Button.ButtonStyle estiloVanity(boolean selecionado) {
+        Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estilo.up = skin.getDrawable(selecionado ? "vanity-selected" : "equip-slot");
+        estilo.over = skin.getDrawable(selecionado ? "vanity-selected" : "equip-slot-hover");
+        estilo.down = skin.getDrawable("vanity-selected");
+        return estilo;
+    }
+
+    /** Quadro "parado de frente" de uma skin, pra icone de aba/opcao. */
+    private Image iconeSkin(String caminho, String corHex) {
+        TextureAtlas.AtlasRegion tira = SkinsUtil.regiao(atlas, caminho);
+        if (tira == null) return null;
+        Image img = new Image(new TextureRegionDrawable(SkinsUtil.quadro(tira, SkinsUtil.FRAME_BAIXO)));
+        img.setScaling(Scaling.fit);
+        if (corHex != null) img.setColor(SkinsUtil.cor(corHex));
+        return img;
+    }
+
+    private void montarAbasVanity() {
+        vanityAbas.clearChildren();
+        for (String cat : CATEGORIAS_VANITY) {
+            Button aba = new Button(estiloVanity(cat.equals(categoriaVanity)));
+            String[] escolhida = skinsRascunho.get(cat);
+            List<String[]> opcoes = skinDb.get(cat);
+            String caminho = escolhida != null ? escolhida[0]
+                : opcoes != null && !opcoes.isEmpty() ? opcoes.get(0)[0]
+                : "base".equals(cat) ? SkinsUtil.BASE_PADRAO : null;
+            Image icone = iconeSkin(caminho, escolhida != null ? escolhida[1] : null);
+            if (icone != null) aba.add(icone).grow().pad(4);
+            // Categoria sem nada pra essa classe fica apagada (igual a asa da print).
+            if (opcoes == null || opcoes.isEmpty()) aba.setColor(1f, 1f, 1f, 0.35f);
+            aba.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    categoriaVanity = cat;
+                    atualizarVanity();
+                }
+            });
+            vanityAbas.add(aba).size(42).pad(2);
+        }
+    }
+
+    private void montarOpcoesVanity() {
+        vanityOpcoes.clearChildren();
+        List<String[]> opcoes = new ArrayList<>();
+        // Roupa/cabeca/acessorio podem ficar vazios; a pele (base) nao.
+        if (!"base".equals(categoriaVanity)) opcoes.add(null);
+        List<String[]> doDb = skinDb.get(categoriaVanity);
+        if (doDb != null) opcoes.addAll(doDb);
+        String[] atual = skinsRascunho.get(categoriaVanity);
+        int coluna = 0;
+        for (String[] opcao : opcoes) {
+            boolean selecionada = opcao == null ? atual == null : atual != null && atual[0].equals(opcao[0]);
+            Button botao = new Button(estiloVanity(selecionada));
+            if (opcao == null) {
+                Image nada = new Image(new TextureRegionDrawable(atlas.findRegion("ui/Negate")));
+                nada.setScaling(Scaling.fit);
+                nada.setColor(1f, 1f, 1f, 0.4f);
+                botao.add(nada).size(20);
+            } else {
+                Image icone = iconeSkin(opcao[0], atual != null && atual[0].equals(opcao[0]) ? atual[1] : null);
+                if (icone != null) botao.add(icone).grow().pad(5);
+            }
+            botao.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    if (opcao == null) {
+                        skinsRascunho.remove(categoriaVanity);
+                    } else {
+                        String[] anterior = skinsRascunho.get(categoriaVanity);
+                        // Mantem a cor escolhida ao trocar de modelo.
+                        skinsRascunho.put(categoriaVanity,
+                            new String[]{opcao[0], anterior != null ? anterior[1] : "ffffffff"});
+                    }
+                    atualizarVanity();
+                }
+            });
+            vanityOpcoes.add(botao).size(SLOT_EQUIP).pad(1.5f);
+            if (++coluna % 5 == 0) vanityOpcoes.row();
+        }
+    }
+
+    private void montarCoresVanity() {
+        vanityCores.clearChildren();
+        String[] atual = skinsRascunho.get(categoriaVanity);
+        int coluna = 0;
+        for (Color cor : PALETA) {
+            String hex = SkinsUtil.hex(cor);
+            boolean selecionada = atual != null && atual[1].equalsIgnoreCase(hex);
+            Button.ButtonStyle estilo = new Button.ButtonStyle();
+            estilo.up = UiSkin.retangulo(cor, selecionada ? Color.WHITE : new Color(0.06f, 0.06f, 0.06f, 1f), 2);
+            estilo.over = UiSkin.retangulo(cor, new Color(0.75f, 0.75f, 0.75f, 1f), 2);
+            Button celula = new Button(estilo);
+            // Sem peca escolhida nessa categoria, nao ha o que pintar.
+            if (atual == null) celula.setColor(1f, 1f, 1f, 0.35f);
+            celula.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    String[] escolhida = skinsRascunho.get(categoriaVanity);
+                    if (escolhida == null) return;
+                    escolhida[1] = hex;
+                    atualizarVanity();
+                }
+            });
+            vanityCores.add(celula).size(34).pad(1.5f);
+            if (++coluna % 8 == 0) vanityCores.row();
+        }
+    }
+
+    /** Personagem montado com as camadas do rascunho, nas 4 direcoes. */
+    private void montarPreviewVanity() {
+        vanityPreview.clearChildren();
+        int[] direcoes = {SkinsUtil.FRAME_BAIXO, SkinsUtil.FRAME_ESQUERDA, SkinsUtil.FRAME_DIREITA, SkinsUtil.FRAME_CIMA};
+        for (int i = 0; i < direcoes.length; i++) {
+            Stack pilha = new Stack();
+            float altura = 17f;
+            for (String cat : SkinsUtil.ORDEM_CAMADAS) {
+                String[] escolhida = skinsRascunho.get(cat);
+                String caminho = escolhida != null ? escolhida[0] : "base".equals(cat) ? SkinsUtil.BASE_PADRAO : null;
+                TextureAtlas.AtlasRegion tira = SkinsUtil.regiao(atlas, caminho);
+                if (tira == null) continue;
+                Image camada = new Image(new TextureRegionDrawable(SkinsUtil.quadro(tira, direcoes[i])));
+                camada.setScaling(Scaling.stretch);
+                if (escolhida != null) camada.setColor(SkinsUtil.cor(escolhida[1]));
+                // Cada camada no tamanho dela (16 x altura da tira), ancorada
+                // nos pes - igual o mundo desenha.
+                com.badlogic.gdx.scenes.scene2d.ui.Container<Image> encaixe =
+                    new com.badlogic.gdx.scenes.scene2d.ui.Container<>(camada);
+                encaixe.size(SkinsUtil.FRAME_LARGURA * ESCALA_PREVIEW, tira.getRegionHeight() * ESCALA_PREVIEW).bottom();
+                pilha.add(encaixe);
+                altura = Math.max(altura, tira.getRegionHeight());
+            }
+            Table celula = new Table();
+            celula.add(pilha).size(SkinsUtil.FRAME_LARGURA * ESCALA_PREVIEW, altura * ESCALA_PREVIEW);
+            vanityPreview.add(celula).expand().pad(2);
+            if (i == 1) vanityPreview.row();
+        }
+    }
+
+    private void equiparSkins() {
+        if (!socket.isConnected()) return;
+        JsonValue raiz = new JsonValue(JsonValue.ValueType.object);
+        JsonValue skins = new JsonValue(JsonValue.ValueType.object);
+        for (Map.Entry<String, String[]> e : skinsRascunho.entrySet()) {
+            JsonValue item = new JsonValue(JsonValue.ValueType.object);
+            item.addChild("caminho", new JsonValue(e.getValue()[0]));
+            item.addChild("cor", new JsonValue(e.getValue()[1]));
+            skins.addChild(e.getKey(), item);
+        }
+        raiz.addChild("skins", skins);
+        socket.emitRaw("update_skins", raiz.toJson(com.badlogic.gdx.utils.JsonWriter.OutputType.json));
+    }
+
     private Color corMoeda(String tipo) {
         switch (tipo) {
             case "Copper": return Color.valueOf("ff8747");
@@ -1326,16 +1627,18 @@ public final class BookMenuUI {
         try {
             secaoAtual = secao;
             tituloSecao.setText(secao);
-            boolean comTitulo = !"Bag".equals(secao) && !"Skills".equals(secao) && !"Equip".equals(secao);
+            boolean comTitulo = !"Bag".equals(secao) && !"Skills".equals(secao) && !"Equip".equals(secao)
+                && !"Vanity".equals(secao);
             tituloSecao.setVisible(comTitulo);
             if (!"Bag".equals(secao)) cancelarExclusao();
             mainWindow.clearChildren();
             // Equip ocupa o painel inteiro (colunas encostam na borda).
-            mainWindow.pad("Equip".equals(secao) || "Bag".equals(secao) ? 1 : 14);
+            mainWindow.pad("Equip".equals(secao) || "Bag".equals(secao) || "Vanity".equals(secao) ? 1 : 14);
             if (comTitulo) {
                 mainWindow.add(tituloSecao).growX().left().padBottom(9).row();
             }
-            Table pagina = "Equip".equals(secao) ? equipPage : "Skills".equals(secao) ? skillsPage : bagPage;
+            Table pagina = "Equip".equals(secao) ? equipPage : "Skills".equals(secao) ? skillsPage
+                : "Vanity".equals(secao) ? vanityPage : bagPage;
             mainWindow.add(pagina).grow();
             actionBar.setVisible("Bag".equals(secao));
             for (Map.Entry<String, Button> entrada : botoes.entrySet()) {

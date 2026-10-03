@@ -239,6 +239,16 @@ public class WorldScreen extends ScreenAdapter {
     private TextureRegion spriteBase;
     private AnimacaoCorpo animacaoBase;
 
+    /** Uma camada de skin (base/body/helm/acc) ja recortada + cor. */
+    private static class CamadaSkin {
+        final AnimacaoCorpo animacao;
+        final Color cor;
+        CamadaSkin(AnimacaoCorpo animacao, Color cor) { this.animacao = animacao; this.cor = cor; }
+    }
+    // Camadas por nome de jogador (local e remotos), na ordem de desenho.
+    private final Map<String, List<CamadaSkin>> skinsJogadores = new HashMap<>();
+    private final Map<String, AnimacaoCorpo> cacheAnimacoesSkin = new HashMap<>();
+
     // Overlay de debug (tecla C) - desenha em vermelho translucido todo SQM
     // que ColisaoGrid considera parede, pra comparar visualmente com o mapa
     // de verdade e achar tile de colisao errado/faltando.
@@ -887,6 +897,8 @@ public class WorldScreen extends ScreenAdapter {
             // ao esbarrar num NPC) - sem esse if, inventario/moedas/skills
             // eram zerados no client.
             if (data.has("inventory")) {
+                definirSkins(local.nome, data.get("skins"));
+                bookMenu.carregarSkins(data.get("skin_db"), data.get("skins"));
                 bookMenu.carregarItemDb(data.get("item_db"));
                 bookMenu.atualizarInventario(data.get("inventory"));
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
@@ -933,6 +945,19 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("player_left", (nomeEvt, data) -> {
             if (data == null) return;
             remotos.remove(data.getString("name", ""));
+            skinsJogadores.remove(data.getString("name", ""));
+        });
+
+        // Skins: confirmacao das minhas (depois do Equip na aba Vanity) e
+        // troca de skin de outro jogador da area.
+        socket.on("skins_synced", (nomeEvt, data) -> {
+            if (data == null) return;
+            definirSkins(local.nome, data.get("skins"));
+            bookMenu.atualizarSkinsEquipadas(data.get("skins"));
+        });
+        socket.on("player_skins_updated", (nomeEvt, data) -> {
+            if (data == null) return;
+            definirSkins(data.getString("name", ""), data.get("skins"));
         });
 
         socket.on("position_saved", (nomeEvt, data) -> finalizarSaidaAposSalvar());
@@ -1195,6 +1220,7 @@ public class WorldScreen extends ScreenAdapter {
         float mx = rawX != -1f ? conversor.rawParaMundoX(rawX) : spawnX;
         float my = rawY != -1f ? conversor.rawParaMundoY(rawY) : spawnY;
         remotos.put(nome, new Jogador(nome, classe, mx, my));
+        definirSkins(nome, p.get("skins"));
     }
 
     /** Mantem o viewport da camera do tamanho real da tela (chamada todo
@@ -1641,8 +1667,39 @@ public class WorldScreen extends ScreenAdapter {
         float ancoraX = Math.round(j.x / camera.zoom) * camera.zoom;
         float ancoraY = Math.round(j.y / camera.zoom) * camera.zoom;
         float x = ancoraX - largura / 2f;
-        // Por enquanto, todos os personagens usam apenas a pele de esqueleto.
-        batch.draw(quadroBase, x, ancoraY, largura, altura);
+        List<CamadaSkin> camadas = skinsJogadores.get(j.nome);
+        if (camadas == null || camadas.isEmpty()) {
+            batch.draw(quadroBase, x, ancoraY, largura, altura);
+            return;
+        }
+        // Camadas de skin (base, roupa, cabeca, acessorio) uma por cima da
+        // outra, cada uma com a cor escolhida na aba Vanity.
+        for (CamadaSkin camada : camadas) {
+            TextureRegion quadro = quadroAtual(camada.animacao, j);
+            batch.setColor(camada.cor);
+            batch.draw(quadro, x, ancoraY, largura, quadro.getRegionHeight() * ESCALA_SPRITE);
+        }
+        batch.setColor(Color.WHITE);
+    }
+
+    /** Monta as camadas de skin de um jogador a partir do formato do servidor
+     * ({categoria: {caminho, cor}}, ver servidor.py::validar_skins). */
+    private void definirSkins(String nome, JsonValue skins) {
+        if (nome == null || nome.isEmpty()) return;
+        List<CamadaSkin> camadas = new ArrayList<>();
+        for (String cat : SkinsUtil.ORDEM_CAMADAS) {
+            String caminho = SkinsUtil.caminho(skins, cat);
+            if (caminho == null && "base".equals(cat)) caminho = SkinsUtil.BASE_PADRAO;
+            TextureRegion tira = SkinsUtil.regiao(atlas, caminho);
+            if (tira == null) continue;
+            AnimacaoCorpo anim = cacheAnimacoesSkin.get(caminho);
+            if (anim == null) {
+                anim = criarAnimacao(tira);
+                cacheAnimacoesSkin.put(caminho, anim);
+            }
+            camadas.add(new CamadaSkin(anim, SkinsUtil.cor(SkinsUtil.corHex(skins, cat))));
+        }
+        skinsJogadores.put(nome, camadas);
     }
 
     private void desenharNPC(NPCVisual npc) {
