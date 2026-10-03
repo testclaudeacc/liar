@@ -998,13 +998,13 @@ public final class BookMenuUI {
     // Abas na ordem da print (roupa, cabeca, acessorio, pele). Catalogo vem do
     // servidor (skin_db no sync_local_player, ja filtrado pela classe); o que
     // vale de verdade e' confirmado pelo servidor em skins_synced.
-    private static final String[] CATEGORIAS_VANITY = {"body", "helm", "acc", "base"};
+    private static final String[] CATEGORIAS_VANITY = {"base", "body", "helm", "acc"};
     private static final float COLUNA_VANITY = 200f;
     private static final float ESCALA_PREVIEW = 3.5f;
     private final Map<String, List<String[]>> skinDb = new LinkedHashMap<>(); // cat -> {caminho, nome}
     private final Map<String, String[]> skinsEquipadas = new LinkedHashMap<>(); // cat -> {caminho, cor}
     private final Map<String, String[]> skinsRascunho = new LinkedHashMap<>();
-    private String categoriaVanity = "body";
+    private String categoriaVanity = "base";
     private final Table vanityAbas = new Table();
     private final Table vanityOpcoes = new Table();
     private final Table vanityCores = new Table();
@@ -1080,7 +1080,7 @@ public final class BookMenuUI {
         colunaEsquerda.top().left();
         colunaEsquerda.setBackground(UiSkin.retangulo(
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
-        colunaEsquerda.add(vanityAbas).center().pad(8, 4, 0, 4).row();
+        colunaEsquerda.add(vanityAbas).growX().pad(6, 8, 0, 8).row();
         colunaEsquerda.add().grow().row();
         colunaEsquerda.add(vanityPreview).growX().height(150).pad(0, 8, 6, 8).row();
         colunaEsquerda.add(botoesVanity).growX().pad(0, 8, 8, 8);
@@ -1193,10 +1193,10 @@ public final class BookMenuUI {
                 : "base".equals(cat) ? SkinsUtil.BASE_PADRAO : null;
             // Icone (quadro de frente da peca atual) + nome da categoria.
             Image icone = iconeSkin(caminho, escolhida != null ? escolhida[1] : null);
-            if (icone != null) aba.add(icone).size(30).padLeft(4).padRight(4);
-            else aba.add().size(30).padLeft(4).padRight(4);
+            if (icone != null) aba.add(icone).size(36).padLeft(6).padRight(8);
+            else aba.add().size(36).padLeft(6).padRight(8);
             Label nome = new Label(nomeCategoriaVanity(cat), skin, "hud");
-            nome.setFontScale(0.68f);
+            nome.setFontScale(0.8f);
             aba.add(nome).left().expandX();
             // Categoria sem nada pra essa classe fica apagada (igual a asa da print).
             if (opcoes == null || opcoes.isEmpty()) aba.setColor(1f, 1f, 1f, 0.35f);
@@ -1206,18 +1206,17 @@ public final class BookMenuUI {
                     atualizarVanity();
                 }
             });
-            vanityAbas.add(aba).width(89).height(40).pad(2);
-            // Grade 2x2.
-            if (vanityAbas.getCells().size % 2 == 0) vanityAbas.row();
+            // Uma "gaveta" por linha, largura toda da coluna.
+            vanityAbas.add(aba).growX().height(44).pad(2, 0, 2, 0).row();
         }
     }
 
     private static String nomeCategoriaVanity(String cat) {
         switch (cat) {
-            case "body": return "Outfit";
-            case "helm": return "Head";
-            case "acc": return "Extra";
             case "base": return "Skin";
+            case "body": return "Cloth";
+            case "helm": return "Hair";
+            case "acc": return "Back";
             default: return cat;
         }
     }
