@@ -311,8 +311,13 @@ public class ChatUI {
         return aba != null ? aba.cor : COR_LOCAL;
     }
 
-    /** Slot na cor da aba. Ativa (aba selecionada embaixo): fundo mais claro
-     * e borda branca grossa pra destacar. */
+    private static Color bordaEscura(Color fundo) {
+        return fundo.cpy().mul(0.6f, 0.6f, 0.6f, 1f);
+    }
+
+    /** Slot na cor da aba, com borda um pouco mais escura que o fundo (pra
+     * dar contraste). Ativa (aba selecionada embaixo): fundo mais claro e
+     * borda mais grossa. */
     private TextButton.TextButtonStyle estiloSlot(Color cor, boolean ativa) {
         // Cache: reconstruirAbas() roda a cada troca de aba e retangulo() cria textura nova.
         String chave = cor.toString() + ativa;
@@ -320,11 +325,12 @@ public class ChatUI {
         if (emCache != null) return emCache;
         TextButton.TextButtonStyle estilo = new TextButton.TextButtonStyle(skin.get("cinza-popup", TextButton.TextButtonStyle.class));
         Color fundo = ativa ? cor.cpy().lerp(Color.WHITE, 0.2f) : cor;
-        Color borda = ativa ? Color.WHITE : cor.cpy().lerp(Color.WHITE, 0.35f);
         int espessura = ativa ? 2 : 1;
-        estilo.up = UiSkin.retangulo(fundo, borda, espessura);
-        estilo.over = UiSkin.retangulo(fundo.cpy().lerp(Color.WHITE, 0.12f), borda, espessura);
-        estilo.down = UiSkin.retangulo(fundo.cpy().mul(0.7f, 0.7f, 0.7f, 1f), borda, espessura);
+        Color over = fundo.cpy().lerp(Color.WHITE, 0.12f);
+        Color down = fundo.cpy().mul(0.7f, 0.7f, 0.7f, 1f);
+        estilo.up = UiSkin.retangulo(fundo, bordaEscura(fundo), espessura);
+        estilo.over = UiSkin.retangulo(over, bordaEscura(over), espessura);
+        estilo.down = UiSkin.retangulo(down, bordaEscura(down), espessura);
         cacheEstilos.put(chave, estilo);
         return estilo;
     }
