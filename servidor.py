@@ -33,6 +33,17 @@ from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from eventlet.queue import Queue
+from eventlet import tpool
+
+# Hash de senha (pbkdf2) e' de proposito lento (~centenas de ms de CPU). No
+# eventlet isso rodava no MESMO fio do jogo: cada login/cadastro travava o
+# mundo pra todo mundo por esse tempo (e um monte de logins seguidos = lag
+# geral). tpool roda numa thread de verdade, fora do loop do jogo.
+def _hash_senha(senha):
+    return tpool.execute(generate_password_hash, senha)
+
+def _conferir_senha(hash_salvo, senha):
+    return tpool.execute(check_password_hash, hash_salvo, senha)
 
 load_dotenv()
 GMAIL_SENDER = os.getenv("GMAIL_SENDER")
@@ -1623,7 +1634,7 @@ def register():
     if len(email) > 254 or not RE_EMAIL.match(email): return jsonify({"erro": "Invalid email."}), 400
     if not (SENHA_MIN <= len(senha) <= SENHA_MAX): return jsonify({"erro": "Invalid password."}), 400
     if _limite_excedido(('register', _ip()), 5, 3600): return _resposta_limite()
-    hashed_password = generate_password_hash(senha)
+    hashed_password = _hash_senha(senha)
     conn = None
     try:
         conn = db_pool.getconn()
@@ -1655,7 +1666,7 @@ def login():
         c = conn.cursor()
         c.execute("SELECT id, password FROM users WHERE email = %s", (email,))
         user = c.fetchone()
-        if user and check_password_hash(user[1], senha):
+        if user and _conferir_senha(user[1], senha):
             return jsonify({"mensagem": "Login ok!", "user_id": user[0], "email": email,
                             "token": gerar_token(user[0], user[1])}), 200
         return jsonify({"erro": "Invalid credentials."}), 401
@@ -1721,7 +1732,7 @@ def reset_password():
                 _reset_erros.pop(email, None)
             return jsonify({"erro": "Invalid or expired code."}), 400
         c.execute("UPDATE users SET password = %s, reset_code = NULL, reset_code_expires = NULL WHERE email = %s",
-                   (generate_password_hash(nova), email))
+                   (_hash_senha(nova), email))
         conn.commit()
         _reset_erros.pop(email, None)
         return jsonify({"mensagem": "Password updated."}), 200
@@ -1806,7 +1817,7 @@ def delete_character():
         if not token_valido(c, dados['user_id'], dados.get('token')): return jsonify({"erro": "Session expired."}), 401
         c.execute("SELECT password FROM users WHERE id = %s", (dados['user_id'],))
         user = c.fetchone()
-        if not user or not check_password_hash(user[0], str(dados['password'])): return jsonify({"erro": "Wrong pass."}), 401
+        if not user or not _conferir_senha(user[0], str(dados['password'])): return jsonify({"erro": "Wrong pass."}), 401
         # Personagem online nao pode ser apagado (ficava "fantasma" no mundo).
         if str(dados['name']) in players_by_name: return jsonify({"erro": "Character is online."}), 409
         c.execute("DELETE FROM characters WHERE user_id = %s AND name = %s", (dados['user_id'], str(dados['name'])))
