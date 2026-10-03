@@ -2117,6 +2117,9 @@ def handle_register_map(data):
             except (TypeError, ValueError): pass
             hit = str(info.get('hit', 'physical_hit'))[:200]
             if hit and not hit.startswith('res://'): m['hit_effect'] = hit
+        mobs_do_mapa = [i for i in (data.get('mobs') or []) if isinstance(i, dict)]
+        print(f"[MOBS] register_map '{map_id}': {len(mobs_do_mapa)} mob(s) recebido(s) do client, "
+              f"{len(active_mobs)} ativo(s) no servidor")
         _registrar_npcs_do_mapa(map_id, data.get('npcs'), sid)
         grade = mapas_colisao.get(map_id)
         if grade is None or grade.get('fp') != fp:
@@ -2125,7 +2128,9 @@ def handle_register_map(data):
         # entrar: no join eles ainda podiam não estar registrados.
         room = online_players[sid].get('room')
         if room:
-            emit('sync_area_data', montar_sync_area(sid, room), room=sid)
+            area = montar_sync_area(sid, room)
+            print(f"[MOBS] sync_area_data pro player na sala {room}: {len(area['mobs'])} mob(s) perto")
+            emit('sync_area_data', area, room=sid)
     except Exception: traceback.print_exc()
 
 @socketio.on('map_grid')
