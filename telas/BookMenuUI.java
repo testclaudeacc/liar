@@ -1528,8 +1528,10 @@ public final class BookMenuUI {
     private final Table rodapeAdicionar = new Table();
     private com.badlogic.gdx.scenes.scene2d.ui.TextField campoNovoAmigo;
     private Label statusAmigos;
-    private String amigoSelecionado = null;
+    private String amigoSelecionado = null; // (sem uso visual: clicar abre a janela do player)
     private Runnable aoMudarAmigos; // avisa quem mostra a janela do jogador
+    private java.util.function.Consumer<String> aoClicarAmigo; // abre a janela do player
+    private boolean modoRemover = false; // "Remove": o proximo clique numa linha remove
 
     private void construirPaginaFriends(Skin skin) {
         friendsPage.top();
@@ -1550,9 +1552,10 @@ public final class BookMenuUI {
         TextButton adicionar = new TextButton("Add Friend", estiloAdicionar);
         remover.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                if (amigoSelecionado == null) { statusAmigos.setText("Select a friend first."); return; }
-                String alvo = amigoSelecionado;
-                if (socket.isConnected()) socket.emitRaw("toggle_friend", GameSocket.obj(w -> w.set("friend_name", alvo)));
+                // Clicar na linha agora abre a janela do player; pra remover,
+                // aperta Remove e depois clica no amigo.
+                modoRemover = !modoRemover;
+                statusAmigos.setText(modoRemover ? "Click a friend to remove." : "");
             }
         });
         adicionar.addListener(new ChangeListener() {
@@ -1618,10 +1621,8 @@ public final class BookMenuUI {
     }
 
     private Table linhaAmigo(AmigoInfo a) {
-        boolean selecionado = a.nome.equals(amigoSelecionado);
         Table linha = new Table();
-        linha.setBackground(UiSkin.retangulo(selecionado ? new Color(0.22f, 0.30f, 0.22f, 1f) : new Color(0.17f, 0.17f, 0.17f, 1f),
-            selecionado ? new Color(0.35f, 0.6f, 0.35f, 1f) : new Color(0.12f, 0.12f, 0.12f, 1f), 1));
+        linha.setBackground(UiSkin.retangulo(new Color(0.17f, 0.17f, 0.17f, 1f), new Color(0.12f, 0.12f, 0.12f, 1f), 1));
         linha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         linha.add(iconeAtlas(a.online ? "ui/OnlineIcon" : "ui/OfflineIcon", 26f)).size(26f).padLeft(8).padRight(8);
         Label nome = new Label(a.nome, skin, "hud");
@@ -1633,9 +1634,13 @@ public final class BookMenuUI {
         linha.add(iconeAtlas(iconeClasse(a.classe), 26f)).size(26f).padRight(8);
         linha.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
             @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
-                amigoSelecionado = a.nome.equals(amigoSelecionado) ? null : a.nome;
-                statusAmigos.setText("");
-                reconstruirListaAmigos();
+                if (modoRemover) {
+                    modoRemover = false;
+                    statusAmigos.setText("");
+                    if (socket.isConnected()) socket.emitRaw("toggle_friend", GameSocket.obj(w -> w.set("friend_name", a.nome)));
+                    return;
+                }
+                if (aoClicarAmigo != null) aoClicarAmigo.accept(a.nome);
             }
         });
         return linha;
@@ -1722,6 +1727,8 @@ public final class BookMenuUI {
     public AmigoInfo amigo(String nome) { return amigos.get(nome); }
 
     public void definirAoMudarAmigos(Runnable r) { aoMudarAmigos = r; }
+
+    public void definirAoClicarAmigo(java.util.function.Consumer<String> c) { aoClicarAmigo = c; }
 
     private Button criarBotaoAcao(String regiao, Color fundo, Color borda, Runnable acao) {
         Button.ButtonStyle estilo = new Button.ButtonStyle();

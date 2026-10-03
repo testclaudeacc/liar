@@ -2303,7 +2303,7 @@ def _filtrar_mensagem_chat(sid, p, texto):
     fim_mute = chat_mutes.get(nome, 0)
     if fim_mute > agora:
         restante = fim_mute - agora
-        cor = 'red' if restante > 5 * 60 else 'yellow'
+        cor = 'red'  # qualquer mute e' punicao: vermelho vivo no client
         chat_sistema(sid, f"You are muted. Wait {_formatar_tempo(restante)} to talk again.", cor)
         return None
 
@@ -2323,7 +2323,7 @@ def _filtrar_mensagem_chat(sid, p, texto):
         else:
             seg = CHAT_SPAM_MUTE_BASE_SEG * n
             _mutar(nome, seg)
-            chat_sistema(sid, f"You are sending messages too fast. You are muted for {_formatar_tempo(seg)}.")
+            chat_sistema(sid, f"You are sending messages too fast. You are muted for {_formatar_tempo(seg)}.", 'red')
         return None
     hist['msgs'].append(agora)
 

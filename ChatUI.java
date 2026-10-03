@@ -44,7 +44,9 @@ public class ChatUI {
     private static final int MAX_MENSAGENS = 60;
     /** Igual servidor.py::CHAT_MAX_CARACTERES - passou disso o campo para de digitar. */
     public static final int MAX_CARACTERES = 200;
-    private static final Color COR_SISTEMA = new Color(1f, 0.82f, 0.3f, 1f);
+    private static final Color COR_SISTEMA = new Color(0.68f, 0.68f, 0.68f, 1f); // cinza
+    /** Punicoes (mute de spam/toxicidade): vermelho vivo. */
+    public static final Color COR_PUNICAO = new Color(1f, 0f, 0f, 1f);
     private static final String ABA_LOCAL = "Local";
     /** Aba extra: icone no atlas + cor de fundo do slot (no "+" e embaixo). */
     private static final class TipoAba {
@@ -446,6 +448,7 @@ public class ChatUI {
         if (abaAtual.equals(ABA_LOCAL)) return;
         mensagensPorAba.remove(abaAtual);
         membrosPorAba.remove(abaAtual);
+        naoLidas.remove(abaAtual);
         if (ehPrivada(abaAtual)) {
             iconePrivada.remove(abaAtual);
             nomeExibidoPrivada.remove(abaAtual);
@@ -460,9 +463,53 @@ public class ChatUI {
 
     private void trocarAba(String nome) {
         abaAtual = nome;
+        naoLidas.remove(nome);
         reconstruirAbas();
         reconstruirLog();
         reconstruirPainelJogadores();
+    }
+
+    // ---- Retrato do player nas abas privadas + mensagens nao lidas ----
+    /** Quem sabe desenhar o player (WorldScreen): o sprite animado dele, ou
+     * o icone de reserva (classe) se ele nao estiver por perto/online. */
+    public interface FornecedorRetrato {
+        com.badlogic.gdx.scenes.scene2d.Actor retrato(String nomeReal, String iconeReserva);
+    }
+    private FornecedorRetrato fornecedorRetrato;
+    private final Map<String, Integer> naoLidas = new java.util.HashMap<>();
+
+    public void setFornecedorRetrato(FornecedorRetrato f) {
+        fornecedorRetrato = f;
+        reconstruirAbas();
+    }
+
+    /** Botao da aba: icone (ou retrato do player no PV) + numero de mensagens
+     * nao lidas no canto inferior direito. */
+    private Button criarBotaoAba(String nome, boolean ativa) {
+        TextButton.TextButtonStyle estilo = estiloSlot(corDaAba(nome), ativa);
+        com.badlogic.gdx.scenes.scene2d.Actor figura = null;
+        if (ehPrivada(nome) && fornecedorRetrato != null) {
+            figura = fornecedorRetrato.retrato(nome.substring(PREFIXO_PRIVADA.length()), iconePrivada.get(nome));
+        } else {
+            TextureRegion icone = atlas != null && iconeDaAba(nome) != null ? atlas.findRegion(iconeDaAba(nome)) : null;
+            if (icone != null) figura = new Image(icone);
+        }
+        if (figura == null) return criarBotaoIcone(null, nome, estilo); // sem atlas (TesteGame): texto
+        Table centro = new Table();
+        centro.add(figura).size(TAMANHO_ICONE);
+        com.badlogic.gdx.scenes.scene2d.ui.Stack pilha = new com.badlogic.gdx.scenes.scene2d.ui.Stack(centro);
+        int qtd = naoLidas.getOrDefault(nome, 0);
+        if (qtd > 0) {
+            Label numero = new Label(qtd > 99 ? "99+" : String.valueOf(qtd), skin, "hud");
+            numero.setFontScale(0.6f);
+            Table canto = new Table();
+            canto.bottom().right();
+            canto.add(numero).pad(0, 0, 1, 3);
+            pilha.add(canto);
+        }
+        Button botao = new Button(estilo);
+        botao.add(pilha).grow();
+        return botao;
     }
 
     private void reconstruirAbas() {
@@ -470,7 +517,7 @@ public class ChatUI {
         for (String nome : mensagensPorAba.keySet()) {
             boolean ativa = nome.equals(abaAtual);
             // Icone em vez do nome, no slot com a cor da aba.
-            Button botao = criarBotaoIcone(iconeDaAba(nome), nome, estiloSlot(corDaAba(nome), ativa));
+            Button botao = criarBotaoAba(nome, ativa);
             botao.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAba(nome); }
             });
@@ -557,6 +604,11 @@ public class ChatUI {
         msgs.add(linha);
         if (msgs.size > MAX_MENSAGENS) msgs.removeIndex(0);
         if (aba.equals(abaAtual)) reconstruirLog();
+        // Nao lida: aba que nao esta aberta, ou o chat inteiro fechado.
+        if (!aba.equals(abaAtual) || !janela.isVisible()) {
+            naoLidas.merge(aba, 1, Integer::sum);
+            reconstruirAbas();
+        }
     }
 
     private void reconstruirLog() {
@@ -611,6 +663,7 @@ public class ChatUI {
 
     public void setVisivel(boolean visivel) {
         janela.setVisible(visivel);
+        if (visivel && naoLidas.remove(abaAtual) != null) reconstruirAbas();
         if (!visivel) {
             popupAdicionar.setVisible(false);
             if (estaDigitando()) stage.setKeyboardFocus(null);

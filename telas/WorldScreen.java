@@ -621,7 +621,7 @@ public class WorldScreen extends ScreenAdapter {
     // 1.4s, que fechava sozinho mesmo com a tela ainda aberta). Menu nao tem
     // uma tela de verdade ainda (BookMenu nao foi portado), entao o proprio
     // clique no botao liga/desliga esse flag.
-    private TextureRegion notifChat, notifConfig;
+    private TextureRegion notifChat, notifConfig, notifMenu;
     // Fumaca de spawn (sprites/SFXs/Spawn/Smoke.png, 7 quadros de 16px) -
     // toca uma vez so' (sem loop) na posicao de spawn assim que o mundo abre.
     private TextureRegion spawnSmokeTex;
@@ -697,6 +697,7 @@ public class WorldScreen extends ScreenAdapter {
 
         notifChat = atlas.findRegion("sprites/notifications/Chat");
         notifConfig = atlas.findRegion("sprites/notifications/Settings");
+        notifMenu = atlas.findRegion("sprites/notifications/Menu");
 
         spawnSmokeTex = atlas.findRegion("sprites/spawn/Smoke");
         TextureRegion[] quadrosFumaca = new TextureRegion[7];
@@ -952,9 +953,9 @@ public class WorldScreen extends ScreenAdapter {
                 chat.adicionarMensagemSistema("Trading is not available yet.");
             }
             @Override public void abrirChat(String nome) {
-                Jogador j = remotos.get(nome);
-                chat.abrirConversaPrivada(nome, nomeVisivel(nome), BookMenuUI.iconeClasse(j != null ? j.classe : null));
-                painelJogador.fechar();
+                fecharOutrasJanelas();
+                chat.abrirConversaPrivada(nome, nomeVisivel(nome), BookMenuUI.iconeClasse(classeDe(nome)));
+                atualizarVisibilidadeJoystick();
             }
             @Override public void alternarIconeAmigo(String nome, String icone) {
                 socket.emitRaw("set_friend_icon", GameSocket.obj(w -> {
@@ -964,6 +965,14 @@ public class WorldScreen extends ScreenAdapter {
             }
         });
         bookMenu.definirAoMudarAmigos(this::atualizarEstadoPainel);
+        // Clicar num amigo na aba Friends: fecha o livro e abre a janela dele.
+        bookMenu.definirAoClicarAmigo(nome -> {
+            bookMenu.setVisible(false);
+            abrirPainelDe(nome);
+        });
+        // Aba de PV no chat mostra o player (sprite animado, ou icone da classe).
+        chat.setFornecedorRetrato((nome, iconeReserva) ->
+            new AtorAlvo(nome, iconeReserva != null ? atlas.findRegion(iconeReserva) : null));
         carregarIgnorados();
         criarPainelMorte();
         dialogoNPC = new DialogoNPCUI(uiStage, skin, atlas.findRegion("ui/currency/Silver"), escala);
@@ -1136,8 +1145,16 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void alternarChat() {
+        if (!chat.isVisivel()) fecharOutrasJanelas();
         chat.setVisivel(!chat.isVisivel());
         atualizarVisibilidadeJoystick();
+    }
+
+    /** Abrir o chat fecha o que estiver aberto (livro, settings, janela do player). */
+    private void fecharOutrasJanelas() {
+        if (bookMenu.isVisible()) bookMenu.setVisible(false);
+        if (settingsAberta()) fecharSettings();
+        if (painelJogador != null && painelJogador.isVisivel()) painelJogador.fechar();
     }
 
     private void alternarBookMenu() {
@@ -1202,9 +1219,23 @@ public class WorldScreen extends ScreenAdapter {
     /** Botao de alvo do topo: com um player marcado, abre a janela dele. */
     private void abrirPainelDoAlvo() {
         if (amigoMarcado == null || !remotos.containsKey(amigoMarcado)) return;
-        String nome = amigoMarcado;
-        painelJogador.abrir(nome, nomeVisivel(nome), new AtorAlvo(nome));
+        abrirPainelDe(amigoMarcado);
+    }
+
+    /** Janela de um player pelo nome (alvo do topo ou clique na lista de amigos). */
+    private void abrirPainelDe(String nome) {
+        TextureRegion reserva = atlas.findRegion(BookMenuUI.iconeClasse(classeDe(nome)));
+        painelJogador.abrir(nome, nomeVisivel(nome), new AtorAlvo(nome, reserva));
         atualizarEstadoPainel();
+    }
+
+    /** Classe de um player que pode nem estar na tela (amigo offline/longe). */
+    private String classeDe(String nome) {
+        Jogador j = remotos.get(nome);
+        if (j == null) j = remotosForaDeVisao.get(nome);
+        if (j != null) return j.classe;
+        BookMenuUI.AmigoInfo a = bookMenu.amigo(nome);
+        return a != null ? a.classe : null;
     }
 
     private void atualizarEstadoPainel() {
@@ -1282,9 +1313,13 @@ public class WorldScreen extends ScreenAdapter {
         // null = segue o alvo atual (botao do topo); com nome = sempre esse
         // player (foto da janela do jogador).
         private final String nomeFixo;
+        // Desenhado quando o player nao esta em lugar nenhum (offline/longe
+        // demais pra ter skin): ex. o icone da classe na aba de PV.
+        private final TextureRegion reserva;
 
-        AtorAlvo() { this(null); }
-        AtorAlvo(String nomeFixo) { this.nomeFixo = nomeFixo; }
+        AtorAlvo() { this(null, null); }
+        AtorAlvo(String nomeFixo) { this(nomeFixo, null); }
+        AtorAlvo(String nomeFixo, TextureRegion reserva) { this.nomeFixo = nomeFixo; this.reserva = reserva; }
 
         @Override
         public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
@@ -1293,6 +1328,9 @@ public class WorldScreen extends ScreenAdapter {
             MobVisual mob = nomeFixo == null && alvoMob != null ? mobs.get(alvoMob) : null;
             String nomeJogador = nomeFixo != null ? nomeFixo : amigoMarcado;
             Jogador j = nomeJogador != null ? remotos.get(nomeJogador) : null;
+            // Foto fixa (janela do jogador/aba de PV): vale tambem quem esta
+            // fora da tela (a skin dele continua guardada).
+            if (j == null && nomeFixo != null) j = remotosForaDeVisao.get(nomeFixo);
             if (mob != null && !mob.morto) {
                 quadros.add(quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso));
                 cores.add(Color.WHITE);
@@ -1309,6 +1347,10 @@ public class WorldScreen extends ScreenAdapter {
                         cores.add(camada.cor);
                     }
                 }
+            }
+            if (quadros.isEmpty() && reserva != null) {
+                quadros.add(reserva);
+                cores.add(Color.WHITE);
             }
             if (quadros.isEmpty()) return;
             // Escala inteira que cabe no botao (pixel art sem distorcer).
@@ -1337,7 +1379,46 @@ public class WorldScreen extends ScreenAdapter {
     private TextureRegion notificacaoAtual() {
         if (settingsAberta()) return notifConfig;
         if (chat.isVisivel()) return notifChat;
+        if (bookMenu.isVisible()) return notifMenu;
         return null;
+    }
+
+    // ---- Balaozinho (chat/menu/settings) em cima dos OUTROS players ----
+    // servidor.py::handle_update_status repassa essas chaves pra area.
+    // is_in_skins = livro (BookMenu) aberto.
+    private static final String[] CHAVES_BALAO = {"is_in_settings", "is_typing", "is_in_skins"};
+    private final Map<String, java.util.Set<String>> baloesRemotos = new HashMap<>();
+    private final boolean[] balaoEnviado = new boolean[CHAVES_BALAO.length];
+
+    private void definirBalaoRemoto(String nome, String chave, boolean ligado) {
+        java.util.Set<String> estado = baloesRemotos.computeIfAbsent(nome, k -> new java.util.HashSet<>());
+        if (ligado) estado.add(chave); else estado.remove(chave);
+    }
+
+    /** Mesma prioridade do proprio jogador: settings > chat > menu. */
+    private TextureRegion balaoRemoto(String nome) {
+        java.util.Set<String> estado = baloesRemotos.get(nome);
+        if (estado == null || estado.isEmpty()) return null;
+        if (estado.contains("is_in_settings")) return notifConfig;
+        if (estado.contains("is_typing")) return notifChat;
+        if (estado.contains("is_in_skins")) return notifMenu;
+        return null;
+    }
+
+    /** Chamado todo frame: avisa o servidor so' quando algo abriu/fechou. */
+    private void enviarEstadoBalao() {
+        if (!socket.isConnected()) return;
+        boolean[] agora = {settingsAberta(), chat.isVisivel(), bookMenu.isVisible()};
+        for (int i = 0; i < CHAVES_BALAO.length; i++) {
+            if (agora[i] == balaoEnviado[i]) continue;
+            balaoEnviado[i] = agora[i];
+            String chave = CHAVES_BALAO[i];
+            boolean valor = agora[i];
+            socket.emitRaw("update_status", GameSocket.obj(jw -> {
+                jw.set("key", chave);
+                jw.set("value", valor);
+            }));
+        }
     }
 
     /** Popup pequeno (220x260 no Godot) - 3 botoes empilhados sem titulo
@@ -1658,7 +1739,7 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("chat_system", (nomeEvt, data) -> {
             if (data == null || chat == null) return;
             String texto = data.getString("text", "");
-            if ("red".equals(data.getString("color", ""))) chat.adicionarMensagemSistema(texto, new Color(1f, 0.25f, 0.25f, 1f));
+            if ("red".equals(data.getString("color", ""))) chat.adicionarMensagemSistema(texto, ChatUI.COR_PUNICAO);
             else chat.adicionarMensagemSistema(texto);
         });
 
@@ -1849,6 +1930,7 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             remotos.remove(data.getString("name", ""));
             remotosForaDeVisao.remove(data.getString("name", ""));
+            baloesRemotos.remove(data.getString("name", ""));
             bookMenu.definirOnline(data.getString("name", ""), false);
             if (data.getString("name", "").equals(painelJogador.nomeAberto())) painelJogador.fechar();
             skinsJogadores.remove(data.getString("name", ""));
@@ -1867,6 +1949,10 @@ public class WorldScreen extends ScreenAdapter {
         // HP dos outros players (servidor.py::broadcast_hp) - so' pra cor do nome.
         socket.on("player_status_updated", (nomeEvt, data) -> {
             if (data == null) return;
+            // Balaozinho em cima da cabeca: abriu/fechou chat, menu ou settings.
+            for (String chave : CHAVES_BALAO) {
+                if (data.has(chave)) definirBalaoRemoto(data.getString("name", ""), chave, data.getBoolean(chave, false));
+            }
             // Outro player morreu / renasceu: troca pro quadro de morte (ou volta).
             if (data.has("is_dead")) {
                 String nomeMorto = data.getString("name", "");
@@ -2248,6 +2334,9 @@ public class WorldScreen extends ScreenAdapter {
         }
         // Ja' entrou morto (morreu antes de eu chegar na area).
         if (p.getBoolean("is_dead", false)) remotosMortos.add(nome);
+        for (String chave : CHAVES_BALAO) {
+            if (p.getBoolean(chave, false)) definirBalaoRemoto(nome, chave, true);
+        }
     }
 
     /** Mantem o viewport da camera do tamanho real da tela (chamada todo
@@ -2490,6 +2579,14 @@ public class WorldScreen extends ScreenAdapter {
             float ny = local.y + 9.5f;
             batch.draw(notifAtual, nx, ny, notifAtual.getRegionWidth(), notifAtual.getRegionHeight());
         }
+        for (Jogador j : remotos.values()) {
+            TextureRegion balao = balaoRemoto(j.nome);
+            if (balao == null || estaMorto(j)) continue;
+            float bx = Math.round(j.x / camera.zoom) * camera.zoom + 2f;
+            float by = Math.round(j.y / camera.zoom) * camera.zoom + 9.5f;
+            batch.draw(balao, bx, by, balao.getRegionWidth(), balao.getRegionHeight());
+        }
+        enviarEstadoBalao();
         batch.end();
 
         // 2. Aplica a iluminação multiplicativa SOBRE a cena renderizada
