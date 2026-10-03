@@ -1567,7 +1567,8 @@ def _skin(caminho, nome, classes=None):
 SKIN_DB = {
     "base": [
         _skin("sprites/base/BaseSoul", "Soul"),
-        _skin("sprites/base/Base", "Human"),
+        _skin("sprites/base/Base", "Light"),
+        _skin("sprites/base/DarkBase", "Dark"),
     ],
     "body": [
         _skin("sprites/body/Knight", "Knight Outfit", ["Knight"]),
@@ -1615,7 +1616,9 @@ def validar_skins(skins, class_name):
         s = _skin_por_caminho(cat, str(item.get('caminho', '')))
         if s is None: continue
         if s["classes"] is not None and class_name not in s["classes"]: continue
-        limpo[cat] = {'nome': s["nome"], 'caminho': s["caminho"], 'cor': _cor_skin_valida(item.get('cor'))}
+        # Pele nao tem cor: o tom vem do proprio modelo (Light/Dark/Soul).
+        cor = 'ffffffff' if cat == 'base' else _cor_skin_valida(item.get('cor'))
+        limpo[cat] = {'nome': s["nome"], 'caminho': s["caminho"], 'cor': cor}
     return limpo
 
 def montar_skin_db_cliente(class_name):

@@ -1250,8 +1250,8 @@ public final class BookMenuUI {
                     } else {
                         String[] anterior = skinsRascunho.get(categoriaVanity);
                         // Mantem a cor escolhida ao trocar de modelo.
-                        skinsRascunho.put(categoriaVanity,
-                            new String[]{opcao[0], anterior != null ? anterior[1] : "ffffffff"});
+                        String cor = "base".equals(categoriaVanity) || anterior == null ? "ffffffff" : anterior[1];
+                        skinsRascunho.put(categoriaVanity, new String[]{opcao[0], cor});
                     }
                     atualizarVanity();
                 }
@@ -1263,6 +1263,9 @@ public final class BookMenuUI {
 
     private void montarCoresVanity() {
         vanityCores.clearChildren();
+        // Skin nao tem paleta: o tom de pele e' escolhido pelo modelo
+        // (Light/Dark/Soul), nao pintando a pele.
+        if ("base".equals(categoriaVanity)) return;
         String[] atual = skinsRascunho.get(categoriaVanity);
         int coluna = 0;
         for (Color cor : PALETA) {
