@@ -1577,6 +1577,7 @@ public final class BookMenuUI {
     private String tradeFoco = null; // instanceId mostrado na esquerda
     private boolean tradeEnviado = false, tradeAceito = false;
     private TextButton botaoEnviarTrade, botaoAceitarTrade;
+    private Label statusMeuAceite;
     private Label tituloTrade, statusTradeConfirm, tituloMinhaOferta, tituloOfertaOutro;
     private final Table gradeMinhaOferta = new Table(), gradeOfertaOutro = new Table();
     private final Table confirmDetalhes = new Table();
@@ -1627,7 +1628,7 @@ public final class BookMenuUI {
         Table direita = new Table();
         direita.top().left();
         direita.setBackground(UiSkin.retangulo(
-            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
         direita.add(tituloTrade).left().pad(8, 12, 0, 12).row();
         direita.add(scroll).grow().pad(6, 12, 6, 12).row();
         direita.add(rodape).growX().pad(0, 12, 10, 12);
@@ -1648,8 +1649,11 @@ public final class BookMenuUI {
         tituloMinhaOferta.setFontScale(0.7f * FONTE_STATS);
         tituloOfertaOutro.setFontScale(0.7f * FONTE_STATS);
         statusTradeConfirm = new Label("", skin, "hud");
-        statusTradeConfirm.setFontScale(0.6f * FONTE_STATS);
+        statusTradeConfirm.setFontScale(0.7f * FONTE_STATS);
         statusTradeConfirm.setColor(COR_TRADE_SELECIONADO);
+        statusMeuAceite = new Label("", skin, "hud");
+        statusMeuAceite.setFontScale(0.7f * FONTE_STATS);
+        statusMeuAceite.setColor(COR_TRADE_SELECIONADO);
         gradeMinhaOferta.top().left();
         gradeOfertaOutro.top().left();
         TextButton cancelar2 = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
@@ -1662,16 +1666,23 @@ public final class BookMenuUI {
         });
         Table rodape2 = new Table();
         rodape2.add(cancelar2).width(110).height(44).left();
-        rodape2.add(statusTradeConfirm).expandX().center();
+        rodape2.add().expandX();
         rodape2.add(botaoAceitarTrade).width(140).height(44).right();
+        // "Accepted" na ponta direita da linha do nome de cada oferta.
+        Table linhaMeuNome = new Table();
+        linhaMeuNome.add(tituloMinhaOferta).left().expandX();
+        linhaMeuNome.add(statusMeuAceite).right();
+        Table linhaNomeOutro = new Table();
+        linhaNomeOutro.add(tituloOfertaOutro).left().expandX();
+        linhaNomeOutro.add(statusTradeConfirm).right();
 
         Table direita2 = new Table();
         direita2.top().left();
         direita2.setBackground(UiSkin.retangulo(
-            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
-        direita2.add(tituloMinhaOferta).left().pad(8, 12, 2, 12).row();
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        direita2.add(linhaMeuNome).growX().pad(8, 12, 2, 12).row();
         direita2.add(caixaOferta(gradeMinhaOferta)).grow().pad(0, 12, 4, 12).row();
-        direita2.add(tituloOfertaOutro).left().pad(4, 12, 2, 12).row();
+        direita2.add(linhaNomeOutro).growX().pad(4, 12, 2, 12).row();
         direita2.add(caixaOferta(gradeOfertaOutro)).grow().pad(0, 12, 6, 12).row();
         direita2.add(rodape2).growX().pad(0, 12, 10, 12);
 
@@ -1909,6 +1920,7 @@ public final class BookMenuUI {
         botaoAceitarTrade.setText("Accept");
         botaoAceitarTrade.setDisabled(false);
         statusTradeConfirm.setText("");
+        statusMeuAceite.setText("");
         tituloMinhaOferta.setText(meuNome != null ? meuNome : "You");
         tituloOfertaOutro.setText(tradeOutro != null ? tradeOutro : "");
         tradeFoco = null;
@@ -1976,7 +1988,8 @@ public final class BookMenuUI {
     /** trade_lock_state_updated. */
     public void estadoAceiteTrade(boolean euAceitei, boolean eleAceitou) {
         if (!modoTrade) return;
-        statusTradeConfirm.setText(eleAceitou ? (tradeOutro != null ? tradeOutro : "Other") + " accepted." : "");
+        statusTradeConfirm.setText(eleAceitou ? "Accepted" : "");
+        statusMeuAceite.setText(euAceitei ? "Accepted" : "");
     }
 
     // ===================== PARTY =====================

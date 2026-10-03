@@ -1238,7 +1238,7 @@ public class WorldScreen extends ScreenAdapter {
         String nome = painelJogador != null ? painelJogador.nomeAberto() : null;
         if (nome == null) return;
         String lider = bookMenu.liderParty();
-        boolean party = lider == null || lider.equals(local.nome);
+        boolean party = (lider == null || lider.equals(local.nome)) && !bookMenu.estaNaParty(nome);
         Jogador j = remotos.get(nome);
         boolean trade = j != null && !estaMorto(j) && !localMorto
             && distanciaSqm(local.x, local.y, j.x, j.y) <= DISTANCIA_TRADE_SQM;
@@ -1443,7 +1443,7 @@ public class WorldScreen extends ScreenAdapter {
         // Balao: x+2 a direita do centro; aqui o espelho dele.
         // Centro vertical igual o do balao (y+9.5, ~8 de altura).
         // Encostado no lado esquerdo do corpo (o desenho tem sobra transparente).
-        float ix = Math.round(j.x / camera.zoom) * camera.zoom + 7f - TAM_ICONE_PARTY;
+        float ix = Math.round(j.x / camera.zoom) * camera.zoom + 9f - TAM_ICONE_PARTY;
         float iy = Math.round(j.y / camera.zoom) * camera.zoom + 13.5f - TAM_ICONE_PARTY / 2f;
         batch.draw(icone, ix, iy, TAM_ICONE_PARTY, TAM_ICONE_PARTY);
     }
@@ -1837,10 +1837,8 @@ public class WorldScreen extends ScreenAdapter {
             if (data != null) bookMenu.estadoAceiteTrade(data.getBoolean("self_locked", false), data.getBoolean("other_locked", false));
         });
         socket.on("trade_cancelled", (nomeEvt, data) -> {
-            boolean estava = bookMenu.emTrade();
             bookMenu.fecharTrade();
             atualizarVisibilidadeJoystick();
-            if (!estava) return;
             String motivo = data != null ? data.getString("reason", "") : "";
             hud.notificar("invalid_offer".equals(motivo) ? "Trade failed: the offer is no longer valid."
                 : "disconnected".equals(motivo) ? "Trade cancelled: the player left."
@@ -1850,7 +1848,7 @@ public class WorldScreen extends ScreenAdapter {
             bookMenu.fecharTrade();
             atualizarVisibilidadeJoystick();
             if (data != null && data.has("new_currency")) bookMenu.atualizarMoedas(data.getLong("new_currency", 0L));
-            hud.notificar("Trade completed!");
+            hud.notificar("Trade successful!");
         });
 
         // Chat Local: [nome, mensagem (ja censurada), classe] de quem esta na
@@ -2203,10 +2201,6 @@ public class WorldScreen extends ScreenAdapter {
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
-        });
-
-        socket.on("trade_executed", (nomeEvt, data) -> {
-            if (data != null) bookMenu.atualizarMoedas(data.getLong("new_currency", 0L));
         });
 
         // Troca de lugar aceita pelo servidor: [nomeA, xA, yA, dirA, nomeB, xB, yB, dirB].
