@@ -133,6 +133,9 @@ ITEM_DB = {
 }
 
 SLOT_MUNICAO = "Hand"
+# Classes que atacam a distancia (o resto e' corpo a corpo) e o alcance delas.
+CLASSES_RANGED = ("Ranger", "Mage", "Bard")
+ALCANCE_RANGED_SQM = 6
 
 # Campos do ITEM_DB que o client usa pra exibir os itens (nome, tipo, level,
 # stats e slot) - mandado no sync_local_player, assim o client nao precisa
@@ -416,6 +419,9 @@ def _montar_payload_sync_stats(p):
         'hp_bonus': hp_bonus, 'mana_bonus': mp_bonus, 'speed_multiplier': speed_multiplier,
         'classe_penalizada': punido,
         'cap_atual': calcular_cap_usado(p), 'cap_maximo': calcular_cap_maximo(level),
+        # Vitais pra barra de HP/MP do client.
+        'max_hp': calcular_max_vitais(p)[0], 'max_mp': calcular_max_vitais(p)[1],
+        'current_hp': p.get('current_hp', -1), 'current_mp': p.get('current_mp', -1),
     }
 
 def calcular_max_vitais(p):
@@ -1731,7 +1737,9 @@ def handle_join_game(data):
         players_by_name[p_name] = sid
 
         # item_db vai so' no payload (nao fica guardado em online_players).
+        max_hp_join, max_mp_join = calcular_max_vitais(data)
         emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente(),
+                                   'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
 
         rooms_area = set(salas_vizinhas(room))
@@ -1948,6 +1956,14 @@ def handle_hit_mob(data):
         
         mob_data = obter_ou_criar_mob(mob_id, mob_type_id, p.get('room'))
         if mob_data.get('hp', 1) <= 0: return
+        # Alcance: corpo a corpo so' do SQM do lado (diagonal vale); a
+        # distancia ate ALCANCE_RANGED_SQM. +1 de folga pro passo em andamento.
+        if 'pos_x' in mob_data:
+            tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+            tm = tile_do_mob(mob_data)
+            dist = max(abs(tp[0] - tm[0]), abs(tp[1] - tm[1]))
+            alcance = ALCANCE_RANGED_SQM if p.get('class_name') in CLASSES_RANGED else 1
+            if dist > alcance + 1: return
         # Mesma regra do mob pro player: andar diferente, sem golpe (nem aggro).
         if int(p.get('floor', 1) or 1) != MOB_FLOOR: return
         mob_data['last_activity'] = now
@@ -3265,7 +3281,8 @@ def regen_loop():
                 if current_mp < max_mp: current_mp = min(max_mp, current_mp + regen); p['current_mp'] = current_mp; curou = True
 
                 if curou:
-                    socketio.emit('sync_vitals', {'current_hp': current_hp, 'current_mp': current_mp}, room=sid)
+                    socketio.emit('sync_vitals', {'current_hp': current_hp, 'current_mp': current_mp,
+                                                  'max_hp': max_hp, 'max_mp': max_mp}, room=sid)
                     broadcast_hp(sid, p)
             except Exception:
                 traceback.print_exc()

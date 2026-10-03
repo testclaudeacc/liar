@@ -1426,7 +1426,7 @@ public final class BookMenuUI {
         return skin.getDrawable(name);
     }
 
-    private TextureAtlas.AtlasRegion iconeDoItem(String caminhoItem) {
+    public TextureAtlas.AtlasRegion iconeDoItem(String caminhoItem) {
         String nome = caminhoItem == null ? "" : caminhoItem.substring(caminhoItem.lastIndexOf('/') + 1);
         int extensao = nome.lastIndexOf('.');
         if (extensao >= 0) nome = nome.substring(0, extensao);

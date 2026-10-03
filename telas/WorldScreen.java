@@ -119,6 +119,7 @@ public class WorldScreen extends ScreenAdapter {
         boolean visivel = false;      // so' aparece depois da 1a posicao do servidor
         boolean voltando = false;     // voltando pra casa (flag do servidor)
         float tempoCorpo = 0f;        // segundos restantes do cadaver no chao
+        float tempoTargetHit = 0f;    // quadradinho de "atacou" (mob.gd::_exibir_target_hit)
 
         // Passo em andamento + fila dos proximos (mob.gd::_fila_passos): cada
         // mob_pos vira um passo animado com a duracao que o SERVIDOR usou, um
@@ -202,6 +203,7 @@ public class WorldScreen extends ScreenAdapter {
 
         void atualizar(float delta) {
             if (morto && tempoCorpo > 0f) tempoCorpo -= delta;
+            if (tempoTargetHit > 0f) tempoTargetHit -= delta;
             if (!movendo) tempoDesdeParou += delta;
             while (movendo && delta > 0f) {
                 float restante = (1f - progresso) * duracao;
@@ -231,6 +233,58 @@ public class WorldScreen extends ScreenAdapter {
         }
     }
     private final List<NumeroDano> numerosDano = new ArrayList<>();
+
+    // ---- Combate (alvo, ataque automatico, efeitos, loot, morte) ----
+    // Mob mirado (clique nele; clique de novo ou ESC tira). Ataca sozinho a
+    // cada ~1s enquanto estiver no alcance (o servidor so' aceita 1 hit/s).
+    private String alvoMob = null;
+    private float esperaAtaque = 0f;
+    private static final float INTERVALO_ATAQUE = 1.05f;
+    private static final int ALCANCE_RANGED_SQM = 6; // igual servidor.py::ALCANCE_RANGED_SQM
+
+    /** Animacao de efeito (tira de quadros de 16px) tocando uma vez num ponto. */
+    private static class Efeito {
+        final TextureRegion[] quadros;
+        final float x, y;
+        float tempo = 0f;
+        Efeito(TextureRegion[] quadros, float x, float y) { this.quadros = quadros; this.x = x; this.y = y; }
+    }
+    private static final float DURACAO_QUADRO_EFEITO = 0.05f;
+    private final List<Efeito> efeitos = new ArrayList<>();
+    private final Map<String, TextureRegion[]> cacheEfeitos = new HashMap<>();
+
+    /** Projetil (flecha/magia/nota) indo do atacante ate o mob; ao chegar toca o hit. */
+    private static class Projetil {
+        final TextureRegion regiao;
+        final float x0, y0, x1, y1;
+        final String efeitoHit;
+        float tempo = 0f;
+        final float duracao;
+        Projetil(TextureRegion regiao, float x0, float y0, float x1, float y1, String efeitoHit) {
+            this.regiao = regiao; this.x0 = x0; this.y0 = y0; this.x1 = x1; this.y1 = y1; this.efeitoHit = efeitoHit;
+            this.duracao = Math.max(0.12f, (float) Math.hypot(x1 - x0, y1 - y0) / 160f);
+        }
+    }
+    private final List<Projetil> projeteis = new ArrayList<>();
+
+    /** Bag de loot no chao (so' quem tem direito ao loot ve). */
+    private static class BagChao {
+        final String id;
+        final float x, y;
+        final boolean dourada;
+        float restante;
+        BagChao(String id, float x, float y, boolean dourada, float restante) {
+            this.id = id; this.x = x; this.y = y; this.dourada = dourada; this.restante = restante;
+        }
+    }
+    private final Map<String, BagChao> bags = new LinkedHashMap<>();
+    private static final float TEMPO_BAG_VISIVEL = 120f; // servidor: LOOT_BAG_VISIVEL_SEG
+
+    private TextureRegion regiaoAlvo, regiaoTargetHit, regiaoFlag, regiaoBag, regiaoBagDourada;
+    private HudVitais hud;
+    private JanelaLoot janelaLoot;
+    private boolean localMorto = false;
+    private Table painelMorte;
     private static final float DURACAO_NUMERO_DANO = 0.85f;
 
     private final Map<String, MobVisual> mobs = new LinkedHashMap<>();
@@ -527,6 +581,11 @@ public class WorldScreen extends ScreenAdapter {
         pmBranco.fill();
         pixelBranco = new Texture(pmBranco);
         pmBranco.dispose();
+        regiaoAlvo = atlas.findRegion("ui/slots/Target");
+        regiaoTargetHit = atlas.findRegion("ui/items/HitHitbox");
+        regiaoFlag = atlas.findRegion("ui/items/Flag");
+        regiaoBag = atlas.findRegion("ui/currency/BasicBag");
+        regiaoBagDourada = atlas.findRegion("ui/currency/GoldBag");
         criarMobsDoMapa();
 
         registrarEventosDeRede();
@@ -556,6 +615,9 @@ public class WorldScreen extends ScreenAdapter {
                 float wx = coords.x;
                 float wy = coords.y;
                 
+                if (!localMorto && cliqueEmBag(wx, wy)) return true;
+                if (!localMorto && cliqueEmMob(wx, wy)) return true;
+
                 NPCVisual npcClicado = null;
                 for (NPCVisual npc : npcs.values()) {
                     float largura = FRAME_LARGURA * ESCALA_SPRITE;
@@ -608,6 +670,9 @@ public class WorldScreen extends ScreenAdapter {
                     return true;
                 }
                 if (keycode == Input.Keys.ESCAPE) {
+                    // Janela de loot e alvo saem antes de qualquer outra coisa.
+                    if (janelaLoot.isVisible()) { janelaLoot.fechar(); return true; }
+                    if (alvoMob != null) { alvoMob = null; return true; }
                     // Fecha a interface ativa antes de abrir Settings.
                     if (dialogoNPC.isVisible()) dialogoNPC.fechar();
                     else if (chat.isVisivel()) alternarChat();
@@ -691,6 +756,9 @@ public class WorldScreen extends ScreenAdapter {
         texJoystickKnob = atlas.findRegion("ui/Joystick_Middle");
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
+        hud = new HudVitais(uiStage, skin, atlas);
+        janelaLoot = new JanelaLoot(uiStage, skin, atlas, bookMenu::iconeDoItem, this::pegarLoot);
+        criarPainelMorte();
         dialogoNPC = new DialogoNPCUI(uiStage, skin, atlas.findRegion("ui/currency/Silver"), escala);
         areaNomeUI = new AreaNomeUI(uiStage, skin, atlas.findRegion("sheet/r83_c11"), escala);
     }
@@ -1040,6 +1108,10 @@ public class WorldScreen extends ScreenAdapter {
             if (data.has("inventory")) {
                 definirSkins(local.nome, data.get("skins"));
                 bookMenu.carregarSkins(data.get("skin_db"), data.get("skins"));
+                // HP/MP: -1 no banco = cheio.
+                float maxHp = data.getFloat("max_hp", -1f), maxMp = data.getFloat("max_mp", -1f);
+                float hpJoin = data.getFloat("current_hp", -1f), mpJoin = data.getFloat("current_mp", -1f);
+                hud.definir(hpJoin < 0f ? maxHp : hpJoin, maxHp, mpJoin < 0f ? maxMp : mpJoin, maxMp);
                 bookMenu.carregarItemDb(data.get("item_db"));
                 bookMenu.atualizarInventario(data.get("inventory"));
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
@@ -1095,6 +1167,44 @@ public class WorldScreen extends ScreenAdapter {
             mob.hp = Math.max(0f, data.getFloat("new_hp", mob.hp));
             boolean critico = data.getBoolean("is_crit", false);
             numerosDano.add(new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (critico ? "!" : ""), critico));
+            // Efeito de hit; a distancia, primeiro o projetil sai do atacante.
+            String efeito = data.getString("hit_type", "physical_hit");
+            Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
+            TextureRegion projetil = regiaoDoCaminho(data.getString("proj", ""));
+            if ("Ranged".equals(data.getString("w_type", "")) && projetil != null && atacante != null) {
+                projeteis.add(new Projetil(projetil, atacante.x, atacante.y + 8f, mob.x, mob.y + 8f, efeito));
+            } else {
+                tocarEfeito(efeito, mob.x, mob.y);
+            }
+        });
+        socket.on("player_damaged", (nomeEvt, data) -> {
+            // Mob bateu num player: TargetHit no mob, numero + efeito no player.
+            if (data == null) return;
+            MobVisual mob = mobs.get(data.getString("attacker_mob_id", ""));
+            if (mob != null) mob.tempoTargetHit = 1.1f;
+            String alvo = data.getString("target_player", "");
+            Jogador j = jogadorPorNome(alvo);
+            if (j != null) {
+                numerosDano.add(new NumeroDano(j.x, j.y + 4f, String.valueOf(data.getInt("damage", 0)), false));
+                tocarEfeito(data.getString("hit_type", "physical_hit"), j.x, j.y);
+            }
+            if (alvo.equals(local.nome)) {
+                float hpNovo = data.getFloat("new_hp", hud.hpAtual());
+                hud.definir(hpNovo, data.getFloat("max_hp", -1f), -1f, -1f);
+                if (hpNovo <= 0f) morrerLocal();
+            }
+        });
+        socket.on("sync_vitals", (nomeEvt, data) -> {
+            if (data == null) return;
+            hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
+                data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
+        });
+        socket.on("loot_result", (nomeEvt, data) -> {
+            if (data != null) janelaLoot.mostrar(data);
+        });
+        socket.on("loot_taken", (nomeEvt, data) -> {
+            if (data == null) return;
+            removerBag(data.getString("loot_id", ""));
         });
         socket.on("mob_died", (nomeEvt, data) -> {
             if (data == null) return;
@@ -1104,6 +1214,13 @@ public class WorldScreen extends ScreenAdapter {
             mob.hp = 0f;
             mob.tempoCorpo = TEMPO_CORPO_MOB;
             mob.voltando = false;
+            if (mob.id.equals(alvoMob)) alvoMob = null;
+            // Bag de loot so' vem pra quem tem direito (loot_id nao vazio).
+            String lootId = data.getString("loot_id", "");
+            if (!lootId.isEmpty() && data.has("pos_x")) {
+                bags.put(lootId, new BagChao(lootId, conversor.rawParaMundoX(data.getFloat("pos_x")),
+                    conversor.rawParaMundoY(data.getFloat("pos_y")), data.getBoolean("has_items", false), TEMPO_BAG_VISIVEL));
+            }
             if (data.has("pos_x")) {
                 moverMob(mob, data.getFloat("pos_x"), data.getFloat("pos_y"), mob.direcao, 0f, true);
             } else {
@@ -1117,6 +1234,9 @@ public class WorldScreen extends ScreenAdapter {
             if (mob == null) return;
             mob.morto = true;
             mob.tempoCorpo = 0f;
+            if (mob.id.equals(alvoMob)) alvoMob = null;
+            // Mesmo efeito de fumaca do spawn do player (sprites/spawn/Smoke).
+            if (mob.visivel) efeitos.add(new Efeito(quadrosFumaca(), mob.x, mob.y));
         });
         socket.on("mob_respawn", (nomeEvt, data) -> {
             if (data == null) return;
@@ -1129,6 +1249,16 @@ public class WorldScreen extends ScreenAdapter {
             mob.visivel = false; // reaparece no mob_pos que vem logo em seguida (SQM onde renasceu)
         });
         socket.on("sync_area_data", (nomeEvt, data) -> {
+            JsonValue listaBags = data == null ? null : data.get("bags");
+            if (listaBags != null) {
+                for (JsonValue b = listaBags.child; b != null; b = b.next) {
+                    String id = b.getString("loot_id", "");
+                    if (id.isEmpty() || bags.containsKey(id)) continue;
+                    bags.put(id, new BagChao(id, conversor.rawParaMundoX(b.getFloat("pos_x", 0f)),
+                        conversor.rawParaMundoY(b.getFloat("pos_y", 0f)), b.getBoolean("has_items", false),
+                        TEMPO_BAG_VISIVEL - b.getFloat("idade", 0f)));
+                }
+            }
             JsonValue lista = data == null ? null : data.get("mobs");
             if (lista == null) return;
             for (JsonValue info = lista.child; info != null; info = info.next) {
@@ -1181,12 +1311,17 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             bookMenu.atualizarMoedas(data.getLong("currency_total", 0L));
             bookMenu.adicionarItens(data.get("items"));
+            if (data.getBoolean("bag_esvaziada", false) || data.getBoolean("already_taken", false)) {
+                removerBag(data.getString("loot_id", ""));
+            }
         });
 
         socket.on("sync_stats", (nomeEvt, data) -> {
             if (data == null) return;
             bookMenu.atualizarCapacidade(data.getFloat("cap_atual", 0f), data.getFloat("cap_maximo", 100f));
             bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getInt("exp", 0), data.getInt("kills", 0));
+            hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
+                data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
         });
 
         socket.on("trade_executed", (nomeEvt, data) -> {
@@ -1471,6 +1606,7 @@ public class WorldScreen extends ScreenAdapter {
         for (Jogador j : remotos.values()) j.atualizar(delta);
         for (NPCVisual npc : npcs.values()) npc.movimento.atualizar(delta);
         for (MobVisual mob : mobs.values()) mob.atualizar(delta);
+        atualizarCombate(delta);
         for (int i = numerosDano.size() - 1; i >= 0; i--) {
             NumeroDano n = numerosDano.get(i);
             n.tempo += delta;
@@ -1493,7 +1629,7 @@ public class WorldScreen extends ScreenAdapter {
         // pra andar e mexer em outras GUIs com ele aberto) - em vez disso,
         // fecharDialogoNPCSeForaDeAlcance() encerra a conversa sozinha se o
         // jogador sair dos SQMs de alcance do NPC (ver abaixo).
-        if (!local.movendo && !settingsAberta() && !chat.isVisivel() && !bookMenu.isVisible()) {
+        if (!local.movendo && !localMorto && !settingsAberta() && !chat.isVisivel() && !bookMenu.isVisible()) {
             processarEntrada();
             if (local.movendo && sobraLocal > 0f) {
                 local.atualizar(sobraLocal);
@@ -1582,9 +1718,11 @@ public class WorldScreen extends ScreenAdapter {
         desenharJogador(local);
         for (Jogador j : remotos.values()) desenharJogador(j);
         for (NPCVisual npc : npcs.values()) desenharNPC(npc);
-        // Cadaveres primeiro (ficam por baixo dos mobs vivos).
+        // Cadaveres primeiro (ficam por baixo dos mobs vivos), bags por cima deles.
         for (MobVisual mob : mobs.values()) if (mob.morto) desenharMob(mob);
+        desenharBags();
         for (MobVisual mob : mobs.values()) if (!mob.morto) desenharMob(mob);
+        desenharEfeitos();
         if (spawnSmokeTempo >= 0f) {
             spawnSmokeTempo += delta;
             if (!spawnSmokeAnim.isAnimationFinished(spawnSmokeTempo)) {
@@ -1997,7 +2135,18 @@ public class WorldScreen extends ScreenAdapter {
         float ancoraX = Math.round(mob.x / camera.zoom) * camera.zoom;
         float ancoraY = Math.round(mob.y / camera.zoom) * camera.zoom;
         float x = ancoraX - largura / 2f;
+        // Quadrado de alvo (ui/slots/Target, 18x18) em volta do SQM do mob mirado.
+        if (!mob.morto && mob.id.equals(alvoMob) && regiaoAlvo != null) {
+            batch.draw(regiaoAlvo, ancoraX - regiaoAlvo.getRegionWidth() / 2f, ancoraY - 1f);
+        }
         batch.draw(quadro, x, ancoraY, largura, altura);
+        if (!mob.morto && mob.tempoTargetHit > 0f && regiaoTargetHit != null) {
+            batch.draw(regiaoTargetHit, ancoraX - regiaoTargetHit.getRegionWidth() / 2f, ancoraY);
+        }
+        // Bandeira enquanto volta pra casa (desistiu do alvo).
+        if (!mob.morto && mob.voltando && regiaoFlag != null) {
+            batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 2f, 8f, 8f);
+        }
         // Barra de vida (logo acima da cabeca; o nome vai por cima dela).
         if (!mob.morto) {
             float barraLargura = 14f;
@@ -2010,6 +2159,267 @@ public class WorldScreen extends ScreenAdapter {
             batch.draw(pixelBranco, barraX, barraY, barraLargura * pct, 2f);
             batch.setColor(Color.WHITE);
         }
+    }
+
+    // ===================== COMBATE =====================
+
+    private Jogador jogadorPorNome(String nome) {
+        if (nome == null || nome.isEmpty()) return null;
+        if (nome.equals(local.nome)) return local;
+        return remotos.get(nome);
+    }
+
+    /** "res://ui/items/Arrow1.png" -> regiao "ui/items/Arrow1" do atlas. */
+    private TextureRegion regiaoDoCaminho(String caminho) {
+        if (caminho == null || caminho.isEmpty()) return null;
+        String nome = caminho.startsWith("res://") ? caminho.substring(6) : caminho;
+        int ponto = nome.lastIndexOf('.');
+        if (ponto > nome.lastIndexOf('/')) nome = nome.substring(0, ponto);
+        return atlas.findRegion(nome);
+    }
+
+    /** Efeito de hit pelo nome que vai no hit_type (o mesmo pra todo client):
+     * Sword/Mana/Music1/Arrow (armas das classes) ou Physical (padrao, mob). */
+    private TextureRegion[] quadrosEfeito(String nome) {
+        String chave = nome == null ? "Physical" : nome;
+        TextureRegion[] quadros = cacheEfeitos.get(chave);
+        if (quadros != null) return quadros;
+        TextureRegion tira;
+        switch (chave) {
+            case "Sword": tira = atlas.findRegion("ui/items/Sword"); break;
+            case "Mana": tira = atlas.findRegion("ui/Mana"); break;
+            case "Music1": tira = atlas.findRegion("ui/items/Music1"); break;
+            case "Arrow": tira = atlas.findRegion("ui/items/Arrow"); break;
+            default: tira = atlas.findRegion("ui/items/Physical"); break;
+        }
+        if (tira == null) tira = atlas.findRegion("ui/items/Physical");
+        if (tira == null) return null;
+        int n = Math.max(1, tira.getRegionWidth() / 16);
+        quadros = new TextureRegion[n];
+        for (int i = 0; i < n; i++) quadros[i] = new TextureRegion(tira, i * 16, 0, 16, tira.getRegionHeight());
+        cacheEfeitos.put(chave, quadros);
+        return quadros;
+    }
+
+    private TextureRegion[] quadrosFumaca() {
+        TextureRegion[] quadros = cacheEfeitos.get("__fumaca");
+        if (quadros == null) {
+            quadros = new TextureRegion[7];
+            for (int i = 0; i < 7; i++) quadros[i] = new TextureRegion(spawnSmokeTex, i * 16, 0, 16, 16);
+            cacheEfeitos.put("__fumaca", quadros);
+        }
+        return quadros;
+    }
+
+    private void tocarEfeito(String nome, float x, float y) {
+        TextureRegion[] quadros = quadrosEfeito(nome);
+        if (quadros != null) efeitos.add(new Efeito(quadros, x, y));
+    }
+
+    /** Efeito e projetil de cada classe (o servidor repassa pros outros clients). */
+    private String efeitoDaClasse() {
+        switch (local.classe) {
+            case "Mage": return "Mana";
+            case "Bard": return "Music1";
+            case "Ranger": return "Arrow";
+            default: return "Sword";
+        }
+    }
+
+    private String projetilDaClasse() {
+        switch (local.classe) {
+            case "Mage": return "res://ui/items/Mana_2.png";
+            case "Bard": return "res://ui/items/Music1_1.png";
+            case "Ranger": return "res://ui/items/Arrow1.png";
+            default: return "";
+        }
+    }
+
+    private boolean classeRanged() {
+        return !"Knight".equals(local.classe);
+    }
+
+    private static int tileX(float mundoX) { return (int) Math.floor(mundoX / Jogador.TILE); }
+    private static int tileY(float mundoY) { return Math.round(mundoY / Jogador.TILE); }
+
+    /** Distancia em SQMs (diagonal conta 1, igual o servidor). */
+    private static int distanciaSqm(float x0, float y0, float x1, float y1) {
+        return Math.max(Math.abs(tileX(x0) - tileX(x1)), Math.abs(tileY(y0) - tileY(y1)));
+    }
+
+    /** Clique num mob vivo: mira nele (ou tira a mira se ja era ele). */
+    private boolean cliqueEmMob(float wx, float wy) {
+        for (MobVisual mob : mobs.values()) {
+            if (mob.morto || !mob.visivel) continue;
+            float largura = FRAME_LARGURA * ESCALA_SPRITE;
+            float altura = mob.animacao.idleBaixo.getRegionHeight() * ESCALA_SPRITE;
+            if (wx >= mob.x - largura / 2f && wx <= mob.x + largura / 2f && wy >= mob.y && wy <= mob.y + altura) {
+                alvoMob = mob.id.equals(alvoMob) ? null : mob.id;
+                esperaAtaque = Math.min(esperaAtaque, 0.1f);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Clique numa bag do lado (ou embaixo) do player: pede o conteudo. */
+    private boolean cliqueEmBag(float wx, float wy) {
+        for (BagChao bag : bags.values()) {
+            if (Math.abs(wx - bag.x) > 8f || wy < bag.y || wy > bag.y + 16f) continue;
+            if (distanciaSqm(local.x, local.y, bag.x, bag.y) > 1) return true; // longe: so' consome o clique
+            String id = bag.id;
+            socket.emitRaw("request_loot", GameSocket.obj(jw -> jw.set("loot_id", id)));
+            return true;
+        }
+        return false;
+    }
+
+    private void pegarLoot(String lootId) {
+        socket.emitRaw("collect_loot", GameSocket.obj(jw -> jw.set("loot_id", lootId)));
+    }
+
+    private void removerBag(String lootId) {
+        bags.remove(lootId);
+        janelaLoot.bagRemovida(lootId);
+    }
+
+    private void atualizarCombate(float delta) {
+        for (int i = efeitos.size() - 1; i >= 0; i--) {
+            Efeito e = efeitos.get(i);
+            e.tempo += delta;
+            if (e.tempo >= e.quadros.length * DURACAO_QUADRO_EFEITO) efeitos.remove(i);
+        }
+        for (int i = projeteis.size() - 1; i >= 0; i--) {
+            Projetil pr = projeteis.get(i);
+            pr.tempo += delta;
+            if (pr.tempo >= pr.duracao) {
+                projeteis.remove(i);
+                tocarEfeito(pr.efeitoHit, pr.x1, pr.y1 - 8f);
+            }
+        }
+        java.util.Iterator<BagChao> it = bags.values().iterator();
+        while (it.hasNext()) {
+            BagChao bag = it.next();
+            bag.restante -= delta;
+            if (bag.restante <= 0f) {
+                it.remove();
+                janelaLoot.bagRemovida(bag.id);
+            }
+        }
+
+        // Ataque automatico no mob mirado.
+        esperaAtaque -= delta;
+        if (alvoMob == null) return;
+        MobVisual alvo = mobs.get(alvoMob);
+        if (alvo == null || alvo.morto || !alvo.visivel) {
+            alvoMob = null;
+            return;
+        }
+        if (localMorto || esperaAtaque > 0f || !socket.isConnected()) return;
+        int alcance = classeRanged() ? ALCANCE_RANGED_SQM : 1;
+        if (distanciaSqm(local.x, local.y, alvo.x, alvo.y) > alcance) return;
+        String id = alvo.id;
+        // "<tipo>_<x>_<y>": tipo e' tudo antes dos 2 ultimos "_" (pode ter "_", ex cave_spider).
+        int ultimo = id.lastIndexOf('_');
+        int penultimo = ultimo > 0 ? id.lastIndexOf('_', ultimo - 1) : -1;
+        String tipo = penultimo > 0 ? id.substring(0, penultimo) : id;
+        String efeito = efeitoDaClasse();
+        String projetil = projetilDaClasse();
+        boolean ranged = classeRanged();
+        socket.emitRaw("hit_mob", GameSocket.obj(jw -> {
+            jw.set("mob_id", id);
+            jw.set("mob_type_id", tipo);
+            jw.set("hit_type", efeito);
+            jw.set("w_type", ranged ? "Ranged" : "Melee");
+            jw.set("proj", projetil);
+        }));
+        esperaAtaque = INTERVALO_ATAQUE;
+    }
+
+    private void desenharBags() {
+        for (BagChao bag : bags.values()) {
+            TextureRegion r = bag.dourada && regiaoBagDourada != null ? regiaoBagDourada : regiaoBag;
+            if (r == null) continue;
+            float ancoraX = Math.round(bag.x / camera.zoom) * camera.zoom;
+            float ancoraY = Math.round(bag.y / camera.zoom) * camera.zoom;
+            batch.draw(r, ancoraX - r.getRegionWidth() / 2f, ancoraY);
+        }
+    }
+
+    private void desenharEfeitos() {
+        for (Projetil pr : projeteis) {
+            float t = Math.min(1f, pr.tempo / pr.duracao);
+            float x = pr.x0 + (pr.x1 - pr.x0) * t;
+            float y = pr.y0 + (pr.y1 - pr.y0) * t;
+            float angulo = (float) Math.toDegrees(Math.atan2(pr.y1 - pr.y0, pr.x1 - pr.x0));
+            float w = pr.regiao.getRegionWidth(), h = pr.regiao.getRegionHeight();
+            batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, 1f, 1f, angulo);
+        }
+        for (Efeito e : efeitos) {
+            int quadro = Math.min(e.quadros.length - 1, (int) (e.tempo / DURACAO_QUADRO_EFEITO));
+            TextureRegion r = e.quadros[quadro];
+            float ancoraX = Math.round(e.x / camera.zoom) * camera.zoom;
+            float ancoraY = Math.round(e.y / camera.zoom) * camera.zoom;
+            batch.draw(r, ancoraX - r.getRegionWidth() / 2f, ancoraY);
+        }
+    }
+
+    // ---- Morte / renascer do player local ----
+
+    private void criarPainelMorte() {
+        painelMorte = new Table();
+        painelMorte.setFillParent(true);
+        Table caixa = new Table();
+        caixa.setBackground(UiSkin.retangulo(new Color(0.1f, 0.02f, 0.02f, 0.92f), new Color(0.6f, 0.1f, 0.1f, 1f), 1));
+        caixa.pad(18);
+        Label titulo = new Label("You are dead", skin, "subtitulo");
+        titulo.setColor(new Color(1f, 0.3f, 0.3f, 1f));
+        TextButton renascer = new TextButton("Respawn", skin, "default");
+        renascer.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                renascerLocal();
+            }
+        });
+        caixa.add(titulo).padBottom(14).row();
+        caixa.add(renascer).width(200).height(56);
+        painelMorte.add(caixa);
+        painelMorte.setVisible(false);
+        uiStage.addActor(painelMorte);
+    }
+
+    private void morrerLocal() {
+        if (localMorto) return;
+        localMorto = true;
+        alvoMob = null;
+        janelaLoot.fechar();
+        painelMorte.setVisible(true);
+    }
+
+    /** Volta pro ponto de spawn com HP/MP cheios (o servidor devolve os vitais
+     * quando recebe is_dead=false; ver servidor.py::handle_update_status). */
+    private void renascerLocal() {
+        if (!localMorto) return;
+        localMorto = false;
+        painelMorte.setVisible(false);
+        local.x = spawnX;
+        local.y = spawnY;
+        local.movendo = false;
+        local.direcao = "down";
+        float rawX = conversor.mundoParaRawX(spawnX);
+        float rawY = conversor.mundoParaRawY(spawnY);
+        socket.emitRaw("request_area_sync", GameSocket.obj(jw -> {
+            jw.set("x", rawX);
+            jw.set("y", rawY);
+            jw.set("floor", 1);
+        }));
+        socket.emitRaw("update_status", GameSocket.obj(jw -> {
+            jw.set("key", "is_dead");
+            jw.set("value", false);
+        }));
+        hud.definir(hud.hpMax(), -1f, -1f, -1f);
+        spawnSmokeX = local.x;
+        spawnSmokeY = local.y;
+        spawnSmokeTempo = 0f;
     }
 
     /** Nome do mob acima da barra de vida, na cor da vida (verde -> vermelho). */
@@ -2135,6 +2545,7 @@ public class WorldScreen extends ScreenAdapter {
         font.dispose();
         pixelColisao.dispose();
         pixelBranco.dispose();
+        hud.dispose();
         uiStage.dispose();
         skin.dispose();
         atlas.dispose();
