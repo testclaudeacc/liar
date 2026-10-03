@@ -62,6 +62,10 @@ public class UiSkin {
         // fina/fraca em vez de grossa. Valor unico pra qualquer plataforma
         // (os mesmos numeros que ja funcionavam bem no mobile) evita essa
         // armadilha.
+        // Martel trocada pela fonte do resto da GUI (dejavu-sans.condensed) a
+        // pedido do usuario: a martel nao tinha numeros/simbolos ("...", "?",
+        // "%"). So' o titulo grande do jogo continua em martel.
+        final String FONTE_GUI = "fonts/dejavu-sans.condensed.ttf";
         int bordaMartelGrande = 3;
         int bordaMartelPequena = 2;
 
@@ -79,11 +83,11 @@ public class UiSkin {
         // que PRECISAM do contorno pra continuar legiveis).
         BitmapFont fonteCampoTexto = gerarFonte("fonts/dejavu-sans.condensed.ttf", 20, 0, escala);
         BitmapFont fonteTitulo = gerarFonte("fonts/martel.ttf", 100, bordaMartelGrande, escala);
-        BitmapFont fonteSubtitulo = gerarFonte("fonts/martel.ttf", 34, bordaMartelPequena, escala);
+        BitmapFont fonteSubtitulo = gerarFonte(FONTE_GUI, 30, 2, escala);
         BitmapFont fonteVersao = gerarFonte("fonts/dejavu-sans.condensed.ttf", 16, 2, escala);
         // Todo botao do jogo real usa martel (mesma fonte do titulo), nao uma
         // fonte generica - ver PlayBtn/BackBtn/CreateBtn etc em main_menu.tscn.
-        BitmapFont fonteBotao = gerarFonte("fonts/martel.ttf", 32, bordaMartelPequena, escala);
+        BitmapFont fonteBotao = gerarFonte(FONTE_GUI, 26, 2, escala);
         // Trocada de NicoClean (pixelada, ficava embacada nas stats do
         // char-select) pra dejavu-sans.condensed - mesma familia do "Beta
         // version" - e subida 8px (24 -> 32) a pedido do usuario. Contorno
@@ -100,15 +104,15 @@ public class UiSkin {
         // e CanvasLayer/OptionsMenu em player.tscn) - tamanhos tirados direto de
         // la (SectionLabel=48, TitleLabel=70), nao reaproveitadas porque nao
         // existe nenhum texto desse tamanho no resto do jogo ainda portado.
-        BitmapFont fonteSecao = gerarFonte("fonts/martel.ttf", 48, bordaMartelGrande, escala);
-        BitmapFont fonteOpcoesTitulo = gerarFonte("fonts/martel.ttf", 70, bordaMartelGrande, escala);
+        BitmapFont fonteSecao = gerarFonte(FONTE_GUI, 40, 2, escala);
+        BitmapFont fonteOpcoesTitulo = gerarFonte(FONTE_GUI, 58, 3, escala);
         // Variante menor do martel de botao (20, nao 32) - usada onde o texto
         // e' comprido demais pro tamanho padrao (ex: "Return to game" no
         // popup de pause). player.tscn usa font_size=24 pro BackBtn real, mas
         // o martel renderizado aqui pelo FreeType fica mais largo por
         // caractere que no Godot nesse mesmo tamanho nominal - 24 ainda
         // vazava do botao de 200px, 20 coube (achado testando ao vivo).
-        BitmapFont fonteBotaoPequeno = gerarFonte("fonts/martel.ttf", 20, bordaMartelPequena, escala);
+        BitmapFont fonteBotaoPequeno = gerarFonte(FONTE_GUI, 18, 2, escala);
         // FPS/ms do WorldScreen - sem contorno (borda=0) a pedido do usuario,
         // que achava o texto de debug com a borda preta pesada demais pra um
         // numero pequeno no canto da tela.

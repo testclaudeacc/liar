@@ -624,6 +624,17 @@ public class WorldScreen extends ScreenAdapter {
     // clique no botao liga/desliga esse flag.
     private TextureRegion notifChat, notifConfig, notifMenu;
     private TextureRegion iconeLiderParty, iconeMembroParty; // ui/party/PT_Crown / PT_Shield
+    private TextureRegion iconeConviteParty; // Pt_Invite: em cima de quem eu convidei (so' eu vejo)
+    private final java.util.Set<String> convitesPartyEnviados = new java.util.HashSet<>();
+
+    /** Primeira regiao que existir no atlas (nome do arquivo pode variar). */
+    private TextureRegion regiaoQualquer(String... nomes) {
+        for (String n : nomes) {
+            TextureRegion r = atlas.findRegion(n);
+            if (r != null) return r;
+        }
+        return null;
+    }
     // Fumaca de spawn (sprites/SFXs/Spawn/Smoke.png, 7 quadros de 16px) -
     // toca uma vez so' (sem loop) na posicao de spawn assim que o mundo abre.
     private TextureRegion spawnSmokeTex;
@@ -701,6 +712,8 @@ public class WorldScreen extends ScreenAdapter {
         iconeLiderParty = atlas.findRegion("ui/party/PT_Crown");
         balaoTrade = atlas.findRegion("ui/items/Trade");
         iconeMembroParty = atlas.findRegion("ui/party/PT_Shield");
+        iconeConviteParty = regiaoQualquer("ui/party/Pt_Invite", "ui/party/PT_Invite", "ui/Pt_Invite", "ui/PT_Invite",
+            "ui/party/PtInvite", "ui/party/PT_invite");
         notifConfig = atlas.findRegion("sprites/notifications/Settings");
         notifMenu = atlas.findRegion("sprites/notifications/Menu");
 
@@ -1436,10 +1449,12 @@ public class WorldScreen extends ScreenAdapter {
     private static final float TAM_ICONE_PARTY = 20f;
 
     private void desenharIconeParty(Jogador j) {
+        if (j == local ? localMorto : estaMorto(j)) return;
         String lider = bookMenu.liderParty();
-        if (lider == null || iconeLiderParty == null || iconeMembroParty == null) return;
-        if (!bookMenu.estaNaParty(j.nome) || (j == local ? localMorto : estaMorto(j))) return;
-        TextureRegion icone = j.nome.equals(lider) ? iconeLiderParty : iconeMembroParty;
+        TextureRegion icone = null;
+        if (lider != null && bookMenu.estaNaParty(j.nome)) icone = j.nome.equals(lider) ? iconeLiderParty : iconeMembroParty;
+        else if (j != local && convitesPartyEnviados.contains(j.nome)) icone = iconeConviteParty;
+        if (icone == null) return;
         // Balao: x+2 a direita do centro; aqui o espelho dele.
         // Centro vertical igual o do balao (y+9.5, ~8 de altura).
         // Encostado no lado esquerdo do corpo (o desenho tem sobra transparente).
@@ -1739,6 +1754,7 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             String alvo = data.getString("target_name", "");
             if (data.getBoolean("success", false)) {
+                convitesPartyEnviados.add(alvo);
                 hud.notificar("Party invite sent to " + alvo + ".");
                 return;
             }
@@ -1752,7 +1768,9 @@ public class WorldScreen extends ScreenAdapter {
             hud.notificar(texto, COR_NOTIF_AVISO, null);
         });
         socket.on("party_invite_declined", (nomeEvt, data) -> {
-            if (data != null) hud.notificar(data.getString("target_name", "") + " declined the party invite.");
+            if (data == null) return;
+            convitesPartyEnviados.remove(data.getString("target_name", ""));
+            hud.notificar(data.getString("target_name", "") + " declined the party invite.");
         });
         socket.on("party_update", (nomeEvt, data) -> {
             if (data == null) return;
@@ -1763,6 +1781,7 @@ public class WorldScreen extends ScreenAdapter {
             bookMenu.atualizarParty(data);
             java.util.Set<String> depois = new java.util.HashSet<>();
             for (BookMenuUI.MembroParty m : bookMenu.membrosParty()) depois.add(m.nome);
+            convitesPartyEnviados.removeAll(depois); // aceitou: vira escudo
             if (antigoLider == null) {
                 if (depois.size() > 1) hud.notificar("You joined " + bookMenu.liderParty() + "'s party.", COR_NOTIF_PARTY, this::abrirAbaParty);
                 else hud.notificar("Party created.", COR_NOTIF_PARTY, null);
@@ -1783,6 +1802,7 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("party_disbanded", (nomeEvt, data) -> {
             boolean estava = bookMenu.liderParty() != null;
             bookMenu.limparParty();
+            convitesPartyEnviados.clear(); // convites da party antiga morrem junto
             if (!estava || data == null) return;
             String motivo = data.getString("reason", "");
             if ("kicked".equals(motivo)) hud.notificar("You were removed from the party.", COR_NOTIF_AVISO, null);
@@ -1961,9 +1981,10 @@ public class WorldScreen extends ScreenAdapter {
             Jogador j = jogadorPorNome(alvo);
             if (j != null) {
                 int dano = data.getInt("damage", 0);
-                // Dano 0 = o player bloqueou (servidor.py: BLOCK_CHANCE).
-                NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? "Blocked" : String.valueOf(dano), false);
-                nd.bloqueio = dano <= 0;
+                // Dano 0 = o player desviou (servidor.py: BLOCK_CHANCE, agora "Dodge"):
+                // "Miss" em amarelo.
+                NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? "Miss" : String.valueOf(dano), false);
+                if (dano <= 0) nd.cor = new Color(1f, 0.9f, 0.1f, 1f);
                 numerosDano.add(nd);
                 Efeito e = tocarEfeito(data.getString("hit_type", "physical_hit"), j.x, j.y);
                 if (e != null) e.jogadorAlvo = j;
@@ -2099,6 +2120,7 @@ public class WorldScreen extends ScreenAdapter {
             remotosForaDeVisao.remove(data.getString("name", ""));
             baloesRemotos.remove(data.getString("name", ""));
             convitesTrade.remove(data.getString("name", ""));
+            convitesPartyEnviados.remove(data.getString("name", ""));
             if (bookMenu.amigo(data.getString("name", "")) != null && !data.getString("name", "").equals(local.nome)) {
                 hud.notificar(data.getString("name", "") + " is offline.", COR_NOTIF_OFF, null);
             }

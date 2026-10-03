@@ -910,7 +910,7 @@ public final class BookMenuUI {
         statusEsquerda.add(linhaStatus("ui/XPIcon", "Experience", "exp")).left().row();
         statusEsquerda.add(linhaStatus("ui/NextLevelIcon", "Next Level", "next")).left().row();
         statusEsquerda.add(linhaStatus("ui/CritIcon", "Crit Chance", "crit")).left().row();
-        statusEsquerda.add(linhaStatus("ui/BlockIcon", "Block Chance", "block")).left().row();
+        statusEsquerda.add(linhaStatus(atlas.findRegion("ui/DodgeIcon") != null ? "ui/DodgeIcon" : "ui/BlockIcon", "Dodge Chance", "block")).left().row();
         statusEsquerda.add(linhaStatus("ui/currency/BagIcon", "Capacity", "capacity")).left().row();
 
         Table statusDireita = new Table();
@@ -1585,6 +1585,65 @@ public final class BookMenuUI {
     private com.badlogic.gdx.scenes.scene2d.ui.TextField campoQtdTrade;
 
     private static final Color COR_TRADE_SELECIONADO = new Color(0.25f, 0.85f, 0.3f, 1f);
+    // Moedas no trade: slot de cada uma (chave "$Nome" em tradeSelecao, valor
+    // = quantas daquela moeda). Aparecem as que valem ate' a maior que o
+    // player tem (com 20 silver aparece copper pra trocar 1 silver em 100).
+    private static final String[] MOEDAS_TRADE = {"Copper", "Silver", "Gold", "Platinum"};
+    private static final long[] VALOR_MOEDA = {1L, 100L, 10_000L, 1_000_000L};
+    private static final String PREFIXO_MOEDA = "$";
+
+    private static int indiceMoeda(String chave) {
+        for (int i = 0; i < MOEDAS_TRADE.length; i++) if ((PREFIXO_MOEDA + MOEDAS_TRADE[i]).equals(chave)) return i;
+        return -1;
+    }
+
+    /** Quantas dessa moeda o player tem (do jeito que a Bag mostra). */
+    private long moedasTidas(int i) {
+        long resto = i + 1 < VALOR_MOEDA.length ? currencyTotal % VALOR_MOEDA[i + 1] : currencyTotal;
+        return resto / VALOR_MOEDA[i];
+    }
+
+    private long valorMoedasSelecionadas(String exceto) {
+        long total = 0;
+        for (Map.Entry<String, Integer> e : tradeSelecao.entrySet()) {
+            int i = indiceMoeda(e.getKey());
+            if (i >= 0 && !e.getKey().equals(exceto)) total += VALOR_MOEDA[i] * e.getValue();
+        }
+        return total;
+    }
+
+    /** Maximo dessa moeda que ainda cabe no saldo (contando as outras ja' escolhidas). */
+    private int maxMoeda(int i, String chave) {
+        long livre = Math.max(0, currencyTotal - valorMoedasSelecionadas(chave));
+        return (int) Math.min(Integer.MAX_VALUE, livre / VALOR_MOEDA[i]);
+    }
+
+    private Button slotMoeda(String tipo, long quantidade, Color corQtd, boolean marcado, boolean foco) {
+        Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estilo.up = skinDrawable(marcado ? "trade-slot-selected" : foco ? "bag-slot-selected" : "bag-slot");
+        estilo.over = marcado ? estilo.up : skinDrawable("bag-slot-hover");
+        estilo.down = skinDrawable("bag-slot-selected");
+        Button slot = new Button(estilo);
+        Stack conteudo = new Stack();
+        TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + tipo);
+        if (r != null) {
+            Image icone = new Image(new TextureRegionDrawable(r));
+            icone.setScaling(Scaling.fit);
+            Table moldura = new Table();
+            moldura.add(icone).grow().pad(8);
+            conteudo.add(moldura);
+        }
+        if (quantidade > 0) {
+            Table marcadores = new Table();
+            marcadores.bottom();
+            adicionarQuantidade(marcadores, (int) Math.min(Integer.MAX_VALUE, quantidade));
+            ((Label) marcadores.getChildren().peek()).setColor(corQtd);
+            marcadores.add().expandX();
+            conteudo.add(marcadores);
+        }
+        slot.add(conteudo).grow().pad(2);
+        return slot;
+    }
 
     private TextButton.TextButtonStyle estiloBotaoTrade(String base) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(skin.get(base, TextButton.TextButtonStyle.class));
@@ -1754,6 +1813,24 @@ public final class BookMenuUI {
 
     private void atualizarGradeTrade() {
         tradeGrid.clearChildren();
+        int n = 0;
+        int maiorMoeda = -1;
+        for (int i = 0; i < VALOR_MOEDA.length; i++) if (currencyTotal >= VALOR_MOEDA[i]) maiorMoeda = i;
+        for (int i = 0; i <= maiorMoeda; i++) {
+            String tipo = MOEDAS_TRADE[i];
+            String chave = PREFIXO_MOEDA + tipo;
+            boolean marcado = tradeSelecao.containsKey(chave);
+            Button slot = slotMoeda(tipo, marcado ? tradeSelecao.get(chave) : moedasTidas(i),
+                marcado ? COR_TRADE_SELECIONADO : corMoeda(tipo), marcado, chave.equals(tradeFoco));
+            final int indice = i;
+            slot.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    clicarMoedaTrade(indice);
+                }
+            });
+            tradeGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
+            if (++n % COLUNAS_INVENTARIO == 0) tradeGrid.row();
+        }
         for (int i = 0; i < inventoryItems.size(); i++) {
             InventoryItem item = inventoryItems.get(i);
             boolean marcado = tradeSelecao.containsKey(item.instanceId);
@@ -1773,9 +1850,9 @@ public final class BookMenuUI {
                 }
             });
             tradeGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
-            if ((i + 1) % COLUNAS_INVENTARIO == 0) tradeGrid.row();
+            if (++n % COLUNAS_INVENTARIO == 0) tradeGrid.row();
         }
-        if (inventoryItems.isEmpty()) {
+        if (n == 0) {
             Label vazio = new Label("Your bag is empty.", skin, "hud");
             vazio.setFontScale(0.6f);
             tradeGrid.add(vazio).pad(10);
@@ -1804,6 +1881,73 @@ public final class BookMenuUI {
         return conteudo;
     }
 
+    private void clicarMoedaTrade(int i) {
+        String chave = PREFIXO_MOEDA + MOEDAS_TRADE[i];
+        if (tradeEnviado) {
+            tradeFoco = chave;
+            atualizarDetalhesTrade();
+            return;
+        }
+        boolean marcado = tradeSelecao.containsKey(chave);
+        if (!marcado) {
+            int max = maxMoeda(i, chave);
+            if (max <= 0) return;
+            // Comeca com o que ele tem daquela moeda (ou 1, se for pra trocar).
+            tradeSelecao.put(chave, (int) Math.max(1, Math.min(max, moedasTidas(i))));
+            tradeFoco = chave;
+        } else if (chave.equals(tradeFoco)) {
+            tradeSelecao.remove(chave);
+        } else {
+            tradeFoco = chave;
+        }
+        atualizarGradeTrade();
+        atualizarDetalhesTrade();
+    }
+
+    private void detalhesMoedaTrade(int i) {
+        String tipo = MOEDAS_TRADE[i];
+        String chave = PREFIXO_MOEDA + tipo;
+        tradeDetalhes.clearChildren();
+        tradeDetalhes.top().left();
+        Label nome = new Label(tipo + " Coins", skin, "hud");
+        nome.setFontScale(0.74f * FONTE_STATS);
+        nome.setColor(corMoeda(tipo));
+        tradeDetalhes.add(nome).left().padBottom(1).row();
+        tradeDetalhes.add(linhaStat("You have " + moedasTidas(i), Color.LIGHT_GRAY)).left().row();
+        if (!tradeSelecao.containsKey(chave) || tradeEnviado) return;
+        tradeDetalhes.add(linhaStat("Amount to trade:", COR_TRADE_SELECIONADO)).left().padTop(6).row();
+        campoQtdTrade = new com.badlogic.gdx.scenes.scene2d.ui.TextField(String.valueOf(tradeSelecao.get(chave)), skin);
+        campoQtdTrade.setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
+        campoQtdTrade.setMaxLength(9);
+        campoQtdTrade.setTextFieldListener((campo, c) -> {
+            String t = campo.getText();
+            if (t.isEmpty()) return;
+            int max = Math.max(1, maxMoeda(i, chave));
+            int v;
+            try { v = Integer.parseInt(t); } catch (NumberFormatException e) { v = max; }
+            int limitado = Math.max(1, Math.min(max, v));
+            if (limitado != v) {
+                campo.setText(String.valueOf(limitado));
+                campo.setCursorPosition(campo.getText().length());
+            }
+            tradeSelecao.put(chave, limitado);
+            atualizarGradeTrade();
+        });
+        TextButton max = new TextButton("Max", estiloBotaoTrade("default"));
+        max.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                int m = Math.max(1, maxMoeda(i, chave));
+                tradeSelecao.put(chave, m);
+                campoQtdTrade.setText(String.valueOf(m));
+                atualizarGradeTrade();
+            }
+        });
+        Table linhaQtd = new Table();
+        linhaQtd.add(campoQtdTrade).width(84).height(36).padRight(4);
+        linhaQtd.add(max).width(52).height(36);
+        tradeDetalhes.add(linhaQtd).left().padTop(2).row();
+    }
+
     private void clicarItemTrade(InventoryItem item) {
         if (tradeEnviado) {
             tradeFoco = item.instanceId;
@@ -1830,6 +1974,11 @@ public final class BookMenuUI {
     }
 
     private void atualizarDetalhesTrade() {
+        int moeda = indiceMoeda(tradeFoco);
+        if (moeda >= 0) {
+            detalhesMoedaTrade(moeda);
+            return;
+        }
         InventoryItem item = itemPorId(tradeFoco);
         if (item == null) {
             tradeDetalhes.clearChildren();
@@ -1884,6 +2033,7 @@ public final class BookMenuUI {
         String payload = GameSocket.obj(w -> {
             w.array("items");
             for (Map.Entry<String, Integer> e : tradeSelecao.entrySet()) {
+                if (indiceMoeda(e.getKey()) >= 0) continue;
                 InventoryItem it = itemPorId(e.getKey());
                 if (it == null) continue;
                 w.object();
@@ -1892,7 +2042,7 @@ public final class BookMenuUI {
                 w.pop();
             }
             w.pop();
-            w.set("currency", 0);
+            w.set("currency", Math.min(currencyTotal, valorMoedasSelecionadas(null)));
         });
         socket.emitRaw("trade_offer_update", payload);
         socket.emitRaw("trade_ready", "{}");
@@ -1944,6 +2094,32 @@ public final class BookMenuUI {
         grade.clearChildren();
         JsonValue itens = oferta != null ? oferta.get("items") : null;
         int n = 0;
+        long moeda = oferta != null ? oferta.getLong("currency", 0L) : 0L;
+        for (int i = MOEDAS_TRADE.length - 1; i >= 0 && moeda > 0; i--) {
+            long qtd = moeda / VALOR_MOEDA[i];
+            if (qtd <= 0) continue;
+            moeda -= qtd * VALOR_MOEDA[i];
+            String tipo = MOEDAS_TRADE[i];
+            String chave = (grade == gradeMinhaOferta ? "eu" : "ele") + PREFIXO_MOEDA + tipo;
+            Button slot = slotMoeda(tipo, qtd, corMoeda(tipo), false, chave.equals(tradeFoco));
+            final long qtdFinal = qtd;
+            slot.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    tradeFoco = chave;
+                    confirmDetalhes.clearChildren();
+                    confirmDetalhes.top().left();
+                    Label nome = new Label(tipo + " Coins", skin, "hud");
+                    nome.setFontScale(0.74f * FONTE_STATS);
+                    nome.setColor(corMoeda(tipo));
+                    confirmDetalhes.add(nome).left().padBottom(1).row();
+                    confirmDetalhes.add(linhaStat("Amount " + qtdFinal, Color.LIGHT_GRAY)).left().row();
+                    montarGradeOferta(gradeMinhaOferta, minhaOferta, vazioTexto);
+                    montarGradeOferta(gradeOfertaOutro, ofertaOutro, vazioTexto);
+                }
+            });
+            grade.add(slot).size(SLOT_EQUIP).pad(1.5f);
+            if (++n % COLUNAS_INVENTARIO == 0) grade.row();
+        }
         if (itens != null) {
             for (JsonValue e = itens.child; e != null; e = e.next) {
                 String caminho = e.getString("item", "");
@@ -2121,13 +2297,12 @@ public final class BookMenuUI {
         // Sem X (nao sou lider, linha de outro): os icones encostam na direita.
         if (acaoX != null) linha.add(botaoIconeParty("ui/Negate", acaoX)).size(30f).padRight(6);
         else linha.getCells().peek().padRight(10);
-        if (classe != null) {
-            linha.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
-                @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
-                    if (aoClicarAmigo != null && !nome.equals(nomeLocal)) aoClicarAmigo.accept(nome);
-                }
-            });
-        }
+        // Clicar na gaveta (membro ou convite) abre a janela do player, igual Friends.
+        linha.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                if (aoClicarAmigo != null && !nome.equals(nomeLocal)) aoClicarAmigo.accept(nome);
+            }
+        });
         return linha;
     }
 
@@ -2605,6 +2780,12 @@ public final class BookMenuUI {
         currencyLabels.get("Silver").setText(String.valueOf(silver));
         currencyLabels.get("Gold").setText(String.valueOf(gold));
         currencyLabels.get("Platinum").setText(String.valueOf(platinum));
+        if (modoTrade && !tradeEnviado) {
+            // Saldo mudou: tira moeda que nao cabe mais.
+            tradeSelecao.keySet().removeIf(k -> indiceMoeda(k) >= 0);
+            atualizarGradeTrade();
+            atualizarDetalhesTrade();
+        }
     }
 
     private static String formatarPeso(float valor) {
