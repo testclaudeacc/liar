@@ -2394,7 +2394,9 @@ def handle_pc(data):
         sid = request.sid
         if sid not in online_players or not isinstance(data, dict): return
         party, _pid = _get_party(sid)
-        if not party: return
+        if not party:
+            chat_sistema(sid, "You are not in a party.")
+            return
         p = online_players[sid]
         msg = _filtrar_mensagem_chat(sid, p, data.get('msg', ''))
         if msg is None: return
@@ -4496,7 +4498,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-03 party chat"
+VERSAO_SERVIDOR = "2026-10-03 party chat v2"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR}")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(autosave_loop)

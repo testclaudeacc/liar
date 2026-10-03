@@ -1423,7 +1423,7 @@ public class WorldScreen extends ScreenAdapter {
         // Balao: x+2 a direita do centro; aqui o espelho dele.
         // Centro vertical igual o do balao (y+9.5, ~8 de altura).
         // Encostado no lado esquerdo do corpo (o desenho tem sobra transparente).
-        float ix = Math.round(j.x / camera.zoom) * camera.zoom + 1f - TAM_ICONE_PARTY;
+        float ix = Math.round(j.x / camera.zoom) * camera.zoom + 7f - TAM_ICONE_PARTY;
         float iy = Math.round(j.y / camera.zoom) * camera.zoom + 13.5f - TAM_ICONE_PARTY / 2f;
         batch.draw(icone, ix, iy, TAM_ICONE_PARTY, TAM_ICONE_PARTY);
     }

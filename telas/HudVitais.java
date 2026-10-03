@@ -102,7 +102,7 @@ public final class HudVitais {
         pixel = new Texture(pm);
         pm.dispose();
         fonte = gerarFonte(escala, 14, false);
-        fonteNotificacao = gerarFonte(escala, 11, true);
+        fonteNotificacao = gerarFonte(escala, MOBILE ? 14 : 11, true);
         Label.LabelStyle estilo = new Label.LabelStyle(fonte, Color.WHITE);
 
         hp = criarBarra(estilo, COR_HP, 314);

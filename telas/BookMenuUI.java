@@ -56,6 +56,10 @@ public final class BookMenuUI {
     private final Table inventoryGrid = new Table();
     private final Table bagDetalhes = new Table();
     private final Label capacityLabel;
+    // No celular o livro ja' e' ampliado (organizer 1.2x) e a fonte "hud"
+    // sai grande demais nos stats/capacity - reduz so' esses textos.
+    private static final float FONTE_STATS = (Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
+        || Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS) ? 0.75f : 1f;
     private final Label actionStatus;
     private final Map<String, Label> currencyLabels = new LinkedHashMap<>();
     private final List<InventoryItem> inventoryItems = new ArrayList<>();
@@ -316,7 +320,7 @@ public final class BookMenuUI {
         scroll.setOverscroll(false, false);
         scroll.setFlickScroll(true);
 
-        capacityLabel.setFontScale(0.8f);
+        capacityLabel.setFontScale(0.8f * FONTE_STATS);
         capacityLabel.setColor(new Color(0.65f, 0.65f, 0.65f, 1f));
 
         Table moedas = new Table();
@@ -647,7 +651,7 @@ public final class BookMenuUI {
         // Fonte fina ("hud", sem contorno) reduzida; linhas na altura natural
         // da fonte (sem sobrepor) e sem espaco extra entre elas.
         Label nome = new Label(nomeExibicao(itemPath), skin, "hud");
-        nome.setFontScale(0.74f);
+        nome.setFontScale(0.74f * FONTE_STATS);
         nome.setWrap(true);
         bloco.add(nome).growX().left().padBottom(1).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
@@ -682,7 +686,7 @@ public final class BookMenuUI {
 
     private Label linhaStat(String texto, Color cor) {
         Label label = new Label(texto, skin, "hud");
-        label.setFontScale(0.62f);
+        label.setFontScale(0.62f * FONTE_STATS);
         label.setColor(cor);
         return label;
     }
