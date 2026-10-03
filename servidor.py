@@ -3342,33 +3342,21 @@ def handle_m(data):
 
 @socketio.on('l')
 def handle_l(data):
+    # Virou pro lado sem andar (ex: encostou numa parede/player). So' muda a
+    # direcao; a posicao do client e' ignorada (antes isso teleportava).
     try:
         sid = request.sid
         if sid not in online_players: return
         p = online_players[sid]
-        p_name = p.get('name', '')
-        if not p_name or not isinstance(data, list) or len(data) < 3: return
+        if not p.get('name') or not isinstance(data, list) or len(data) < 2: return
         if isinstance(data[0], str): d_int = int(float(data[1]))
         else: d_int = int(data[0])
-        # So' vira (olhar pra um lado). O x/y do client e' ignorado: antes
-        # isso tambem movia o player pra qualquer lugar (teleporte).
-        x, y = p.get('pos_x', 0), p.get('pos_y', 0)
-        p['direction'] = DIR_MAP.get(d_int, 'down')
-        old_room = p.get('room')
-        floor = p.get('floor', 1)
-        new_room = get_chunk(x, y, floor)
-        if old_room != new_room:
-            if old_room: leave_room(old_room)
-            join_room(new_room)
-            p['room'] = new_room
-            # Entrou num chunk novo: manda o estado da area nova (mobs parados
-            # nao mandam mob_pos, entao sem isso o client nunca sabia onde
-            # estavam os mobs dos chunks que acabaram de ficar perto).
-            emit('sync_area_data', montar_sync_area(sid, new_room), room=sid)
-            
-        payload = [p_name, d_int, x, y]
-        for r in salas_vizinhas(new_room):
-            emit('l', payload, room=r, include_self=False)
+        if d_int not in DIR_MAP or p.get('is_dead'): return
+        if p.get('direction') == DIR_MAP[d_int]: return
+        p['direction'] = DIR_MAP[d_int]
+        # Vai no pacote de movimento como um "passo" pro mesmo SQM: quem ve o
+        # player so' vira ele pro lado.
+        marcar_movimento(sid, (p.get('pos_x', 0), p.get('pos_y', 0), d_int))
     except Exception: pass
 
 @socketio.on('request_area_sync')

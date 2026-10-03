@@ -29,6 +29,16 @@ public class Jogador {
     public boolean movendo = false;
 
     private float origemX, origemY, destinoX, destinoY, progresso;
+    private float duracao = TEMPO_PASSO;
+
+    // Player remoto: os passos chegam do servidor em pacotes (10x/s), entao
+    // chegam "tremidos" (ate' ~0.1s antes/depois). Tocar cada um na hora que
+    // chega fazia o boneco dar uma paradinha quando o proximo atrasava. Agora
+    // os passos entram numa fila e tocam colados; o 1o passo depois de parado
+    // dura BUFFER_REMOTO a mais, o que cria uma folga pra absorver o atraso.
+    private static final float BUFFER_REMOTO = 0.12f;
+    private static final int FILA_MAX = 4; // atrasou demais: pula pro ultimo
+    private final java.util.ArrayDeque<Object[]> fila = new java.util.ArrayDeque<>();
 
     public Jogador(String nome, String classe, float x, float y) {
         this.nome = nome;
@@ -55,18 +65,50 @@ public class Jogador {
         origemX = x; origemY = y;
         destinoX = x + dx; destinoY = y + dy;
         progresso = 0f;
+        duracao = TEMPO_PASSO;
         movendo = true;
     }
 
     /** Player remoto: o servidor manda a posicao alvo pronta (evento "m") -
      * tween ate la na mesma duracao de um passo, em vez de ficar teleportando. */
     public void definirAlvo(float alvoX, float alvoY, String direcao) {
+        if (movendo || !fila.isEmpty()) {
+            fila.add(new Object[]{alvoX, alvoY, direcao});
+            if (fila.size() > FILA_MAX) {
+                Object[] ultimo = fila.peekLast();
+                posicionar((Float) ultimo[0], (Float) ultimo[1], (String) ultimo[2]);
+            }
+            return;
+        }
+        iniciarAlvo(alvoX, alvoY, direcao, TEMPO_PASSO + BUFFER_REMOTO);
+    }
+
+    /** Vai direto pra posicao (sem passo), descartando a fila. */
+    public void posicionar(float nx, float ny, String direcao) {
+        fila.clear();
+        x = nx; y = ny;
+        movendo = false;
+        progresso = 1f;
         this.direcao = direcao;
+    }
+
+    private void iniciarAlvo(float alvoX, float alvoY, String direcao, float dur) {
+        this.direcao = direcao;
+        if (alvoX == x && alvoY == y) { // so' virou pro lado
+            movendo = false;
+            return;
+        }
         origemX = x; origemY = y;
         destinoX = alvoX; destinoY = alvoY;
         progresso = 0f;
+        duracao = dur;
         movendo = true;
     }
+
+    /** Ultima posicao pedida (fim da fila, ou o passo atual). */
+    public float ultimoAlvoX() { return !fila.isEmpty() ? (Float) fila.peekLast()[0] : movendo ? destinoX : x; }
+
+    public float ultimoAlvoY() { return !fila.isEmpty() ? (Float) fila.peekLast()[1] : movendo ? destinoY : y; }
 
     /** Avanca o passo em andamento. Devolve o tempo (em segundos) que sobrou
      * de "delta" depois que o passo terminou dentro desta mesma chamada - o
@@ -76,21 +118,31 @@ public class Jogador {
      * cruzado, perceptivel andando continuo - achado comparando com o Tween
      * do Godot, que e' continuo e nunca perde tempo entre passos). */
     public float atualizar(float delta) {
-        if (!movendo) {
-            return delta;
+        float restante = delta;
+        while (true) {
+            if (!movendo) {
+                if (fila.isEmpty()) return restante;
+                // Proximo passo da fila, colado no anterior. Com a fila
+                // acumulando (atraso), anda um pouco mais rapido pra alcancar.
+                Object[] prox = fila.poll();
+                float dur = fila.size() >= 1 ? TEMPO_PASSO * 0.85f : TEMPO_PASSO;
+                iniciarAlvo((Float) prox[0], (Float) prox[1], (String) prox[2], dur);
+                continue;
+            }
+            progresso += restante / duracao;
+            if (progresso >= 1f) {
+                restante = (progresso - 1f) * duracao;
+                x = destinoX;
+                y = destinoY;
+                progresso = 1f;
+                movendo = false;
+                if (fila.isEmpty()) return restante;
+                continue;
+            }
+            x = origemX + (destinoX - origemX) * progresso;
+            y = origemY + (destinoY - origemY) * progresso;
+            return 0f;
         }
-        progresso += delta / TEMPO_PASSO;
-        if (progresso >= 1f) {
-            float sobra = (progresso - 1f) * TEMPO_PASSO;
-            x = destinoX;
-            y = destinoY;
-            progresso = 1f;
-            movendo = false;
-            return sobra;
-        }
-        x = origemX + (destinoX - origemX) * progresso;
-        y = origemY + (destinoY - origemY) * progresso;
-        return 0f;
     }
 
     /** Fracao (0..1) do passo atual - usada pra escolher o frame de andar em

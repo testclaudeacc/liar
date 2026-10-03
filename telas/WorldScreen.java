@@ -2402,6 +2402,7 @@ public class WorldScreen extends ScreenAdapter {
             enviarMove(alvoX, alvoY, direcao);
             return;
         }
+        if (!direcao.equals(local.direcao)) enviarVirada(direcao);
         local.direcao = direcao;
         // Outro player parado no caminho: insistindo (segurando a direcao
         // contra ele) por TEMPO_INSISTIR_TROCA, pede pro servidor trocar de
@@ -2421,8 +2422,20 @@ public class WorldScreen extends ScreenAdapter {
         }
     }
 
+    /** Virou pro lado sem andar (bloqueado): avisa o servidor pra os outros
+     * verem a direcao nova (servidor.py::handle_l). */
+    private void enviarVirada(String direcao) {
+        if (!socket.isConnected()) return;
+        JsonValue lista = new JsonValue(JsonValue.ValueType.array);
+        lista.addChild(new JsonValue(local.nome));
+        lista.addChild(new JsonValue(intDaDirecao(direcao)));
+        lista.addChild(new JsonValue(conversor.mundoParaRawX(local.x)));
+        lista.addChild(new JsonValue(conversor.mundoParaRawY(local.y)));
+        socket.emitRaw("l", lista.toJson(JsonWriter.OutputType.json));
+    }
+
     // Troca de lugar com player parado no caminho (ver processarEntrada).
-    private static final float TEMPO_INSISTIR_TROCA = 1f;
+    private static final float TEMPO_INSISTIR_TROCA = 2f;
     private float tempoInsistindo = 0f;
     private String alvoInsistindo = null;
 
@@ -2432,7 +2445,7 @@ public class WorldScreen extends ScreenAdapter {
         int tileY = (int) Math.floor((mundoY - 1f) / Jogador.TILE);
         for (Jogador j : remotos.values()) {
             if (remotosMortos.contains(j.nome)) continue;
-            float jx = j.posicaoSalvarX(), jy = j.posicaoSalvarY(); // pra onde ele esta indo
+            float jx = j.ultimoAlvoX(), jy = j.ultimoAlvoY(); // pra onde ele esta indo
             if ((int) Math.floor(jx / Jogador.TILE) == tileX && (int) Math.floor((jy - 1f) / Jogador.TILE) == tileY) return j;
         }
         return null;
@@ -2451,21 +2464,20 @@ public class WorldScreen extends ScreenAdapter {
         boolean morto = (flags & 2) != 0;
         if ((flags & 1) != 0) {
             // Aparecer/reposicionar: sem animacao de passo nem cadaver.
-            j.x = mx;
-            j.y = my;
-            j.movendo = false;
-            j.direcao = direcao;
+            j.posicionar(mx, my, direcao);
             if (morto) remotosMortos.add(nome); else remotosMortos.remove(nome);
+            return;
+        }
+        float alvoAtualX = j.ultimoAlvoX(), alvoAtualY = j.ultimoAlvoY();
+        // Mesma posicao: so' virou pro lado (vai na fila, vira na hora certa).
+        if (mx == alvoAtualX && my == alvoAtualY) {
+            j.definirAlvo(mx, my, direcao);
             return;
         }
         // Passo normal. Morto nao anda: se mexeu, renasceu (cadaver fica).
         if (remotosMortos.remove(nome)) deixarCadaver(j);
-        float alvoAtualX = j.posicaoSalvarX(), alvoAtualY = j.posicaoSalvarY();
         if (Math.abs(mx - alvoAtualX) + Math.abs(my - alvoAtualY) > Jogador.TILE * 2.5f) {
-            j.x = mx; // pulou passos (pacote atrasado): vai direto
-            j.y = my;
-            j.movendo = false;
-            j.direcao = direcao;
+            j.posicionar(mx, my, direcao); // pulou passos (pacote perdido): vai direto
         } else {
             j.definirAlvo(mx, my, direcao);
         }
@@ -3001,7 +3013,10 @@ public class WorldScreen extends ScreenAdapter {
     private void mirarMob(MobVisual mob) {
         alvoMob = mob.id.equals(alvoMob) ? null : mob.id;
         amigoMarcado = null; // um alvo por vez
-        esperaAtaque = Math.min(esperaAtaque, 0.1f);
+        // NAO zera a espera: o cooldown e' do player, nao do alvo. Antes,
+        // trocar de alvo logo depois de matar um mob mandava o golpe antes do
+        // cooldown do servidor acabar - ele recusava, e o client ainda
+        // esperava o intervalo inteiro de novo (parecia cooldown dobrado).
     }
 
     /** Clique em outro player: nao ataca, so' marca o SQM dele com o
