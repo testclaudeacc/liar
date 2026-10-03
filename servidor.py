@@ -2350,6 +2350,10 @@ def handle_m(data):
             if old_room: leave_room(old_room)
             join_room(new_room)
             p['room'] = new_room
+            # Entrou num chunk novo: manda o estado da area nova (mobs parados
+            # nao mandam mob_pos, entao sem isso o client nunca sabia onde
+            # estavam os mobs dos chunks que acabaram de ficar perto).
+            emit('sync_area_data', montar_sync_area(sid, new_room), room=sid)
             
         payload = [p_name, x, y, d_int]
         destinos = set(salas_vizinhas(new_room))
@@ -2378,6 +2382,10 @@ def handle_l(data):
             if old_room: leave_room(old_room)
             join_room(new_room)
             p['room'] = new_room
+            # Entrou num chunk novo: manda o estado da area nova (mobs parados
+            # nao mandam mob_pos, entao sem isso o client nunca sabia onde
+            # estavam os mobs dos chunks que acabaram de ficar perto).
+            emit('sync_area_data', montar_sync_area(sid, new_room), room=sid)
             
         payload = [p_name, d_int, x, y]
         for r in salas_vizinhas(new_room):

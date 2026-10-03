@@ -2096,6 +2096,8 @@ public class WorldScreen extends ScreenAdapter {
                 continue;
             }
             String id = idDoMob(spawn);
+            Gdx.app.log("WorldScreen", "Mob criado: " + id + " (spawn_range=" + spawn.spawnRange
+                + ", respawn_time=" + spawn.respawnTime + ")");
             String nome = Character.toUpperCase(spawn.mobId.charAt(0)) + spawn.mobId.substring(1);
             mobs.put(id, new MobVisual(id, nome, spawn.worldX, spawn.worldY, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE)));
         }
@@ -2115,7 +2117,12 @@ public class WorldScreen extends ScreenAdapter {
     private void moverMob(MobVisual mob, float rawX, float rawY, String direcao, float duracaoPasso, boolean posicaoAbsoluta) {
         float mx = conversor.rawParaMundoX(rawX);
         float my = conversor.rawParaMundoY(rawY);
-        if (posicaoAbsoluta || !mob.visivel) {
+        if (posicaoAbsoluta && mob.visivel && !mob.morto
+                && mx == mob.destinoFinalX() && my == mob.destinoFinalY()) {
+            // Sync de area com o mob ja indo pra esse SQM: deixa o passo terminar
+            // (mob.gd::posicionar faz o mesmo), sem "tp" no meio do caminho.
+            if (!mob.movendo) mob.direcao = direcao;
+        } else if (posicaoAbsoluta || !mob.visivel) {
             mob.posicionar(mx, my, direcao);
         } else {
             mob.receberPasso(mx, my, direcao, duracaoPasso);

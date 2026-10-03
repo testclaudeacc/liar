@@ -1,5 +1,6 @@
 package com.teste.game.mapa;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.maps.MapLayer;
 import com.badlogic.gdx.maps.MapObject;
@@ -208,15 +209,29 @@ public class MapaPropriedades {
         if (camadaMobs != null) {
             for (MapObject obj : camadaMobs.getObjects()) {
                 String mobId = obj.getProperties().get("mob_id", String.class);
-                if (mobId == null || mobId.trim().isEmpty() || !(obj instanceof RectangleMapObject)) continue;
+                if (mobId == null || mobId.trim().isEmpty()) {
+                    Gdx.app.log("MapaPropriedades", "MobSpawns: objeto sem a propriedade mob_id, ignorado");
+                    continue;
+                }
+                Vector2 pos = posicaoDoObjeto(obj);
+                if (pos == null) {
+                    Gdx.app.log("MapaPropriedades", "MobSpawns: objeto '" + mobId + "' sem posicao (tipo "
+                        + obj.getClass().getSimpleName() + "), ignorado");
+                    continue;
+                }
                 // Mesmo snap pro SQM dos SpawnPoints/NPCSpawns acima.
-                Rectangle r = ((RectangleMapObject) obj).getRectangle();
-                float mundoX = (float) Math.round(r.x / Jogador.TILE) * Jogador.TILE + (Jogador.TILE / 2f);
-                float mundoY = (float) Math.round(r.y / Jogador.TILE) * Jogador.TILE;
+                float mundoX = (float) Math.round(pos.x / Jogador.TILE) * Jogador.TILE + (Jogador.TILE / 2f);
+                float mundoY = (float) Math.round(pos.y / Jogador.TILE) * Jogador.TILE;
                 mobSpawns.add(new MobSpawn(mobId.trim().toLowerCase(), mundoX, mundoY,
                     numeroInt(obj.getProperties().get("spawn_range"), 0),
                     numeroFloat(obj.getProperties().get("respawn_time"), 120f)));
             }
+        }
+
+        if (camadaMobs == null) {
+            Gdx.app.log("MapaPropriedades", "Camada de objetos 'MobSpawns' nao encontrada no mapa - nenhum mob");
+        } else {
+            Gdx.app.log("MapaPropriedades", mobSpawns.size() + " mob(s) na camada MobSpawns");
         }
 
         MapLayer camadaAreas = mapa.getLayers().get("AreasName");
@@ -445,5 +460,25 @@ public class MapaPropriedades {
         } catch (NumberFormatException e) {
             return padrao;
         }
+    }
+
+    /**
+     * Canto inferior-esquerdo do objeto em espaco de mundo (Y pra cima).
+     * Point do Tiled chega como RectangleMapObject 0x0 em algumas versoes do
+     * libGDX e como PointMapObject em outras (que nem existe nas antigas) -
+     * pra nao depender da versao, objeto que nao for retangulo usa as
+     * propriedades "x"/"y" que o TmxMapLoader preenche (ja com Y invertido).
+     */
+    private static Vector2 posicaoDoObjeto(MapObject obj) {
+        if (obj instanceof RectangleMapObject) {
+            Rectangle r = ((RectangleMapObject) obj).getRectangle();
+            return new Vector2(r.x, r.y);
+        }
+        Object x = obj.getProperties().get("x");
+        Object y = obj.getProperties().get("y");
+        if (x instanceof Number && y instanceof Number) {
+            return new Vector2(((Number) x).floatValue(), ((Number) y).floatValue());
+        }
+        return null;
     }
 }
