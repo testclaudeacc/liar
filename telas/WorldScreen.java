@@ -279,7 +279,6 @@ public class WorldScreen extends ScreenAdapter {
         float tempo = 0f;
         // Hits usam DURACAO_QUADRO_HIT (mais lento); fumaca de spawn segue no ritmo antigo.
         float duracaoQuadro = DURACAO_QUADRO_EFEITO;
-        boolean brilhoAzul = false; // hit de mana
         Efeito(TextureRegion[] quadros, float x, float y) { this.quadros = quadros; this.x = x; this.y = y; }
         float posX() { return mobAlvo != null ? mobAlvo.x : jogadorAlvo != null ? jogadorAlvo.x : x; }
         float posY() { return mobAlvo != null ? mobAlvo.y : jogadorAlvo != null ? jogadorAlvo.y : y; }
@@ -287,8 +286,6 @@ public class WorldScreen extends ScreenAdapter {
     private static final float DURACAO_QUADRO_EFEITO = 0.05f;
     // Hit no mob/player: 0.05s por quadro passava rapido demais (a pedido do usuario).
     private static final float DURACAO_QUADRO_HIT = 0.1f;
-    // Brilho azul do projetil e do hit de mana (Mage).
-    private static final Color COR_BRILHO_MANA = new Color(0.35f, 0.6f, 1f, 1f);
     private final List<Efeito> efeitos = new ArrayList<>();
     private final Map<String, TextureRegion[]> cacheEfeitos = new HashMap<>();
 
@@ -306,7 +303,6 @@ public class WorldScreen extends ScreenAdapter {
         Projetil(TextureRegion regiao, float x0, float y0, MobVisual alvo, String efeitoHit) {
             this.regiao = regiao; this.x0 = x0; this.y0 = y0; this.alvo = alvo; this.efeitoHit = efeitoHit;
         }
-        boolean brilhoAzul() { return "Mana".equals(efeitoHit); }
         float x1() { return alvo.x; }
         float y1() { return alvo.y + 8f; }
     }
@@ -2416,7 +2412,6 @@ public class WorldScreen extends ScreenAdapter {
         if (quadros == null) return null;
         Efeito e = new Efeito(quadros, x, y);
         e.duracaoQuadro = DURACAO_QUADRO_HIT;
-        e.brilhoAzul = "Mana".equals(nome);
         efeitos.add(e);
         return e;
     }
@@ -2678,7 +2673,6 @@ public class WorldScreen extends ScreenAdapter {
             float y = pr.y0 + (pr.y1() - pr.y0) * t;
             float angulo = (float) Math.toDegrees(Math.atan2(pr.y1() - pr.y0, pr.x1() - pr.x0));
             float w = pr.regiao.getRegionWidth(), h = pr.regiao.getRegionHeight();
-            if (pr.brilhoAzul()) desenharBrilhoAzul(pr.regiao, x, y, angulo);
             batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, 1f, 1f, angulo);
         }
         for (Efeito e : efeitos) {
@@ -2686,24 +2680,8 @@ public class WorldScreen extends ScreenAdapter {
             TextureRegion r = e.quadros[quadro];
             float ancoraX = Math.round(e.posX() / camera.zoom) * camera.zoom;
             float ancoraY = Math.round(e.posY() / camera.zoom) * camera.zoom;
-            if (e.brilhoAzul) desenharBrilhoAzul(r, ancoraX, ancoraY + r.getRegionHeight() / 2f, 0f);
             batch.draw(r, ancoraX - r.getRegionWidth() / 2f, ancoraY);
         }
-    }
-
-    /** Leve brilho azul: o proprio sprite, tingido de azul e um pouco maior,
-     * desenhado por baixo com blend aditivo (centrado em cx/cy). */
-    private void desenharBrilhoAzul(TextureRegion r, float cx, float cy, float angulo) {
-        float w = r.getRegionWidth(), h = r.getRegionHeight();
-        int srcAnterior = batch.getBlendSrcFunc(), dstAnterior = batch.getBlendDstFunc();
-        Color corAnterior = batch.getColor().cpy();
-        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
-        batch.setColor(COR_BRILHO_MANA.r, COR_BRILHO_MANA.g, COR_BRILHO_MANA.b, 0.35f);
-        batch.draw(r, cx - w / 2f, cy - h / 2f, w / 2f, h / 2f, w, h, 1.6f, 1.6f, angulo);
-        batch.setColor(COR_BRILHO_MANA.r, COR_BRILHO_MANA.g, COR_BRILHO_MANA.b, 0.5f);
-        batch.draw(r, cx - w / 2f, cy - h / 2f, w / 2f, h / 2f, w, h, 1.2f, 1.2f, angulo);
-        batch.setBlendFunction(srcAnterior, dstAnterior);
-        batch.setColor(corAnterior);
     }
 
     // ---- Morte / renascer do player local ----
