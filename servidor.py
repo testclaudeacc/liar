@@ -1778,51 +1778,190 @@ def handle_join_game(data):
 CHAT_MAX_CARACTERES = 200          # igual o maxLength do campo no client (ChatUI)
 CHAT_SPAM_MAX_MSGS = 3             # mais que isso dentro da janela = spam
 CHAT_SPAM_JANELA_SEG = 4.0
+# Cada aviso de spam muta por mais tempo: 10s, 20s, 30s... 70s (linear, pra
+# 8 avisos ainda caberem em ~20 min; dobrando passaria disso so' de mute).
+CHAT_SPAM_MUTE_BASE_SEG = 10
+CHAT_SPAM_AVISOS_JANELA_SEG = 20 * 60   # avisos contam por 20 min
+CHAT_SPAM_AVISOS_MAX = 8                # 8o aviso nessa janela = mute de 1h
+CHAT_TOXICO_MAX = 100                   # palavroes em...
+CHAT_TOXICO_JANELA_SEG = 30 * 60        # ...30 min = mute de 1h
+CHAT_MUTE_LONGO_SEG = 60 * 60
+CHAT_MUTES_ARQUIVO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chat_mutes.json')
 
 # Censura "engracada": troca o palavrao por algo que ainda da' pra entender,
-# em vez de ****. Frases/palavras compostas primeiro (casam antes das partes).
-TROCAS_PALAVROES = [
-    # Ingles
-    ("motherfuckers", "mother huggers"), ("motherfucker", "mother hugger"),
-    ("niggers", "hard workers"), ("niggas", "hard workers"),
-    ("nigger", "hard worker"), ("nigga", "hard worker"),
-    ("bullshit", "bull poop"), ("assholes", "butt nuggets"), ("asshole", "butt nugget"),
-    ("fucking", "fudging"), ("fucked", "fudged"), ("fucker", "fudger"), ("fuck", "fudge"),
-    ("shit", "poop"), ("bitches", "sweeties"), ("bitch", "sweetie"),
-    ("cunt", "cupcake"), ("dick", "pickle"), ("cock", "rooster"), ("pussy", "kitty"),
-    ("bastard", "rascal"), ("whore", "princess"), ("slut", "princess"),
-    ("faggot", "fabulous person"), ("fag", "fabulous person"),
-    ("retarded", "silly goose"), ("retard", "silly goose"),
-    ("damn", "dang"), ("ass", "butt"), ("kys", "have a nice day"),
+# em vez de ****. Frases (com espaco) sao trocadas por regex no texto cru;
+# palavras soltas passam por _normalizar_palavra antes (pega n!gger, sh1t,
+# f*ck, fuuuck...).
+TROCAS_FRASES = [
     # Portugues
     ("puta que pariu", "pudim que caiu"), ("filho da puta", "filho da fada"),
-    ("foda-se", "fofura"), ("caralho", "caramba"), ("porra", "poxa"),
-    ("merda", "meleca"), ("putas", "fadas"), ("puta", "fada"),
-    ("buceta", "borboleta"), ("boceta", "borboleta"), ("arrombado", "abençoado"),
-    ("cacete", "cacilda"), ("viado", "colega"), ("foder", "fofar"), ("fuder", "fofar"),
-    ("foda", "fofa"), ("cu", "bumbum"),
+    ("filha da puta", "filha da fada"), ("vai tomar no cu", "vai tomar no colo"),
+    ("tomar no cu", "tomar no colo"), ("vai se foder", "vai ser feliz"),
+    ("vai se fuder", "vai ser feliz"), ("vai a merda", "vai a meleca"),
+    # Ingles
+    ("son of a bitch", "son of a biscuit"), ("shut the fuck up", "shush please"),
+    ("what the fuck", "what the fudge"), ("go fuck yourself", "go hug yourself"),
+    ("kill yourself", "have a nice day"),
     # Espanhol
-    ("mierda", "miércoles"), ("joder", "jolines"), ("coño", "coco"),
-    ("pendejo", "panqueque"), ("cabrón", "campeón"), ("cabron", "campeon"),
-    ("gilipollas", "piruleta"),
+    ("hijo de puta", "hijo de hada"), ("hija de puta", "hija de hada"),
+    ("concha de tu madre", "concha de mar"), ("me cago en", "me cachis en"),
+    # Russo
+    ("ёб твою мать", "ёлки-палки"), ("еб твою мать", "ёлки-палки"),
+    ("yob tvoyu mat", "yolki-palki"),
 ]
-_RE_PALAVROES = re.compile(
-    r"(?<!\w)(" + "|".join(re.escape(p) for p, _ in TROCAS_PALAVROES) + r")(?!\w)",
-    re.IGNORECASE)
-_MAPA_PALAVROES = {p: t for p, t in TROCAS_PALAVROES}
+TROCAS_PALAVRAS = {
+    # ---- Ingles ----
+    "nigger": "hard worker", "niggers": "hard workers", "nigga": "hard worker",
+    "niggas": "hard workers", "nigg": "hard worker",
+    "ass": "butt", "asses": "butts", "asshole": "butt nugget", "assholes": "butt nuggets",
+    "dumbass": "dummy butt", "jackass": "donkey", "fatass": "chubby butt",
+    "fuck": "fudge", "fucks": "fudges", "fucking": "fudging", "fuckin": "fudging",
+    "fucked": "fudged", "fucker": "fudger", "fuckers": "fudgers", "fck": "fudge",
+    "fk": "fudge", "fuk": "fudge", "fking": "fudging", "fcking": "fudging",
+    "motherfucker": "mother hugger", "motherfuckers": "mother huggers", "mf": "my friend",
+    "wtf": "what the fudge", "stfu": "shush please", "gtfo": "go away please",
+    "kys": "have a nice day", "shit": "poop", "shits": "poops", "shitty": "poopy",
+    "bullshit": "bull poop", "bs": "bull poop", "bitch": "sweetie", "bitches": "sweeties",
+    "cunt": "cupcake", "dick": "pickle", "dicks": "pickles", "dickhead": "pickle head",
+    "cock": "rooster", "pussy": "kitty", "bastard": "rascal", "whore": "princess",
+    "slut": "princess", "hoe": "garden tool", "hoes": "garden tools", "thot": "sweet potato",
+    "faggot": "fabulous person", "fag": "fabulous person", "retard": "silly goose",
+    "retarded": "silly goose", "damn": "dang", "piss": "pee", "pissed": "peeved",
+    "prick": "cactus", "twat": "teapot", "wanker": "banker", "bollocks": "bubbles",
+    "douche": "shower gel", "douchebag": "shower gel", "spic": "pal", "chink": "pal",
+    "kike": "pal", "crap": "crud",
+    # ---- Portugues ----
+    "porra": "poxa", "prr": "poxa", "pqp": "pudim que caiu", "caralho": "caramba",
+    "caralhos": "carambas", "krl": "caramba", "crl": "caramba", "karalho": "caramba",
+    "merda": "meleca", "merdas": "melecas", "puta": "fada", "putas": "fadas",
+    "puto": "pato", "putos": "patos", "fdp": "fofo de pijama", "vsf": "vá ser feliz",
+    "vsfd": "vá ser feliz demais", "tnc": "tomar no colo", "vtnc": "vai tomar no colo",
+    "foda-se": "tá né", "fodase": "tá né", "foda": "fofa", "foder": "fofar",
+    "fuder": "fofar", "fudido": "fofinho", "fodido": "fofinho", "cu": "bumbum",
+    "cuzao": "bumbunzão", "cuzão": "bumbunzão", "buceta": "borboleta",
+    "boceta": "borboleta", "bct": "borboleta", "pau": "pão", "pinto": "pudim",
+    "rola": "rosquinha", "piroca": "pipoca", "caceta": "caneta", "cacete": "cacilda",
+    "arrombado": "abençoado", "arrombada": "abençoada", "viado": "colega",
+    "veado": "colega", "bicha": "colega", "macaco": "capivara", "macaca": "capivara",
+    "desgraçado": "abençoado", "desgracado": "abençoado", "otario": "otimista",
+    "otário": "otimista", "babaca": "batata", "corno": "cornetinha",
+    "vagabundo": "vagalume", "vagabunda": "vagalume", "vadia": "fada",
+    "piranha": "sardinha", "imbecil": "inocente", "idiota": "ídolo", "retardado": "sonolento",
+    # ---- Espanhol ----
+    "mierda": "miércoles", "joder": "jolines", "coño": "coco", "cono": "coco",
+    "pendejo": "panqueque", "pendeja": "panqueque", "cabrón": "campeón",
+    "cabron": "campeon", "gilipollas": "piruleta", "hdp": "hijo de hada",
+    "ctm": "cuídate mucho", "pinche": "pinchito", "verga": "verdura",
+    "chinga": "chancla", "chingada": "chancla", "chingar": "chanclear",
+    "culero": "cuchara", "maricón": "marinero", "maricon": "marinero",
+    "carajo": "caramba", "cojones": "cojines", "malparido": "bien parido",
+    "pelotudo": "peludito", "boludo": "bombón", "mamón": "melón", "mamon": "melon",
+    "zorra": "zorrita", "perra": "perrita", "imbécil": "inocente",
+    # ---- Russo (cirilico + transliterado) ----
+    "блять": "блин", "блядь": "блин", "бля": "блин", "сука": "сушка", "суки": "сушки",
+    "сучка": "сушка", "хуй": "хобот", "хуйня": "фигня", "нахуй": "на хутор",
+    "пиздец": "капец", "пизда": "пицца", "ебать": "ёлки", "ебаный": "ёлочный",
+    "мудак": "чудак", "гандон": "гондола", "долбоёб": "дятел", "долбоеб": "дятел",
+    "пидор": "помидор", "пидорас": "помидор", "сволочь": "солнышко",
+    "blyat": "blin", "blyad": "blin", "blya": "blin", "suka": "sushka", "cyka": "sushka",
+    "pizdec": "kapec", "pizdets": "kapec", "pizda": "pizza", "nahui": "na hutor",
+    "nahuy": "na hutor", "huy": "hobot", "hui": "hobot", "mudak": "chudak",
+    "pidor": "pomidor", "gandon": "gondola", "debil": "dobryak",
+}
+_RE_FRASES = re.compile(
+    r"(?<!\w)(" + "|".join(re.escape(f) for f, _ in TROCAS_FRASES) + r")(?!\w)", re.IGNORECASE)
+_MAPA_FRASES = {f: t for f, t in TROCAS_FRASES}
+# Palavra = letras/numeros + simbolos usados pra disfarcar (n!gger, a$$, f*ck),
+# podendo ter hifen no meio (foda-se).
+_RE_PALAVRA = re.compile(r"[\w@$*!]+(?:-[\w@$*!]+)*")
+_LEET = str.maketrans({'0': 'o', '1': 'i', '!': 'i', '3': 'e', '4': 'a', '@': 'a',
+                       '$': 's', '5': 's', '7': 't'})
+
+def _manter_caixa(original, troca):
+    letras = [c for c in original if c.isalpha()]
+    # PALAVRAO -> TROCA, Palavrao -> Troca.
+    if len(letras) > 1 and all(c.isupper() for c in letras): return troca.upper()
+    if letras and letras[0].isupper(): return troca[0].upper() + troca[1:]
+    return troca
+
+def _troca_da_palavra(nucleo):
+    base = nucleo.lower().translate(_LEET)
+    # Repeticao de letra pra fugir do filtro: "fuuuuck", "shiiit".
+    candidatos = [base, re.sub(r"(.)\1+", r"\1\1", base), re.sub(r"(.)\1+", r"\1", base)]
+    for c in candidatos:
+        if c in TROCAS_PALAVRAS: return TROCAS_PALAVRAS[c]
+    # f*ck, sh*t: '*' vale qualquer letra (exige 2+ letras de verdade, senao
+    # "****" casaria com qualquer palavrao de 4 letras).
+    if '*' in base and sum(ch.isalpha() for ch in base) >= 2:
+        padrao = re.compile("^" + re.escape(base).replace(r"\*", ".") + "$")
+        for palavra, troca in TROCAS_PALAVRAS.items():
+            if padrao.match(palavra): return troca
+    return None
 
 def censurar(msg):
-    def trocar(m):
-        original = m.group(0)
-        troca = _MAPA_PALAVROES[original.lower()]
-        # Mantem o "grito": PALAVRAO -> TROCA, Palavrao -> Troca.
-        if original.isupper() and len(original) > 1: return troca.upper()
-        if original[0].isupper(): return troca[0].upper() + troca[1:]
-        return troca
-    return _RE_PALAVROES.sub(trocar, msg)
+    """Devolve (texto censurado, quantos palavroes foram trocados)."""
+    total = 0
+    def trocar_frase(m):
+        nonlocal total
+        total += 1
+        return _manter_caixa(m.group(0), _MAPA_FRASES[m.group(0).lower()])
+    msg = _RE_FRASES.sub(trocar_frase, msg)
 
-def chat_sistema(sid, texto):
-    socketio.emit('chat_system', {'text': texto}, room=sid)
+    def trocar_palavra(m):
+        nonlocal total
+        token = m.group(0)
+        # "!" nas pontas e' pontuacao ("shit!"), so' no meio vira "i" (n!gger).
+        nucleo = token.strip('!')
+        if not nucleo: return token
+        troca = _troca_da_palavra(nucleo)
+        if troca is None: return token
+        total += 1
+        ini = token[:len(token) - len(token.lstrip('!'))]
+        fim = token[len(token.rstrip('!')):]
+        return ini + _manter_caixa(nucleo, troca) + fim
+    return _RE_PALAVRA.sub(trocar_palavra, msg), total
+
+# Mutes por NOME do player (sobrevive a relogar) e salvos em disco (sobrevive
+# a reiniciar o servidor): nome -> timestamp de quando acaba.
+chat_mutes = {}
+# Historico por nome (memoria): avisos de spam e palavroes recentes.
+chat_historico = {}
+
+def carregar_mutes_chat():
+    global chat_mutes
+    try:
+        with open(CHAT_MUTES_ARQUIVO, 'r') as f:
+            agora = time.time()
+            chat_mutes = {n: float(t) for n, t in json.load(f).items() if float(t) > agora}
+    except FileNotFoundError:
+        pass
+    except Exception:
+        traceback.print_exc()
+
+def salvar_mutes_chat():
+    try:
+        agora = time.time()
+        with open(CHAT_MUTES_ARQUIVO, 'w') as f:
+            json.dump({n: t for n, t in chat_mutes.items() if t > agora}, f)
+    except Exception:
+        traceback.print_exc()
+
+carregar_mutes_chat()
+
+def chat_sistema(sid, texto, cor='yellow'):
+    socketio.emit('chat_system', {'text': texto, 'color': cor}, room=sid)
+
+def _formatar_tempo(seg):
+    seg = int(math.ceil(seg))
+    if seg >= 3600: return "1 hour" if seg <= 3600 else f"{math.ceil(seg / 3600)} hours"
+    if seg >= 120:
+        m = math.ceil(seg / 60)
+        return f"{m} minute" + ("" if m == 1 else "s")
+    return f"{seg} second" + ("" if seg == 1 else "s")
+
+def _mutar(nome, seg):
+    chat_mutes[nome] = max(chat_mutes.get(nome, 0), time.time() + seg)
+    salvar_mutes_chat()
 
 @socketio.on('c')
 def handle_c(data):
@@ -1830,24 +1969,53 @@ def handle_c(data):
         sid = request.sid
         if sid not in online_players: return
         p = online_players[sid]
+        nome = p.get('name', '')
         if not isinstance(data, list) or len(data) == 0: return
         msg = str(data[0]).strip()[:CHAT_MAX_CARACTERES]
         if not msg: return
-
-        # Anti-spam: mais de CHAT_SPAM_MAX_MSGS na janela -> descarta e avisa
-        # so' quem mandou.
         agora = time.time()
-        recentes = [t for t in p.get('chat_times', []) if agora - t < CHAT_SPAM_JANELA_SEG]
-        if len(recentes) >= CHAT_SPAM_MAX_MSGS:
-            p['chat_times'] = recentes
-            chat_sistema(sid, "You are sending messages too fast. Please slow down.")
-            return
-        recentes.append(agora)
-        p['chat_times'] = recentes
+        hist = chat_historico.setdefault(nome, {'msgs': [], 'avisos': [], 'palavroes': []})
 
-        msg = censurar(msg)
+        # Mutado: nao conta como spam de novo, so' lembra quanto falta.
+        fim_mute = chat_mutes.get(nome, 0)
+        if fim_mute > agora:
+            restante = fim_mute - agora
+            cor = 'red' if restante > 5 * 60 else 'yellow'
+            chat_sistema(sid, f"You are muted. Wait {_formatar_tempo(restante)} to talk again.", cor)
+            return
+
+        # Anti-spam: mais de CHAT_SPAM_MAX_MSGS na janela -> descarta, avisa e
+        # muta por um tempo que dobra a cada aviso (nos ultimos 20 min). No 8o
+        # aviso, mute de 1 hora.
+        hist['msgs'] = [t for t in hist['msgs'] if agora - t < CHAT_SPAM_JANELA_SEG]
+        if len(hist['msgs']) >= CHAT_SPAM_MAX_MSGS:
+            hist['msgs'] = []
+            hist['avisos'] = [t for t in hist['avisos'] if agora - t < CHAT_SPAM_AVISOS_JANELA_SEG]
+            hist['avisos'].append(agora)
+            n = len(hist['avisos'])
+            if n >= CHAT_SPAM_AVISOS_MAX:
+                hist['avisos'] = []
+                _mutar(nome, CHAT_MUTE_LONGO_SEG)
+                chat_sistema(sid, "You have been muted for 1 hour for spam.", 'red')
+            else:
+                seg = CHAT_SPAM_MUTE_BASE_SEG * n
+                _mutar(nome, seg)
+                chat_sistema(sid, f"You are sending messages too fast. You are muted for {_formatar_tempo(seg)}.")
+            return
+        hist['msgs'].append(agora)
+
+        msg, palavroes = censurar(msg)
+        if palavroes:
+            hist['palavroes'] = [t for t in hist['palavroes'] if agora - t < CHAT_TOXICO_JANELA_SEG]
+            hist['palavroes'].extend([agora] * palavroes)
+            if len(hist['palavroes']) >= CHAT_TOXICO_MAX:
+                hist['palavroes'] = []
+                _mutar(nome, CHAT_MUTE_LONGO_SEG)
+                chat_sistema(sid, "You have been muted for 1 hour for toxic behavior.", 'red')
+                return
+
         room = p.get('room')
-        payload = [p.get('name', ''), msg, p.get('class_name', 'Knight')]
+        payload = [nome, msg, p.get('class_name', 'Knight')]
         # Mesma área do movimento ('m'): o chunk do player + os 8 vizinhos.
         # Antes ia só pro chunk (800px) exato dele: quem estava do lado, mas
         # do outro lado da borda do chunk, via o player andar e nunca recebia

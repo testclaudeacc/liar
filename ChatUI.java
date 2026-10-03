@@ -467,7 +467,12 @@ public class ChatUI {
 
     /** Aviso do sistema no chat Local (sem nome): level/skill up, anti-spam... */
     public void adicionarMensagemSistema(String texto) {
-        adicionarNaAba(ABA_LOCAL, hora() + " [#" + COR_SISTEMA.toString() + "]" + escaparMarkup(texto) + "[]");
+        adicionarMensagemSistema(texto, COR_SISTEMA);
+    }
+
+    /** Idem, com cor propria (ex: vermelho pro mute de 1 hora). */
+    public void adicionarMensagemSistema(String texto, Color cor) {
+        adicionarNaAba(ABA_LOCAL, hora() + " [#" + cor.toString() + "]" + escaparMarkup(texto) + "[]");
     }
 
     private static String hora() {

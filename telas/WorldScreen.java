@@ -1268,10 +1268,13 @@ public class WorldScreen extends ScreenAdapter {
             chat.adicionarMensagemLocal(nomeVisivel(nome), cor, texto);
             falas.put(nome, new Fala(nome, texto, cor));
         });
-        // Aviso do servidor so' pra esse jogador (ex: anti-spam).
+        // Aviso do servidor so' pra esse jogador (anti-spam/mute). "red" =
+        // mute de 1 hora (spam ou palavrao demais).
         socket.on("chat_system", (nomeEvt, data) -> {
             if (data == null || chat == null) return;
-            chat.adicionarMensagemSistema(data.getString("text", ""));
+            String texto = data.getString("text", "");
+            if ("red".equals(data.getString("color", ""))) chat.adicionarMensagemSistema(texto, new Color(1f, 0.25f, 0.25f, 1f));
+            else chat.adicionarMensagemSistema(texto);
         });
 
         // Membros de um chat extra (Portuguese/Spanish/...), igual grupo: o
