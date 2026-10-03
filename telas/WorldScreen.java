@@ -320,7 +320,20 @@ public class WorldScreen extends ScreenAdapter {
 
     private TextureRegion regiaoAlvo, regiaoTargetHit, regiaoFlag, regiaoBag, regiaoBagDourada;
     private HudVitais hud;
-    private JanelaLoot janelaLoot;
+    /** Loot pego subindo em cima do player (estilo Kakele): uma linha por
+     * item / moeda, com icone e quantidade. Fica onde o player estava. */
+    private static class LootFlutuante {
+        final float x, y;
+        final List<TextureRegion> icones = new ArrayList<>();
+        final List<String> textos = new ArrayList<>();
+        final List<Color> cores = new ArrayList<>();
+        float tempo = 0f;
+        LootFlutuante(float x, float y) { this.x = x; this.y = y; }
+        void adicionar(TextureRegion icone, String texto, Color cor) { icones.add(icone); textos.add(texto); cores.add(cor); }
+    }
+    private final List<LootFlutuante> lootsFlutuantes = new ArrayList<>();
+    private static final float DURACAO_LOOT_FLUTUANTE = 2.5f;
+    private static final int ALCANCE_BAG_SQM = 4;
     private boolean localMorto = false;
     private Table painelMorte;
     private static final float DURACAO_NUMERO_DANO = 0.85f;
@@ -710,7 +723,6 @@ public class WorldScreen extends ScreenAdapter {
                 }
                 if (keycode == Input.Keys.ESCAPE) {
                     // Janela de loot e alvo saem antes de qualquer outra coisa.
-                    if (janelaLoot.isVisible()) { janelaLoot.fechar(); return true; }
                     if (alvoMob != null) { alvoMob = null; return true; }
                     // Fecha a interface ativa antes de abrir Settings.
                     if (dialogoNPC.isVisible()) dialogoNPC.fechar();
@@ -796,7 +808,6 @@ public class WorldScreen extends ScreenAdapter {
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
-        janelaLoot = new JanelaLoot(uiStage, skin, atlas, bookMenu::iconeDoItem, this::pegarLoot);
         criarPainelMorte();
         dialogoNPC = new DialogoNPCUI(uiStage, skin, atlas.findRegion("ui/currency/Silver"), escala);
         areaNomeUI = new AreaNomeUI(uiStage, skin, atlas.findRegion("sheet/r83_c11"), escala);
@@ -1284,9 +1295,6 @@ public class WorldScreen extends ScreenAdapter {
             n.cor = Color.WHITE;
             numerosDano.add(n);
         });
-        socket.on("loot_result", (nomeEvt, data) -> {
-            if (data != null) janelaLoot.mostrar(data);
-        });
         socket.on("loot_taken", (nomeEvt, data) -> {
             if (data == null) return;
             removerBag(data.getString("loot_id", ""));
@@ -1422,6 +1430,7 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             bookMenu.atualizarMoedas(data.getLong("currency_total", 0L));
             bookMenu.adicionarItens(data.get("items"));
+            if (!data.getBoolean("already_taken", false)) mostrarLootPego(data);
             if (data.getBoolean("bag_esvaziada", false) || data.getBoolean("already_taken", false)) {
                 removerBag(data.getString("loot_id", ""));
             }
@@ -1722,6 +1731,11 @@ public class WorldScreen extends ScreenAdapter {
         for (NPCVisual npc : npcs.values()) npc.movimento.atualizar(delta);
         for (MobVisual mob : mobs.values()) mob.atualizar(delta);
         atualizarCombate(delta);
+        for (int i = lootsFlutuantes.size() - 1; i >= 0; i--) {
+            LootFlutuante l = lootsFlutuantes.get(i);
+            l.tempo += delta;
+            if (l.tempo >= DURACAO_LOOT_FLUTUANTE) lootsFlutuantes.remove(i);
+        }
         for (int i = textosFlutuantes.size() - 1; i >= 0; i--) {
             TextoFlutuante t = textosFlutuantes.get(i);
             t.tempo += delta;
@@ -1874,6 +1888,7 @@ public class WorldScreen extends ScreenAdapter {
         for (MobVisual mob : mobs.values()) desenharNomeMob(mob);
         desenharNumerosDano();
         desenharTextosFlutuantes();
+        desenharLootsFlutuantes();
         desenharBalaoInteracaoNPC(npcMaisProximoParaConversar());
         TextureRegion notifAtual = notificacaoAtual();
         if (notifAtual != null) {
@@ -2436,25 +2451,77 @@ public class WorldScreen extends ScreenAdapter {
         return false;
     }
 
-    /** Clique numa bag do lado (ou embaixo) do player: pede o conteudo. */
+    /** Clique numa bag a ate ALCANCE_BAG_SQM SQMs: pega tudo direto (sem
+     * janela) e o que veio aparece subindo em cima do player. */
     private boolean cliqueEmBag(float wx, float wy) {
         for (BagChao bag : bags.values()) {
             if (Math.abs(wx - bag.x) > 8f || wy < bag.y || wy > bag.y + 16f) continue;
-            if (distanciaSqm(local.x, local.y, bag.x, bag.y) > 1) return true; // longe: so' consome o clique
+            if (distanciaSqm(local.x, local.y, bag.x, bag.y) > ALCANCE_BAG_SQM) return true; // longe: so' consome o clique
             String id = bag.id;
-            socket.emitRaw("request_loot", GameSocket.obj(jw -> jw.set("loot_id", id)));
+            socket.emitRaw("collect_loot", GameSocket.obj(jw -> jw.set("loot_id", id)));
             return true;
         }
         return false;
     }
 
-    private void pegarLoot(String lootId) {
-        socket.emitRaw("collect_loot", GameSocket.obj(jw -> jw.set("loot_id", lootId)));
-    }
-
     private void removerBag(String lootId) {
         bags.remove(lootId);
-        janelaLoot.bagRemovida(lootId);
+    }
+
+    /** Monta o "+ loot" em cima do player com a resposta do collect_loot. */
+    private void mostrarLootPego(JsonValue data) {
+        LootFlutuante loot = new LootFlutuante(local.x, local.y);
+        // Itens iguais viram uma linha so' com a quantidade.
+        Map<String, Integer> contagem = new LinkedHashMap<>();
+        JsonValue itens = data.get("items");
+        if (itens != null) {
+            for (JsonValue item = itens.child; item != null; item = item.next) {
+                String caminho = item.getString("item", "");
+                contagem.merge(caminho, Math.max(1, item.getInt("qty", 1)), Integer::sum);
+            }
+        }
+        for (Map.Entry<String, Integer> e : contagem.entrySet()) {
+            loot.adicionar(bookMenu.iconeDoItem(e.getKey()), "x" + e.getValue(), Color.WHITE);
+        }
+        long moedas = data.getLong("currency_gained", 0L);
+        long[] valores = {moedas / 1_000_000L, (moedas % 1_000_000L) / 10_000L, (moedas % 10_000L) / 100L, moedas % 100L};
+        String[] tipos = {"Platinum", "Gold", "Silver", "Copper"};
+        for (int i = 0; i < tipos.length; i++) {
+            if (valores[i] > 0) loot.adicionar(atlas.findRegion("ui/currency/" + tipos[i]), "+" + valores[i], Color.WHITE);
+        }
+        if (data.getBoolean("cap_bloqueado", false)) {
+            loot.adicionar(null, "Not enough capacity", new Color(1f, 0.3f, 0.3f, 1f));
+        }
+        if (!loot.textos.isEmpty()) lootsFlutuantes.add(loot);
+    }
+
+    private void desenharLootsFlutuantes() {
+        Color anterior = new Color(font.getColor());
+        for (LootFlutuante l : lootsFlutuantes) {
+            float t = l.tempo / DURACAO_LOOT_FLUTUANTE;
+            float subida = 14f * (1f - (1f - t) * (1f - t));
+            float alfa = t < 0.7f ? 1f : 1f - (t - 0.7f) / 0.3f;
+            float ancoraX = Math.round(l.x / camera.zoom) * camera.zoom;
+            float base = l.y + 26f + subida;
+            for (int i = 0; i < l.textos.size(); i++) {
+                // Linhas de baixo pra cima (a primeira fica embaixo).
+                float y = Math.round((base + i * 9f) / camera.zoom) * camera.zoom;
+                TextureRegion icone = l.icones.get(i);
+                layout.setText(font, l.textos.get(i));
+                float tamanhoIcone = icone != null ? 8f : 0f;
+                float largura = tamanhoIcone + (icone != null ? 1f : 0f) + layout.width;
+                float x = Math.round((ancoraX - largura / 2f) / camera.zoom) * camera.zoom;
+                if (icone != null) {
+                    batch.setColor(1f, 1f, 1f, Math.max(0f, alfa));
+                    batch.draw(icone, x, y - tamanhoIcone + 1f, tamanhoIcone, tamanhoIcone);
+                    batch.setColor(Color.WHITE);
+                }
+                Color c = l.cores.get(i);
+                font.setColor(c.r, c.g, c.b, Math.max(0f, alfa));
+                font.draw(batch, l.textos.get(i), x + largura - layout.width, y);
+            }
+        }
+        font.setColor(anterior);
     }
 
     private void atualizarCombate(float delta) {
@@ -2482,7 +2549,6 @@ public class WorldScreen extends ScreenAdapter {
             bag.restante -= delta;
             if (bag.restante <= 0f) {
                 it.remove();
-                janelaLoot.bagRemovida(bag.id);
             }
         }
 
@@ -2605,7 +2671,6 @@ public class WorldScreen extends ScreenAdapter {
         if (localMorto) return;
         localMorto = true;
         alvoMob = null;
-        janelaLoot.fechar();
         painelMorte.setVisible(true);
     }
 

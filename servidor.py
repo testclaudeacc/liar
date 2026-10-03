@@ -135,6 +135,7 @@ ITEM_DB = {
 SLOT_MUNICAO = "Hand"
 # Classes que atacam a distancia (o resto e' corpo a corpo) e o alcance delas.
 CLASSES_RANGED = ("Ranger", "Mage", "Bard")
+ALCANCE_LOOT_SQM = 4
 ALCANCE_RANGED_SQM = 6
 
 # Campos do ITEM_DB que o client usa pra exibir os itens (nome, tipo, level,
@@ -2195,6 +2196,12 @@ def handle_collect_loot(data):
         if loot is None or p.get('name') not in loot.get('owners', ()):
             emit('loot_collected', {'loot_id': loot_id, 'items': [], 'currency_gained': 0, 'currency_total': int(p.get('currency', 0)), 'already_taken': True, 'cap_bloqueado': False, 'bag_esvaziada': True}, room=sid)
             return
+
+        # Alcance pra pegar a bag: ate ALCANCE_LOOT_SQM SQMs (+1 de folga).
+        if 'pos' in loot:
+            tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+            tb = tile_de(loot['pos'][0], loot['pos'][1])
+            if max(abs(tp[0] - tb[0]), abs(tp[1] - tb[1])) > ALCANCE_LOOT_SQM + 1: return
 
         itens = loot['items']
         currency_ganha = loot['currency']

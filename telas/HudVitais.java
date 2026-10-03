@@ -113,7 +113,8 @@ public final class HudVitais {
         raiz.top().left().padLeft(px(17)).padTop(px(13));
         raiz.add(painel).left().row();
         raiz.add(painelXp).left().padTop(px(6));
-        stage.addActor(raiz);
+        // Sempre por baixo de qualquer outra tela (BookMenu, chat, settings...).
+        stage.getRoot().addActorAt(0, raiz);
         atualizar();
         definirXp(1, 0);
     }
