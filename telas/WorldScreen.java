@@ -588,6 +588,9 @@ public class WorldScreen extends ScreenAdapter {
     private Table painelSettings, painelOptions;
     private SelectBox<String> botaoZoom;
     private Button botaoTopoChat, botaoTopoMenu, botaoTopoConfig;
+    // 4o botao do topo: mostra o sprite (animado) do mob/player mirado, com o
+    // fundo na cor da vida dele (cinza normal sem alvo).
+    private Button botaoTopoAlvo;
     private CheckBox checkFullscreen;
     // GUI de chat portada 1:1 da simulacao de estresse (TesteGame/ChatUI) -
     // so' pra validar o layout/toque no mobile; ainda nao fala com o servidor
@@ -941,6 +944,9 @@ public class WorldScreen extends ScreenAdapter {
         Table barra = new Table();
         barra.setFillParent(true);
         barra.top().right().pad(0, 0, 0, 20);
+        botaoTopoAlvo = criarBotaoTopo(null, () -> {});
+        botaoTopoAlvo.add(new AtorAlvo()).size(ICONE_BOTAO_TOPO);
+        barra.add(botaoTopoAlvo).size(TAMANHO_BOTAO_TOPO).padRight(12);
         botaoTopoChat = criarBotaoTopo(iconeChat, this::alternarChat);
         imagemIconeChat = (Image) botaoTopoChat.getChildren().first();
         // Icone de "mensagem nova" (chat fechado). Sem ele no atlas, usa o
@@ -960,7 +966,7 @@ public class WorldScreen extends ScreenAdapter {
         Table infoDesempenho = new Table();
         infoDesempenho.add(labelFps).right().row();
         infoDesempenho.add(labelMs).right();
-        barra.add(infoDesempenho).colspan(3).right().padTop(6);
+        barra.add(infoDesempenho).colspan(4).right().padTop(6);
 
         uiStage.addActor(barra);
     }
@@ -1060,9 +1066,11 @@ public class WorldScreen extends ScreenAdapter {
         estilo.over = new TextureRegionDrawable(texBotaoTopoHover);
         estilo.down = new TextureRegionDrawable(texBotaoTopoClick);
         Button botao = new Button(estilo);
-        Image imagemIcone = new Image(new TextureRegionDrawable(icone));
-        imagemIcone.setScaling(Scaling.fit);
-        botao.add(imagemIcone).size(ICONE_BOTAO_TOPO);
+        if (icone != null) {
+            Image imagemIcone = new Image(new TextureRegionDrawable(icone));
+            imagemIcone.setScaling(Scaling.fit);
+            botao.add(imagemIcone).size(ICONE_BOTAO_TOPO);
+        }
         botao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
         });
@@ -1116,6 +1124,72 @@ public class WorldScreen extends ScreenAdapter {
         botaoTopoChat.setVisible(!algumAberto);
         botaoTopoMenu.setVisible(!algumAberto);
         botaoTopoConfig.setVisible(!algumAberto);
+        botaoTopoAlvo.setVisible(!algumAberto);
+        // Fundo do botao de alvo na cor da vida do alvo (cinza normal sem alvo).
+        float pct = vidaDoAlvo();
+        botaoTopoAlvo.setColor(pct < 0f ? Color.WHITE : corDaVida(pct));
+    }
+
+    /** % de vida do mob/player mirado; -1 sem alvo. */
+    private float vidaDoAlvo() {
+        if (alvoMob != null) {
+            MobVisual mob = mobs.get(alvoMob);
+            if (mob != null && !mob.morto) return mob.maxHp > 0f ? mob.hp / mob.maxHp : 1f;
+        }
+        if (amigoMarcado != null && remotos.containsKey(amigoMarcado)) {
+            float[] vida = vidaRemotos.get(amigoMarcado);
+            return vida != null && vida[1] > 0f ? vida[0] / vida[1] : 1f;
+        }
+        return -1f;
+    }
+
+    /** Sprite do alvo atual dentro do botao: o quadro de animacao de AGORA
+     * (anda junto com ele), player com as camadas de skin e cores. */
+    private class AtorAlvo extends com.badlogic.gdx.scenes.scene2d.Actor {
+        private final List<TextureRegion> quadros = new ArrayList<>();
+        private final List<Color> cores = new ArrayList<>();
+
+        @Override
+        public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
+            quadros.clear();
+            cores.clear();
+            MobVisual mob = alvoMob != null ? mobs.get(alvoMob) : null;
+            Jogador j = amigoMarcado != null ? remotos.get(amigoMarcado) : null;
+            if (mob != null && !mob.morto) {
+                quadros.add(quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso));
+                cores.add(Color.WHITE);
+            } else if (j != null) {
+                List<CamadaSkin> camadas = skinsJogadores.get(j.nome);
+                if (camadas == null || camadas.isEmpty()) {
+                    quadros.add(quadroAtual(animacaoBase, j));
+                    cores.add(Color.WHITE);
+                } else {
+                    for (CamadaSkin camada : camadas) {
+                        TextureRegion q = quadroAtual(camada.animacao, j);
+                        if (q == null) continue;
+                        quadros.add(q);
+                        cores.add(camada.cor);
+                    }
+                }
+            }
+            if (quadros.isEmpty()) return;
+            // Escala inteira que cabe no botao (pixel art sem distorcer).
+            float alturaQuadro = 0f;
+            for (TextureRegion q : quadros) alturaQuadro = Math.max(alturaQuadro, q.getRegionHeight());
+            float escala = Math.min(getWidth() / FRAME_LARGURA, getHeight() / alturaQuadro);
+            if (escala >= 1f) escala = (float) Math.floor(escala);
+            float w = FRAME_LARGURA * escala;
+            float x = getX() + (getWidth() - w) / 2f;
+            float y = getY() + (getHeight() - alturaQuadro * escala) / 2f;
+            Color anterior = new Color(batch.getColor());
+            for (int i = 0; i < quadros.size(); i++) {
+                TextureRegion q = quadros.get(i);
+                Color c = cores.get(i);
+                batch.setColor(c.r, c.g, c.b, c.a * parentAlpha);
+                batch.draw(q, x, y, w, q.getRegionHeight() * escala);
+            }
+            batch.setColor(anterior);
+        }
     }
 
     /** Qual balaozinho (se algum) deve estar visivel agora - um por tela
