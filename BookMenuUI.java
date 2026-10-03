@@ -1215,7 +1215,7 @@ public final class BookMenuUI {
         switch (cat) {
             case "base": return "Skin";
             case "body": return "Cloth";
-            case "helm": return "Hair";
+            case "helm": return "Hair/Hat";
             case "acc": return "Back";
             default: return cat;
         }
