@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Button;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -1174,7 +1175,7 @@ public final class BookMenuUI {
 
     /** Quadro "parado de frente" de uma skin, pra icone de aba/opcao. */
     private Image iconeSkin(String caminho, String corHex) {
-        TextureAtlas.AtlasRegion tira = SkinsUtil.regiao(atlas, caminho);
+        TextureRegion tira = SkinsUtil.regiao(atlas, caminho);
         if (tira == null) return null;
         Image img = new Image(new TextureRegionDrawable(SkinsUtil.quadro(tira, SkinsUtil.FRAME_BAIXO)));
         img.setScaling(Scaling.fit);
@@ -1300,7 +1301,7 @@ public final class BookMenuUI {
             for (String cat : SkinsUtil.ORDEM_CAMADAS) {
                 String[] escolhida = skinsRascunho.get(cat);
                 String caminho = escolhida != null ? escolhida[0] : "base".equals(cat) ? SkinsUtil.BASE_PADRAO : null;
-                TextureAtlas.AtlasRegion tira = SkinsUtil.regiao(atlas, caminho);
+                TextureRegion tira = SkinsUtil.regiao(atlas, caminho);
                 if (tira == null) continue;
                 Image camada = new Image(new TextureRegionDrawable(SkinsUtil.quadro(tira, direcoes[i])));
                 camada.setScaling(Scaling.stretch);
