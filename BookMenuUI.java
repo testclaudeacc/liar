@@ -1009,6 +1009,8 @@ public final class BookMenuUI {
     private final Table vanityOpcoes = new Table();
     private final Table vanityCores = new Table();
     private final Table vanityPreview = new Table();
+    private TextButton botaoAplicarSkins;
+    private TextButton.TextButtonStyle estiloAplicarNormal, estiloAplicarAlterado;
     private static final List<Color> PALETA = criarPaleta();
 
     private static List<Color> criarPaleta() {
@@ -1052,7 +1054,12 @@ public final class BookMenuUI {
         TextButton.TextButtonStyle estiloBotao = new TextButton.TextButtonStyle(
             skin.get("default", TextButton.TextButtonStyle.class));
         estiloBotao.font = skin.getFont("botao-pequeno-font");
-        TextButton equipar = new TextButton("Equip", estiloBotao);
+        // Cinza sem alteracoes; verde quando o rascunho difere do que esta equipado.
+        estiloAplicarNormal = estiloBotao;
+        estiloAplicarAlterado = new TextButton.TextButtonStyle(skin.get("verde", TextButton.TextButtonStyle.class));
+        estiloAplicarAlterado.font = skin.getFont("botao-pequeno-font");
+        TextButton equipar = new TextButton("Apply", estiloBotao);
+        botaoAplicarSkins = equipar;
         equipar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 equiparSkins();
@@ -1131,12 +1138,26 @@ public final class BookMenuUI {
         atualizarVanity();
     }
 
+    /** true se o rascunho (o que esta no preview) difere do equipado. */
+    private boolean skinsAlteradas() {
+        if (skinsRascunho.size() != skinsEquipadas.size()) return true;
+        for (Map.Entry<String, String[]> e : skinsRascunho.entrySet()) {
+            String[] equipada = skinsEquipadas.get(e.getKey());
+            if (equipada == null || !equipada[0].equals(e.getValue()[0])
+                || !equipada[1].equalsIgnoreCase(e.getValue()[1])) return true;
+        }
+        return false;
+    }
+
     private static void copiarSkins(Map<String, String[]> de, Map<String, String[]> para) {
         para.clear();
         for (Map.Entry<String, String[]> e : de.entrySet()) para.put(e.getKey(), e.getValue().clone());
     }
 
     private void atualizarVanity() {
+        if (botaoAplicarSkins != null) {
+            botaoAplicarSkins.setStyle(skinsAlteradas() ? estiloAplicarAlterado : estiloAplicarNormal);
+        }
         montarAbasVanity();
         montarOpcoesVanity();
         montarCoresVanity();
@@ -1202,7 +1223,8 @@ public final class BookMenuUI {
                 nada.setColor(1f, 1f, 1f, 0.4f);
                 botao.add(nada).size(20);
             } else {
-                Image icone = iconeSkin(opcao[0], atual != null && atual[0].equals(opcao[0]) ? atual[1] : null);
+                // Todas as opcoes mostram a cor escolhida pra categoria.
+                Image icone = iconeSkin(opcao[0], atual != null ? atual[1] : null);
                 if (icone != null) botao.add(icone).grow().pad(5);
             }
             botao.addListener(new ChangeListener() {
