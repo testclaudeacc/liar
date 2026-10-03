@@ -4294,7 +4294,7 @@ def handle_get_friends_list(data):
 
         conn = db_pool.getconn()
         c = conn.cursor()
-        c.execute("""SELECT f.friend_name, f.icon_pk, f.icon_guild, f.icon_seller, ch.class_name
+        c.execute("""SELECT f.friend_name, f.icon_pk, f.icon_guild, f.icon_seller, ch.class_name, ch.skins
                      FROM friendships f LEFT JOIN characters ch ON ch.name = f.friend_name
                      WHERE f.owner_name = %s""", (owner_name,))
         rows = c.fetchall()
@@ -4306,6 +4306,9 @@ def handle_get_friends_list(data):
             'icon_guild': bool(row[2]),
             'icon_seller': bool(row[3]),
             'class_name': row[4] or 'Knight',
+            # Skin (aparencia) pra mostrar o amigo mesmo offline (janela do
+            # jogador / aba de PV). Mesma validacao do jogo.
+            'skins': validar_skins(json.loads(row[5]) if row[5] else {}, row[4] or 'Knight'),
             'online': row[0] in players_by_name,
         } for row in rows]
 

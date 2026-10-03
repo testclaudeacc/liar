@@ -1229,6 +1229,16 @@ public class WorldScreen extends ScreenAdapter {
         atualizarEstadoPainel();
     }
 
+    /** Boneco "de foto" de um amigo que nao esta no jogo/na area: usa a skin
+     * da lista de amigos (servidor.py::get_friends_list). null se nao tiver. */
+    private Jogador jogadorDeAmigoOffline(String nome) {
+        if (remotos.containsKey(nome) || remotosForaDeVisao.containsKey(nome)) return null;
+        BookMenuUI.AmigoInfo a = bookMenu.amigo(nome);
+        if (a == null || a.skins == null) return null;
+        definirSkins(nome, a.skins);
+        return new Jogador(nome, a.classe != null ? a.classe : "Knight", 0f, 0f);
+    }
+
     /** Classe de um player que pode nem estar na tela (amigo offline/longe). */
     private String classeDe(String nome) {
         Jogador j = remotos.get(nome);
@@ -1316,10 +1326,17 @@ public class WorldScreen extends ScreenAdapter {
         // Desenhado quando o player nao esta em lugar nenhum (offline/longe
         // demais pra ter skin): ex. o icone da classe na aba de PV.
         private final TextureRegion reserva;
+        // Player que nao esta online nem por perto (amigo offline): boneco
+        // parado de frente, com a skin que o servidor mandou na lista de amigos.
+        private final Jogador parado;
 
         AtorAlvo() { this(null, null); }
         AtorAlvo(String nomeFixo) { this(nomeFixo, null); }
-        AtorAlvo(String nomeFixo, TextureRegion reserva) { this.nomeFixo = nomeFixo; this.reserva = reserva; }
+        AtorAlvo(String nomeFixo, TextureRegion reserva) {
+            this.nomeFixo = nomeFixo;
+            this.reserva = reserva;
+            this.parado = nomeFixo != null ? jogadorDeAmigoOffline(nomeFixo) : null;
+        }
 
         @Override
         public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
@@ -1331,6 +1348,7 @@ public class WorldScreen extends ScreenAdapter {
             // Foto fixa (janela do jogador/aba de PV): vale tambem quem esta
             // fora da tela (a skin dele continua guardada).
             if (j == null && nomeFixo != null) j = remotosForaDeVisao.get(nomeFixo);
+            if (j == null) j = parado;
             if (mob != null && !mob.morto) {
                 quadros.add(quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso));
                 cores.add(Color.WHITE);

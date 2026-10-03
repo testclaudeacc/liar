@@ -1519,6 +1519,8 @@ public final class BookMenuUI {
         public final String nome;
         public String classe;
         public boolean online, pk, guild, seller;
+        /** Skin salva no servidor (aparece mesmo com ele offline). */
+        public JsonValue skins;
         AmigoInfo(String nome) { this.nome = nome; }
     }
 
@@ -1677,6 +1679,7 @@ public final class BookMenuUI {
                 a.pk = f.getBoolean("icon_pk", false);
                 a.guild = f.getBoolean("icon_guild", false);
                 a.seller = f.getBoolean("icon_seller", false);
+                a.skins = f.get("skins");
                 amigos.put(a.nome, a);
             }
         }
