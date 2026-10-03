@@ -1480,7 +1480,9 @@ def get_characters():
             char_list.append({
                 "name": row[0], "class_name": row[1], "level": row[2], "exp": row[3] if row[3] else 0,
                 "pos_x": row[4], "pos_y": row[5], "direction": row[6],
-                "skins": json.loads(row[7]) if row[7] else {},
+                # Mesma validacao do jogo (roupa padrao da classe etc), pro
+                # preview da tela de slots bater com o que aparece no mundo.
+                "skins": validar_skins(json.loads(row[7]) if row[7] else {}, row[1]),
                 "floor": row[8] if row[8] else 1,
                 "inventory": normalizar_inventario(json.loads(row[9]) if row[9] else []),
                 "equipped_items": normalizar_equipados(json.loads(row[10]) if row[10] else {}),

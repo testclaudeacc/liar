@@ -3,7 +3,12 @@ package com.teste.game.telas;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.scenes.scene2d.ui.Widget;
 import com.badlogic.gdx.utils.JsonValue;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Helpers de skin compartilhados entre o mundo (WorldScreen) e a aba Vanity
@@ -57,5 +62,52 @@ public final class SkinsUtil {
     public static String corHex(JsonValue skins, String categoria) {
         JsonValue item = skins == null ? null : skins.get(categoria);
         return item == null || !item.isObject() ? "ffffffff" : item.getString("cor", "ffffffff");
+    }
+
+    /**
+     * Boneco montado com as camadas de skin (pele, roupa, cabelo, costas) num
+     * quadro so' (ex: FRAME_BAIXO = parado de frente). Todas as camadas na
+     * mesma escala e ancoradas nos pes, igual o mundo desenha - por isso um
+     * Widget proprio em vez de varias Image num Stack (cada Image escalaria
+     * sozinha conforme a altura da propria tira).
+     */
+    public static class Preview extends Widget {
+        private final List<TextureRegion> quadros = new ArrayList<>();
+        private final List<Color> cores = new ArrayList<>();
+        private float alturaMaxima = 17f;
+
+        public Preview(TextureAtlas atlas, JsonValue skins, int frame) {
+            for (String cat : ORDEM_CAMADAS) {
+                String caminho = caminho(skins, cat);
+                if (caminho == null && "base".equals(cat)) caminho = BASE_PADRAO;
+                TextureRegion tira = regiao(atlas, caminho);
+                if (tira == null) continue;
+                quadros.add(quadro(tira, frame));
+                cores.add("base".equals(cat) ? new Color(Color.WHITE) : cor(corHex(skins, cat)));
+                alturaMaxima = Math.max(alturaMaxima, tira.getRegionHeight());
+            }
+        }
+
+        @Override public float getPrefWidth() { return FRAME_LARGURA; }
+        @Override public float getPrefHeight() { return alturaMaxima; }
+
+        @Override
+        public void draw(Batch batch, float parentAlpha) {
+            validate();
+            if (quadros.isEmpty()) return;
+            float escala = Math.min(getWidth() / FRAME_LARGURA, getHeight() / alturaMaxima);
+            float largura = FRAME_LARGURA * escala;
+            float x = getX() + (getWidth() - largura) / 2f;
+            float y = getY() + (getHeight() - alturaMaxima * escala) / 2f;
+            Color anterior = new Color(batch.getColor());
+            Color propria = getColor();
+            for (int i = 0; i < quadros.size(); i++) {
+                Color c = cores.get(i);
+                batch.setColor(c.r * propria.r, c.g * propria.g, c.b * propria.b, c.a * propria.a * parentAlpha);
+                TextureRegion q = quadros.get(i);
+                batch.draw(q, x, y, largura, q.getRegionHeight() * escala);
+            }
+            batch.setColor(anterior);
+        }
     }
 }

@@ -49,11 +49,6 @@ public class AuthScreen extends ScreenAdapter {
     // tocar em nenhuma constante de tamanho individual pelo resto do arquivo.
     private static final float MUNDO_VIRTUAL_LARGURA = 960f;
     private static final float MUNDO_VIRTUAL_ALTURA = 540f;
-    // Mesmo spritesheet/quadro parado "de frente" que o WorldScreen usa pro
-    // jogador de verdade (ver WorldScreen::FRAME_LARGURA/FRAME_INDICE_FRENTE)
-    // - preview do slot reaproveita o quadro 3, so' que parado (sem andar).
-    private static final int FRAME_LARGURA = 16;
-    private static final int FRAME_INDICE_FRENTE = 3;
     private static final Pattern EMAIL_REGEX = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
 
     private static final String[] BANNED_NAMES = {
@@ -145,6 +140,8 @@ public class AuthScreen extends ScreenAdapter {
 
     private int currentUserId = -1;
     private final CharacterData[] slots = new CharacterData[MAX_SLOTS];
+    // Skins de cada slot (JSON cru do /characters) - pro preview do boneco.
+    private final JsonValue[] skinsSlots = new JsonValue[MAX_SLOTS];
     private int currentSlotIndex = 0;
     private int deleteConfirmStage = 0;
     private String selectedClassKey = "";
@@ -192,7 +189,6 @@ public class AuthScreen extends ScreenAdapter {
             // comparando print antigo x novo, nao e o mesmo arquivo.
             texturas.put("classe-grande-" + key, atlas.findRegion("ui/" + key + "_Icon"));
         }
-        texturas.put("corpo-base", atlas.findRegion("sprites/base/BaseSoul"));
         texturas.put("logout", atlas.findRegion("ui/Logout"));
         texturas.put("discord", atlas.findRegion("ui/Discord"));
         texturas.put("seta-esq", atlas.findRegion("ui/LeftArrow"));
@@ -757,7 +753,10 @@ public class AuthScreen extends ScreenAdapter {
         ServerApi.getCharacters(currentUserId, new ServerApi.ApiCallback() {
             @Override public void onResponse(int statusCode, JsonValue body) {
                 if (statusCode == 200) {
-                    for (int i = 0; i < MAX_SLOTS; i++) slots[i] = null;
+                    for (int i = 0; i < MAX_SLOTS; i++) {
+                        slots[i] = null;
+                        skinsSlots[i] = null;
+                    }
                     JsonValue lista = body;
                     if (body != null && body.isObject() && body.has("characters")) lista = body.get("characters");
                     if (lista != null && lista.isArray()) {
@@ -765,6 +764,7 @@ public class AuthScreen extends ScreenAdapter {
                         for (JsonValue c : lista) {
                             if (i >= MAX_SLOTS) break;
                             slots[i] = CharacterData.deParsed(c);
+                            skinsSlots[i] = c.get("skins");
                             i++;
                         }
                     }
@@ -895,9 +895,9 @@ public class AuthScreen extends ScreenAdapter {
             ClasseInfo classe = CLASSES.getOrDefault(atual.className, CLASSES.get("Knight"));
             Label nome = new Label(atual.name, skin, "subtitulo");
             nome.setColor(classe.cor);
-            // Preview do personagem com a pele de esqueleto, sem roupa.
-            Image previewBase = new Image(new TextureRegionDrawable(quadroFrenteCorpo("corpo-base")));
-            previewBase.setScaling(Scaling.fit);
+            // Preview do personagem com as skins dele (pele, roupa, cabelo,
+            // costas), parado de frente - mesmas camadas do mundo.
+            SkinsUtil.Preview previewBase = new SkinsUtil.Preview(atlas, skinsSlots[currentSlotIndex], SkinsUtil.FRAME_BAIXO);
             // Metade do tamanho (a pedido do usuario) - a CELULA continua
             // dando grow() (reserva o mesmo espaco/layout de antes), so' o
             // ator e' desenhado a 50% escalado a partir do proprio centro,
@@ -1057,12 +1057,6 @@ public class AuthScreen extends ScreenAdapter {
         }
     }
 
-    /** Recorta o quadro "de frente parado" (indice 3) de um spritesheet de
-     * corpo/roupa - mesmo layout usado no mundo (WorldScreen). */
-    private TextureRegion quadroFrenteCorpo(String chaveTextura) {
-        TextureRegion tex = texturas.get(chaveTextura);
-        return new TextureRegion(tex, FRAME_INDICE_FRENTE * FRAME_LARGURA, 0, FRAME_LARGURA, tex.getRegionHeight());
-    }
 
     private void adicionarLinhaStat(Table painel, TextureRegion icone, Label label, float escalaTexto, float larguraMaximaLabel, float tamanhoIcone) {
         Image img = new Image(new TextureRegionDrawable(icone));
