@@ -998,7 +998,7 @@ public final class BookMenuUI {
     // Abas na ordem da print (roupa, cabeca, acessorio, pele). Catalogo vem do
     // servidor (skin_db no sync_local_player, ja filtrado pela classe); o que
     // vale de verdade e' confirmado pelo servidor em skins_synced.
-    private static final String[] CATEGORIAS_VANITY = {"base", "body", "helm", "acc"};
+    private static final String[] CATEGORIAS_VANITY = {"base", "helm", "body", "acc"};
     private static final float COLUNA_VANITY = 200f;
     private static final float ESCALA_PREVIEW = 3.5f;
     private final Map<String, List<String[]>> skinDb = new LinkedHashMap<>(); // cat -> {caminho, nome}
@@ -1224,8 +1224,8 @@ public final class BookMenuUI {
     private void montarOpcoesVanity() {
         vanityOpcoes.clearChildren();
         List<String[]> opcoes = new ArrayList<>();
-        // Roupa/cabeca/acessorio podem ficar vazios; a pele (base) nao.
-        if (!"base".equals(categoriaVanity)) opcoes.add(null);
+        // So' cabelo/chapeu e costas podem ficar vazios; pele e roupa sao obrigatorias.
+        if ("helm".equals(categoriaVanity) || "acc".equals(categoriaVanity)) opcoes.add(null);
         List<String[]> doDb = skinDb.get(categoriaVanity);
         if (doDb != null) opcoes.addAll(doDb);
         String[] atual = skinsRascunho.get(categoriaVanity);

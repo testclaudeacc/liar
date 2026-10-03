@@ -1558,8 +1558,9 @@ def handle_save_position(data):
 # uma linha aqui (o client monta a tela de Vanity a partir disso).
 # ---------------------------------------------------------------------------
 CATEGORIAS_SKIN = ('base', 'body', 'helm', 'acc')
-# Categorias que podem ficar vazias (sem nada desenhado por cima).
-CATEGORIAS_SKIN_OPCIONAIS = ('body', 'helm', 'acc')
+# Categorias que podem ficar vazias (sem nada desenhado por cima). Pele e
+# roupa sao obrigatorias - sem roupa o client cai na primeira opcao da classe.
+CATEGORIAS_SKIN_OPCIONAIS = ('helm', 'acc')
 
 def _skin(caminho, nome, classes=None):
     return {"caminho": "res://" + caminho + ".png", "nome": nome, "classes": classes}
@@ -1608,7 +1609,7 @@ def _cor_skin_valida(cor):
 def validar_skins(skins, class_name):
     """So' deixa passar skins do catalogo, de categorias conhecidas, que a
     classe do player pode usar; cor vira hex rrggbbaa. Nome vem do catalogo."""
-    if not isinstance(skins, dict): return {}
+    if not isinstance(skins, dict): skins = {}
     limpo = {}
     for cat in CATEGORIAS_SKIN:
         item = skins.get(cat)
@@ -1619,6 +1620,12 @@ def validar_skins(skins, class_name):
         # Pele nao tem cor: o tom vem do proprio modelo (Light/Dark/Soul).
         cor = 'ffffffff' if cat == 'base' else _cor_skin_valida(item.get('cor'))
         limpo[cat] = {'nome': s["nome"], 'caminho': s["caminho"], 'cor': cor}
+    # Roupa nunca fica vazia: sem uma valida, veste a primeira da classe.
+    if 'body' not in limpo:
+        padrao = next((s for s in SKIN_DB.get('body', [])
+                       if s["classes"] is None or class_name in s["classes"]), None)
+        if padrao is not None:
+            limpo['body'] = {'nome': padrao["nome"], 'caminho': padrao["caminho"], 'cor': 'ffffffff'}
     return limpo
 
 def montar_skin_db_cliente(class_name):
