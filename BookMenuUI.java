@@ -99,7 +99,7 @@ public final class BookMenuUI {
     private static final float LARGURA_NOME_SKILL = 90f;
     private static final float TAMANHO_ICONE_SKILL = 24f;
     private static final float TAMANHO_ICONE_STATUS = 20f;
-    private static final float LARGURA_ROTULO_STATUS = 104f;
+    private static final float LARGURA_ROTULO_STATUS = 124f;
     private static final float ALTURA_TOPO_SKILLS = 160f;
 
     public BookMenuUI(Stage stage, Skin skin, TextureAtlas atlas, GameSocket socket, String classeJogador) {
