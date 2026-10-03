@@ -21,6 +21,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.NinePatchDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
+import com.teste.game.telas.UiSkin;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,10 +52,13 @@ public class ChatUI {
         {"Help", "ui/items/Flag"},
     };
     private static final int ICONES_POR_LINHA = 3;
+    private static final String ICONE_LOCAL = "ui/ChatButton";
 
     private final Stage stage;
     private final Skin skin;
     private final TextureAtlas atlas; // pode ser null (TesteGame) - ai os botoes viram texto
+    // Slot escuro dos botoes de icone (a "cinza-popup" ficava clara demais).
+    private final TextButton.TextButtonStyle estiloSlot;
     private final Table janela;
     private final TextField campoTexto;
     private final Label logLabel;
@@ -94,6 +98,11 @@ public class ChatUI {
         this.stage = stage;
         this.skin = skin;
         this.atlas = atlas;
+        estiloSlot = new TextButton.TextButtonStyle(skin.get("cinza-popup", TextButton.TextButtonStyle.class));
+        Color bordaSlot = new Color(0.4f, 0.4f, 0.4f, 1f);
+        estiloSlot.up = UiSkin.retangulo(new Color(0.16f, 0.16f, 0.16f, 1f), bordaSlot, 1);
+        estiloSlot.over = UiSkin.retangulo(new Color(0.24f, 0.24f, 0.24f, 1f), bordaSlot, 1);
+        estiloSlot.down = UiSkin.retangulo(new Color(0.1f, 0.1f, 0.1f, 1f), bordaSlot, 1);
         this.nomeJogadorLocal = nomeJogadorLocal;
         this.corJogadorLocal = corDaClasse(classeJogadorLocal);
         mensagensPorAba.put(ABA_LOCAL, new Array<>());
@@ -122,6 +131,8 @@ public class ChatUI {
         botaoMais.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 popupAdicionar.setVisible(!popupAdicionar.isVisible());
+                // Escolher o chat novo nao deve comecar a digitar.
+                if (estaDigitando()) stage.setKeyboardFocus(null);
             }
         });
         botaoMenos.addListener(new ChangeListener() {
@@ -209,6 +220,9 @@ public class ChatUI {
         });
         conteudo.addListener(new ClickListener() {
             @Override public void clicked(InputEvent event, float x, float y) {
+                // Clique num botao (+, -, abas, Close) nao foca o campo - senao
+                // abrir o "+" pra adicionar um chat ja comecava a digitar.
+                if (vemDeBotao(event.getTarget())) return;
                 // janela.isVisible(): o clique no botao "Close" tambem borbulha
                 // pra ca (conteudo e' ancestral dele) - o listener do proprio
                 // botao (que fecha a janela E solta o foco, ver setVisivel)
@@ -237,7 +251,7 @@ public class ChatUI {
         // enabled (Table vem childrenOnly): clique no fundo do painel entre os
         // icones nao pode "vazar" pra ancora e fechar a barra.
         popup.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
-        TextButton.TextButtonStyle estiloBotao = skin.get("cinza-popup", TextButton.TextButtonStyle.class);
+        TextButton.TextButtonStyle estiloBotao = estiloSlot;
         int n = 0;
         for (String[] aba : ABAS_ADICIONAVEIS) {
             final String nome = aba[0];
@@ -269,9 +283,23 @@ public class ChatUI {
         return ancora;
     }
 
+    private static boolean vemDeBotao(com.badlogic.gdx.scenes.scene2d.Actor alvo) {
+        for (com.badlogic.gdx.scenes.scene2d.Actor a = alvo; a != null; a = a.getParent()) {
+            if (a instanceof Button) return true;
+        }
+        return false;
+    }
+
+    /** Icone de cada aba (Local = balao de chat, extras = bandeira/Help). */
+    private static String iconeDaAba(String nome) {
+        if (ABA_LOCAL.equals(nome)) return ICONE_LOCAL;
+        for (String[] aba : ABAS_ADICIONAVEIS) if (aba[0].equals(nome)) return aba[1];
+        return null;
+    }
+
     /** Botao com o icone do atlas; sem atlas/icone (ex: TesteGame) vira texto. */
     private Button criarBotaoIcone(String caminhoIcone, String textoReserva, TextButton.TextButtonStyle estilo) {
-        TextureRegion icone = atlas != null ? atlas.findRegion(caminhoIcone) : null;
+        TextureRegion icone = atlas != null && caminhoIcone != null ? atlas.findRegion(caminhoIcone) : null;
         if (icone != null) {
             Button botao = new Button(estilo);
             // 32px: icones de 16px em 2x e a Flag (32px) em 1x - escala
@@ -316,17 +344,14 @@ public class ChatUI {
         linhaAbas.clearChildren();
         for (String nome : mensagensPorAba.keySet()) {
             boolean ativa = nome.equals(abaAtual);
-            TextButton botao = new TextButton(nome, skin, ativa ? "verde-popup" : "cinza-popup");
+            // Icone em vez do nome; aba ativa no slot verde, as outras no escuro.
+            TextButton.TextButtonStyle estilo = ativa ? skin.get("verde-popup", TextButton.TextButtonStyle.class) : estiloSlot;
+            Button botao = criarBotaoIcone(iconeDaAba(nome), nome, estilo);
             botao.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAba(nome); }
             });
-            // minWidth (nao width fixo) - abas adicionadas com nome longo
-            // (ex: "Portuguese") vazavam do botao de 110px fixo (bug
-            // reportado pelo usuario); pad lateral de verdade na propria
-            // celula do label faz o botao crescer o suficiente pra caber,
-            // sem encolher as abas curtas (Local/Help) que ja cabiam.
-            botao.getLabelCell().padLeft(10).padRight(10);
-            linhaAbas.add(botao).minWidth(110).height(48).padRight(6);
+            if (botao instanceof TextButton) ((TextButton) botao).getLabelCell().padLeft(10).padRight(10);
+            linhaAbas.add(botao).minWidth(56).height(56).padRight(6);
         }
     }
 
