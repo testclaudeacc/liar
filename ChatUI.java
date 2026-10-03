@@ -100,6 +100,8 @@ public class ChatUI {
         boolean enviouLocal(String texto);
         /** Idem pra um chat de idioma: o servidor repassa pra todo mundo do canal. */
         boolean enviouCanal(String canal, String texto);
+        /** Mensagem privada pra esse player (nome real). */
+        boolean enviouPrivado(String destino, String texto);
     }
     private OuvinteCanais ouvinteCanais;
     private String abaAtual = ABA_LOCAL;
@@ -321,16 +323,56 @@ public class ChatUI {
         return null;
     }
 
-    /** Icone de cada aba (Local = NotificationIcon, extras = bandeira/Help). */
-    private static String iconeDaAba(String nome) {
+    /** Icone de cada aba (Local = NotificationIcon, extras = bandeira/Help,
+     * conversa privada = icone da classe do outro player). */
+    private String iconeDaAba(String nome) {
         if (ABA_LOCAL.equals(nome)) return ICONE_LOCAL;
+        if (ehPrivada(nome)) return iconePrivada.get(nome);
         TipoAba aba = tipoDaAba(nome);
         return aba != null ? aba.icone : null;
     }
 
-    private static Color corDaAba(String nome) {
+    private Color corDaAba(String nome) {
+        if (ehPrivada(nome)) return COR_PRIVADA;
         TipoAba aba = tipoDaAba(nome);
         return aba != null ? aba.cor : COR_LOCAL;
+    }
+
+    // ---- Conversa privada (botao de chat da janela do jogador) ----
+    // Aba "@<nome real>"; so' voce e ele (servidor.py::handle_pm).
+    private static final String PREFIXO_PRIVADA = "@";
+    private static final Color COR_PRIVADA = new Color(0.12f, 0.24f, 0.30f, 1f);
+    private final Map<String, String> iconePrivada = new java.util.HashMap<>();
+    private final Map<String, String> nomeExibidoPrivada = new java.util.HashMap<>();
+
+    private static boolean ehPrivada(String aba) { return aba.startsWith(PREFIXO_PRIVADA); }
+
+    private void garantirAbaPrivada(String nomeReal, String nomeExibido, String icone) {
+        String aba = PREFIXO_PRIVADA + nomeReal;
+        if (icone != null) iconePrivada.put(aba, icone);
+        nomeExibidoPrivada.put(aba, nomeExibido);
+        if (mensagensPorAba.containsKey(aba)) return;
+        mensagensPorAba.put(aba, new Array<>());
+        List<String> membros = new java.util.ArrayList<>();
+        membros.add(nomeJogadorLocal);
+        membros.add(nomeExibido);
+        membrosPorAba.put(aba, membros);
+        reconstruirAbas();
+    }
+
+    /** Abre (ou volta pra) a conversa privada com esse player e mostra o chat. */
+    public void abrirConversaPrivada(String nomeReal, String nomeExibido, String iconeClasse) {
+        garantirAbaPrivada(nomeReal, nomeExibido, iconeClasse);
+        trocarAba(PREFIXO_PRIVADA + nomeReal);
+        setVisivel(true);
+    }
+
+    /** Mensagem privada recebida/enviada (o servidor devolve a propria tambem).
+     * outro* = o outro lado da conversa (a aba); remetente* = quem escreveu. */
+    public void adicionarMensagemPrivada(String outroReal, String outroExibido, String outroIcone,
+                                         String remetenteExibido, Color corRemetente, String texto) {
+        garantirAbaPrivada(outroReal, outroExibido, outroIcone);
+        adicionarNaAba(PREFIXO_PRIVADA + outroReal, linhaDeJogador(remetenteExibido, corRemetente, texto));
     }
 
     /** Estilo vazio (sem up/over/down) - so' o conteudo do botao aparece. */
@@ -404,7 +446,12 @@ public class ChatUI {
         if (abaAtual.equals(ABA_LOCAL)) return;
         mensagensPorAba.remove(abaAtual);
         membrosPorAba.remove(abaAtual);
-        if (ouvinteCanais != null) ouvinteCanais.saiu(abaAtual);
+        if (ehPrivada(abaAtual)) {
+            iconePrivada.remove(abaAtual);
+            nomeExibidoPrivada.remove(abaAtual);
+        } else if (ouvinteCanais != null) {
+            ouvinteCanais.saiu(abaAtual);
+        }
         abaAtual = ABA_LOCAL;
         reconstruirAbas();
         reconstruirLog();
@@ -448,7 +495,9 @@ public class ChatUI {
         if (ouvinteCanais != null) {
             boolean foiProServidor = abaAtual.equals(ABA_LOCAL)
                 ? ouvinteCanais.enviouLocal(texto)
-                : ouvinteCanais.enviouCanal(abaAtual, texto);
+                : ehPrivada(abaAtual)
+                    ? ouvinteCanais.enviouPrivado(abaAtual.substring(PREFIXO_PRIVADA.length()), texto)
+                    : ouvinteCanais.enviouCanal(abaAtual, texto);
             if (foiProServidor) return;
         }
         adicionarNaAba(abaAtual, linhaDeJogador(nomeJogadorLocal, corJogadorLocal, texto));
@@ -552,7 +601,7 @@ public class ChatUI {
     /** Painel da direita: nome do chat selecionado + quantos/quem esta nele. */
     private void reconstruirPainelJogadores() {
         List<String> nomes = membrosPorAba.getOrDefault(abaAtual, java.util.Collections.emptyList());
-        cabecalhoJogadores.setText(abaAtual);
+        cabecalhoJogadores.setText(ehPrivada(abaAtual) ? nomeExibidoPrivada.getOrDefault(abaAtual, "Private") : abaAtual);
         contadorJogadores.setText(nomes.size() + " Player" + (nomes.size() == 1 ? "" : "s"));
         listaJogadoresBox.clearChildren();
         for (String nome : nomes) {

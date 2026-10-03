@@ -815,6 +815,8 @@ public class WorldScreen extends ScreenAdapter {
                 }
                 if (keycode == Input.Keys.ESCAPE) {
                     // Janela de loot e alvo saem antes de qualquer outra coisa.
+                    if (painelJogador.isVisivel()) { painelJogador.fechar(); return true; }
+                    if (conviteParty != null) { responderConviteParty(false); return true; }
                     if (alvoMob != null) { alvoMob = null; return true; }
                     if (amigoMarcado != null) { amigoMarcado = null; return true; }
                     // Fecha a interface ativa antes de abrir Settings.
@@ -905,6 +907,14 @@ public class WorldScreen extends ScreenAdapter {
                 socket.emitRaw("c", lista.toJson(JsonWriter.OutputType.json));
                 return true;
             }
+            @Override public boolean enviouPrivado(String destino, String texto) {
+                if (!socket.isConnected()) return false;
+                socket.emitRaw("pm", GameSocket.obj(jw -> {
+                    jw.set("to", destino);
+                    jw.set("msg", texto);
+                }));
+                return true;
+            }
             @Override public boolean enviouCanal(String canal, String texto) {
                 if (!socket.isConnected()) return false;
                 socket.emitRaw("cc", GameSocket.obj(jw -> {
@@ -921,6 +931,40 @@ public class WorldScreen extends ScreenAdapter {
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
+        painelJogador = new PainelJogadorUI(uiStage, skin, atlas, new PainelJogadorUI.Ouvinte() {
+            @Override public void alternarAmigo(String nome) {
+                socket.emitRaw("toggle_friend", GameSocket.obj(w -> w.set("friend_name", nome)));
+            }
+            @Override public void alternarIgnorar(String nome) {
+                boolean agora = !ignorados.contains(nome);
+                if (agora) ignorados.add(nome); else ignorados.remove(nome);
+                salvarIgnorados();
+                chat.adicionarMensagemSistema(agora ? "You are now ignoring " + nomeVisivel(nome) + "."
+                    : "You stopped ignoring " + nomeVisivel(nome) + ".");
+                atualizarEstadoPainel();
+            }
+            @Override public void convidarParty(String nome) {
+                socket.emitRaw("invite_party", GameSocket.obj(w -> w.set("target_name", nome)));
+            }
+            @Override public void convidarTrade(String nome) {
+                // O servidor ja' tem a troca, mas a janela de troca (ofertas,
+                // confirmar) ainda nao existe nesse client.
+                chat.adicionarMensagemSistema("Trading is not available yet.");
+            }
+            @Override public void abrirChat(String nome) {
+                Jogador j = remotos.get(nome);
+                chat.abrirConversaPrivada(nome, nomeVisivel(nome), BookMenuUI.iconeClasse(j != null ? j.classe : null));
+                painelJogador.fechar();
+            }
+            @Override public void alternarIconeAmigo(String nome, String icone) {
+                socket.emitRaw("set_friend_icon", GameSocket.obj(w -> {
+                    w.set("friend_name", nome);
+                    w.set("icon", icone);
+                }));
+            }
+        });
+        bookMenu.definirAoMudarAmigos(this::atualizarEstadoPainel);
+        carregarIgnorados();
         criarPainelMorte();
         dialogoNPC = new DialogoNPCUI(uiStage, skin, atlas.findRegion("ui/currency/Silver"), escala);
         areaNomeUI = new AreaNomeUI(uiStage, skin, atlas.findRegion("sheet/r83_c11"), escala);
@@ -950,7 +994,7 @@ public class WorldScreen extends ScreenAdapter {
         Table barra = new Table();
         barra.setFillParent(true);
         barra.top().right().pad(0, 0, 0, 20);
-        botaoTopoAlvo = criarBotaoTopo(null, () -> {});
+        botaoTopoAlvo = criarBotaoTopo(null, this::abrirPainelDoAlvo);
         botaoTopoAlvo.add(new AtorAlvo()).size(ICONE_BOTAO_TOPO);
         barra.add(botaoTopoAlvo).size(TAMANHO_BOTAO_TOPO).padRight(12);
         botaoTopoChat = criarBotaoTopo(iconeChat, this::alternarChat);
@@ -1149,18 +1193,106 @@ public class WorldScreen extends ScreenAdapter {
         return -1f;
     }
 
+    // ---- Janela do jogador / ignorados / convite de party ----
+    private PainelJogadorUI painelJogador;
+    private final java.util.Set<String> ignorados = new java.util.HashSet<>();
+    private Table conviteParty;
+    private String quemConvidouParty;
+
+    /** Botao de alvo do topo: com um player marcado, abre a janela dele. */
+    private void abrirPainelDoAlvo() {
+        if (amigoMarcado == null || !remotos.containsKey(amigoMarcado)) return;
+        String nome = amigoMarcado;
+        painelJogador.abrir(nome, nomeVisivel(nome), new AtorAlvo(nome));
+        atualizarEstadoPainel();
+    }
+
+    private void atualizarEstadoPainel() {
+        String nome = painelJogador != null ? painelJogador.nomeAberto() : null;
+        if (nome == null) return;
+        BookMenuUI.AmigoInfo a = bookMenu.amigo(nome);
+        painelJogador.definirEstado(a != null, ignorados.contains(nome),
+            a != null && a.pk, a != null && a.guild, a != null && a.seller);
+    }
+
+    /** Lista de ignorados fica no aparelho (por personagem): esconde chat
+     * Local, de idioma e privado desse player, e recusa convite de party. */
+    private void carregarIgnorados() {
+        ignorados.clear();
+        try {
+            String salvo = Gdx.app.getPreferences("inverted_realms_ignorados").getString(local.nome, "");
+            for (String n : salvo.split(",")) if (!n.trim().isEmpty()) ignorados.add(n.trim());
+        } catch (Exception ignorado) { }
+    }
+
+    private void salvarIgnorados() {
+        try {
+            com.badlogic.gdx.Preferences prefs = Gdx.app.getPreferences("inverted_realms_ignorados");
+            prefs.putString(local.nome, String.join(",", ignorados));
+            prefs.flush();
+        } catch (Exception ignorado) { }
+    }
+
+    /** "X invited you to a party" com Accept/Decline (no meio da tela). */
+    private void mostrarConviteParty(String quem) {
+        if (conviteParty != null) conviteParty.remove();
+        quemConvidouParty = quem;
+        Table caixa = new Table();
+        caixa.setBackground(UiSkin.retangulo(new Color(0.1f, 0.1f, 0.1f, 0.97f), new Color(0.36f, 0.36f, 0.36f, 1f), 1));
+        caixa.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        caixa.pad(14);
+        Label texto = new Label(nomeVisivel(quem) + " invited you to a party.", skin, "hud");
+        texto.setFontScale(0.7f);
+        TextButton aceitar = new TextButton("Accept", skin, "verde-popup");
+        TextButton recusar = new TextButton("Decline", skin, "vermelho-popup");
+        aceitar.getLabel().setStyle(new Label.LabelStyle(skin.getFont("botao-pequeno-font"), Color.WHITE));
+        recusar.getLabel().setStyle(new Label.LabelStyle(skin.getFont("botao-pequeno-font"), Color.WHITE));
+        aceitar.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { responderConviteParty(true); }
+        });
+        recusar.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { responderConviteParty(false); }
+        });
+        caixa.add(texto).colspan(2).padBottom(12).row();
+        caixa.add(recusar).width(130).height(48).padRight(10);
+        caixa.add(aceitar).width(130).height(48);
+        conviteParty = new Table();
+        conviteParty.setFillParent(true);
+        conviteParty.center();
+        conviteParty.add(caixa);
+        uiStage.addActor(conviteParty);
+    }
+
+    private void responderConviteParty(boolean aceitar) {
+        if (conviteParty != null) conviteParty.remove();
+        conviteParty = null;
+        String quem = quemConvidouParty;
+        quemConvidouParty = null;
+        if (quem == null || !socket.isConnected()) return;
+        socket.emitRaw(aceitar ? "accept_party_invite" : "decline_party_invite",
+            GameSocket.obj(w -> w.set("inviter_name", quem)));
+        if (aceitar) chat.adicionarMensagemSistema("You joined " + nomeVisivel(quem) + "'s party.");
+    }
+
     /** Sprite do alvo atual dentro do botao: o quadro de animacao de AGORA
      * (anda junto com ele), player com as camadas de skin e cores. */
     private class AtorAlvo extends com.badlogic.gdx.scenes.scene2d.Actor {
         private final List<TextureRegion> quadros = new ArrayList<>();
         private final List<Color> cores = new ArrayList<>();
+        // null = segue o alvo atual (botao do topo); com nome = sempre esse
+        // player (foto da janela do jogador).
+        private final String nomeFixo;
+
+        AtorAlvo() { this(null); }
+        AtorAlvo(String nomeFixo) { this.nomeFixo = nomeFixo; }
 
         @Override
         public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
             quadros.clear();
             cores.clear();
-            MobVisual mob = alvoMob != null ? mobs.get(alvoMob) : null;
-            Jogador j = amigoMarcado != null ? remotos.get(amigoMarcado) : null;
+            MobVisual mob = nomeFixo == null && alvoMob != null ? mobs.get(alvoMob) : null;
+            String nomeJogador = nomeFixo != null ? nomeFixo : amigoMarcado;
+            Jogador j = nomeJogador != null ? remotos.get(nomeJogador) : null;
             if (mob != null && !mob.morto) {
                 quadros.add(quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso));
                 cores.add(Color.WHITE);
@@ -1383,6 +1515,7 @@ public class WorldScreen extends ScreenAdapter {
             // ao esbarrar num NPC) - sem esse if, inventario/moedas/skills
             // eram zerados no client.
             if (data.has("inventory")) {
+                if (socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
                 definirSkins(local.nome, data.get("skins"));
                 bookMenu.carregarSkins(data.get("skin_db"), data.get("skins"));
                 // HP/MP: -1 no banco = cheio.
@@ -1424,7 +1557,71 @@ public class WorldScreen extends ScreenAdapter {
             }
         });
 
-        socket.on("player_joined", (nomeEvt, data) -> adicionarRemotoSeNovo(data));
+        socket.on("player_joined", (nomeEvt, data) -> {
+            adicionarRemotoSeNovo(data);
+            if (data != null) bookMenu.definirOnline(data.getString("name", ""), true);
+        });
+
+        // ---- Amigos (servidor.py::toggle_friend/get_friends_list/...) ----
+        socket.on("friends_list", (nomeEvt, data) -> bookMenu.atualizarAmigos(data));
+        socket.on("friend_status", (nomeEvt, data) -> {
+            if (data == null) return;
+            String nome = data.getString("friend_name", "");
+            boolean amigo = data.getBoolean("is_friend", false);
+            bookMenu.definirAmigo(nome, amigo);
+            chat.adicionarMensagemSistema(amigo ? nome + " was added to your friends." : nome + " was removed from your friends.");
+        });
+        socket.on("friend_icon_updated", (nomeEvt, data) -> {
+            if (data == null) return;
+            bookMenu.definirIconeAmigo(data.getString("friend_name", ""), data.getString("icon", ""), data.getBoolean("value", false));
+        });
+        socket.on("friend_add_result", (nomeEvt, data) -> {
+            if (data == null) return;
+            bookMenu.resultadoAdicionarAmigo(data.getBoolean("success", false), data.getString("friend_name", ""),
+                data.getString("reason", ""));
+        });
+
+        // ---- Mensagem privada: {from, to, msg, class, to_class} ----
+        socket.on("pm", (nomeEvt, data) -> {
+            if (data == null || chat == null) return;
+            String de = data.getString("from", ""), para = data.getString("to", "");
+            boolean minha = de.equals(local.nome);
+            if (!minha && ignorados.contains(de)) return;
+            String outro = minha ? para : de;
+            String iconeOutro = BookMenuUI.iconeClasse(minha ? data.getString("to_class", "Knight") : data.getString("class", "Knight"));
+            chat.adicionarMensagemPrivada(outro, nomeVisivel(outro), iconeOutro, nomeVisivel(de),
+                ChatUI.corDaClasse(data.getString("class", "Knight")), data.getString("msg", ""));
+            if (!minha) avisarMensagemNova(de);
+        });
+
+        // ---- Party ----
+        socket.on("party_invite_received", (nomeEvt, data) -> {
+            if (data == null) return;
+            String quem = data.getString("inviter_name", "");
+            if (ignorados.contains(quem)) {
+                socket.emitRaw("decline_party_invite", GameSocket.obj(w -> w.set("inviter_name", quem)));
+                return;
+            }
+            mostrarConviteParty(quem);
+        });
+        socket.on("party_invite_result", (nomeEvt, data) -> {
+            if (data == null) return;
+            String alvo = nomeVisivel(data.getString("target_name", ""));
+            if (data.getBoolean("success", false)) {
+                chat.adicionarMensagemSistema("Party invite sent to " + alvo + ".");
+                return;
+            }
+            String motivo = data.getString("reason", "");
+            String texto = "party_full".equals(motivo) ? "Your party is full."
+                : "offline".equals(motivo) || "not_found".equals(motivo) ? alvo + " is offline."
+                : "already_in_your_party".equals(motivo) ? alvo + " is already in your party."
+                : "already_in_party".equals(motivo) ? alvo + " is already in another party."
+                : "Could not invite " + alvo + ".";
+            chat.adicionarMensagemSistema(texto);
+        });
+        socket.on("party_invite_declined", (nomeEvt, data) -> {
+            if (data != null) chat.adicionarMensagemSistema(nomeVisivel(data.getString("target_name", "")) + " declined the party invite.");
+        });
 
         // Chat Local: [nome, mensagem (ja censurada), classe] de quem esta na
         // area (inclusive o proprio jogador, que recebe a dele de volta).
@@ -1434,6 +1631,7 @@ public class WorldScreen extends ScreenAdapter {
             String texto = data.get(1).asString();
             Color cor = ChatUI.corDaClasse(data.size > 2 ? data.get(2).asString() : "Knight");
             if (nome == null || texto == null) return;
+            if (ignorados.contains(nome)) return; // ignorado: nem chat nem balao
             chat.adicionarMensagemLocal(nomeVisivel(nome), cor, texto);
             avisarMensagemNova(nome);
             falas.put(nome, new Fala(nome, texto, cor));
@@ -1441,6 +1639,7 @@ public class WorldScreen extends ScreenAdapter {
         // Chat de idioma: {channel, name, msg (ja censurada), class}.
         socket.on("cc", (nomeEvt, data) -> {
             if (data == null || chat == null) return;
+            if (ignorados.contains(data.getString("name", ""))) return;
             chat.adicionarMensagemCanal(data.getString("channel", ""), nomeVisivel(data.getString("name", "")),
                 ChatUI.corDaClasse(data.getString("class", "Knight")), data.getString("msg", ""));
             avisarMensagemNova(data.getString("name", ""));
@@ -1650,6 +1849,8 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             remotos.remove(data.getString("name", ""));
             remotosForaDeVisao.remove(data.getString("name", ""));
+            bookMenu.definirOnline(data.getString("name", ""), false);
+            if (data.getString("name", "").equals(painelJogador.nomeAberto())) painelJogador.fechar();
             skinsJogadores.remove(data.getString("name", ""));
             vidaRemotos.remove(data.getString("name", ""));
             remotosMortos.remove(data.getString("name", ""));

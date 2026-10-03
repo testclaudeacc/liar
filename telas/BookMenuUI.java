@@ -52,6 +52,7 @@ public final class BookMenuUI {
     private final Table equipPage = new Table();
     private final Table skillsPage = new Table();
     private final Table vanityPage = new Table();
+    private final Table friendsPage = new Table();
     private final Table inventoryGrid = new Table();
     private final Table bagDetalhes = new Table();
     private final Label capacityLabel;
@@ -182,6 +183,7 @@ public final class BookMenuUI {
         atualizarEquipados(null);
         construirPaginaSkills(skin);
         construirPaginaVanity(skin);
+        construirPaginaFriends(skin);
         mainWindow.add(bagPage).grow();
 
         organizer.add(leftTab).width(COLUNA_LARGURA).height(JANELA_ALTURA);
@@ -1508,6 +1510,219 @@ public final class BookMenuUI {
         trashButton.setDisabled(false);
     }
 
+    // ===================== FRIENDS =====================
+    // Lista de amigos (servidor.py::get_friends_list): online primeiro, depois
+    // ordem alfabetica. Cada linha: bolinha On/Off, nome e, na direita, os
+    // motivos marcados (Seller/Guild/Pk) e o icone da classe.
+
+    public static final class AmigoInfo {
+        public final String nome;
+        public String classe;
+        public boolean online, pk, guild, seller;
+        AmigoInfo(String nome) { this.nome = nome; }
+    }
+
+    private final Map<String, AmigoInfo> amigos = new LinkedHashMap<>();
+    private final Table listaAmigos = new Table();
+    private final Table rodapeAmigos = new Table();
+    private final Table rodapeAdicionar = new Table();
+    private com.badlogic.gdx.scenes.scene2d.ui.TextField campoNovoAmigo;
+    private Label statusAmigos;
+    private String amigoSelecionado = null;
+    private Runnable aoMudarAmigos; // avisa quem mostra a janela do jogador
+
+    private void construirPaginaFriends(Skin skin) {
+        friendsPage.top();
+        listaAmigos.top();
+        com.badlogic.gdx.scenes.scene2d.ui.ScrollPane scroll = new com.badlogic.gdx.scenes.scene2d.ui.ScrollPane(listaAmigos, skin);
+        scroll.setFadeScrollBars(false);
+        scroll.setScrollingDisabled(true, false);
+        Table caixa = new Table();
+        caixa.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.2f, 0.2f, 0.2f, 1f), 1));
+        caixa.top();
+        caixa.add(scroll).grow().pad(4);
+
+        TextButton.TextButtonStyle estiloRemover = new TextButton.TextButtonStyle(skin.get("vermelho", TextButton.TextButtonStyle.class));
+        estiloRemover.font = skin.getFont("botao-pequeno-font");
+        TextButton.TextButtonStyle estiloAdicionar = new TextButton.TextButtonStyle(skin.get("verde", TextButton.TextButtonStyle.class));
+        estiloAdicionar.font = skin.getFont("botao-pequeno-font");
+        TextButton remover = new TextButton("Remove", estiloRemover);
+        TextButton adicionar = new TextButton("Add Friend", estiloAdicionar);
+        remover.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                if (amigoSelecionado == null) { statusAmigos.setText("Select a friend first."); return; }
+                String alvo = amigoSelecionado;
+                if (socket.isConnected()) socket.emitRaw("toggle_friend", GameSocket.obj(w -> w.set("friend_name", alvo)));
+            }
+        });
+        adicionar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                mostrarCampoAdicionar(true);
+            }
+        });
+        statusAmigos = new Label("", skin, "hud");
+        statusAmigos.setFontScale(0.6f);
+        rodapeAmigos.add(statusAmigos).expandX().left();
+        rodapeAmigos.add(remover).width(110).height(44).padRight(6);
+        rodapeAmigos.add(adicionar).width(130).height(44);
+
+        // "Add Friend": campo com o nome + Add/Cancel no lugar do rodape.
+        campoNovoAmigo = new com.badlogic.gdx.scenes.scene2d.ui.TextField("", skin);
+        campoNovoAmigo.setMessageText("Friend name");
+        campoNovoAmigo.setMaxLength(12);
+        TextButton confirmar = new TextButton("Add", estiloAdicionar);
+        TextButton cancelar = new TextButton("Cancel", estiloRemover);
+        confirmar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                String nome = campoNovoAmigo.getText().trim();
+                if (nome.isEmpty() || !socket.isConnected()) return;
+                socket.emitRaw("add_friend_by_name", GameSocket.obj(w -> w.set("friend_name", nome)));
+                mostrarCampoAdicionar(false);
+            }
+        });
+        cancelar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                mostrarCampoAdicionar(false);
+            }
+        });
+        rodapeAdicionar.add(campoNovoAmigo).growX().height(44).padRight(6);
+        rodapeAdicionar.add(cancelar).width(100).height(44).padRight(6);
+        rodapeAdicionar.add(confirmar).width(90).height(44);
+
+        Stack rodape = new Stack(rodapeAmigos, rodapeAdicionar);
+        rodapeAdicionar.setVisible(false);
+        friendsPage.add(caixa).grow().row();
+        friendsPage.add(rodape).growX().height(44).padTop(8);
+        reconstruirListaAmigos();
+    }
+
+    private void mostrarCampoAdicionar(boolean mostrar) {
+        rodapeAmigos.setVisible(!mostrar);
+        rodapeAdicionar.setVisible(mostrar);
+        campoNovoAmigo.setText("");
+        if (mostrar && root.getStage() != null) root.getStage().setKeyboardFocus(campoNovoAmigo);
+        else if (root.getStage() != null) root.getStage().setKeyboardFocus(null);
+    }
+
+    private void reconstruirListaAmigos() {
+        listaAmigos.clearChildren();
+        List<AmigoInfo> ordenados = new ArrayList<>(amigos.values());
+        // Online primeiro, depois ordem alfabetica (sem diferenciar maiuscula).
+        ordenados.sort((a, b) -> a.online != b.online ? (a.online ? -1 : 1) : a.nome.compareToIgnoreCase(b.nome));
+        for (AmigoInfo a : ordenados) listaAmigos.add(linhaAmigo(a)).growX().height(40).padBottom(3).row();
+        if (ordenados.isEmpty()) {
+            Label vazio = new Label("No friends yet.", skin, "hud");
+            vazio.setFontScale(0.6f);
+            listaAmigos.add(vazio).pad(10);
+        }
+    }
+
+    private Table linhaAmigo(AmigoInfo a) {
+        boolean selecionado = a.nome.equals(amigoSelecionado);
+        Table linha = new Table();
+        linha.setBackground(UiSkin.retangulo(selecionado ? new Color(0.22f, 0.30f, 0.22f, 1f) : new Color(0.17f, 0.17f, 0.17f, 1f),
+            selecionado ? new Color(0.35f, 0.6f, 0.35f, 1f) : new Color(0.12f, 0.12f, 0.12f, 1f), 1));
+        linha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        linha.add(iconeAtlas(a.online ? "ui/OnlineIcon" : "ui/OfflineIcon", 26f)).size(26f).padLeft(8).padRight(8);
+        Label nome = new Label(a.nome, skin, "hud");
+        nome.setFontScale(0.75f);
+        linha.add(nome).expandX().left();
+        if (a.seller) linha.add(iconeAtlas("ui/SellerIcon", 26f)).size(26f).padRight(4);
+        if (a.guild) linha.add(iconeAtlas("ui/GuildIcon", 26f)).size(26f).padRight(4);
+        if (a.pk) linha.add(iconeAtlas("ui/PkIcon", 26f)).size(26f).padRight(4);
+        linha.add(iconeAtlas(iconeClasse(a.classe), 26f)).size(26f).padRight(8);
+        linha.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                amigoSelecionado = a.nome.equals(amigoSelecionado) ? null : a.nome;
+                statusAmigos.setText("");
+                reconstruirListaAmigos();
+            }
+        });
+        return linha;
+    }
+
+    private Image iconeAtlas(String regiao, float tamanho) {
+        TextureAtlas.AtlasRegion r = atlas.findRegion(regiao);
+        Image img = r != null ? new Image(new TextureRegionDrawable(r)) : new Image();
+        img.setScaling(Scaling.fit);
+        img.setSize(tamanho, tamanho);
+        return img;
+    }
+
+    public static String iconeClasse(String classe) {
+        if (classe == null) return "ui/KnightIcon";
+        switch (classe) {
+            case "Bard": return "ui/BardIcon";
+            case "Ranger": return "ui/RangerIcon";
+            case "Mage": return "ui/MageIcon";
+            default: return "ui/KnightIcon";
+        }
+    }
+
+    /** friends_list do servidor: troca a lista toda. */
+    public void atualizarAmigos(JsonValue dados) {
+        amigos.clear();
+        JsonValue lista = dados != null ? dados.get("friends") : null;
+        if (lista != null) {
+            for (JsonValue f = lista.child; f != null; f = f.next) {
+                AmigoInfo a = new AmigoInfo(f.getString("name", ""));
+                if (a.nome.isEmpty()) continue;
+                a.classe = f.getString("class_name", "Knight");
+                a.online = f.getBoolean("online", false);
+                a.pk = f.getBoolean("icon_pk", false);
+                a.guild = f.getBoolean("icon_guild", false);
+                a.seller = f.getBoolean("icon_seller", false);
+                amigos.put(a.nome, a);
+            }
+        }
+        if (amigoSelecionado != null && !amigos.containsKey(amigoSelecionado)) amigoSelecionado = null;
+        reconstruirListaAmigos();
+        if (aoMudarAmigos != null) aoMudarAmigos.run();
+    }
+
+    /** friend_status: virou amigo (pede a lista de novo) ou deixou de ser. */
+    public void definirAmigo(String nome, boolean amigo) {
+        if (amigo) {
+            if (socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
+            if (!amigos.containsKey(nome)) amigos.put(nome, new AmigoInfo(nome));
+        } else {
+            amigos.remove(nome);
+            if (nome.equals(amigoSelecionado)) amigoSelecionado = null;
+        }
+        reconstruirListaAmigos();
+        if (aoMudarAmigos != null) aoMudarAmigos.run();
+    }
+
+    /** friend_icon_updated (icon = "pk"/"guild"/"seller"). */
+    public void definirIconeAmigo(String nome, String icone, boolean valor) {
+        AmigoInfo a = amigos.get(nome);
+        if (a == null) return;
+        if ("pk".equals(icone)) a.pk = valor;
+        else if ("guild".equals(icone)) a.guild = valor;
+        else if ("seller".equals(icone)) a.seller = valor;
+        reconstruirListaAmigos();
+        if (aoMudarAmigos != null) aoMudarAmigos.run();
+    }
+
+    /** player_joined/player_left: bolinha verde/cinza sem pedir a lista toda. */
+    public void definirOnline(String nome, boolean online) {
+        AmigoInfo a = amigos.get(nome);
+        if (a == null || a.online == online) return;
+        a.online = online;
+        reconstruirListaAmigos();
+    }
+
+    /** friend_add_result: mensagem curta no rodape. */
+    public void resultadoAdicionarAmigo(boolean sucesso, String nome, String motivo) {
+        if (sucesso) statusAmigos.setText(nome + " added.");
+        else if ("self".equals(motivo)) statusAmigos.setText("You can't add yourself.");
+        else statusAmigos.setText("Player not found.");
+    }
+
+    public AmigoInfo amigo(String nome) { return amigos.get(nome); }
+
+    public void definirAoMudarAmigos(Runnable r) { aoMudarAmigos = r; }
+
     private Button criarBotaoAcao(String regiao, Color fundo, Color borda, Runnable acao) {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
         estilo.up = UiSkin.retangulo(fundo, borda, 2);
@@ -1714,10 +1929,13 @@ public final class BookMenuUI {
             // Equip ocupa o painel inteiro (colunas encostam na borda).
             mainWindow.pad("Equip".equals(secao) || "Bag".equals(secao) || "Vanity".equals(secao) ? 1 : 14);
             if (comTitulo) {
+                // Friends: titulo centralizado (igual o mock "tela desejada 2").
+                tituloSecao.setAlignment("Friends".equals(secao) ? Align.center : Align.left);
                 mainWindow.add(tituloSecao).growX().left().padBottom(9).row();
             }
             Table pagina = "Equip".equals(secao) ? equipPage : "Skills".equals(secao) ? skillsPage
-                : "Vanity".equals(secao) ? vanityPage : bagPage;
+                : "Vanity".equals(secao) ? vanityPage : "Friends".equals(secao) ? friendsPage : bagPage;
+            if ("Friends".equals(secao) && socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
             mainWindow.add(pagina).grow();
             actionBar.setVisible("Bag".equals(secao));
             for (Map.Entry<String, Button> entrada : botoes.entrySet()) {

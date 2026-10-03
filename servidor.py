@@ -2361,6 +2361,29 @@ def handle_c(data):
             socketio.emit('c', payload, room=destino)
     except Exception: traceback.print_exc()
 
+# Mensagem privada (botao de chat da janela do jogador): so' quem mandou e
+# quem recebe. Mesmas regras do chat (limite, mute, anti-spam, censura).
+@socketio.on('pm')
+def handle_pm(data):
+    try:
+        sid = request.sid
+        if sid not in online_players or not isinstance(data, dict): return
+        p = online_players[sid]
+        destino_nome = str(data.get('to', '')).strip()[:32]
+        destino_sid = players_by_name.get(destino_nome)
+        if not destino_nome or destino_sid == sid: return
+        if not destino_sid or destino_sid not in online_players:
+            chat_sistema(sid, "This player is offline.")
+            return
+        msg = _filtrar_mensagem_chat(sid, p, data.get('msg', ''))
+        if msg is None: return
+        payload = {'from': p.get('name', ''), 'to': destino_nome, 'msg': msg,
+                   'class': p.get('class_name', 'Knight'),
+                   'to_class': online_players[destino_sid].get('class_name', 'Knight')}
+        socketio.emit('pm', payload, room=destino_sid)
+        socketio.emit('pm', payload, room=sid)
+    except Exception: traceback.print_exc()
+
 # Chat de idioma (Portuguese/Spanish/...): vai pra todo mundo que tem o canal
 # aberto, em qualquer lugar do mapa (igual grupo). So' quem esta no canal fala nele.
 @socketio.on('cc')
@@ -3744,9 +3767,17 @@ def handle_invite_party(data):
         sid = request.sid
         if sid not in online_players: return
         party, party_id = _get_party(sid)
-        if not party or party['leader_sid'] != sid: return
+        if not party:
+            # Convidar sem ter party (botao Party da janela do jogador): cria
+            # uma com quem convidou de lider, igual o create_party.
+            party_id = sid
+            parties[party_id] = {'leader_sid': sid, 'members': [sid], 'pending_invites': {}}
+            online_players[sid]['party_id'] = party_id
+            party = parties[party_id]
+            _emit_party_update(party_id)
+        if party['leader_sid'] != sid: return
 
-        target_name = str(data.get('target_name', '')).strip()
+        target_name = str(data.get('target_name', '') if isinstance(data, dict) else '').strip()
 
         if len(party['members']) >= PARTY_MAX_SIZE:
             emit('party_invite_result', {'success': False, 'reason': 'party_full', 'target_name': target_name}, room=sid)
