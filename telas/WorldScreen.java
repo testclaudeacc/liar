@@ -227,6 +227,7 @@ public class WorldScreen extends ScreenAdapter {
         final float x, y;
         final String texto;
         final boolean critico;
+        boolean bloqueio = false;
         float tempo = 0f;
         NumeroDano(float x, float y, String texto, boolean critico) {
             this.x = x; this.y = y; this.texto = texto; this.critico = critico;
@@ -244,7 +245,9 @@ public class WorldScreen extends ScreenAdapter {
         TextoFlutuante(Jogador alvo, String texto, Color cor) { this.alvo = alvo; this.texto = texto; this.cor = cor; }
     }
     private final List<TextoFlutuante> textosFlutuantes = new ArrayList<>();
-    private static final float DURACAO_TEXTO_FLUTUANTE = 2.5f;
+    // Sobe por 1.2s, fica parado 5s (da' tempo de tirar print) e some em 0.5s.
+    private static final float TEXTO_SUBIDA = 1.2f, TEXTO_PARADO = 5f, TEXTO_SUMINDO = 0.5f;
+    private static final float DURACAO_TEXTO_FLUTUANTE = TEXTO_SUBIDA + TEXTO_PARADO + TEXTO_SUMINDO;
 
     // ---- Combate (alvo, ataque automatico, efeitos, loot, morte) ----
     // Mob mirado (clique nele; clique de novo ou ESC tira). Ataca sozinho a
@@ -262,8 +265,13 @@ public class WorldScreen extends ScreenAdapter {
     private static class Efeito {
         final TextureRegion[] quadros;
         final float x, y;
+        // Se tiver alvo, o efeito acompanha o sprite dele (mob/player andando).
+        MobVisual mobAlvo;
+        Jogador jogadorAlvo;
         float tempo = 0f;
         Efeito(TextureRegion[] quadros, float x, float y) { this.quadros = quadros; this.x = x; this.y = y; }
+        float posX() { return mobAlvo != null ? mobAlvo.x : jogadorAlvo != null ? jogadorAlvo.x : x; }
+        float posY() { return mobAlvo != null ? mobAlvo.y : jogadorAlvo != null ? jogadorAlvo.y : y; }
     }
     private static final float DURACAO_QUADRO_EFEITO = 0.05f;
     private final List<Efeito> efeitos = new ArrayList<>();
@@ -272,14 +280,17 @@ public class WorldScreen extends ScreenAdapter {
     /** Projetil (flecha/magia/nota) indo do atacante ate o mob; ao chegar toca o hit. */
     private static class Projetil {
         final TextureRegion regiao;
-        final float x0, y0, x1, y1;
+        final float x0, y0;
+        final MobVisual alvo;   // persegue o mob (ele pode estar andando)
         final String efeitoHit;
         float tempo = 0f;
         final float duracao;
-        Projetil(TextureRegion regiao, float x0, float y0, float x1, float y1, String efeitoHit) {
-            this.regiao = regiao; this.x0 = x0; this.y0 = y0; this.x1 = x1; this.y1 = y1; this.efeitoHit = efeitoHit;
-            this.duracao = Math.max(0.12f, (float) Math.hypot(x1 - x0, y1 - y0) / 160f);
+        Projetil(TextureRegion regiao, float x0, float y0, MobVisual alvo, String efeitoHit) {
+            this.regiao = regiao; this.x0 = x0; this.y0 = y0; this.alvo = alvo; this.efeitoHit = efeitoHit;
+            this.duracao = Math.max(0.12f, (float) Math.hypot(alvo.x - x0, alvo.y + 8f - y0) / 160f);
         }
+        float x1() { return alvo.x; }
+        float y1() { return alvo.y + 8f; }
     }
     private final List<Projetil> projeteis = new ArrayList<>();
 
@@ -1133,6 +1144,7 @@ public class WorldScreen extends ScreenAdapter {
                 float maxHp = data.getFloat("max_hp", -1f), maxMp = data.getFloat("max_mp", -1f);
                 float hpJoin = data.getFloat("current_hp", -1f), mpJoin = data.getFloat("current_mp", -1f);
                 hud.definir(hpJoin < 0f ? maxHp : hpJoin, maxHp, mpJoin < 0f ? maxMp : mpJoin, maxMp);
+                hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
                 bookMenu.carregarItemDb(data.get("item_db"));
                 bookMenu.atualizarInventario(data.get("inventory"));
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
@@ -1193,9 +1205,9 @@ public class WorldScreen extends ScreenAdapter {
             Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
             TextureRegion projetil = regiaoDoCaminho(data.getString("proj", ""));
             if ("Ranged".equals(data.getString("w_type", "")) && projetil != null && atacante != null) {
-                projeteis.add(new Projetil(projetil, atacante.x, atacante.y + 8f, mob.x, mob.y + 8f, efeito));
+                projeteis.add(new Projetil(projetil, atacante.x, atacante.y + 8f, mob, efeito));
             } else {
-                tocarEfeito(efeito, mob.x, mob.y);
+                tocarEfeitoNoMob(efeito, mob);
             }
         });
         socket.on("player_damaged", (nomeEvt, data) -> {
@@ -1206,8 +1218,13 @@ public class WorldScreen extends ScreenAdapter {
             String alvo = data.getString("target_player", "");
             Jogador j = jogadorPorNome(alvo);
             if (j != null) {
-                numerosDano.add(new NumeroDano(j.x, j.y + 4f, String.valueOf(data.getInt("damage", 0)), false));
-                tocarEfeito(data.getString("hit_type", "physical_hit"), j.x, j.y);
+                int dano = data.getInt("damage", 0);
+                // Dano 0 = o player bloqueou (servidor.py: BLOCK_CHANCE).
+                NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? "Blocked" : String.valueOf(dano), false);
+                nd.bloqueio = dano <= 0;
+                numerosDano.add(nd);
+                Efeito e = tocarEfeito(data.getString("hit_type", "physical_hit"), j.x, j.y);
+                if (e != null) e.jogadorAlvo = j;
             }
             if (!alvo.equals(local.nome) && data.has("new_hp")) {
                 vidaRemotos.put(alvo, new float[]{data.getFloat("new_hp", 1f), data.getFloat("max_hp", 1f)});
@@ -1374,6 +1391,7 @@ public class WorldScreen extends ScreenAdapter {
             bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getInt("exp", 0), data.getInt("kills", 0));
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
+            if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
         });
 
         socket.on("trade_executed", (nomeEvt, data) -> {
@@ -2316,9 +2334,18 @@ public class WorldScreen extends ScreenAdapter {
         return quadros;
     }
 
-    private void tocarEfeito(String nome, float x, float y) {
+    private Efeito tocarEfeito(String nome, float x, float y) {
         TextureRegion[] quadros = quadrosEfeito(nome);
-        if (quadros != null) efeitos.add(new Efeito(quadros, x, y));
+        if (quadros == null) return null;
+        Efeito e = new Efeito(quadros, x, y);
+        efeitos.add(e);
+        return e;
+    }
+
+    /** Hit que acompanha o sprite do mob enquanto ele anda. */
+    private void tocarEfeitoNoMob(String nome, MobVisual mob) {
+        Efeito e = tocarEfeito(nome, mob.x, mob.y);
+        if (e != null) e.mobAlvo = mob;
     }
 
     /** Efeito e projetil de cada classe (o servidor repassa pros outros clients). */
@@ -2399,7 +2426,7 @@ public class WorldScreen extends ScreenAdapter {
             pr.tempo += delta;
             if (pr.tempo >= pr.duracao) {
                 projeteis.remove(i);
-                tocarEfeito(pr.efeitoHit, pr.x1, pr.y1 - 8f);
+                tocarEfeitoNoMob(pr.efeitoHit, pr.alvo);
             }
         }
         java.util.Iterator<BagChao> it = bags.values().iterator();
@@ -2489,17 +2516,17 @@ public class WorldScreen extends ScreenAdapter {
     private void desenharEfeitos() {
         for (Projetil pr : projeteis) {
             float t = Math.min(1f, pr.tempo / pr.duracao);
-            float x = pr.x0 + (pr.x1 - pr.x0) * t;
-            float y = pr.y0 + (pr.y1 - pr.y0) * t;
-            float angulo = (float) Math.toDegrees(Math.atan2(pr.y1 - pr.y0, pr.x1 - pr.x0));
+            float x = pr.x0 + (pr.x1() - pr.x0) * t;
+            float y = pr.y0 + (pr.y1() - pr.y0) * t;
+            float angulo = (float) Math.toDegrees(Math.atan2(pr.y1() - pr.y0, pr.x1() - pr.x0));
             float w = pr.regiao.getRegionWidth(), h = pr.regiao.getRegionHeight();
             batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, 1f, 1f, angulo);
         }
         for (Efeito e : efeitos) {
             int quadro = Math.min(e.quadros.length - 1, (int) (e.tempo / DURACAO_QUADRO_EFEITO));
             TextureRegion r = e.quadros[quadro];
-            float ancoraX = Math.round(e.x / camera.zoom) * camera.zoom;
-            float ancoraY = Math.round(e.y / camera.zoom) * camera.zoom;
+            float ancoraX = Math.round(e.posX() / camera.zoom) * camera.zoom;
+            float ancoraY = Math.round(e.posY() / camera.zoom) * camera.zoom;
             batch.draw(r, ancoraX - r.getRegionWidth() / 2f, ancoraY);
         }
     }
@@ -2608,17 +2635,21 @@ public class WorldScreen extends ScreenAdapter {
         Map<Jogador, Integer> pilha = new HashMap<>();
         for (TextoFlutuante t : textosFlutuantes) {
             int ordem = pilha.merge(t.alvo, 1, Integer::sum) - 1;
-            float p = t.tempo / DURACAO_TEXTO_FLUTUANTE;
-            float subida = 16f * p;
-            float alfa = p < 0.7f ? 1f : 1f - (p - 0.7f) / 0.3f;
+            float ps = Math.min(1f, t.tempo / TEXTO_SUBIDA);
+            float subida = 16f * (1f - (1f - ps) * (1f - ps)); // ease-out e para no topo
+            float fim = TEXTO_SUBIDA + TEXTO_PARADO;
+            float alfa = t.tempo < fim ? 1f : 1f - (t.tempo - fim) / TEXTO_SUMINDO;
             float ancoraX = Math.round(t.alvo.x / camera.zoom) * camera.zoom;
             float ancoraY = Math.round(t.alvo.y / camera.zoom) * camera.zoom;
+            // Dobro do tamanho do nome.
+            font.getData().setScale(NOME_ESCALA_BASE * 2f);
             layout.setText(font, t.texto);
             float x = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
-            float y = Math.round((ancoraY + 30f + subida + ordem * 9f) / camera.zoom) * camera.zoom;
+            float y = Math.round((ancoraY + 34f + subida + ordem * 16f) / camera.zoom) * camera.zoom;
             font.setColor(t.cor.r, t.cor.g, t.cor.b, Math.max(0f, alfa));
             font.draw(batch, t.texto, x, y);
         }
+        font.getData().setScale(NOME_ESCALA_BASE);
         font.setColor(anterior);
     }
 
@@ -2632,10 +2663,13 @@ public class WorldScreen extends ScreenAdapter {
             layout.setText(font, n.texto);
             float x = Math.round((n.x - layout.width / 2f) / camera.zoom) * camera.zoom;
             float y = Math.round((n.y + 20f + subida) / camera.zoom) * camera.zoom;
-            Color cor = new Color(1f, 0.4f, 0.4f, 1f); // vermelho claro (critico so' ganha o "!")
+            Color cor = n.bloqueio ? new Color(0.55f, 0.8f, 1f, 1f) : new Color(1f, 0f, 0f, 1f); // vermelho puro
             cor.a = Math.max(0f, alfa);
             font.setColor(cor);
+            // Critico: fonte ~2px maior (e o "!" no texto).
+            if (n.critico) font.getData().setScale(NOME_ESCALA_BASE * 1.3f);
             font.draw(batch, n.texto, x, y);
+            if (n.critico) font.getData().setScale(NOME_ESCALA_BASE);
         }
         font.setColor(anterior);
     }
