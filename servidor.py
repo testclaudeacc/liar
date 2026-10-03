@@ -784,6 +784,22 @@ def obter_ou_criar_mob(mob_id, mob_type_id=None, room=None):
 def tile_do_mob(m):
     return tile_de(m.get('pos_x', 0), m.get('pos_y', 0))
 
+def _tile_de_nascimento(mob_id, m):
+    """SQM onde o mob (re)nasce: qualquer SQM livre (sem parede, sem player/mob
+    em cima) dentro de spawn_range SQMs do ponto marcado no Tiled. Sem grade de
+    colisao ainda ou sem SQM livre, usa o proprio ponto."""
+    centro = spawn_do_mob_id(mob_id)
+    if centro is None: return None
+    alcance = int(m.get('spawn_range', 0) or 0)
+    if alcance <= 0: return centro
+    grade = mapas_colisao.get(m.get('mapa'))
+    if grade is None: return centro
+    ocupados = _tiles_ocupados(excluir_mob=mob_id)
+    livres = [(centro[0] + dx, centro[1] + dy)
+              for dx in range(-alcance, alcance + 1) for dy in range(-alcance, alcance + 1)]
+    livres = [t for t in livres if not eh_parede(grade, t) and t not in ocupados]
+    return random.choice(livres) if livres else centro
+
 def payload_mob_pos(mob_id, m, step=0.0):
     # [mob_id, x, y, dir_int, owner(sempre ""), returning, duração do passo]
     return [mob_id, m.get('pos_x', 0), m.get('pos_y', 0), DIR_TO_INT.get(m.get('direction', 'down'), 0),
@@ -2064,8 +2080,21 @@ def handle_register_map(data):
             if not isinstance(info, dict): continue
             mob_id = str(info.get('id', ''))[:120]
             if not mob_id or spawn_do_mob_id(mob_id) is None: continue
+            novo = mob_id not in active_mobs
             m = obter_ou_criar_mob(mob_id, str(info.get('type', '')) or None)
             m['mapa'] = map_id
+            # Propriedades do ponto no Tiled (camada MobSpawns).
+            try:
+                m['spawn_range'] = min(10, max(0, int(info.get('spawn_range', m.get('spawn_range', 0)))))
+                m['respawn_seg'] = min(86400.0, max(5.0, float(info.get('respawn_time', m.get('respawn_seg', MOB_RESPAWN_SEG)))))
+            except (TypeError, ValueError): pass
+            # Primeira vez que o mob aparece: ja nasce num SQM sorteado do raio.
+            if novo and m.get('hp', 1) > 0:
+                t = _tile_de_nascimento(mob_id, m)
+                if t is not None:
+                    m['spawn'] = t
+                    m['pos_x'], m['pos_y'] = centro_tile(t)
+                    m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
             try:
                 m['speed'] = min(10.0, max(0.2, float(info.get('speed', m.get('speed', MOB_SPEED_PADRAO)))))
                 m['cooldown'] = min(30.0, max(0.3, float(info.get('cooldown', m.get('cooldown', MOB_COOLDOWN_PADRAO)))))
@@ -3282,7 +3311,7 @@ def mob_cleanup_loop():
             if m_data.get('hp', 1) > 0: continue
             if 'died_at' not in m_data:
                 m_data['died_at'] = now
-            if now - m_data['died_at'] < MOB_RESPAWN_SEG: continue
+            if now - m_data['died_at'] < m_data.get('respawn_seg', MOB_RESPAWN_SEG): continue
             # Renasce no spawn com tudo zerado.
             m_data['hp'] = m_data.get('max_hp', 40)
             m_data.pop('died_at', None)
@@ -3295,6 +3324,11 @@ def mob_cleanup_loop():
             m_data['next_attack'] = 0.0
             m_data['direction'] = 'down'
             m_data['dmg_tracker'] = {}
+            # Renasce num SQM sorteado dentro do spawn_range do ponto do Tiled;
+            # esse SQM vira a "casa" dele nessa vida (pra onde volta/leash).
+            nascimento = _tile_de_nascimento(m_id, m_data)
+            if nascimento is not None:
+                m_data['spawn'] = nascimento
             if m_data.get('spawn') is not None:
                 m_data['pos_x'], m_data['pos_y'] = centro_tile(m_data['spawn'])
                 m_data['room'] = get_chunk(m_data['pos_x'], m_data['pos_y'], MOB_FLOOR)

@@ -108,6 +108,28 @@ public class MapaPropriedades {
         }
     }
 
+    /**
+     * Ponto de spawn de mob (camada de objetos "MobSpawns" no Tiled, um Point
+     * por mob). Propriedades: mob_id (string, ex "rotworm" - nome do MOB_DB do
+     * servidor), spawn_range (int, SQMs pra cada lado em que ele pode nascer,
+     * 0 = so' no ponto) e respawn_time (float, segundos ate renascer).
+     */
+    public static class MobSpawn {
+        public final String mobId;
+        public final float worldX;
+        public final float worldY;
+        public final int spawnRange;
+        public final float respawnTime;
+
+        MobSpawn(String mobId, float worldX, float worldY, int spawnRange, float respawnTime) {
+            this.mobId = mobId;
+            this.worldX = worldX;
+            this.worldY = worldY;
+            this.spawnRange = spawnRange;
+            this.respawnTime = respawnTime;
+        }
+    }
+
     private static final String[] CAMADAS_COLISAO_E_LUZ = {"Ground", "Buildings1", "Buildings2", "Roofs", "Pillars"};
     private static final String[] CAMADAS_VELOCIDADE = {"Ground", "Buildings1"};
 
@@ -123,6 +145,7 @@ public class MapaPropriedades {
     public final List<CelulaOverlay> celulasOverlay = new ArrayList<>();
     public final Map<String, Vector2> spawns = new HashMap<>();
     public final List<NPCSpawn> npcSpawns = new ArrayList<>();
+    public final List<MobSpawn> mobSpawns = new ArrayList<>();
     public final List<Luz> luzes = new ArrayList<>();
     public final List<AreaNomeada> areasNomeadas = new ArrayList<>();
 
@@ -178,6 +201,21 @@ public class MapaPropriedades {
                 float mundoX = (float) Math.round(r.x / Jogador.TILE) * Jogador.TILE + (Jogador.TILE / 2f);
                 float mundoY = (float) Math.round(r.y / Jogador.TILE) * Jogador.TILE;
                 npcSpawns.add(new NPCSpawn(npcId.trim(), mundoX, mundoY));
+            }
+        }
+
+        MapLayer camadaMobs = mapa.getLayers().get("MobSpawns");
+        if (camadaMobs != null) {
+            for (MapObject obj : camadaMobs.getObjects()) {
+                String mobId = obj.getProperties().get("mob_id", String.class);
+                if (mobId == null || mobId.trim().isEmpty() || !(obj instanceof RectangleMapObject)) continue;
+                // Mesmo snap pro SQM dos SpawnPoints/NPCSpawns acima.
+                Rectangle r = ((RectangleMapObject) obj).getRectangle();
+                float mundoX = (float) Math.round(r.x / Jogador.TILE) * Jogador.TILE + (Jogador.TILE / 2f);
+                float mundoY = (float) Math.round(r.y / Jogador.TILE) * Jogador.TILE;
+                mobSpawns.add(new MobSpawn(mobId.trim().toLowerCase(), mundoX, mundoY,
+                    numeroInt(obj.getProperties().get("spawn_range"), 0),
+                    numeroFloat(obj.getProperties().get("respawn_time"), 120f)));
             }
         }
 
@@ -387,5 +425,25 @@ public class MapaPropriedades {
             if (mod != null) return mod;
         }
         return 1f;
+    }
+
+    /** Propriedade numerica do Tiled (int/float/string, dependendo de como
+     * foi criada no editor) -> int. */
+    private static int numeroInt(Object valor, int padrao) {
+        if (valor instanceof Number) return ((Number) valor).intValue();
+        try {
+            return valor == null ? padrao : (int) Float.parseFloat(valor.toString().trim());
+        } catch (NumberFormatException e) {
+            return padrao;
+        }
+    }
+
+    private static float numeroFloat(Object valor, float padrao) {
+        if (valor instanceof Number) return ((Number) valor).floatValue();
+        try {
+            return valor == null ? padrao : Float.parseFloat(valor.toString().trim());
+        } catch (NumberFormatException e) {
+            return padrao;
+        }
     }
 }

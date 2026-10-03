@@ -104,6 +104,32 @@ public class WorldScreen extends ScreenAdapter {
     private final Map<String, Jogador> remotos = new HashMap<>();
     private final Map<String, NPCVisual> npcs = new LinkedHashMap<>();
 
+    /** Mob do servidor (IA/HP/morte/respawn rodam la; aqui so' desenha).
+     * Criado a partir da camada MobSpawns do Tiled (ver MapaPropriedades). */
+    private static class MobVisual {
+        final String id;
+        final Jogador movimento;
+        final AnimacaoCorpo animacao;
+        final TextureRegion quadroMorto;
+        float hp = 1f, maxHp = 1f;
+        boolean morto = false;
+        boolean visivel = false;      // so' aparece depois da 1a posicao do servidor
+        boolean teleportar = true;    // proxima posicao e' salto (spawn/respawn), nao passo
+        float tempoCorpo = 0f;        // segundos restantes do cadaver no chao
+
+        MobVisual(String id, Jogador movimento, AnimacaoCorpo animacao, TextureRegion quadroMorto) {
+            this.id = id;
+            this.movimento = movimento;
+            this.animacao = animacao;
+            this.quadroMorto = quadroMorto;
+        }
+    }
+    private final Map<String, MobVisual> mobs = new LinkedHashMap<>();
+    // Cadaver some depois disso (servidor: MOB_DESPAWN_CORPO_SEG).
+    private static final float TEMPO_CORPO_MOB = 60f;
+    private static final int FRAME_MORTE = 10;
+    private Texture pixelBranco;
+
     private static class NPCVisual {
         final String id;
         final String tipo;
@@ -387,6 +413,12 @@ public class WorldScreen extends ScreenAdapter {
         pm.fill();
         pixelColisao = new Texture(pm);
         pm.dispose();
+        Pixmap pmBranco = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pmBranco.setColor(Color.WHITE);
+        pmBranco.fill();
+        pixelBranco = new Texture(pmBranco);
+        pmBranco.dispose();
+        criarMobsDoMapa();
 
         registrarEventosDeRede();
         construirUiSettings();
@@ -936,6 +968,67 @@ public class WorldScreen extends ScreenAdapter {
             }
         });
 
+        // ---- Mobs (ver servidor.py: mob_ai_loop / mob_cleanup_loop) ----
+        socket.on("mob_pos", (nomeEvt, data) -> {
+            // [mob_id, x, y, dir_int, owner, returning, duracao do passo]
+            if (data == null || !data.isArray() || data.size < 4) return;
+            MobVisual mob = mobs.get(data.get(0).asString());
+            if (mob == null) return;
+            moverMob(mob, data.get(1).asFloat(), data.get(2).asFloat(), direcaoDoInt(data.get(3).asInt()));
+        });
+        socket.on("mob_damaged", (nomeEvt, data) -> {
+            if (data == null) return;
+            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            if (mob == null) return;
+            mob.maxHp = Math.max(1f, data.getFloat("max_hp", mob.maxHp));
+            mob.hp = Math.max(0f, data.getFloat("new_hp", mob.hp));
+        });
+        socket.on("mob_died", (nomeEvt, data) -> {
+            if (data == null) return;
+            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            if (mob == null) return;
+            mob.morto = true;
+            mob.hp = 0f;
+            mob.tempoCorpo = TEMPO_CORPO_MOB;
+            if (data.has("pos_x")) {
+                mob.teleportar = true;
+                moverMob(mob, data.getFloat("pos_x"), data.getFloat("pos_y"), mob.movimento.direcao);
+            }
+        });
+        socket.on("mob_vanish", (nomeEvt, data) -> {
+            // Perseguiu longe demais e sumiu (conta como morto, sem cadaver).
+            if (data == null) return;
+            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            if (mob == null) return;
+            mob.morto = true;
+            mob.tempoCorpo = 0f;
+        });
+        socket.on("mob_respawn", (nomeEvt, data) -> {
+            if (data == null) return;
+            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            if (mob == null) return;
+            mob.morto = false;
+            mob.hp = mob.maxHp;
+            mob.tempoCorpo = 0f;
+            mob.teleportar = true; // o mob_pos que vem logo em seguida e' o SQM onde renasceu
+        });
+        socket.on("sync_area_data", (nomeEvt, data) -> {
+            JsonValue lista = data == null ? null : data.get("mobs");
+            if (lista == null) return;
+            for (JsonValue info = lista.child; info != null; info = info.next) {
+                MobVisual mob = mobs.get(info.getString("mob_id", ""));
+                if (mob == null) continue;
+                mob.maxHp = Math.max(1f, info.getFloat("max_hp", mob.maxHp));
+                mob.hp = info.getFloat("hp", mob.hp);
+                mob.morto = info.getBoolean("is_dead", false);
+                mob.tempoCorpo = mob.morto ? Math.max(0f, TEMPO_CORPO_MOB - info.getFloat("dead_for", 0f)) : 0f;
+                if (info.has("pos_x")) {
+                    mob.teleportar = true;
+                    moverMob(mob, info.getFloat("pos_x"), info.getFloat("pos_y"), info.getString("direction", "down"));
+                }
+            }
+        });
+
         socket.on("npc_moved", (nomeEvt, data) -> {
             if (data != null && MAP_ID_SERVIDOR.equals(data.getString("map", MAP_ID_SERVIDOR))) {
                 atualizarMovimentoNPC(data);
@@ -1020,7 +1113,15 @@ public class WorldScreen extends ScreenAdapter {
         String payload = GameSocket.obj(w -> {
             w.set("map", MAP_ID_SERVIDOR);
             w.set("fp", colisao.fingerprint());
-            w.array("mobs"); // libGDX ainda nao tem entidades de mob locais pra reportar
+            w.array("mobs");
+            for (MapaPropriedades.MobSpawn spawn : mapa.propriedades.mobSpawns) {
+                w.object();
+                w.set("id", idDoMob(spawn));
+                w.set("type", spawn.mobId);
+                w.set("spawn_range", spawn.spawnRange);
+                w.set("respawn_time", spawn.respawnTime);
+                w.pop();
+            }
             w.pop();
             w.array("npcs");
             for (MapaPropriedades.NPCSpawn npc : mapa.propriedades.npcSpawns) {
@@ -1253,6 +1354,10 @@ public class WorldScreen extends ScreenAdapter {
         float sobraLocal = local.atualizar(delta);
         for (Jogador j : remotos.values()) j.atualizar(delta);
         for (NPCVisual npc : npcs.values()) npc.movimento.atualizar(delta);
+        for (MobVisual mob : mobs.values()) {
+            mob.movimento.atualizar(delta);
+            if (mob.morto && mob.tempoCorpo > 0f) mob.tempoCorpo -= delta;
+        }
         dialogoNPC.atualizar();
         atualizarAreaNomeada();
 
@@ -1359,6 +1464,9 @@ public class WorldScreen extends ScreenAdapter {
         desenharJogador(local);
         for (Jogador j : remotos.values()) desenharJogador(j);
         for (NPCVisual npc : npcs.values()) desenharNPC(npc);
+        // Cadaveres primeiro (ficam por baixo dos mobs vivos).
+        for (MobVisual mob : mobs.values()) if (mob.morto) desenharMob(mob);
+        for (MobVisual mob : mobs.values()) if (!mob.morto) desenharMob(mob);
         if (spawnSmokeTempo >= 0f) {
             spawnSmokeTempo += delta;
             if (!spawnSmokeAnim.isAnimationFinished(spawnSmokeTempo)) {
@@ -1711,6 +1819,78 @@ public class WorldScreen extends ScreenAdapter {
         batch.draw(quadro, ancoraX - largura / 2f, ancoraY, largura, altura);
     }
 
+    /** Id que o servidor usa pro mob: "<mob_id>_<x cru>_<y cru>" do ponto do
+     * Tiled (servidor.py::spawn_do_mob_id tira o SQM de spawn daqui). */
+    private String idDoMob(MapaPropriedades.MobSpawn spawn) {
+        return spawn.mobId + "_" + Math.round(conversor.mundoParaRawX(spawn.worldX))
+            + "_" + Math.round(conversor.mundoParaRawY(spawn.worldY));
+    }
+
+    private void criarMobsDoMapa() {
+        for (MapaPropriedades.MobSpawn spawn : mapa.propriedades.mobSpawns) {
+            TextureRegion sprite = spriteDoMob(spawn.mobId);
+            if (sprite == null) {
+                Gdx.app.error("WorldScreen", "Spritesheet de mob nao encontrada: sprites/mobs/" + spawn.mobId);
+                continue;
+            }
+            String id = idDoMob(spawn);
+            Jogador movimento = new Jogador(id, spawn.mobId, spawn.worldX, spawn.worldY);
+            mobs.put(id, new MobVisual(id, movimento, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE)));
+        }
+    }
+
+    /** sprites/mobs/<nome> - aceita o nome como esta no atlas (ex: "Rotworm")
+     * ou todo minusculo ("rat"), ja' que o mob_id do Tiled vem minusculo. */
+    private TextureRegion spriteDoMob(String mobId) {
+        TextureRegion sprite = atlas.findRegion("sprites/mobs/" + mobId);
+        if (sprite == null && !mobId.isEmpty()) {
+            sprite = atlas.findRegion("sprites/mobs/" + Character.toUpperCase(mobId.charAt(0)) + mobId.substring(1));
+        }
+        return sprite;
+    }
+
+    private void moverMob(MobVisual mob, float rawX, float rawY, String direcao) {
+        float mx = conversor.rawParaMundoX(rawX);
+        float my = conversor.rawParaMundoY(rawY);
+        if (mob.teleportar || !mob.visivel) {
+            mob.movimento.x = mx;
+            mob.movimento.y = my;
+            mob.movimento.movendo = false;
+            mob.movimento.direcao = direcao;
+            mob.teleportar = false;
+        } else {
+            mob.movimento.definirAlvo(mx, my, direcao);
+        }
+        mob.visivel = true;
+    }
+
+    /** Mesmo alinhamento do player (desenharJogador): X centralizado no SQM,
+     * pes no fundo do SQM, ancora snapada pra grade da camera antes de somar
+     * qualquer offset. */
+    private void desenharMob(MobVisual mob) {
+        if (!mob.visivel || (mob.morto && mob.tempoCorpo <= 0f)) return;
+        Jogador j = mob.movimento;
+        TextureRegion quadro = mob.morto ? mob.quadroMorto : quadroAtual(mob.animacao, j);
+        float largura = FRAME_LARGURA * ESCALA_SPRITE;
+        float altura = quadro.getRegionHeight() * ESCALA_SPRITE;
+        float ancoraX = Math.round(j.x / camera.zoom) * camera.zoom;
+        float ancoraY = Math.round(j.y / camera.zoom) * camera.zoom;
+        float x = ancoraX - largura / 2f;
+        batch.draw(quadro, x, ancoraY, largura, altura);
+        // Barra de vida so' quando ja levou dano.
+        if (!mob.morto && mob.hp < mob.maxHp) {
+            float barraLargura = 14f;
+            float barraX = ancoraX - barraLargura / 2f;
+            float barraY = ancoraY + altura + 1f;
+            float pct = Math.max(0f, Math.min(1f, mob.hp / mob.maxHp));
+            batch.setColor(0f, 0f, 0f, 0.8f);
+            batch.draw(pixelBranco, barraX - 0.5f, barraY - 0.5f, barraLargura + 1f, 3f);
+            batch.setColor(pct > 0.5f ? new Color(0.2f, 0.85f, 0.2f, 1f) : pct > 0.25f ? Color.ORANGE : Color.RED);
+            batch.draw(pixelBranco, barraX, barraY, barraLargura * pct, 2f);
+            batch.setColor(Color.WHITE);
+        }
+    }
+
     private void desenharNomeNPC(NPCVisual npc) {
         TextureRegion quadro = quadroAtual(npc.animacao, npc.movimento);
         float ancoraX = Math.round(npc.movimento.x / camera.zoom) * camera.zoom;
@@ -1792,6 +1972,7 @@ public class WorldScreen extends ScreenAdapter {
         batch.dispose();
         font.dispose();
         pixelColisao.dispose();
+        pixelBranco.dispose();
         uiStage.dispose();
         skin.dispose();
         atlas.dispose();
