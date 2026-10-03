@@ -695,7 +695,7 @@ public final class BookMenuUI {
         percentLabel.setColor(corPercentual);
         percentLabel.setAlignment(Align.center);
         pilha.add(percentLabel);
-        pai.add(pilha).width(LARGURA_BARRA_SKILL).height(ALTURA_BARRA_SKILL).padBottom(10).row();
+        pai.add(pilha).width(LARGURA_BARRA_SKILL).height(ALTURA_BARRA_SKILL).row();
 
         return new BarraSkill(nivelLabel, percentLabel, preenchimento, alinhador, comNivel);
     }
@@ -724,6 +724,9 @@ public final class BookMenuUI {
 
         Table barras = new Table();
         barras.top().left();
+        // Espaco entre linhas em TODAS as celulas - se ficar so' na barra,
+        // icone/nome centralizam numa linha mais alta e descem em relacao a ela.
+        barras.defaults().padBottom(10);
         barraNivel = criarBarraSkill(barras, "ui/XPIcon", "Level", COR_NIVEL, COR_BARRA_XP, Color.WHITE, true);
         barraPrincipal = criarBarraSkill(barras, iconeSkillPrincipal(), principal[1], corPrincipal, corPrincipal, Color.WHITE, true);
         barraDefesa = criarBarraSkill(barras, "ui/DefenseIcon", "Defense", COR_DEFESA, COR_DEFESA, Color.WHITE, true);
