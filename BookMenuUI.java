@@ -1080,7 +1080,7 @@ public final class BookMenuUI {
         colunaEsquerda.top().left();
         colunaEsquerda.setBackground(UiSkin.retangulo(
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
-        colunaEsquerda.add(vanityAbas).left().pad(8, 6, 0, 6).row();
+        colunaEsquerda.add(vanityAbas).center().pad(8, 4, 0, 4).row();
         colunaEsquerda.add().grow().row();
         colunaEsquerda.add(vanityPreview).growX().height(150).pad(0, 8, 6, 8).row();
         colunaEsquerda.add(botoesVanity).growX().pad(0, 8, 8, 8);
@@ -1191,8 +1191,13 @@ public final class BookMenuUI {
             String caminho = escolhida != null ? escolhida[0]
                 : opcoes != null && !opcoes.isEmpty() ? opcoes.get(0)[0]
                 : "base".equals(cat) ? SkinsUtil.BASE_PADRAO : null;
+            // Icone (quadro de frente da peca atual) + nome da categoria.
             Image icone = iconeSkin(caminho, escolhida != null ? escolhida[1] : null);
-            if (icone != null) aba.add(icone).grow().pad(4);
+            if (icone != null) aba.add(icone).size(30).padLeft(4).padRight(4);
+            else aba.add().size(30).padLeft(4).padRight(4);
+            Label nome = new Label(nomeCategoriaVanity(cat), skin, "hud");
+            nome.setFontScale(0.68f);
+            aba.add(nome).left().expandX();
             // Categoria sem nada pra essa classe fica apagada (igual a asa da print).
             if (opcoes == null || opcoes.isEmpty()) aba.setColor(1f, 1f, 1f, 0.35f);
             aba.addListener(new ChangeListener() {
@@ -1201,7 +1206,19 @@ public final class BookMenuUI {
                     atualizarVanity();
                 }
             });
-            vanityAbas.add(aba).size(42).pad(2);
+            vanityAbas.add(aba).width(89).height(40).pad(2);
+            // Grade 2x2.
+            if (vanityAbas.getCells().size % 2 == 0) vanityAbas.row();
+        }
+    }
+
+    private static String nomeCategoriaVanity(String cat) {
+        switch (cat) {
+            case "body": return "Outfit";
+            case "helm": return "Head";
+            case "acc": return "Extra";
+            case "base": return "Skin";
+            default: return cat;
         }
     }
 
