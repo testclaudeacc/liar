@@ -70,17 +70,26 @@ public final class BookMenuUI {
     private String secaoAtual = "Bag";
 
     // --- Equip ---
+    // Grade 3x3 da coluna esquerda (null = celula vazia), igual prints/tela desejada.png.
     private static final String[][] SLOTS_EQUIP = {
-        {"Helm", "Necklace"}, {"MainHand", "Hand"}, {"Chest", "Gloves"}, {"Boots", "Ring"}
+        {null, "Helm", "Necklace"}, {"MainHand", "Chest", "Hand"}, {"Gloves", "Boots", "Ring"}
     };
+    private static final float SLOT_EQUIP = 55f;
+    private static final float COLUNA_EQUIP = 176f;
+    private static final float ALTURA_GRADE_EQUIP = 216f;
+    private static final int COLUNAS_EQUIP = 5;
     private final Map<String, Button> equipSlotButtons = new LinkedHashMap<>();
     private final Map<String, String> equippedItemPaths = new LinkedHashMap<>();
+    private final List<Integer> equipCandidatos = new ArrayList<>();
     private final Table equipItemGrid = new Table();
-    private Label equipSlotTitle;
-    private Table equipEquipadoBloco;
-    private Table equipCandidatoBloco;
-    private Button equipButton;
-    private Button unequipButton;
+    private final Table equipDetalhesEsquerda = new Table();
+    private final Table equipDetalhesDireita = new Table();
+    private Table equipColunaEsquerda;
+    private Table equipSlotsTabela;
+    private Table equipColunaDireita;
+    private Table equipPainelGrade;
+    private TextButton equipButton;
+    private TextButton unequipButton;
     private String selectedSlot = "";
     private int selectedEquipCandidate = -1;
 
@@ -164,6 +173,7 @@ public final class BookMenuUI {
         actionStatus = new Label("", skin, "hud");
         construirPaginaBag(skin);
         construirPaginaEquip(skin);
+        atualizarEquipados(null);
         construirPaginaSkills(skin);
         mainWindow.add(bagPage).grow();
 
@@ -330,12 +340,17 @@ public final class BookMenuUI {
     // ===================== EQUIP =====================
 
     private static final class EquipStats {
+        final String nome, tipo;
+        final int reqLevel;
         final String reqClass;
         final int bonusDamage, defense, stamina, mana, fourthStatValue;
         final String fourthStatType;
 
-        EquipStats(String reqClass, int bonusDamage, int defense, int stamina, int mana,
-                   String fourthStatType, int fourthStatValue) {
+        EquipStats(String nome, String tipo, int reqLevel, String reqClass, int bonusDamage, int defense,
+                   int stamina, int mana, String fourthStatType, int fourthStatValue) {
+            this.nome = nome;
+            this.tipo = tipo;
+            this.reqLevel = reqLevel;
             this.reqClass = reqClass;
             this.bonusDamage = bonusDamage;
             this.defense = defense;
@@ -348,183 +363,221 @@ public final class BookMenuUI {
 
     private static final Map<String, EquipStats> ITEM_STATS = new LinkedHashMap<>();
     static {
-        ITEM_STATS.put("res://sprites/items/Sword.tres", new EquipStats("Knight", 100, 0, 0, 0, "None", 0));
-        ITEM_STATS.put("res://sprites/items/Bard/Weapons/StarterFlute.tres", new EquipStats("Bard", 1, 0, 5, 5, "Musicality", 3));
-        ITEM_STATS.put("res://sprites/items/Bard/SecondHand/StarterSheet.tres", new EquipStats("Bard", 0, 0, 10, 10, "Musicality", 3));
-        ITEM_STATS.put("res://sprites/items/Knight/Weapons/StarterSword.tres", new EquipStats("Knight", 1, 5, 10, 0, "Melee", 5));
-        ITEM_STATS.put("res://sprites/items/Knight/SecondHand/StarterShield.tres", new EquipStats("Knight", 1, 5, 10, 0, "", 0));
-        ITEM_STATS.put("res://sprites/items/Mage/Weapons/StarterStaff.tres", new EquipStats("Mage", 1, 0, 0, 10, "Magic", 2));
-        ITEM_STATS.put("res://sprites/items/Mage/SecondHand/StarterBook.tres", new EquipStats("Mage", 0, 0, 0, 10, "Magic", 5));
-        ITEM_STATS.put("res://sprites/items/Ranger/Weapons/StarterBow.tres", new EquipStats("Ranger", 1, 0, 5, 0, "Focus", 5));
-        ITEM_STATS.put("res://sprites/items/Ranger/SecondHand/StarterArrow.tres", new EquipStats("Ranger", 0, 0, 0, 0, "Focus", 5));
+        ITEM_STATS.put("res://sprites/items/Sword.tres", new EquipStats("Sword", "Sword", 0, "Knight", 100, 0, 0, 0, "None", 0));
+        ITEM_STATS.put("res://sprites/items/Bard/Weapons/StarterFlute.tres", new EquipStats("Basic Flute", "Flute", 0, "Bard", 1, 0, 5, 5, "Musicality", 3));
+        ITEM_STATS.put("res://sprites/items/Bard/SecondHand/StarterSheet.tres", new EquipStats("Basic Music Sheet", "Music Sheet", 0, "Bard", 0, 0, 10, 10, "Musicality", 3));
+        ITEM_STATS.put("res://sprites/items/Knight/Weapons/StarterSword.tres", new EquipStats("Basic Sword", "Sword", 0, "Knight", 1, 5, 10, 0, "Melee", 5));
+        ITEM_STATS.put("res://sprites/items/Knight/SecondHand/StarterShield.tres", new EquipStats("Basic Shield", "Shield", 0, "Knight", 1, 5, 10, 0, "", 0));
+        ITEM_STATS.put("res://sprites/items/Mage/Weapons/StarterStaff.tres", new EquipStats("Basic Staff", "Staff", 0, "Mage", 1, 0, 0, 10, "Magic", 2));
+        ITEM_STATS.put("res://sprites/items/Mage/SecondHand/StarterBook.tres", new EquipStats("Basic Book", "Book", 0, "Mage", 0, 0, 0, 10, "Magic", 5));
+        ITEM_STATS.put("res://sprites/items/Ranger/Weapons/StarterBow.tres", new EquipStats("Basic Bow", "Bow", 0, "Ranger", 1, 0, 5, 0, "Focus", 5));
+        ITEM_STATS.put("res://sprites/items/Ranger/SecondHand/StarterArrow.tres", new EquipStats("Basic Arrow", "Arrow", 0, "Ranger", 0, 0, 0, 0, "Focus", 5));
+    }
+
+    private static String regiaoSlotVazio(String slot) {
+        switch (slot) {
+            case "Helm": return "ui/slots/HelmSlot";
+            case "Necklace": return "ui/slots/NeckSlot";
+            case "MainHand": return "ui/slots/SwordSlot";
+            case "Hand": return "ui/slots/ShieldSlot";
+            case "Chest": return "ui/slots/ChestSlot";
+            case "Gloves": return "ui/slots/GlovesSlot";
+            case "Boots": return "ui/slots/BootsSlot";
+            case "Ring": return "ui/slots/RingSlot";
+            default: return null;
+        }
+    }
+
+    /** Slot onde o item entra, deduzido do caminho (null = nao e' equipavel/desconhecido). */
+    private static String slotDoItem(String caminho) {
+        if (caminho == null) return null;
+        if (caminho.contains("/Weapons/") || caminho.endsWith("/Sword.tres")) return "MainHand";
+        if (caminho.contains("/SecondHand/")) return "Hand";
+        String nome = caminho.substring(caminho.lastIndexOf('/') + 1).toLowerCase();
+        if (nome.contains("helm") || nome.contains("hat")) return "Helm";
+        if (nome.contains("neck") || nome.contains("amulet")) return "Necklace";
+        if (nome.contains("chest") || nome.contains("armor") || nome.contains("robe")) return "Chest";
+        if (nome.contains("glove")) return "Gloves";
+        if (nome.contains("boot")) return "Boots";
+        if (nome.contains("ring")) return "Ring";
+        return null;
     }
 
     private void construirPaginaEquip(Skin skin) {
-        equipPage.top().left();
-        equipItemGrid.top().left();
+        skin.add("equip-slot", UiSkin.retangulo(
+            new Color(0.15f, 0.15f, 0.15f, 1f), new Color(0.21f, 0.21f, 0.21f, 1f), 2),
+            com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
+        skin.add("equip-slot-hover", UiSkin.retangulo(
+            new Color(0.18f, 0.18f, 0.18f, 1f), new Color(0.32f, 0.32f, 0.32f, 1f), 2),
+            com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
+        skin.add("equip-slot-selected", UiSkin.retangulo(
+            new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.95f, 0.65f, 0.24f, 1f), 2),
+            com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
 
+        // Coluna esquerda: grade de slots equipados + detalhes do slot selecionado.
         Table slots = new Table();
-        slots.top();
+        slots.top().left();
+        equipSlotsTabela = slots;
         for (String[] linha : SLOTS_EQUIP) {
             for (String nomeSlot : linha) {
-                Button.ButtonStyle estilo = new Button.ButtonStyle();
-                estilo.up = skin.getDrawable("bag-slot");
-                estilo.over = skin.getDrawable("bag-slot-hover");
-                estilo.down = skin.getDrawable("bag-slot-selected");
-                estilo.checked = skin.getDrawable("bag-slot-selected");
-                estilo.checkedOver = estilo.checked;
-                Button botao = new Button(estilo);
+                if (nomeSlot == null) {
+                    slots.add().size(SLOT_EQUIP).pad(1.5f);
+                    continue;
+                }
+                Button botao = new Button(estiloSlotEquip());
                 botao.addListener(new ChangeListener() {
                     @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                         selecionarSlotEquip(nomeSlot);
                     }
                 });
                 equipSlotButtons.put(nomeSlot, botao);
-
-                Table celula = new Table();
-                Label rotulo = new Label(nomeSlot, skin, "hud");
-                rotulo.setFontScale(0.5f);
-                rotulo.setAlignment(Align.center);
-                celula.add(rotulo).growX().center().padBottom(2).row();
-                celula.add(botao).size(42);
-                slots.add(celula).pad(2);
+                slots.add(botao).size(SLOT_EQUIP).pad(1.5f);
             }
             slots.row();
         }
 
-        Table detalhes = new Table();
-        detalhes.setBackground(skin.getDrawable("bag-detail"));
-        detalhes.top().left().pad(8);
-        equipSlotTitle = new Label("Select a slot", skin, "default");
-        equipSlotTitle.setWrap(true);
-        Label rotuloEquipado = new Label("Equipped", skin, "hud");
-        rotuloEquipado.setColor(Color.GRAY);
-        rotuloEquipado.setFontScale(0.85f);
-        equipEquipadoBloco = new Table();
-        Label rotuloCandidato = new Label("Candidate", skin, "hud");
-        rotuloCandidato.setColor(Color.GRAY);
-        rotuloCandidato.setFontScale(0.85f);
-        equipCandidatoBloco = new Table();
-        detalhes.add(equipSlotTitle).growX().left().padBottom(6).row();
-        detalhes.add(rotuloEquipado).left().row();
-        detalhes.add(equipEquipadoBloco).growX().left().padBottom(8).row();
-        detalhes.add(rotuloCandidato).left().row();
-        detalhes.add(equipCandidatoBloco).growX().left().row();
-        detalhes.add(new Table()).growY();
+        equipColunaEsquerda = new Table();
+        equipColunaEsquerda.top().left();
+        equipColunaEsquerda.setBackground(UiSkin.retangulo(
+            new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        equipDetalhesEsquerda.top().left();
 
-        Label.LabelStyle fontePequena = skin.get("hud", Label.LabelStyle.class);
-        TextButton.TextButtonStyle estiloEquipar = new TextButton.TextButtonStyle(
-            skin.get("verde", TextButton.TextButtonStyle.class));
-        estiloEquipar.font = fontePequena.font;
-        TextButton.TextButtonStyle estiloDesequipar = new TextButton.TextButtonStyle(
-            skin.get("vermelho", TextButton.TextButtonStyle.class));
-        estiloDesequipar.font = fontePequena.font;
-        TextButton botaoEquipar = new TextButton("Equip", estiloEquipar);
-        botaoEquipar.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                equiparSelecionado();
-            }
-        });
-        TextButton botaoDesequipar = new TextButton("Unequip", estiloDesequipar);
-        botaoDesequipar.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                desequiparSlotSelecionado();
-            }
-        });
-        equipButton = botaoEquipar;
-        unequipButton = botaoDesequipar;
-
-        Table botoesAcao = new Table();
-        botoesAcao.center();
-        botoesAcao.add(equipButton).width(62).height(26).padRight(4);
-        botoesAcao.add(unequipButton).width(62).height(26);
-
-        Table colunaEsquerda = new Table();
-        colunaEsquerda.top();
-        colunaEsquerda.add(slots).padBottom(6).row();
-        colunaEsquerda.add(botoesAcao).padTop(4);
-
-        Table painelGrade = new Table();
-        painelGrade.pad(7);
+        // Coluna direita: itens da bag que podem ser equipados + botao + detalhes.
+        equipItemGrid.top().left();
         ScrollPane scroll = new ScrollPane(equipItemGrid, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
         scroll.setOverscroll(false, false);
         scroll.setFlickScroll(true);
-        painelGrade.add(scroll).grow();
+        equipPainelGrade = new Table();
+        equipPainelGrade.top().left();
+        equipPainelGrade.add(scroll).grow().pad(12, 12, 6, 12);
+        equipDetalhesDireita.top().left();
 
-        Table colunaDireita = new Table();
-        colunaDireita.add(detalhes).growX().height(172).padBottom(6).row();
-        colunaDireita.add(painelGrade).grow();
+        TextButton.TextButtonStyle estiloEquipar = new TextButton.TextButtonStyle(
+            skin.get("verde", TextButton.TextButtonStyle.class));
+        estiloEquipar.font = skin.getFont("botao-pequeno-font");
+        TextButton.TextButtonStyle estiloDesequipar = new TextButton.TextButtonStyle(
+            skin.get("default", TextButton.TextButtonStyle.class));
+        estiloDesequipar.font = skin.getFont("botao-pequeno-font");
+        equipButton = new TextButton("Equip", estiloEquipar);
+        equipButton.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                equiparSelecionado();
+            }
+        });
+        unequipButton = new TextButton("Unequip", estiloDesequipar);
+        unequipButton.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                desequiparSlotSelecionado();
+            }
+        });
 
-        equipPage.add(colunaEsquerda).width(138).growY().padTop(7).padRight(7);
-        equipPage.add(colunaDireita).grow();
-        atualizarDetalhesEquip();
+        equipColunaDireita = new Table();
+        equipColunaDireita.top().left();
+        equipColunaDireita.setBackground(UiSkin.retangulo(
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
+
+        equipPage.add(equipColunaEsquerda).width(COLUNA_EQUIP).growY();
+        equipPage.add(equipColunaDireita).grow();
         atualizarGradeEquip();
+        atualizarDetalhesEquip();
+    }
+
+    private Button.ButtonStyle estiloSlotEquip() {
+        Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estilo.up = skin.getDrawable("equip-slot");
+        estilo.over = skin.getDrawable("equip-slot-hover");
+        estilo.down = skin.getDrawable("equip-slot-selected");
+        estilo.checked = skin.getDrawable("equip-slot-selected");
+        estilo.checkedOver = estilo.checked;
+        return estilo;
     }
 
     private void selecionarSlotEquip(String slot) {
-        selectedSlot = slot;
+        selectedSlot = slot.equals(selectedSlot) ? "" : slot;
         selectedEquipCandidate = -1;
-        for (Map.Entry<String, Button> entrada : equipSlotButtons.entrySet()) {
-            entrada.getValue().setChecked(entrada.getKey().equals(slot));
-        }
+        atualizarGradeEquip();
         atualizarDetalhesEquip();
     }
 
     private void atualizarGradeEquip() {
-        equipItemGrid.clearChildren();
+        equipCandidatos.clear();
         for (int i = 0; i < inventoryItems.size(); i++) {
-            final int indice = i;
-            InventoryItem item = inventoryItems.get(i);
-            Button.ButtonStyle estilo = new Button.ButtonStyle();
-            estilo.up = skinDrawable("bag-slot");
-            estilo.over = skinDrawable("bag-slot-hover");
-            estilo.down = skinDrawable("bag-slot-selected");
-            estilo.checked = skinDrawable("bag-slot-selected");
-            estilo.checkedOver = estilo.checked;
-            Button slotBtn = new Button(estilo);
-            slotBtn.setChecked(i == selectedEquipCandidate);
+            String caminho = inventoryItems.get(i).itemPath;
+            if (slotDoItem(caminho) != null || ITEM_STATS.containsKey(caminho)) equipCandidatos.add(i);
+        }
+        equipItemGrid.clearChildren();
+        if (equipCandidatos.isEmpty()) {
+            Button vazio = new Button(estiloSlotEquip());
+            vazio.setDisabled(true);
+            equipItemGrid.add(vazio).size(SLOT_EQUIP).pad(1.5f);
+            return;
+        }
+        for (int n = 0; n < equipCandidatos.size(); n++) {
+            final int indice = equipCandidatos.get(n);
+            InventoryItem item = inventoryItems.get(indice);
+            Button slotBtn = new Button(estiloSlotEquip());
+            slotBtn.setChecked(indice == selectedEquipCandidate);
             TextureAtlas.AtlasRegion textura = iconeDoItem(item.itemPath);
             if (textura != null) {
                 Image icone = new Image(new TextureRegionDrawable(textura));
                 icone.setScaling(Scaling.fit);
-                slotBtn.add(icone).grow().pad(4);
+                slotBtn.add(icone).grow().pad(6);
             }
             slotBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     selectedEquipCandidate = (selectedEquipCandidate == indice) ? -1 : indice;
-                    atualizarDetalhesEquip();
+                    selectedSlot = "";
                     atualizarGradeEquip();
+                    atualizarDetalhesEquip();
                 }
             });
-            equipItemGrid.add(slotBtn).size(42).pad(1);
-            if ((i + 1) % COLUNAS_INVENTARIO == 0) equipItemGrid.row();
+            equipItemGrid.add(slotBtn).size(SLOT_EQUIP).pad(1.5f);
+            if ((n + 1) % COLUNAS_EQUIP == 0) equipItemGrid.row();
         }
     }
 
     private void atualizarDetalhesEquip() {
-        if (selectedSlot.isEmpty()) {
-            equipSlotTitle.setText("Select a slot");
-            preencherBlocoStats(equipEquipadoBloco, null);
-            preencherBlocoStats(equipCandidatoBloco, null);
-            equipButton.setDisabled(true);
-            unequipButton.setDisabled(true);
-            return;
+        for (Map.Entry<String, Button> entrada : equipSlotButtons.entrySet()) {
+            entrada.getValue().setChecked(entrada.getKey().equals(selectedSlot));
         }
-        equipSlotTitle.setText(selectedSlot);
-        String equipadoPath = equippedItemPaths.get(selectedSlot);
-        preencherBlocoStats(equipEquipadoBloco, equipadoPath);
-        unequipButton.setDisabled(equipadoPath == null);
+        String equipadoPath = selectedSlot.isEmpty() ? null : equippedItemPaths.get(selectedSlot);
+        String candidatoPath = selectedEquipCandidate >= 0 && selectedEquipCandidate < inventoryItems.size()
+            ? inventoryItems.get(selectedEquipCandidate).itemPath : null;
+        if (candidatoPath == null) selectedEquipCandidate = -1;
 
-        if (selectedEquipCandidate >= 0 && selectedEquipCandidate < inventoryItems.size()) {
-            String candidatoPath = inventoryItems.get(selectedEquipCandidate).itemPath;
-            preencherBlocoStats(equipCandidatoBloco, candidatoPath);
-            equipButton.setDisabled(false);
-        } else {
-            preencherBlocoStats(equipCandidatoBloco, null);
-            equipButton.setDisabled(true);
+        // Esquerda: detalhes do item equipado no slot selecionado.
+        equipColunaEsquerda.clearChildren();
+        equipColunaEsquerda.add(equipSlotsTabela).top().left().pad(4).row();
+        if (equipadoPath != null) {
+            preencherBlocoStats(equipDetalhesEsquerda, equipadoPath, null);
+            equipColunaEsquerda.add(separadorEquip()).growX().height(1).padTop(4).row();
+            equipColunaEsquerda.add(equipDetalhesEsquerda).growX().top().left().pad(6, 7, 6, 7).row();
         }
+
+        // Direita: grade; com candidato -> botao Equip + detalhes comparando
+        // com o que esta equipado no slot dele; com slot equipado -> Unequip.
+        equipColunaDireita.clearChildren();
+        if (candidatoPath != null) {
+            String slotAlvo = slotDoItem(candidatoPath);
+            String atual = slotAlvo == null ? null : equippedItemPaths.get(slotAlvo);
+            equipColunaDireita.add(equipPainelGrade).growX().height(ALTURA_GRADE_EQUIP - 54f).row();
+            equipColunaDireita.add(equipButton).width(120).height(42).right().padRight(14).padBottom(8).row();
+            equipColunaDireita.add(separadorEquip()).growX().height(1).row();
+            preencherBlocoStats(equipDetalhesDireita, candidatoPath, atual == null ? "" : atual);
+            equipColunaDireita.add(equipDetalhesDireita).grow().top().left().pad(6, 7, 6, 7);
+            equipButton.setDisabled(slotAlvo == null && selectedSlot.isEmpty());
+        } else {
+            equipColunaDireita.add(equipPainelGrade).grow().row();
+            if (equipadoPath != null) {
+                equipColunaDireita.add(unequipButton).width(120).height(42).right().padRight(14).padBottom(10);
+            }
+        }
+    }
+
+    private Image separadorEquip() {
+        return criarPreenchimentoBarra(new Color(0.35f, 0.35f, 0.35f, 1f));
     }
 
     private static Color corClasse(String classe) {
@@ -543,52 +596,72 @@ public final class BookMenuUI {
         switch (tipo) {
             case "Magic": return Color.valueOf("a474d4");
             case "Focus": return Color.valueOf("00d084");
-            case "Musicality": return Color.valueOf("ffa24e");
+            case "Musicality": return Color.valueOf("f0a35a");
             case "Melee": return Color.valueOf("cccccc");
             default: return Color.WHITE;
         }
     }
 
-    private void preencherBlocoStats(Table bloco, String itemPath) {
+    private static final Color COR_REQUISITO = Color.valueOf("ffff33");
+    private static final Color COR_STAMINA = Color.valueOf("22e022");
+    private static final Color COR_MANA = Color.valueOf("4a8cff");
+
+    /**
+     * Nome + requisitos + stats do item. compararCom != null mostra a diferenca
+     * pro item equipado no mesmo slot ("" = slot vazio), ex: "Mana 10 (+10)".
+     */
+    private void preencherBlocoStats(Table bloco, String itemPath, String compararCom) {
         bloco.clearChildren();
         bloco.top().left();
-        if (itemPath == null) {
-            Label vazio = linhaStat("(empty)", Color.GRAY);
-            bloco.add(vazio).left();
-            return;
-        }
-        Label nome = linhaStat(nomeExibicao(itemPath), Color.WHITE);
-        bloco.add(nome).left().row();
+        Label nome = new Label(nomeExibicao(itemPath), skin, "hud");
+        nome.setFontScale(0.95f);
+        bloco.add(nome).left().padBottom(2).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
         if (dados == null) return;
-        bloco.add(linhaStat(dados.reqClass, corClasse(dados.reqClass))).left().row();
-        if (dados.bonusDamage != 0) bloco.add(linhaStat("Attack +" + dados.bonusDamage, Color.WHITE)).left().row();
-        if (dados.defense != 0) bloco.add(linhaStat("Defense +" + dados.defense, Color.WHITE)).left().row();
-        if (dados.stamina != 0) bloco.add(linhaStat("Stamina +" + dados.stamina, Color.valueOf("6ab7ff"))).left().row();
-        if (dados.mana != 0) bloco.add(linhaStat("Mana +" + dados.mana, Color.valueOf("4287f5"))).left().row();
-        if (dados.fourthStatType != null && !dados.fourthStatType.isEmpty()
-            && !"None".equals(dados.fourthStatType) && dados.fourthStatValue != 0) {
-            bloco.add(linhaStat(dados.fourthStatType + " +" + dados.fourthStatValue,
-                corQuartoStat(dados.fourthStatType))).left().row();
+        EquipStats base = compararCom == null ? null : ITEM_STATS.get(compararCom);
+        boolean comparar = compararCom != null;
+        bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
+        bloco.add(linhaStat(dados.reqClass + " " + dados.tipo, COR_REQUISITO)).left().row();
+        adicionarLinhaStat(bloco, "Attack", dados.bonusDamage, base == null ? 0 : base.bonusDamage, comparar, Color.WHITE);
+        adicionarLinhaStat(bloco, "Defense", dados.defense, base == null ? 0 : base.defense, comparar, Color.WHITE);
+        adicionarLinhaStat(bloco, "Stamina", dados.stamina, base == null ? 0 : base.stamina, comparar, COR_STAMINA);
+        adicionarLinhaStat(bloco, "Mana", dados.mana, base == null ? 0 : base.mana, comparar, COR_MANA);
+        if (dados.fourthStatType != null && !dados.fourthStatType.isEmpty() && !"None".equals(dados.fourthStatType)) {
+            int anterior = base != null && dados.fourthStatType.equals(base.fourthStatType) ? base.fourthStatValue : 0;
+            adicionarLinhaStat(bloco, dados.fourthStatType, dados.fourthStatValue, anterior, comparar,
+                corQuartoStat(dados.fourthStatType));
         }
+    }
+
+    private void adicionarLinhaStat(Table bloco, String nome, int valor, int anterior, boolean comparar, Color cor) {
+        if (valor == 0 && (!comparar || anterior == 0)) return;
+        String texto = nome + " " + valor;
+        if (comparar) {
+            int diferenca = valor - anterior;
+            texto += " (" + (diferenca >= 0 ? "+" : "") + diferenca + ")";
+        }
+        bloco.add(linhaStat(texto, cor)).left().row();
     }
 
     private Label linhaStat(String texto, Color cor) {
         Label label = new Label(texto, skin, "hud");
-        label.setFontScale(0.85f);
+        label.setFontScale(0.8f);
         label.setColor(cor);
         return label;
     }
 
     private void equiparSelecionado() {
-        if (selectedSlot.isEmpty() || selectedEquipCandidate < 0 || selectedEquipCandidate >= inventoryItems.size()
+        if (selectedEquipCandidate < 0 || selectedEquipCandidate >= inventoryItems.size()
             || !socket.isConnected()) return;
-        String instanceId = inventoryItems.get(selectedEquipCandidate).instanceId;
-        if (instanceId.isEmpty()) return;
-        String slot = selectedSlot;
+        InventoryItem item = inventoryItems.get(selectedEquipCandidate);
+        String slotItem = slotDoItem(item.itemPath);
+        String slot = slotItem != null ? slotItem : selectedSlot;
+        if (item.instanceId.isEmpty() || slot.isEmpty()) return;
+        String instanceId = item.instanceId;
         String payload = GameSocket.obj(w -> { w.set("instance_id", instanceId); w.set("slot", slot); });
         socket.emitRaw("equip_item", payload);
         selectedEquipCandidate = -1;
+        selectedSlot = slot;
     }
 
     private void desequiparSlotSelecionado() {
@@ -611,10 +684,11 @@ public final class BookMenuUI {
             botao.clearChildren();
             String caminho = equippedItemPaths.get(entrada.getKey());
             TextureAtlas.AtlasRegion textura = caminho == null ? null : iconeDoItem(caminho);
+            if (textura == null) textura = atlas.findRegion(regiaoSlotVazio(entrada.getKey()));
             if (textura != null) {
                 Image icone = new Image(new TextureRegionDrawable(textura));
                 icone.setScaling(Scaling.fit);
-                botao.add(icone).grow().pad(4);
+                botao.add(icone).grow().pad(caminho == null ? 4 : 6);
             }
         }
         atualizarDetalhesEquip();
@@ -1061,6 +1135,8 @@ public final class BookMenuUI {
 
     private String nomeExibicao(String caminho) {
         if (caminho == null || caminho.isEmpty()) return "Unknown item";
+        EquipStats dados = ITEM_STATS.get(caminho);
+        if (dados != null) return dados.nome;
         String nome = caminho.substring(caminho.lastIndexOf('/') + 1);
         int extensao = nome.lastIndexOf('.');
         if (extensao >= 0) nome = nome.substring(0, extensao);
@@ -1151,9 +1227,11 @@ public final class BookMenuUI {
         try {
             secaoAtual = secao;
             tituloSecao.setText(secao);
-            boolean comTitulo = !"Bag".equals(secao) && !"Skills".equals(secao);
+            boolean comTitulo = !"Bag".equals(secao) && !"Skills".equals(secao) && !"Equip".equals(secao);
             tituloSecao.setVisible(comTitulo);
             mainWindow.clearChildren();
+            // Equip ocupa o painel inteiro (colunas encostam na borda).
+            mainWindow.pad("Equip".equals(secao) ? 1 : 14);
             if (comTitulo) {
                 mainWindow.add(tituloSecao).growX().left().padBottom(9).row();
             }
@@ -1182,6 +1260,25 @@ public final class BookMenuUI {
             case "Rank": return Color.valueOf("f5d328");
             default: return Color.WHITE;
         }
+    }
+
+    // Atalhos do teclado com o menu aberto: 1 = Bag, 2 = Equip, ... (Esc fecha, ver WorldScreen).
+    private static final String[] ORDEM_ATALHOS = {
+        "Bag", "Equip", "Skills", "Vanity", "Spells", "Party", "Friends", "Map", "Rank"
+    };
+
+    /** Trata as teclas 1-9 (linha de cima ou numpad). Retorna true se consumiu. */
+    public boolean teclaAtalho(int keycode) {
+        if (!isVisible()) return false;
+        int indice = -1;
+        if (keycode >= com.badlogic.gdx.Input.Keys.NUM_1 && keycode <= com.badlogic.gdx.Input.Keys.NUM_9) {
+            indice = keycode - com.badlogic.gdx.Input.Keys.NUM_1;
+        } else if (keycode >= com.badlogic.gdx.Input.Keys.NUMPAD_1 && keycode <= com.badlogic.gdx.Input.Keys.NUMPAD_9) {
+            indice = keycode - com.badlogic.gdx.Input.Keys.NUMPAD_1;
+        }
+        if (indice < 0 || indice >= ORDEM_ATALHOS.length) return false;
+        selecionarSecao(ORDEM_ATALHOS[indice]);
+        return true;
     }
 
     public void alternar() {

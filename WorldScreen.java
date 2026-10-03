@@ -454,6 +454,8 @@ public class WorldScreen extends ScreenAdapter {
                     alternarBookMenu();
                     return true;
                 }
+                // 1-9 trocam a aba do book menu aberto (ver BookMenuUI.teclaAtalho).
+                if (!chat.estaDigitando() && bookMenu.teclaAtalho(keycode)) return true;
                 if (keycode == Input.Keys.ESCAPE) {
                     // Fecha a interface ativa antes de abrir Settings.
                     if (dialogoNPC.isVisible()) dialogoNPC.fechar();
