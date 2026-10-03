@@ -22,6 +22,7 @@ import com.badlogic.gdx.utils.Scaling;
 import com.teste.game.rede.GameSocket;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,6 +86,7 @@ public final class BookMenuUI {
     private static final int COLUNAS_EQUIP = 5;
     private final Map<String, Button> equipSlotButtons = new LinkedHashMap<>();
     private final Map<String, String> equippedItemPaths = new LinkedHashMap<>();
+    private final Map<String, Integer> equippedQuantidades = new HashMap<>();
     private final List<Integer> equipCandidatos = new ArrayList<>();
     private final Table equipItemGrid = new Table();
     private final Table equipDetalhesEsquerda = new Table();
@@ -703,26 +705,55 @@ public final class BookMenuUI {
         socket.emitRaw("unequip_item", payload);
     }
 
-    public void atualizarEquipados(JsonValue dados) {
-        equippedItemPaths.clear();
-        if (dados != null && dados.isObject()) {
-            for (JsonValue entrada = dados.child; entrada != null; entrada = entrada.next) {
-                String caminho = entrada.getString("item", "");
-                if (!caminho.isEmpty()) equippedItemPaths.put(entrada.name, caminho);
-            }
-        }
+    /** Quantidade de um item equipado mudou (ex: flecha gasta, sync_vitals ammo_qty). */
+    public void definirQuantidadeEquipada(String slot, int quantidade) {
+        if (!equippedItemPaths.containsKey(slot)) return;
+        equippedQuantidades.put(slot, quantidade);
+        redesenharSlotsEquipados();
+    }
+
+    /** Icone de cada slot equipado; item empilhavel (flechas) mostra a
+     * quantidade no canto inferior esquerdo, igual na Bag. */
+    private void redesenharSlotsEquipados() {
         for (Map.Entry<String, Button> entrada : equipSlotButtons.entrySet()) {
             Button botao = entrada.getValue();
             botao.clearChildren();
             String caminho = equippedItemPaths.get(entrada.getKey());
             TextureAtlas.AtlasRegion textura = caminho == null ? null : iconeDoItem(caminho);
             if (textura == null) textura = atlas.findRegion(regiaoSlotVazio(entrada.getKey()));
-            if (textura != null) {
-                Image icone = new Image(new TextureRegionDrawable(textura));
-                icone.setScaling(Scaling.fit);
+            if (textura == null) continue;
+            Image icone = new Image(new TextureRegionDrawable(textura));
+            icone.setScaling(Scaling.fit);
+            int qtd = equippedQuantidades.getOrDefault(entrada.getKey(), 1);
+            if (caminho == null || qtd <= 1) {
                 botao.add(icone).grow().pad(caminho == null ? 4 : 6);
+                continue;
+            }
+            Table moldura = new Table();
+            moldura.add(icone).grow().pad(6);
+            Table marcadores = new Table();
+            marcadores.bottom().left();
+            Label quantidade = new Label(String.valueOf(qtd), skin, "hud");
+            quantidade.setFontScale(0.6f);
+            quantidade.setColor(Color.WHITE);
+            marcadores.add(quantidade).left().bottom().pad(2);
+            botao.add(new Stack(moldura, marcadores)).grow();
+        }
+    }
+
+    public void atualizarEquipados(JsonValue dados) {
+        equippedItemPaths.clear();
+        equippedQuantidades.clear();
+        if (dados != null && dados.isObject()) {
+            for (JsonValue entrada = dados.child; entrada != null; entrada = entrada.next) {
+                String caminho = entrada.getString("item", "");
+                if (!caminho.isEmpty()) {
+                    equippedItemPaths.put(entrada.name, caminho);
+                    equippedQuantidades.put(entrada.name, Math.max(1, entrada.getInt("qty", 1)));
+                }
             }
         }
+        redesenharSlotsEquipados();
         atualizarDetalhesEquip();
         // A comparacao (+x) dos detalhes da Bag depende do que esta equipado.
         if (favoriteButton != null) atualizarDetalhes(itemSelecionado());
@@ -732,7 +763,7 @@ public final class BookMenuUI {
 
     private String[] skillPrincipal() {
         switch (classeJogador) {
-            case "Ranger": return new String[]{"distance", "Distance"};
+            case "Ranger": return new String[]{"distance", "Focus"}; // chave do servidor continua "distance"
             case "Mage": return new String[]{"magic", "Magic"};
             case "Bard": return new String[]{"musicality", "Musicality"};
             default: return new String[]{"melee", "Melee"};
@@ -1214,7 +1245,7 @@ public final class BookMenuUI {
     private static String nomeCategoriaVanity(String cat) {
         switch (cat) {
             case "base": return "Skin";
-            case "body": return "Cloth";
+            case "body": return "Clothe";
             case "helm": return "Hair/Hat";
             case "acc": return "Back";
             default: return cat;

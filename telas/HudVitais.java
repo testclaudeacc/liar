@@ -37,6 +37,7 @@ public final class HudVitais {
     private static final Color COR_MP = new Color(96 / 255f, 153 / 255f, 1f, 1f);
     private static final Color COR_XP_FUNDO = new Color(14 / 255f, 14 / 255f, 14 / 255f, 1f);
     private static final Color COR_XP = Color.valueOf("e8b020");
+    private static final Color COR_MUNICAO = new Color(0.32f, 0.32f, 0.32f, 1f);
 
     private final float escala; // pixels de tela por unidade do stage
     // Tudo aqui e' medido em pixels de tela (da print do PC); no celular, com
@@ -50,6 +51,10 @@ public final class HudVitais {
     private final BitmapFont fonte;
     private final Table raiz = new Table();
     private final Barra hp, mp, xp;
+    // Barrinha cinza de municao (icone da flecha + quantidade), abaixo do XP.
+    private final Table painelMunicao = new Table();
+    private final Image iconeMunicao = new Image();
+    private final Label textoMunicao;
     private float hpAtual = 1f, hpMax = 1f, mpAtual = 1f, mpMax = 1f;
 
     private static final class Barra {
@@ -119,7 +124,21 @@ public final class HudVitais {
         raiz.setFillParent(true);
         raiz.top().left().padLeft(px(17)).padTop(px(13));
         raiz.add(painel).left().row();
-        raiz.add(painelXp).left().padTop(px(6));
+        raiz.add(painelXp).left().padTop(px(6)).row();
+
+        // ---- Municao (so' aparece com flecha equipada) ----
+        iconeMunicao.setScaling(Scaling.fit);
+        textoMunicao = new Label("", estilo);
+        Table internoMunicao = new Table();
+        internoMunicao.setBackground(cor(COR_MUNICAO));
+        internoMunicao.left();
+        internoMunicao.add(iconeMunicao).size(px(24)).padLeft(px(4)).padRight(px(6));
+        internoMunicao.add(textoMunicao).left().expandX();
+        painelMunicao.setBackground(cor(Color.BLACK));
+        painelMunicao.pad(px(1));
+        painelMunicao.add(internoMunicao).size(px(110), px(28));
+        painelMunicao.setVisible(false);
+        raiz.add(painelMunicao).left().padTop(px(6));
         // Sempre por baixo de qualquer outra tela (BookMenu, chat, settings...).
         stage.getRoot().addActorAt(0, raiz);
         atualizar();
@@ -215,6 +234,16 @@ public final class HudVitais {
     private static long expParaLevel(int level) {
         if (level <= 1) return 0;
         return (long) ((50.0 / 3.0) * (Math.pow(level, 3) - 6 * Math.pow(level, 2) + 17 * level - 12));
+    }
+
+    /** Flecha equipada: icone + quantidade. icone null = sem municao (esconde). */
+    public void definirMunicao(TextureRegion icone, int quantidade) {
+        boolean mostrar = icone != null;
+        painelMunicao.setVisible(mostrar);
+        if (!mostrar) return;
+        iconeMunicao.setDrawable(new TextureRegionDrawable(icone));
+        textoMunicao.setText(String.valueOf(Math.max(0, quantidade)));
+        textoMunicao.setColor(quantidade <= 0 ? new Color(1f, 0.35f, 0.35f, 1f) : Color.WHITE);
     }
 
     public float hpAtual() { return hpAtual; }

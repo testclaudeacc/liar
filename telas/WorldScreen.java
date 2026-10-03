@@ -1307,6 +1307,7 @@ public class WorldScreen extends ScreenAdapter {
                 bookMenu.atualizarInventario(data.get("inventory"));
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
                 bookMenu.atualizarEquipados(data.get("equipped_items"));
+                atualizarMunicao(data.get("equipped_items"));
                 bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getInt("exp", 0), data.getInt("kills", 0));
             }
             JsonValue dialogosVistos = data.get("npc_dialogue_state");
@@ -1453,6 +1454,12 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
+            // Flecha gasta (o servidor manda a quantidade restante a cada tiro).
+            if (data.has("ammo_qty") && caminhoMunicao != null) {
+                quantidadeMunicao = data.getInt("ammo_qty", quantidadeMunicao);
+                hud.definirMunicao(bookMenu.iconeDoItem(caminhoMunicao), quantidadeMunicao);
+                bookMenu.definirQuantidadeEquipada(SLOT_MUNICAO, quantidadeMunicao);
+            }
         });
         // XP ganha ao matar um mob: sobe em branco em cima do player, igual o dano.
         socket.on("xp_gained", (nomeEvt, data) -> {
@@ -1628,6 +1635,7 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             bookMenu.atualizarInventario(data.get("inventory"));
             bookMenu.atualizarEquipados(data.get("equipped_items"));
+            atualizarMunicao(data.get("equipped_items"));
         });
 
         socket.on("loot_collected", (nomeEvt, data) -> {
@@ -2713,6 +2721,28 @@ public class WorldScreen extends ScreenAdapter {
         }
     }
 
+    // Municao equipada (Ranger): slot "Hand" (servidor.py::SLOT_MUNICAO).
+    private static final String SLOT_MUNICAO = "Hand";
+    private String caminhoMunicao = null;
+    private int quantidadeMunicao = 0;
+    private boolean avisouSemMunicao = false;
+
+    /** Le a flecha equipada (item + qty) e mostra/esconde a barrinha da HUD. */
+    private void atualizarMunicao(JsonValue equipados) {
+        caminhoMunicao = null;
+        quantidadeMunicao = 0;
+        if ("Ranger".equals(local.classe) && equipados != null && equipados.has(SLOT_MUNICAO)) {
+            JsonValue inst = equipados.get(SLOT_MUNICAO);
+            String caminho = inst.getString("item", "");
+            if (!caminho.isEmpty()) {
+                caminhoMunicao = caminho;
+                quantidadeMunicao = Math.max(0, inst.getInt("qty", 1));
+                avisouSemMunicao = false;
+            }
+        }
+        hud.definirMunicao(caminhoMunicao != null ? bookMenu.iconeDoItem(caminhoMunicao) : null, quantidadeMunicao);
+    }
+
     private boolean classeRanged() {
         return !"Knight".equals(local.classe);
     }
@@ -2906,6 +2936,14 @@ public class WorldScreen extends ScreenAdapter {
             return;
         }
         if (localMorto || esperaAtaque > 0f || !socket.isConnected()) return;
+        // Arco sem flecha nao ataca (o servidor tambem recusa).
+        if ("Ranger".equals(local.classe) && (caminhoMunicao == null || quantidadeMunicao <= 0)) {
+            if (!avisouSemMunicao) {
+                avisouSemMunicao = true;
+                chat.adicionarMensagemSistema("You have no arrows equipped.", new Color(1f, 0.25f, 0.25f, 1f));
+            }
+            return;
+        }
         if (classeRanged()) {
             float dx = local.x - alvo.x, dy = local.y - alvo.y;
             if (dx * dx + dy * dy > (float) (ALCANCE_RANGED_SQM * Jogador.TILE) * (ALCANCE_RANGED_SQM * Jogador.TILE)) return;
@@ -2943,7 +2981,7 @@ public class WorldScreen extends ScreenAdapter {
 
     private static String nomeSkill(String chave) {
         switch (chave) {
-            case "distance": return "Distance";
+            case "distance": return "Focus"; // chave do servidor continua "distance"
             case "magic": return "Magic";
             case "musicality": return "Musicality";
             case "melee": return "Melee";
