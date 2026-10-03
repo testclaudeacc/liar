@@ -102,7 +102,7 @@ public final class HudVitais {
         pixel = new Texture(pm);
         pm.dispose();
         fonte = gerarFonte(escala, 14, false);
-        fonteNotificacao = gerarFonte(escala, MOBILE ? 14 : 11, true);
+        fonteNotificacao = gerarFonte(escala, MOBILE ? 18 : 11, true);
         Label.LabelStyle estilo = new Label.LabelStyle(fonte, Color.WHITE);
 
         hp = criarBarra(estilo, COR_HP, 314);
@@ -172,11 +172,11 @@ public final class HudVitais {
         Table internoNotif = new Table();
         internoNotif.setBackground(cor(COR_MUNICAO));
         internoNotif.left();
-        internoNotif.add(iconeNotificacao).size(px(20)).padLeft(px(4)).padRight(px(6));
+        internoNotif.add(iconeNotificacao).size(px(MOBILE ? 22 : 20)).padLeft(px(4)).padRight(px(6));
         internoNotif.add(textoNotificacao).left().expandX().padRight(px(8));
         painelNotificacao.setBackground(cor(Color.BLACK));
         painelNotificacao.pad(px(1));
-        painelNotificacao.add(internoNotif).minWidth(px(110)).height(px(28));
+        painelNotificacao.add(internoNotif).minWidth(px(110)).height(px(MOBILE ? 32 : 28));
         painelNotificacao.setVisible(false);
         painelNotificacao.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         painelNotificacao.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {

@@ -66,7 +66,9 @@ public class PainelJogadorUI {
     private final Label nomeLabel;
     private final Table areaFoto = new Table();
     private final Button botaoIconBtn;
-    private final Button botaoAmigo, botaoIgnorar;
+    private final Button botaoAmigo, botaoIgnorar, botaoParty, botaoTrade, botaoChat;
+    private final Table botoes = new Table();
+    private boolean mostrarParty = true, mostrarTrade = true;
     private final Button miniPk, miniGuild, miniSeller;
     private final Button.ButtonStyle estiloSlot, estiloSlotAtivo;
 
@@ -100,18 +102,15 @@ public class PainelJogadorUI {
         // ---- Botoes de baixo (ordem do mock, esquerda -> direita) ----
         botaoAmigo = botaoIcone("ui/buttons/FriendsBtn", estiloSlot, TAM_ICONE_BOTAO);
         botaoIgnorar = botaoIcone("ui/buttons/IgnoreBtn", estiloSlot, TAM_ICONE_BOTAO);
-        Button botaoParty = botaoIcone("ui/buttons/PartyBtn", estiloSlot, TAM_ICONE_BOTAO);
-        Button botaoTrade = botaoIcone("ui/currency/Gold", estiloSlot, TAM_ICONE_BOTAO);
-        Button botaoChat = botaoIcone("ui/ChatButton", estiloSlot, TAM_ICONE_BOTAO);
+        botaoParty = botaoIcone("ui/buttons/PartyBtn", estiloSlot, TAM_ICONE_BOTAO);
+        botaoTrade = botaoIcone("ui/currency/Gold", estiloSlot, TAM_ICONE_BOTAO);
+        botaoChat = botaoIcone("ui/ChatButton", estiloSlot, TAM_ICONE_BOTAO);
         acao(botaoAmigo, () -> ouvinte.alternarAmigo(nomeAtual));
         acao(botaoIgnorar, () -> ouvinte.alternarIgnorar(nomeAtual));
         acao(botaoParty, () -> ouvinte.convidarParty(nomeAtual));
         acao(botaoTrade, () -> ouvinte.convidarTrade(nomeAtual));
         acao(botaoChat, () -> ouvinte.abrirChat(nomeAtual));
-        Table botoes = new Table();
-        for (Button b : new Button[]{botaoAmigo, botaoIgnorar, botaoParty, botaoTrade, botaoChat}) {
-            botoes.add(b).size(TAM_BOTAO).pad(0, 2, 0, 2);
-        }
+        montarBotoes();
 
         janela.setBackground(UiSkin.retangulo(COR_FUNDO, COR_BORDA, 1));
         janela.setTouchable(Touchable.enabled);
@@ -180,6 +179,24 @@ public class PainelJogadorUI {
         miniPk.setStyle(pk ? estiloSlotAtivo : estiloSlot);
         miniGuild.setStyle(guild ? estiloSlotAtivo : estiloSlot);
         miniSeller.setStyle(seller ? estiloSlotAtivo : estiloSlot);
+    }
+
+    private void montarBotoes() {
+        botoes.clearChildren();
+        for (Button b : new Button[]{botaoAmigo, botaoIgnorar, botaoParty, botaoTrade, botaoChat}) {
+            if (b == botaoParty && !mostrarParty) continue;
+            if (b == botaoTrade && !mostrarTrade) continue;
+            botoes.add(b).size(TAM_BOTAO).pad(0, 2, 0, 2);
+        }
+    }
+
+    /** Party: so' sem party ou sendo o lider. Trade: so' perto (5 SQMs).
+     * Chamado todo frame com a janela aberta; so' remonta quando muda. */
+    public void definirBotoesVisiveis(boolean party, boolean trade) {
+        if (party == mostrarParty && trade == mostrarTrade) return;
+        mostrarParty = party;
+        mostrarTrade = trade;
+        montarBotoes();
     }
 
     public void fechar() {

@@ -189,6 +189,9 @@ public final class BookMenuUI {
         construirPaginaVanity(skin);
         construirPaginaFriends(skin);
         construirPaginaParty(skin);
+        construirPaginasTrade(skin);
+        colunaEsquerdaAbas = leftTab;
+        colunaDireitaAbas = rightTab;
         mainWindow.add(bagPage).grow();
 
         organizer.add(leftTab).width(COLUNA_LARGURA).height(JANELA_ALTURA);
@@ -528,6 +531,15 @@ public final class BookMenuUI {
         selectedEquipCandidate = -1;
         atualizarGradeEquip();
         atualizarDetalhesEquip();
+        if (modoTrade) {
+            // Item que sumiu da bag sai da selecao.
+            tradeSelecao.keySet().removeIf(id -> itemPorId(id) == null);
+            if (itemPorId(tradeFoco) == null) tradeFoco = null;
+            if (!tradeEnviado) {
+                atualizarGradeTrade();
+                atualizarDetalhesTrade();
+            }
+        }
     }
 
     private void atualizarGradeEquip() {
@@ -1544,6 +1556,429 @@ public final class BookMenuUI {
         trashButton.setDisabled(false);
     }
 
+    // ===================== TRADE =====================
+    // Duas telas no lugar do livro (abas laterais escondidas), mesmo visual
+    // da Bag: (1) escolher os itens - clique marca/desmarca, item com mais de
+    // 1 abre um campo pra digitar a quantia; Cancel / Send Trade (vira
+    // "Waiting..." ate o outro mandar tambem). (2) com os dois prontos: em
+    // cima a MINHA oferta, embaixo a do outro (cada um se ve como o player 1);
+    // clicar num item mostra nome/stats na esquerda; Cancel / Accept.
+    // Tudo validado no servidor (servidor.py, TRADE).
+
+    private boolean modoTrade = false;
+    private String tradeOutro = null;
+    private String secaoAntesDoTrade = "Bag";
+    private Table colunaEsquerdaAbas, colunaDireitaAbas;
+    private final Table tradePage = new Table();
+    private final Table tradeConfirmPage = new Table();
+    private final Table tradeGrid = new Table();
+    private final Table tradeDetalhes = new Table();
+    private final Map<String, Integer> tradeSelecao = new LinkedHashMap<>(); // instanceId -> qty
+    private String tradeFoco = null; // instanceId mostrado na esquerda
+    private boolean tradeEnviado = false, tradeAceito = false;
+    private TextButton botaoEnviarTrade, botaoAceitarTrade;
+    private Label tituloTrade, statusTradeConfirm, tituloMinhaOferta, tituloOfertaOutro;
+    private final Table gradeMinhaOferta = new Table(), gradeOfertaOutro = new Table();
+    private final Table confirmDetalhes = new Table();
+    private JsonValue minhaOferta, ofertaOutro;
+    private com.badlogic.gdx.scenes.scene2d.ui.TextField campoQtdTrade;
+
+    private static final Color COR_TRADE_SELECIONADO = new Color(0.25f, 0.85f, 0.3f, 1f);
+
+    private TextButton.TextButtonStyle estiloBotaoTrade(String base) {
+        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(skin.get(base, TextButton.TextButtonStyle.class));
+        e.font = skin.getFont("botao-pequeno-font");
+        return e;
+    }
+
+    private void construirPaginasTrade(Skin skin) {
+        skin.add("trade-slot-selected", UiSkin.retangulo(
+            new Color(0.12f, 0.24f, 0.12f, 1f), COR_TRADE_SELECIONADO, 2),
+            com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
+
+        // ---- Tela 1: escolher itens ----
+        tradeGrid.top().left();
+        tradeDetalhes.top().left();
+        Table esquerda = new Table();
+        esquerda.top().left();
+        esquerda.setBackground(UiSkin.retangulo(
+            new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        esquerda.add(tradeDetalhes).grow().top().left().pad(8);
+
+        tituloTrade = new Label("", skin, "hud");
+        tituloTrade.setFontScale(0.7f * FONTE_STATS);
+        ScrollPane scroll = new ScrollPane(tradeGrid, skin);
+        scroll.setFadeScrollBars(false);
+        scroll.setScrollingDisabled(true, false);
+        scroll.setOverscroll(false, false);
+        TextButton cancelar = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
+        botaoEnviarTrade = new TextButton("Send Trade", estiloBotaoTrade("verde"));
+        cancelar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { cancelarTrade(); }
+        });
+        botaoEnviarTrade.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { enviarOfertaTrade(); }
+        });
+        Table rodape = new Table();
+        rodape.add(cancelar).width(110).height(44).left();
+        rodape.add().expandX();
+        rodape.add(botaoEnviarTrade).width(140).height(44).right();
+
+        Table direita = new Table();
+        direita.top().left();
+        direita.setBackground(UiSkin.retangulo(
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
+        direita.add(tituloTrade).left().pad(8, 12, 0, 12).row();
+        direita.add(scroll).grow().pad(6, 12, 6, 12).row();
+        direita.add(rodape).growX().pad(0, 12, 10, 12);
+
+        tradePage.add(esquerda).width(COLUNA_BAG).growY();
+        tradePage.add(direita).grow();
+
+        // ---- Tela 2: confirmar ----
+        confirmDetalhes.top().left();
+        Table esquerda2 = new Table();
+        esquerda2.top().left();
+        esquerda2.setBackground(UiSkin.retangulo(
+            new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        esquerda2.add(confirmDetalhes).grow().top().left().pad(8);
+
+        tituloMinhaOferta = new Label("", skin, "hud");
+        tituloOfertaOutro = new Label("", skin, "hud");
+        tituloMinhaOferta.setFontScale(0.7f * FONTE_STATS);
+        tituloOfertaOutro.setFontScale(0.7f * FONTE_STATS);
+        statusTradeConfirm = new Label("", skin, "hud");
+        statusTradeConfirm.setFontScale(0.6f * FONTE_STATS);
+        statusTradeConfirm.setColor(COR_TRADE_SELECIONADO);
+        gradeMinhaOferta.top().left();
+        gradeOfertaOutro.top().left();
+        TextButton cancelar2 = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
+        botaoAceitarTrade = new TextButton("Accept", estiloBotaoTrade("verde"));
+        cancelar2.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { cancelarTrade(); }
+        });
+        botaoAceitarTrade.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aceitarTrade(); }
+        });
+        Table rodape2 = new Table();
+        rodape2.add(cancelar2).width(110).height(44).left();
+        rodape2.add(statusTradeConfirm).expandX().center();
+        rodape2.add(botaoAceitarTrade).width(140).height(44).right();
+
+        Table direita2 = new Table();
+        direita2.top().left();
+        direita2.setBackground(UiSkin.retangulo(
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
+        direita2.add(tituloMinhaOferta).left().pad(8, 12, 2, 12).row();
+        direita2.add(caixaOferta(gradeMinhaOferta)).grow().pad(0, 12, 4, 12).row();
+        direita2.add(tituloOfertaOutro).left().pad(4, 12, 2, 12).row();
+        direita2.add(caixaOferta(gradeOfertaOutro)).grow().pad(0, 12, 6, 12).row();
+        direita2.add(rodape2).growX().pad(0, 12, 10, 12);
+
+        tradeConfirmPage.add(esquerda2).width(COLUNA_BAG).growY();
+        tradeConfirmPage.add(direita2).grow();
+    }
+
+    private Table caixaOferta(Table grade) {
+        ScrollPane sp = new ScrollPane(grade, skin);
+        sp.setFadeScrollBars(false);
+        sp.setScrollingDisabled(true, false);
+        sp.setOverscroll(false, false);
+        Table caixa = new Table();
+        caixa.setBackground(UiSkin.retangulo(new Color(0.11f, 0.11f, 0.11f, 1f), new Color(0.24f, 0.24f, 0.24f, 1f), 1));
+        caixa.add(sp).grow().pad(4);
+        return caixa;
+    }
+
+    public boolean emTrade() { return modoTrade; }
+
+    /** trade_started: abre a tela 1 no lugar do livro. */
+    public void abrirTrade(String outro) {
+        modoTrade = true;
+        tradeOutro = outro;
+        tradeSelecao.clear();
+        tradeFoco = null;
+        tradeEnviado = false;
+        tradeAceito = false;
+        minhaOferta = null;
+        ofertaOutro = null;
+        secaoAntesDoTrade = secaoAtual;
+        cancelarExclusao();
+        if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(false);
+        if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(false);
+        tituloTrade.setText("Trade with " + outro);
+        botaoEnviarTrade.setText("Send Trade");
+        botaoEnviarTrade.setDisabled(false);
+        mostrarPaginaTrade(tradePage);
+        atualizarGradeTrade();
+        atualizarDetalhesTrade();
+        root.setVisible(true);
+    }
+
+    private void mostrarPaginaTrade(Table pagina) {
+        mainWindow.clearChildren();
+        mainWindow.pad(1);
+        mainWindow.add(pagina).grow();
+        actionBar.setVisible(false);
+    }
+
+    /** Fecha as telas de trade (sem avisar o servidor) e volta o livro ao normal. */
+    public void fecharTrade() {
+        if (!modoTrade) return;
+        modoTrade = false;
+        tradeOutro = null;
+        if (root.getStage() != null && campoQtdTrade != null && root.getStage().getKeyboardFocus() == campoQtdTrade) {
+            root.getStage().setKeyboardFocus(null);
+        }
+        if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(true);
+        if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(true);
+        root.setVisible(false);
+        selecionarSecao(secaoAntesDoTrade);
+    }
+
+    private void cancelarTrade() {
+        if (socket.isConnected()) socket.emitRaw("trade_cancel", "{}");
+        fecharTrade();
+    }
+
+    private void atualizarGradeTrade() {
+        tradeGrid.clearChildren();
+        for (int i = 0; i < inventoryItems.size(); i++) {
+            InventoryItem item = inventoryItems.get(i);
+            boolean marcado = tradeSelecao.containsKey(item.instanceId);
+            Button.ButtonStyle estilo = new Button.ButtonStyle();
+            estilo.up = skinDrawable(marcado ? "trade-slot-selected" : "bag-slot");
+            estilo.over = marcado ? estilo.up : skinDrawable("bag-slot-hover");
+            estilo.down = skinDrawable("bag-slot-selected");
+            Button slot = new Button(estilo);
+            if (item.instanceId.equals(tradeFoco) && !marcado) {
+                estilo.up = estilo.over = skinDrawable("bag-slot-selected");
+            }
+            int qtdEscolhida = marcado ? tradeSelecao.get(item.instanceId) : item.quantity;
+            slot.add(conteudoSlot(item.itemPath, item.quantity, marcado ? qtdEscolhida : -1)).grow().pad(2);
+            slot.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    clicarItemTrade(item);
+                }
+            });
+            tradeGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
+            if ((i + 1) % COLUNAS_INVENTARIO == 0) tradeGrid.row();
+        }
+        if (inventoryItems.isEmpty()) {
+            Label vazio = new Label("Your bag is empty.", skin, "hud");
+            vazio.setFontScale(0.6f);
+            tradeGrid.add(vazio).pad(10);
+        }
+    }
+
+    /** Icone + quantidade (escolhida/total em verde quando marcado). */
+    private Stack conteudoSlot(String caminho, int quantidade, int escolhida) {
+        Stack conteudo = new Stack();
+        TextureAtlas.AtlasRegion textura = iconeDoItem(caminho);
+        if (textura != null) {
+            Image icone = new Image(new TextureRegionDrawable(textura));
+            icone.setScaling(Scaling.fit);
+            Table moldura = new Table();
+            moldura.add(icone).grow().pad(3);
+            conteudo.add(moldura);
+        }
+        if (quantidade > 1 || escolhida > 1) {
+            Table marcadores = new Table();
+            marcadores.bottom();
+            adicionarQuantidade(marcadores, escolhida > 0 ? escolhida : quantidade);
+            if (escolhida > 0) ((Label) marcadores.getChildren().peek()).setColor(COR_TRADE_SELECIONADO);
+            marcadores.add().expandX();
+            conteudo.add(marcadores);
+        }
+        return conteudo;
+    }
+
+    private void clicarItemTrade(InventoryItem item) {
+        if (tradeEnviado) {
+            tradeFoco = item.instanceId;
+            atualizarDetalhesTrade();
+            return;
+        }
+        boolean marcado = tradeSelecao.containsKey(item.instanceId);
+        if (!marcado) {
+            tradeSelecao.put(item.instanceId, item.quantity);
+            tradeFoco = item.instanceId;
+        } else if (item.instanceId.equals(tradeFoco)) {
+            tradeSelecao.remove(item.instanceId);
+        } else {
+            tradeFoco = item.instanceId; // so' mostra (pra mudar a quantia)
+        }
+        atualizarGradeTrade();
+        atualizarDetalhesTrade();
+    }
+
+    private InventoryItem itemPorId(String id) {
+        if (id == null) return null;
+        for (InventoryItem it : inventoryItems) if (it.instanceId.equals(id)) return it;
+        return null;
+    }
+
+    private void atualizarDetalhesTrade() {
+        InventoryItem item = itemPorId(tradeFoco);
+        if (item == null) {
+            tradeDetalhes.clearChildren();
+            Label dica = new Label(tradeEnviado ? "Waiting for " + tradeOutro + "..." : "Click the items you want to trade.", skin, "hud");
+            dica.setFontScale(0.6f * FONTE_STATS);
+            dica.setWrap(true);
+            tradeDetalhes.add(dica).growX().left();
+            return;
+        }
+        preencherBlocoStats(tradeDetalhes, item.itemPath, null);
+        if (item.quantity > 1) {
+            tradeDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
+            if (tradeSelecao.containsKey(item.instanceId) && !tradeEnviado) {
+                // Quantia: so' numeros, de 1 ate o que tem.
+                tradeDetalhes.add(linhaStat("Amount to trade:", COR_TRADE_SELECIONADO)).left().padTop(6).row();
+                campoQtdTrade = new com.badlogic.gdx.scenes.scene2d.ui.TextField(
+                    String.valueOf(tradeSelecao.get(item.instanceId)), skin);
+                campoQtdTrade.setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
+                campoQtdTrade.setMaxLength(String.valueOf(item.quantity).length());
+                campoQtdTrade.setTextFieldListener((campo, c) -> {
+                    String t = campo.getText();
+                    if (t.isEmpty()) return;
+                    int v;
+                    try { v = Integer.parseInt(t); } catch (NumberFormatException e) { v = item.quantity; }
+                    int limitado = Math.max(1, Math.min(item.quantity, v));
+                    if (limitado != v) {
+                        campo.setText(String.valueOf(limitado));
+                        campo.setCursorPosition(campo.getText().length());
+                    }
+                    tradeSelecao.put(item.instanceId, limitado);
+                    atualizarGradeTrade();
+                });
+                TextButton max = new TextButton("Max", estiloBotaoTrade("default"));
+                max.addListener(new ChangeListener() {
+                    @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                        tradeSelecao.put(item.instanceId, item.quantity);
+                        campoQtdTrade.setText(String.valueOf(item.quantity));
+                        atualizarGradeTrade();
+                    }
+                });
+                Table linhaQtd = new Table();
+                linhaQtd.add(campoQtdTrade).width(64).height(36).padRight(4);
+                linhaQtd.add(max).width(52).height(36);
+                tradeDetalhes.add(linhaQtd).left().padTop(2).row();
+            }
+        }
+    }
+
+    private void enviarOfertaTrade() {
+        if (tradeEnviado || !socket.isConnected()) return;
+        // Campo vazio na hora de mandar: vale a quantia que ja' estava.
+        String payload = GameSocket.obj(w -> {
+            w.array("items");
+            for (Map.Entry<String, Integer> e : tradeSelecao.entrySet()) {
+                InventoryItem it = itemPorId(e.getKey());
+                if (it == null) continue;
+                w.object();
+                w.set("instance_id", e.getKey());
+                w.set("qty", Math.max(1, Math.min(it.quantity, e.getValue())));
+                w.pop();
+            }
+            w.pop();
+            w.set("currency", 0);
+        });
+        socket.emitRaw("trade_offer_update", payload);
+        socket.emitRaw("trade_ready", "{}");
+        tradeEnviado = true;
+        botaoEnviarTrade.setText("Waiting...");
+        botaoEnviarTrade.setDisabled(true);
+        if (root.getStage() != null && campoQtdTrade != null && root.getStage().getKeyboardFocus() == campoQtdTrade) {
+            root.getStage().setKeyboardFocus(null);
+        }
+        atualizarDetalhesTrade();
+    }
+
+    /** trade_offer_updated: guarda as duas ofertas (pra tela 2). */
+    public void atualizarOfertasTrade(JsonValue dados) {
+        if (dados == null) return;
+        minhaOferta = dados.get("self_offer");
+        ofertaOutro = dados.get("other_offer");
+        if (modoTrade && tradeConfirmPage.getParent() != null) montarConfirmacaoTrade();
+    }
+
+    /** trade_advanced_to_confirm: os dois mandaram - abre a tela 2. */
+    public void mostrarConfirmacaoTrade(String meuNome) {
+        if (!modoTrade) return;
+        tradeAceito = false;
+        botaoAceitarTrade.setText("Accept");
+        botaoAceitarTrade.setDisabled(false);
+        statusTradeConfirm.setText("");
+        tituloMinhaOferta.setText(meuNome != null ? meuNome : "You");
+        tituloOfertaOutro.setText(tradeOutro != null ? tradeOutro : "");
+        tradeFoco = null;
+        mostrarPaginaTrade(tradeConfirmPage);
+        montarConfirmacaoTrade();
+    }
+
+    private void montarConfirmacaoTrade() {
+        montarGradeOferta(gradeMinhaOferta, minhaOferta, "Nothing offered.");
+        montarGradeOferta(gradeOfertaOutro, ofertaOutro, "Nothing offered.");
+        if (tradeFoco == null) {
+            confirmDetalhes.clearChildren();
+            Label dica = new Label("Click an item to see it.", skin, "hud");
+            dica.setFontScale(0.6f * FONTE_STATS);
+            dica.setWrap(true);
+            confirmDetalhes.add(dica).growX().left();
+        }
+    }
+
+    private void montarGradeOferta(Table grade, JsonValue oferta, String vazioTexto) {
+        grade.clearChildren();
+        JsonValue itens = oferta != null ? oferta.get("items") : null;
+        int n = 0;
+        if (itens != null) {
+            for (JsonValue e = itens.child; e != null; e = e.next) {
+                String caminho = e.getString("item", "");
+                int qtd = Math.max(1, e.getInt("qty", 1));
+                String chave = (grade == gradeMinhaOferta ? "eu:" : "ele:") + e.getString("instance_id", "" + n);
+                Button.ButtonStyle estilo = new Button.ButtonStyle();
+                estilo.up = skinDrawable(chave.equals(tradeFoco) ? "bag-slot-selected" : "bag-slot");
+                estilo.over = skinDrawable("bag-slot-hover");
+                estilo.down = skinDrawable("bag-slot-selected");
+                Button slot = new Button(estilo);
+                slot.add(conteudoSlot(caminho, qtd, -1)).grow().pad(2);
+                slot.addListener(new ChangeListener() {
+                    @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                        tradeFoco = chave;
+                        preencherBlocoStats(confirmDetalhes, caminho, null);
+                        if (qtd > 1) confirmDetalhes.add(linhaStat("Quantity " + qtd, Color.LIGHT_GRAY)).left().row();
+                        montarGradeOferta(gradeMinhaOferta, minhaOferta, vazioTexto);
+                        montarGradeOferta(gradeOfertaOutro, ofertaOutro, vazioTexto);
+                    }
+                });
+                grade.add(slot).size(SLOT_EQUIP).pad(1.5f);
+                n++;
+                if (n % COLUNAS_INVENTARIO == 0) grade.row();
+            }
+        }
+        if (n == 0) {
+            Label vazio = new Label(vazioTexto, skin, "hud");
+            vazio.setFontScale(0.6f * FONTE_STATS);
+            vazio.setColor(new Color(0.6f, 0.6f, 0.6f, 1f));
+            grade.add(vazio).pad(8);
+        }
+    }
+
+    private void aceitarTrade() {
+        if (tradeAceito || !socket.isConnected()) return;
+        tradeAceito = true;
+        socket.emitRaw("trade_lock_in", "{}");
+        botaoAceitarTrade.setText("Waiting...");
+        botaoAceitarTrade.setDisabled(true);
+    }
+
+    /** trade_lock_state_updated. */
+    public void estadoAceiteTrade(boolean euAceitei, boolean eleAceitou) {
+        if (!modoTrade) return;
+        statusTradeConfirm.setText(eleAceitou ? (tradeOutro != null ? tradeOutro : "Other") + " accepted." : "");
+    }
+
     // ===================== PARTY =====================
     // Igual o mock "tela desejada 3": lider sempre no topo (linha mais clara,
     // icone Leader), depois os membros e, embaixo, os convites recebidos
@@ -2265,7 +2700,7 @@ public final class BookMenuUI {
         stage.addCaptureListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
             @Override
             public boolean keyDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, int keycode) {
-                if (!isVisible() || digitandoEmCampo(stage)) return false;
+                if (!isVisible() || modoTrade || digitandoEmCampo(stage)) return false;
                 for (int i = 0; i < ORDEM_ATALHOS.length; i++) {
                     for (int tecla : TECLAS_ATALHOS[i]) {
                         if (tecla == keycode) {
@@ -2302,6 +2737,10 @@ public final class BookMenuUI {
     }
 
     public void setVisible(boolean visible) {
+        if (!visible && modoTrade) {
+            cancelarTrade(); // fechar o livro no meio do trade cancela pros dois
+            return;
+        }
         if (!visible) cancelarExclusao();
         root.setVisible(visible);
     }

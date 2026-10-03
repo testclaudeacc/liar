@@ -3917,8 +3917,13 @@ def handle_get_party_status(data):
 # Mesmo espírito do sistema de party: tudo em memória (trade_pending_invites,
 # trades), nunca vai pro banco, não sobrevive a desconexão. Um trade_id só
 # existe depois do accept; antes disso é só um convite pendente (trade_pending_invites).
-TRADE_INVITE_TIMEOUT_SEG = 15
-trade_pending_invites = {}  # target_sid -> {'inviter_sid': sid, 'criado_em': time.time()}
+TRADE_INVITE_TIMEOUT_SEG = 60
+# Distancia maxima (SQMs) pra mandar/aceitar trade. +1 de folga no servidor
+# pro atraso do movimento (o client ja' esconde o botao acima de 5).
+TRADE_DISTANCIA_SQM = 5
+# Um player pode convidar varios ao mesmo tempo; o primeiro que aceitar
+# cancela os outros convites (dos dois lados).
+trade_pending_invites = {}  # (inviter_sid, target_sid) -> criado_em
 trades = {}  # trade_id -> {'a_sid','b_sid','offers':{sid:{'items':[{'instance_id','qty'}],'currency':int}},'ready':{sid:bool},'locked':{sid:bool}}
 
 def _get_trade(sid):
@@ -3927,6 +3932,44 @@ def _get_trade(sid):
 
 def _outro_lado_trade(trade, sid):
     return trade['b_sid'] if trade['a_sid'] == sid else trade['a_sid']
+
+def _distancia_sqm_players(a_sid, b_sid):
+    pa, pb = online_players.get(a_sid), online_players.get(b_sid)
+    if not pa or not pb: return 9999
+    try:
+        ax, ay = tile_de(float(pa.get('pos_x', 0)), float(pa.get('pos_y', 0)))
+        bx, by = tile_de(float(pb.get('pos_x', 0)), float(pb.get('pos_y', 0)))
+    except (TypeError, ValueError):
+        return 9999
+    return max(abs(ax - bx), abs(ay - by))
+
+def _cancelar_convite_trade(inviter_sid, target_sid, motivo=None):
+    """Tira um convite pendente: some o balao do alvo e (com motivo) avisa quem convidou."""
+    if trade_pending_invites.pop((inviter_sid, target_sid), None) is None: return
+    inviter_name = online_players.get(inviter_sid, {}).get('name', '')
+    if target_sid in online_players:
+        socketio.emit('trade_pending_status', {'pending': False, 'inviter_name': inviter_name}, room=target_sid)
+    if motivo and inviter_sid in online_players:
+        socketio.emit('trade_invite_result', {'success': False, 'reason': motivo,
+                      'target_name': online_players.get(target_sid, {}).get('name', '')}, room=inviter_sid)
+
+def _iniciar_trade(inviter_sid, sid):
+    trade_pending_invites.pop((inviter_sid, sid), None)
+    # Primeiro que aceitou: cancela todos os outros convites desses dois.
+    for (inv, alvo) in list(trade_pending_invites):
+        if inv in (inviter_sid, sid) or alvo in (inviter_sid, sid):
+            _cancelar_convite_trade(inv, alvo, 'target_busy' if alvo in (inviter_sid, sid) else None)
+    trade_id = uuid.uuid4().hex
+    trades[trade_id] = {
+        'a_sid': inviter_sid, 'b_sid': sid,
+        'offers': {inviter_sid: {'items': [], 'currency': 0}, sid: {'items': [], 'currency': 0}},
+        'ready': {inviter_sid: False, sid: False},
+        'locked': {inviter_sid: False, sid: False},
+    }
+    online_players[inviter_sid]['trade_id'] = trade_id
+    online_players[sid]['trade_id'] = trade_id
+    socketio.emit('trade_started', {'trade_id': trade_id, 'self_name': online_players[inviter_sid].get('name', ''), 'other_name': online_players[sid].get('name', '')}, room=inviter_sid)
+    socketio.emit('trade_started', {'trade_id': trade_id, 'self_name': online_players[sid].get('name', ''), 'other_name': online_players[inviter_sid].get('name', '')}, room=sid)
 
 def _validar_oferta(sid, offer):
     # Nunca confia no que o client mandou: reconstrói a oferta do zero a
@@ -3991,14 +4034,10 @@ def _emit_trade_lock_state(trade_id):
 # esconder a janela local).
 def _remover_do_trade(sid, motivo="cancelled"):
     trade, trade_id = _get_trade(sid)
-    # Mesmo sem trade ativo, pode haver só um convite pendente envolvendo sid.
-    for alvo_sid, entrada in list(trade_pending_invites.items()):
-        inv_sid = entrada['inviter_sid']
-        if alvo_sid == sid or inv_sid == sid:
-            outro_sid = inv_sid if alvo_sid == sid else alvo_sid
-            del trade_pending_invites[alvo_sid]
-            if outro_sid in online_players:
-                emit('trade_pending_status', {'pending': False, 'inviter_name': online_players.get(inv_sid, {}).get('name', '')}, room=outro_sid)
+    # Mesmo sem trade ativo, pode haver convites pendentes envolvendo sid.
+    for (inv_sid, alvo_sid) in list(trade_pending_invites):
+        if sid in (inv_sid, alvo_sid):
+            _cancelar_convite_trade(inv_sid, alvo_sid, 'offline' if alvo_sid == sid else None)
 
     if not trade:
         return False
@@ -4015,7 +4054,7 @@ def _remover_do_trade(sid, motivo="cancelled"):
 @socketio.on('trade_invite')
 def handle_trade_invite(data):
     sid = request.sid
-    if sid not in online_players: return
+    if sid not in online_players or not isinstance(data, dict): return
     if online_players[sid].get('trade_id'): return
 
     target_name = str(data.get('target_name', '')).strip()
@@ -4029,11 +4068,18 @@ def handle_trade_invite(data):
     if online_players[target_sid].get('trade_id'):
         emit('trade_invite_result', {'success': False, 'reason': 'target_busy', 'target_name': target_name}, room=sid)
         return
-    if target_sid in trade_pending_invites or any(e['inviter_sid'] == sid for e in trade_pending_invites.values()):
+    if _distancia_sqm_players(sid, target_sid) > TRADE_DISTANCIA_SQM + 1:
+        emit('trade_invite_result', {'success': False, 'reason': 'too_far', 'target_name': target_name}, room=sid)
+        return
+    # Ele ja' tinha me convidado: clicar em Trade nele = aceitar.
+    if (target_sid, sid) in trade_pending_invites:
+        _iniciar_trade(target_sid, sid)
+        return
+    if (sid, target_sid) in trade_pending_invites:
         emit('trade_invite_result', {'success': False, 'reason': 'already_pending', 'target_name': target_name}, room=sid)
         return
 
-    trade_pending_invites[target_sid] = {'inviter_sid': sid, 'criado_em': time.time()}
+    trade_pending_invites[(sid, target_sid)] = time.time()
     emit('trade_invite_result', {'success': True, 'reason': '', 'target_name': target_name}, room=sid)
     inviter_name = online_players[sid].get('name', '')
     emit('trade_invite_received', {'inviter_name': inviter_name}, room=target_sid)
@@ -4042,26 +4088,18 @@ def handle_trade_invite(data):
 @socketio.on('accept_trade_invite')
 def handle_accept_trade_invite(data):
     sid = request.sid
-    if sid not in online_players: return
+    if sid not in online_players or not isinstance(data, dict): return
     inviter_name = str(data.get('inviter_name', '')).strip()
     inviter_sid = players_by_name.get(inviter_name)
     if not inviter_sid or inviter_sid not in online_players: return
-    if trade_pending_invites.get(sid, {}).get('inviter_sid') != inviter_sid: return
-    if online_players[sid].get('trade_id') or online_players[inviter_sid].get('trade_id'): return
-
-    del trade_pending_invites[sid]
-    trade_id = uuid.uuid4().hex
-    trades[trade_id] = {
-        'a_sid': inviter_sid, 'b_sid': sid,
-        'offers': {inviter_sid: {'items': [], 'currency': 0}, sid: {'items': [], 'currency': 0}},
-        'ready': {inviter_sid: False, sid: False},
-        'locked': {inviter_sid: False, sid: False},
-    }
-    online_players[inviter_sid]['trade_id'] = trade_id
-    online_players[sid]['trade_id'] = trade_id
-
-    emit('trade_started', {'trade_id': trade_id, 'self_name': online_players[inviter_sid].get('name', ''), 'other_name': online_players[sid].get('name', '')}, room=inviter_sid)
-    emit('trade_started', {'trade_id': trade_id, 'self_name': online_players[sid].get('name', ''), 'other_name': online_players[inviter_sid].get('name', '')}, room=sid)
+    if (inviter_sid, sid) not in trade_pending_invites: return
+    if online_players[sid].get('trade_id') or online_players[inviter_sid].get('trade_id'):
+        _cancelar_convite_trade(inviter_sid, sid, 'target_busy')
+        return
+    if _distancia_sqm_players(sid, inviter_sid) > TRADE_DISTANCIA_SQM + 1:
+        emit('trade_invite_result', {'success': False, 'reason': 'too_far', 'target_name': inviter_name}, room=sid)
+        return
+    _iniciar_trade(inviter_sid, sid)
 
 @socketio.on('trade_offer_update')
 def handle_trade_offer_update(data):
@@ -4389,23 +4427,16 @@ def loot_cleanup_loop():
         for l_id in stale:
             ground_loot.pop(l_id, None)
 
-# Convite de trade expira sozinho se o alvo não aceitar/recusar em 15s -
+# Convite de trade expira sozinho se o alvo não aceitar em TRADE_INVITE_TIMEOUT_SEG -
 # tick de 1s (igual mob_cleanup_loop) pra não deixar o convite "pendurado"
 # por muito mais tempo que o prometido.
 def trade_invite_cleanup_loop():
     while True:
         socketio.sleep(1.0)
         now = time.time()
-        stale = [alvo_sid for alvo_sid, entrada in list(trade_pending_invites.items()) if now - entrada.get('criado_em', now) > TRADE_INVITE_TIMEOUT_SEG]
-        for alvo_sid in stale:
-            entrada = trade_pending_invites.pop(alvo_sid, None)
-            if not entrada: continue
-            inviter_sid = entrada['inviter_sid']
-            inviter_name = online_players.get(inviter_sid, {}).get('name', '')
-            if inviter_sid in online_players:
-                socketio.emit('trade_invite_result', {'success': False, 'reason': 'timeout', 'target_name': online_players.get(alvo_sid, {}).get('name', '')}, room=inviter_sid)
-            if alvo_sid in online_players:
-                socketio.emit('trade_pending_status', {'pending': False, 'inviter_name': inviter_name}, room=alvo_sid)
+        stale = [par for par, criado in list(trade_pending_invites.items()) if now - criado > TRADE_INVITE_TIMEOUT_SEG]
+        for (inviter_sid, alvo_sid) in stale:
+            _cancelar_convite_trade(inviter_sid, alvo_sid, 'timeout')
 
 MOB_AVISO_SPAWN_SEG = 6.0  # SpawnWarning no client antes do mob renascer
 
@@ -4498,7 +4529,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-03 party chat v2"
+VERSAO_SERVIDOR = "2026-10-03 trade"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR}")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(autosave_loop)

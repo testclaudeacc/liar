@@ -381,10 +381,10 @@ public class ChatUI {
         }
     }
 
-    /** Mensagem da party (vinda do servidor): nome na cor da classe, texto amarelo. */
+    /** Mensagem da party (vinda do servidor): igual o Local (nome na cor da
+     * classe, texto branco) - so' o balao de fala no mundo e' amarelo. */
     public void adicionarMensagemParty(String nome, Color corNome, String texto) {
-        adicionarNaAba(ABA_PARTY, hora() + " [#" + corNome.toString() + "]" + escaparMarkup(nome) + "[]: [#"
-            + COR_MSG_PARTY.toString() + "]" + escaparMarkup(texto) + "[]");
+        adicionarNaAba(ABA_PARTY, linhaDeJogador(nome, corNome, texto));
     }
 
     // ---- Conversa privada (botao de chat da janela do jogador) ----

@@ -699,6 +699,7 @@ public class WorldScreen extends ScreenAdapter {
 
         notifChat = atlas.findRegion("sprites/notifications/Chat");
         iconeLiderParty = atlas.findRegion("ui/party/PT_Crown");
+        balaoTrade = atlas.findRegion("ui/items/Trade");
         iconeMembroParty = atlas.findRegion("ui/party/PT_Shield");
         notifConfig = atlas.findRegion("sprites/notifications/Settings");
         notifMenu = atlas.findRegion("sprites/notifications/Menu");
@@ -955,11 +956,12 @@ public class WorldScreen extends ScreenAdapter {
             }
             @Override public void convidarParty(String nome) {
                 socket.emitRaw("invite_party", GameSocket.obj(w -> w.set("target_name", nome)));
+                painelJogador.fechar();
             }
             @Override public void convidarTrade(String nome) {
-                // O servidor ja' tem a troca, mas a janela de troca (ofertas,
-                // confirmar) ainda nao existe nesse client.
-                chat.adicionarMensagemSistema("Trading is not available yet.");
+                // Se ele ja' tinha me mandado trade, o servidor trata como aceitar.
+                socket.emitRaw("trade_invite", GameSocket.obj(w -> w.set("target_name", nome)));
+                painelJogador.fechar();
             }
             @Override public void abrirChat(String nome) {
                 fecharOutrasJanelas();
@@ -1223,6 +1225,24 @@ public class WorldScreen extends ScreenAdapter {
             return vida != null && vida[1] > 0f ? vida[0] / vida[1] : 1f;
         }
         return -1f;
+    }
+
+    // Quem me mandou trade (balaozinho "Trade" em cima dele, so' eu vejo).
+    private final java.util.Set<String> convitesTrade = new java.util.HashSet<>();
+    private TextureRegion balaoTrade;
+    private static final int DISTANCIA_TRADE_SQM = 5; // servidor.py::TRADE_DISTANCIA_SQM
+
+    /** Botoes da janela do jogador: Party so' sem party ou sendo o lider;
+     * Trade so' com ele a ate 5 SQMs (e vivo). Todo frame com a janela aberta. */
+    private void atualizarBotoesPainel() {
+        String nome = painelJogador != null ? painelJogador.nomeAberto() : null;
+        if (nome == null) return;
+        String lider = bookMenu.liderParty();
+        boolean party = lider == null || lider.equals(local.nome);
+        Jogador j = remotos.get(nome);
+        boolean trade = j != null && !estaMorto(j) && !localMorto
+            && distanciaSqm(local.x, local.y, j.x, j.y) <= DISTANCIA_TRADE_SQM;
+        painelJogador.definirBotoesVisiveis(party, trade);
     }
 
     // ---- Notificacoes (HudVitais.notificar) ----
@@ -1769,11 +1789,68 @@ public class WorldScreen extends ScreenAdapter {
             else if ("left".equals(motivo)) hud.notificar("You left the party.");
             else if ("auto_disband".equals(motivo)) hud.notificar("Your party was disbanded.");
         });
+        // ---- Trade (servidor.py, TRADE) ----
         socket.on("trade_invite_received", (nomeEvt, data) -> {
             if (data == null) return;
             String quem = data.getString("inviter_name", "");
             if (ignorados.contains(quem)) return;
-            hud.notificar(quem + " wants to trade.", COR_NOTIF_PARTY, null);
+            convitesTrade.add(quem); // balaozinho "Trade" em cima dele (so' pra mim)
+            hud.notificar(quem + " wants to trade.", COR_NOTIF_PARTY, () -> {
+                if (socket.isConnected() && convitesTrade.contains(quem)) {
+                    socket.emitRaw("accept_trade_invite", GameSocket.obj(w -> w.set("inviter_name", quem)));
+                }
+            });
+        });
+        socket.on("trade_pending_status", (nomeEvt, data) -> {
+            if (data == null) return;
+            if (!data.getBoolean("pending", false)) convitesTrade.remove(data.getString("inviter_name", ""));
+        });
+        socket.on("trade_invite_result", (nomeEvt, data) -> {
+            if (data == null) return;
+            String alvo = data.getString("target_name", "");
+            if (data.getBoolean("success", false)) {
+                hud.notificar("Trade request sent to " + alvo + ".");
+                return;
+            }
+            String motivo = data.getString("reason", "");
+            String texto = "too_far".equals(motivo) ? alvo + " is too far away."
+                : "target_busy".equals(motivo) ? alvo + " is busy."
+                : "already_pending".equals(motivo) ? "You already sent a trade request to " + alvo + "."
+                : "timeout".equals(motivo) ? "Trade request to " + alvo + " expired."
+                : "offline".equals(motivo) ? alvo + " is offline."
+                : "Could not trade with " + alvo + ".";
+            hud.notificar(texto, COR_NOTIF_AVISO, null);
+        });
+        socket.on("trade_started", (nomeEvt, data) -> {
+            if (data == null) return;
+            String outro = data.getString("other_name", "");
+            convitesTrade.remove(outro);
+            if (painelJogador.isVisivel()) painelJogador.fechar();
+            if (settingsAberta()) fecharSettings();
+            if (chat.isVisivel()) chat.setVisivel(false);
+            bookMenu.abrirTrade(outro);
+            atualizarVisibilidadeJoystick();
+        });
+        socket.on("trade_offer_updated", (nomeEvt, data) -> bookMenu.atualizarOfertasTrade(data));
+        socket.on("trade_advanced_to_confirm", (nomeEvt, data) -> bookMenu.mostrarConfirmacaoTrade(local.nome));
+        socket.on("trade_lock_state_updated", (nomeEvt, data) -> {
+            if (data != null) bookMenu.estadoAceiteTrade(data.getBoolean("self_locked", false), data.getBoolean("other_locked", false));
+        });
+        socket.on("trade_cancelled", (nomeEvt, data) -> {
+            boolean estava = bookMenu.emTrade();
+            bookMenu.fecharTrade();
+            atualizarVisibilidadeJoystick();
+            if (!estava) return;
+            String motivo = data != null ? data.getString("reason", "") : "";
+            hud.notificar("invalid_offer".equals(motivo) ? "Trade failed: the offer is no longer valid."
+                : "disconnected".equals(motivo) ? "Trade cancelled: the player left."
+                : "Trade cancelled.", COR_NOTIF_AVISO, null);
+        });
+        socket.on("trade_executed", (nomeEvt, data) -> {
+            bookMenu.fecharTrade();
+            atualizarVisibilidadeJoystick();
+            if (data != null && data.has("new_currency")) bookMenu.atualizarMoedas(data.getLong("new_currency", 0L));
+            hud.notificar("Trade completed!");
         });
 
         // Chat Local: [nome, mensagem (ja censurada), classe] de quem esta na
@@ -1799,7 +1876,8 @@ public class WorldScreen extends ScreenAdapter {
             Color cor = ChatUI.corDaClasse(data.getString("class", "Knight"));
             chat.adicionarMensagemParty(nome, cor, texto);
             avisarMensagemNova(nome);
-            Fala f = new Fala(nome, texto, cor);
+            // Balao todo amarelo (nome e texto); no log fica igual o Local.
+            Fala f = new Fala(nome, texto, ChatUI.COR_MSG_PARTY);
             f.corTexto = ChatUI.COR_MSG_PARTY;
             falas.put(nome, f);
         });
@@ -2022,6 +2100,7 @@ public class WorldScreen extends ScreenAdapter {
             remotos.remove(data.getString("name", ""));
             remotosForaDeVisao.remove(data.getString("name", ""));
             baloesRemotos.remove(data.getString("name", ""));
+            convitesTrade.remove(data.getString("name", ""));
             if (bookMenu.amigo(data.getString("name", "")) != null && !data.getString("name", "").equals(local.nome)) {
                 hud.notificar(data.getString("name", "") + " is offline.", COR_NOTIF_OFF, null);
             }
@@ -2676,13 +2755,14 @@ public class WorldScreen extends ScreenAdapter {
         desenharIconeParty(local);
         for (Jogador j : remotos.values()) desenharIconeParty(j);
         for (Jogador j : remotos.values()) {
-            TextureRegion balao = balaoRemoto(j.nome);
+            TextureRegion balao = convitesTrade.contains(j.nome) && balaoTrade != null ? balaoTrade : balaoRemoto(j.nome);
             if (balao == null || estaMorto(j)) continue;
             float bx = Math.round(j.x / camera.zoom) * camera.zoom + 2f;
             float by = Math.round(j.y / camera.zoom) * camera.zoom + 9.5f;
             batch.draw(balao, bx, by, balao.getRegionWidth(), balao.getRegionHeight());
         }
         enviarEstadoBalao();
+        atualizarBotoesPainel();
         batch.end();
 
         // 2. Aplica a iluminação multiplicativa SOBRE a cena renderizada
