@@ -104,26 +104,135 @@ public class WorldScreen extends ScreenAdapter {
     private final Map<String, Jogador> remotos = new HashMap<>();
     private final Map<String, NPCVisual> npcs = new LinkedHashMap<>();
 
-    /** Mob do servidor (IA/HP/morte/respawn rodam la; aqui so' desenha).
-     * Criado a partir da camada MobSpawns do Tiled (ver MapaPropriedades). */
+    /** Mob do servidor (IA/HP/morte/respawn rodam la; aqui so' desenha) -
+     * porta do visual de mob.gd. Criado a partir da camada MobSpawns do Tiled
+     * (ver MapaPropriedades). */
     private static class MobVisual {
         final String id;
-        final Jogador movimento;
+        final String nome;
         final AnimacaoCorpo animacao;
         final TextureRegion quadroMorto;
+        float x, y;
+        String direcao = "down";
         float hp = 1f, maxHp = 1f;
         boolean morto = false;
         boolean visivel = false;      // so' aparece depois da 1a posicao do servidor
-        boolean teleportar = true;    // proxima posicao e' salto (spawn/respawn), nao passo
+        boolean voltando = false;     // voltando pra casa (flag do servidor)
         float tempoCorpo = 0f;        // segundos restantes do cadaver no chao
 
-        MobVisual(String id, Jogador movimento, AnimacaoCorpo animacao, TextureRegion quadroMorto) {
+        // Passo em andamento + fila dos proximos (mob.gd::_fila_passos): cada
+        // mob_pos vira um passo animado com a duracao que o SERVIDOR usou, um
+        // atras do outro, em vez de teleportar pro destino.
+        boolean movendo = false;
+        float origemX, origemY, destinoX, destinoY, duracao = 1f, progresso = 1f;
+        String direcaoPendente = null;
+        // Depois de um passo, espera um tiquinho antes do quadro parado - o
+        // proximo passo do servidor costuma chegar logo e o mob nao "pisca"
+        // parado entre um SQM e outro (mob.gd: timer de 0.12s).
+        float tempoDesdeParou = 1f;
+        final java.util.ArrayDeque<Object[]> fila = new java.util.ArrayDeque<>(); // {x, y, dir, dur}
+
+        MobVisual(String id, String nome, float x, float y, AnimacaoCorpo animacao, TextureRegion quadroMorto) {
             this.id = id;
-            this.movimento = movimento;
+            this.nome = nome;
+            this.x = x;
+            this.y = y;
             this.animacao = animacao;
             this.quadroMorto = quadroMorto;
         }
+
+        float destinoFinalX() { return !fila.isEmpty() ? (Float) fila.peekLast()[0] : movendo ? destinoX : x; }
+        float destinoFinalY() { return !fila.isEmpty() ? (Float) fila.peekLast()[1] : movendo ? destinoY : y; }
+
+        /** Posicao absoluta (sync, morte, respawn): para tudo e vai direto. */
+        void posicionar(float nx, float ny, String dir) {
+            fila.clear();
+            movendo = false;
+            tempoDesdeParou = 1f;
+            direcaoPendente = null;
+            x = nx;
+            y = ny;
+            direcao = dir;
+            progresso = 1f;
+        }
+
+        /** Um passo (ou so' virada/flag) decidido pelo servidor. */
+        void receberPasso(float nx, float ny, String dir, float dur) {
+            float ux = destinoFinalX(), uy = destinoFinalY();
+            if (nx == ux && ny == uy) {
+                // So' virou (ex: encarando o alvo pra atacar).
+                if (!movendo && fila.isEmpty()) direcao = dir; else direcaoPendente = dir;
+                return;
+            }
+            // Pulou passos (entrou na area agora / perdeu pacote): vai direto.
+            if (Math.abs(nx - ux) + Math.abs(ny - uy) > Jogador.TILE * 1.5f || fila.size() >= 4) {
+                posicionar(nx, ny, dir);
+                return;
+            }
+            fila.add(new Object[]{nx, ny, dir, dur});
+            direcaoPendente = null;
+            if (!movendo) proximoPasso();
+        }
+
+        private void proximoPasso() {
+            Object[] passo = fila.poll();
+            if (passo == null) {
+                if (movendo) tempoDesdeParou = 0f;
+                movendo = false;
+                if (direcaoPendente != null) {
+                    direcao = direcaoPendente;
+                    direcaoPendente = null;
+                }
+                return;
+            }
+            origemX = x;
+            origemY = y;
+            destinoX = (Float) passo[0];
+            destinoY = (Float) passo[1];
+            direcao = (String) passo[2];
+            float dur = (Float) passo[3];
+            duracao = dur > 0f ? dur : 1f;
+            // Atrasado em relacao ao servidor: anda um pouco mais rapido.
+            if (!fila.isEmpty()) duracao *= 0.75f;
+            progresso = 0f;
+            movendo = true;
+        }
+
+        boolean andandoVisual() { return movendo || tempoDesdeParou < 0.12f; }
+
+        void atualizar(float delta) {
+            if (morto && tempoCorpo > 0f) tempoCorpo -= delta;
+            if (!movendo) tempoDesdeParou += delta;
+            while (movendo && delta > 0f) {
+                float restante = (1f - progresso) * duracao;
+                if (delta < restante) {
+                    progresso += delta / duracao;
+                    x = origemX + (destinoX - origemX) * progresso;
+                    y = origemY + (destinoY - origemY) * progresso;
+                    return;
+                }
+                delta -= restante;
+                x = destinoX;
+                y = destinoY;
+                progresso = 1f;
+                proximoPasso();
+            }
+        }
     }
+
+    /** Numero de dano subindo em cima de um mob (mob.gd::exibir_numero_dano). */
+    private static class NumeroDano {
+        final float x, y;
+        final String texto;
+        final boolean critico;
+        float tempo = 0f;
+        NumeroDano(float x, float y, String texto, boolean critico) {
+            this.x = x; this.y = y; this.texto = texto; this.critico = critico;
+        }
+    }
+    private final List<NumeroDano> numerosDano = new ArrayList<>();
+    private static final float DURACAO_NUMERO_DANO = 0.85f;
+
     private final Map<String, MobVisual> mobs = new LinkedHashMap<>();
     // Cadaver some depois disso (servidor: MOB_DESPAWN_CORPO_SEG).
     private static final float TEMPO_CORPO_MOB = 60f;
@@ -974,7 +1083,9 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null || !data.isArray() || data.size < 4) return;
             MobVisual mob = mobs.get(data.get(0).asString());
             if (mob == null) return;
-            moverMob(mob, data.get(1).asFloat(), data.get(2).asFloat(), direcaoDoInt(data.get(3).asInt()));
+            mob.voltando = data.size > 5 && data.get(5).asInt() == 1;
+            float dur = data.size > 6 ? data.get(6).asFloat() : 0f;
+            moverMob(mob, data.get(1).asFloat(), data.get(2).asFloat(), direcaoDoInt(data.get(3).asInt()), dur, false);
         });
         socket.on("mob_damaged", (nomeEvt, data) -> {
             if (data == null) return;
@@ -982,6 +1093,8 @@ public class WorldScreen extends ScreenAdapter {
             if (mob == null) return;
             mob.maxHp = Math.max(1f, data.getFloat("max_hp", mob.maxHp));
             mob.hp = Math.max(0f, data.getFloat("new_hp", mob.hp));
+            boolean critico = data.getBoolean("is_crit", false);
+            numerosDano.add(new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (critico ? "!" : ""), critico));
         });
         socket.on("mob_died", (nomeEvt, data) -> {
             if (data == null) return;
@@ -990,9 +1103,11 @@ public class WorldScreen extends ScreenAdapter {
             mob.morto = true;
             mob.hp = 0f;
             mob.tempoCorpo = TEMPO_CORPO_MOB;
+            mob.voltando = false;
             if (data.has("pos_x")) {
-                mob.teleportar = true;
-                moverMob(mob, data.getFloat("pos_x"), data.getFloat("pos_y"), mob.movimento.direcao);
+                moverMob(mob, data.getFloat("pos_x"), data.getFloat("pos_y"), mob.direcao, 0f, true);
+            } else {
+                mob.posicionar(mob.x, mob.y, mob.direcao);
             }
         });
         socket.on("mob_vanish", (nomeEvt, data) -> {
@@ -1010,7 +1125,8 @@ public class WorldScreen extends ScreenAdapter {
             mob.morto = false;
             mob.hp = mob.maxHp;
             mob.tempoCorpo = 0f;
-            mob.teleportar = true; // o mob_pos que vem logo em seguida e' o SQM onde renasceu
+            mob.voltando = false;
+            mob.visivel = false; // reaparece no mob_pos que vem logo em seguida (SQM onde renasceu)
         });
         socket.on("sync_area_data", (nomeEvt, data) -> {
             JsonValue lista = data == null ? null : data.get("mobs");
@@ -1022,9 +1138,9 @@ public class WorldScreen extends ScreenAdapter {
                 mob.hp = info.getFloat("hp", mob.hp);
                 mob.morto = info.getBoolean("is_dead", false);
                 mob.tempoCorpo = mob.morto ? Math.max(0f, TEMPO_CORPO_MOB - info.getFloat("dead_for", 0f)) : 0f;
+                mob.voltando = info.getBoolean("returning", false);
                 if (info.has("pos_x")) {
-                    mob.teleportar = true;
-                    moverMob(mob, info.getFloat("pos_x"), info.getFloat("pos_y"), info.getString("direction", "down"));
+                    moverMob(mob, info.getFloat("pos_x"), info.getFloat("pos_y"), info.getString("direction", "down"), 0f, true);
                 }
             }
         });
@@ -1354,9 +1470,11 @@ public class WorldScreen extends ScreenAdapter {
         float sobraLocal = local.atualizar(delta);
         for (Jogador j : remotos.values()) j.atualizar(delta);
         for (NPCVisual npc : npcs.values()) npc.movimento.atualizar(delta);
-        for (MobVisual mob : mobs.values()) {
-            mob.movimento.atualizar(delta);
-            if (mob.morto && mob.tempoCorpo > 0f) mob.tempoCorpo -= delta;
+        for (MobVisual mob : mobs.values()) mob.atualizar(delta);
+        for (int i = numerosDano.size() - 1; i >= 0; i--) {
+            NumeroDano n = numerosDano.get(i);
+            n.tempo += delta;
+            if (n.tempo >= DURACAO_NUMERO_DANO) numerosDano.remove(i);
         }
         dialogoNPC.atualizar();
         atualizarAreaNomeada();
@@ -1498,6 +1616,8 @@ public class WorldScreen extends ScreenAdapter {
         desenharNome(local);
         for (Jogador j : remotos.values()) desenharNome(j);
         for (NPCVisual npc : npcs.values()) desenharNomeNPC(npc);
+        for (MobVisual mob : mobs.values()) desenharNomeMob(mob);
+        desenharNumerosDano();
         desenharBalaoInteracaoNPC(npcMaisProximoParaConversar());
         TextureRegion notifAtual = notificacaoAtual();
         if (notifAtual != null) {
@@ -1729,16 +1849,20 @@ public class WorldScreen extends ScreenAdapter {
      * "parado" e' sempre um corte limpo pro quadro idle, nunca um quadro de
      * andar fora de hora. */
     private TextureRegion quadroAtual(AnimacaoCorpo a, Jogador j) {
-        if (!j.movendo) {
-            switch (j.direcao) {
+        return quadroAtual(a, j.movendo, j.direcao, j.progresso());
+    }
+
+    private TextureRegion quadroAtual(AnimacaoCorpo a, boolean movendo, String direcao, float progresso) {
+        if (!movendo) {
+            switch (direcao) {
                 case "up": return a.idleCima;
                 case "left": return a.idleEsquerda;
                 case "right": return a.idleDireita;
                 default: return a.idleBaixo;
             }
         }
-        int indiceFrame = Math.min(1, (int) (j.progresso() * 2f));
-        switch (j.direcao) {
+        int indiceFrame = Math.min(1, (int) (progresso * 2f));
+        switch (direcao) {
             case "up": return a.andarCima[indiceFrame];
             case "left": return a.andarEsquerda[indiceFrame];
             case "right": return a.andarDireita[indiceFrame];
@@ -1834,8 +1958,8 @@ public class WorldScreen extends ScreenAdapter {
                 continue;
             }
             String id = idDoMob(spawn);
-            Jogador movimento = new Jogador(id, spawn.mobId, spawn.worldX, spawn.worldY);
-            mobs.put(id, new MobVisual(id, movimento, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE)));
+            String nome = Character.toUpperCase(spawn.mobId.charAt(0)) + spawn.mobId.substring(1);
+            mobs.put(id, new MobVisual(id, nome, spawn.worldX, spawn.worldY, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE)));
         }
     }
 
@@ -1849,17 +1973,14 @@ public class WorldScreen extends ScreenAdapter {
         return sprite;
     }
 
-    private void moverMob(MobVisual mob, float rawX, float rawY, String direcao) {
+    /** posicaoAbsoluta: sync/morte (vai direto); senao e' um passo do mob_pos. */
+    private void moverMob(MobVisual mob, float rawX, float rawY, String direcao, float duracaoPasso, boolean posicaoAbsoluta) {
         float mx = conversor.rawParaMundoX(rawX);
         float my = conversor.rawParaMundoY(rawY);
-        if (mob.teleportar || !mob.visivel) {
-            mob.movimento.x = mx;
-            mob.movimento.y = my;
-            mob.movimento.movendo = false;
-            mob.movimento.direcao = direcao;
-            mob.teleportar = false;
+        if (posicaoAbsoluta || !mob.visivel) {
+            mob.posicionar(mx, my, direcao);
         } else {
-            mob.movimento.definirAlvo(mx, my, direcao);
+            mob.receberPasso(mx, my, direcao, duracaoPasso);
         }
         mob.visivel = true;
     }
@@ -1869,26 +1990,67 @@ public class WorldScreen extends ScreenAdapter {
      * qualquer offset. */
     private void desenharMob(MobVisual mob) {
         if (!mob.visivel || (mob.morto && mob.tempoCorpo <= 0f)) return;
-        Jogador j = mob.movimento;
-        TextureRegion quadro = mob.morto ? mob.quadroMorto : quadroAtual(mob.animacao, j);
+        TextureRegion quadro = mob.morto ? mob.quadroMorto
+            : quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
         float largura = FRAME_LARGURA * ESCALA_SPRITE;
         float altura = quadro.getRegionHeight() * ESCALA_SPRITE;
-        float ancoraX = Math.round(j.x / camera.zoom) * camera.zoom;
-        float ancoraY = Math.round(j.y / camera.zoom) * camera.zoom;
+        float ancoraX = Math.round(mob.x / camera.zoom) * camera.zoom;
+        float ancoraY = Math.round(mob.y / camera.zoom) * camera.zoom;
         float x = ancoraX - largura / 2f;
         batch.draw(quadro, x, ancoraY, largura, altura);
-        // Barra de vida so' quando ja levou dano.
-        if (!mob.morto && mob.hp < mob.maxHp) {
+        // Barra de vida (logo acima da cabeca; o nome vai por cima dela).
+        if (!mob.morto) {
             float barraLargura = 14f;
             float barraX = ancoraX - barraLargura / 2f;
             float barraY = ancoraY + altura + 1f;
             float pct = Math.max(0f, Math.min(1f, mob.hp / mob.maxHp));
             batch.setColor(0f, 0f, 0f, 0.8f);
             batch.draw(pixelBranco, barraX - 0.5f, barraY - 0.5f, barraLargura + 1f, 3f);
-            batch.setColor(pct > 0.5f ? new Color(0.2f, 0.85f, 0.2f, 1f) : pct > 0.25f ? Color.ORANGE : Color.RED);
+            batch.setColor(corDaVida(pct));
             batch.draw(pixelBranco, barraX, barraY, barraLargura * pct, 2f);
             batch.setColor(Color.WHITE);
         }
+    }
+
+    /** Nome do mob acima da barra de vida, na cor da vida (verde -> vermelho). */
+    private void desenharNomeMob(MobVisual mob) {
+        if (!mob.visivel || mob.morto) return;
+        TextureRegion quadro = quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
+        float altura = quadro.getRegionHeight() * ESCALA_SPRITE;
+        float ancoraX = Math.round(mob.x / camera.zoom) * camera.zoom;
+        float ancoraY = Math.round(mob.y / camera.zoom) * camera.zoom;
+        layout.setText(font, mob.nome);
+        float nomeX = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
+        float nomeY = Math.round((ancoraY + altura + 10f) / camera.zoom) * camera.zoom;
+        Color anterior = new Color(font.getColor());
+        font.setColor(corDaVida(mob.hp / mob.maxHp));
+        font.draw(batch, mob.nome, nomeX, nomeY);
+        font.setColor(anterior);
+    }
+
+    private static Color corDaVida(float pct) {
+        if (pct > 0.75f) return new Color(0.2f, 0.85f, 0.2f, 1f);
+        if (pct > 0.5f) return new Color(0.6f, 0.85f, 0.2f, 1f);
+        if (pct > 0.25f) return Color.ORANGE;
+        return Color.RED;
+    }
+
+    /** Dano subindo ~24px e sumindo no fim (mob.gd::exibir_numero_dano). */
+    private void desenharNumerosDano() {
+        Color anterior = new Color(font.getColor());
+        for (NumeroDano n : numerosDano) {
+            float t = n.tempo / DURACAO_NUMERO_DANO;
+            float subida = 24f * (1f - (1f - t) * (1f - t)); // ease-out
+            float alfa = t < 0.55f ? 1f : 1f - (t - 0.55f) / 0.45f;
+            layout.setText(font, n.texto);
+            float x = Math.round((n.x - layout.width / 2f) / camera.zoom) * camera.zoom;
+            float y = Math.round((n.y + 20f + subida) / camera.zoom) * camera.zoom;
+            Color cor = n.critico ? new Color(1f, 0.6f, 0f, 1f) : new Color(1f, 0.2f, 0.2f, 1f);
+            cor.a = Math.max(0f, alfa);
+            font.setColor(cor);
+            font.draw(batch, n.texto, x, y);
+        }
+        font.setColor(anterior);
     }
 
     private void desenharNomeNPC(NPCVisual npc) {
