@@ -1834,6 +1834,7 @@ def handle_connect():
 def handle_disconnect():
     sid = request.sid
     _baldes_eventos.pop(sid, None)
+    _remover_da_visao(sid)
     ip = _ip_da_conexao.pop(sid, None)
     if ip is not None:
         restante = _conexoes_por_ip.get(ip, 1) - 1
@@ -2034,6 +2035,7 @@ def handle_join_game(data):
                 if room_to_leave: leave_room(room_to_leave, sid=existing_sid)
                 emit('player_left', {"name": player.get('name')}, broadcast=True, include_self=False)
                 del online_players[existing_sid]
+                _remover_da_visao(existing_sid)
                 # Derruba um pouco depois: da' tempo do force_disconnect chegar
                 # antes do socket fechar (senao o client mostraria "Server shutdown").
                 def _derrubar(s=existing_sid):
@@ -2053,6 +2055,7 @@ def handle_join_game(data):
         data['_floor_broadcast'] = data.get('floor', 1)
         online_players[sid] = data
         players_by_name[p_name] = sid
+        marcar_movimento(sid)  # aparece pra quem esta perto e ve quem esta perto
 
         # item_db vai so' no payload (nao fica guardado em online_players).
         max_hp_join, max_mp_join = calcular_max_vitais(data)
@@ -2341,8 +2344,10 @@ def handle_c(data):
         # do outro lado da borda do chunk, via o player andar e nunca recebia
         # a mensagem nem o balão.
         # Inclui quem mandou: ele recebe de volta a versao ja censurada.
-        if room:
-            emit_area('c', payload, room)
+        # Vai pra quem tem o player no raio da tela (mesmo raio do movimento,
+        # ver _flush_visao) - igual a lista de jogadores do chat Local.
+        for destino in _visto_por.get(sid, set()) | {sid}:
+            socketio.emit('c', payload, room=destino)
     except Exception: traceback.print_exc()
 
 # Chat de idioma (Portuguese/Spanish/...): vai pra todo mundo que tem o canal
@@ -2496,6 +2501,10 @@ def handle_swap_req(data):
                 quem['room'] = nova
         for r in salas:
             socketio.emit('swap_exec', payload, room=r)
+        # Com passo: quem ja' via os dois so' confirma o passo (o swap_exec ja'
+        # animou); quem passa a ver recebe a posicao nova.
+        marcar_movimento(sid, (tx, ty, d_int))
+        marcar_movimento(target_sid, (px, py, t_dint))
     except Exception: traceback.print_exc()
 
 def _calcular_xp_por_participante(mob_data, xp_total):
@@ -2809,6 +2818,7 @@ def handle_register_map(data):
         # Personagem novo (sem posicao salva): comeca no spawn do servidor.
         if p_reg.get('pos_x') == -1 and p_reg.get('pos_y') == -1:
             p_reg['pos_x'], p_reg['pos_y'] = _spawn_do_player(p_reg)
+            marcar_movimento(sid)
             nova_sala = get_chunk(p_reg['pos_x'], p_reg['pos_y'], 1)
             if p_reg.get('room') != nova_sala:
                 if p_reg.get('room'): leave_room(p_reg['room'])
@@ -3056,6 +3066,166 @@ def handle_skill_hit(data):
                 emit_area('player_skill_leveled_up', {'name': p_name, 'skill_name': skill_name, 'new_level': current_lvl}, room)
     except Exception: pass
 
+# =========================================================================
+# MOVIMENTO EM PACOTES, SO' NO RAIO DA TELA
+# =========================================================================
+# Antes cada passo ia na hora pra area inteira (3x3 chunks de 800px, bem
+# maior que a tela). Com muita gente junta isso virava dezenas de milhares
+# de mensagens por segundo. Agora:
+#  - o passo so' entra numa fila (marcar_movimento);
+#  - VISAO_FLUSH_SEG em VISAO_FLUSH_SEG o loop manda, pra cada jogador, UM
+#    pacote ('mb') com os passos de quem esta no raio da tela dele;
+#  - quem entra no raio chega ja' na posicao certa (flag 1 = "aparecer
+#    aqui"), quem sai recebe 'mh' e some da tela do outro.
+# O raio cobre a tela no zoom mais afastado (PC ate' ~2560px de largura, e
+# o celular) com folga; pra sair do raio tem uma margem a mais (senao quem
+# fica na borda pisca aparecendo/sumindo).
+VISAO_X = 40 * TILE
+VISAO_Y = 24 * TILE
+VISAO_MARGEM_SAIR = 4 * TILE
+VISAO_FLUSH_SEG = 0.1
+_CELULA_VISAO = 16 * TILE  # grade espacial so' pra achar quem esta perto rapido
+
+_grade_visao = {}        # celula -> set(sid)
+_celula_de = {}          # sid -> celula
+_vendo = {}              # sid -> set(sids que ele ve)
+_visto_por = {}          # sid -> set(sids que veem ele)
+_movidos = set()
+_passos_pendentes = {}   # sid -> [(x, y, d_int)] desde o ultimo pacote
+
+def marcar_movimento(sid, passo=None):
+    _movidos.add(sid)
+    if passo is not None:
+        _passos_pendentes.setdefault(sid, []).append(passo)
+
+def _celula(x, y):
+    return (int(float(x) // _CELULA_VISAO), int(float(y) // _CELULA_VISAO))
+
+def _atualizar_celula(sid, p):
+    nova = _celula(p.get('pos_x', 0), p.get('pos_y', 0))
+    antiga = _celula_de.get(sid)
+    if antiga == nova: return
+    if antiga is not None:
+        conj = _grade_visao.get(antiga)
+        if conj:
+            conj.discard(sid)
+            if not conj: _grade_visao.pop(antiga, None)
+    _grade_visao.setdefault(nova, set()).add(sid)
+    _celula_de[sid] = nova
+
+def _candidatos_visao(x, y):
+    alcance_x = int((VISAO_X + VISAO_MARGEM_SAIR) // _CELULA_VISAO) + 1
+    alcance_y = int((VISAO_Y + VISAO_MARGEM_SAIR) // _CELULA_VISAO) + 1
+    cx, cy = _celula(x, y)
+    for dx in range(-alcance_x, alcance_x + 1):
+        for dy in range(-alcance_y, alcance_y + 1):
+            conj = _grade_visao.get((cx + dx, cy + dy))
+            if conj: yield from conj
+
+def _no_raio(p1, p2, ja_via):
+    dx = abs(float(p1.get('pos_x', 0)) - float(p2.get('pos_x', 0)))
+    dy = abs(float(p1.get('pos_y', 0)) - float(p2.get('pos_y', 0)))
+    margem = VISAO_MARGEM_SAIR if ja_via else 0
+    return dx <= VISAO_X + margem and dy <= VISAO_Y + margem
+
+def _foto(p):
+    """Entrada de 'aparecer aqui': [nome, x, y, dir, flags] (1=posicionar, 2=morto)."""
+    return [p.get('name', ''), p.get('pos_x', 0), p.get('pos_y', 0),
+            DIR_TO_INT.get(p.get('direction', 'down'), 0), 1 | (2 if p.get('is_dead') else 0)]
+
+def _remover_da_visao(sid):
+    _movidos.discard(sid)
+    _passos_pendentes.pop(sid, None)
+    cel = _celula_de.pop(sid, None)
+    if cel is not None:
+        conj = _grade_visao.get(cel)
+        if conj:
+            conj.discard(sid)
+            if not conj: _grade_visao.pop(cel, None)
+    for v in _visto_por.pop(sid, set()):
+        _vendo.get(v, set()).discard(sid)
+    for o in _vendo.pop(sid, set()):
+        _visto_por.get(o, set()).discard(sid)
+
+def _flush_visao():
+    global _movidos, _passos_pendentes
+    if not _movidos: return
+    movidos, passos = _movidos, _passos_pendentes
+    _movidos, _passos_pendentes = set(), {}
+    op = online_players
+    for m in movidos:
+        if m in op: _atualizar_celula(m, op[m])
+
+    vx, vy = float(VISAO_X), float(VISAO_Y)
+    vxm, vym = vx + VISAO_MARGEM_SAIR, vy + VISAO_MARGEM_SAIR
+    pacotes = {}   # sid -> [entradas]
+    sumiram = {}   # sid -> [nomes]
+    fotos = set()  # (destino, quem) ja' mandados nesse pacote
+
+    def mandar_foto(dest, quem_sid, quem_p):
+        if (dest, quem_sid) in fotos: return
+        fotos.add((dest, quem_sid))
+        pacotes.setdefault(dest, []).append(_foto(quem_p))
+
+    for m in movidos:
+        pm = op.get(m)
+        if pm is None: continue
+        nome_m = pm.get('name', '')
+        mx, my = float(pm.get('pos_x', 0)), float(pm.get('pos_y', 0))
+        vendo_m = _vendo.setdefault(m, set())
+        visto_m = _visto_por.setdefault(m, set())
+        # Passos de m montados UMA vez e reaproveitados pra todo mundo que ja' via.
+        lista_passos = passos.get(m)
+        entradas_m = [[nome_m, x, y, d, 0] for (x, y, d) in lista_passos] if lista_passos else None
+        candidatos = set(_candidatos_visao(mx, my))
+        candidatos |= vendo_m
+        candidatos |= visto_m
+        candidatos.discard(m)
+        for v in candidatos:
+            pv = op.get(v)
+            if pv is None:
+                visto_m.discard(v); vendo_m.discard(v)
+                continue
+            dx = abs(mx - float(pv.get('pos_x', 0)))
+            dy = abs(my - float(pv.get('pos_y', 0)))
+            dentro = dx <= vx and dy <= vy
+            dentro_margem = dentro or (dx <= vxm and dy <= vym)
+            # -- quem ve m --
+            if v in visto_m:
+                if dentro_margem:
+                    if entradas_m is not None:
+                        pacotes.setdefault(v, []).extend(entradas_m)
+                    else:
+                        # Mudou de lugar sem "passo" (respawn, teleporte): reposiciona.
+                        mandar_foto(v, m, pm)
+                else:
+                    visto_m.discard(v); _vendo.get(v, set()).discard(m)
+                    sumiram.setdefault(v, []).append(nome_m)
+            elif dentro:
+                visto_m.add(v); _vendo.setdefault(v, set()).add(m)
+                mandar_foto(v, m, pm)
+            # -- o que m ve (m andou: quem esta parado pode entrar/sair) --
+            if v in vendo_m:
+                if not dentro_margem:
+                    vendo_m.discard(v); _visto_por.get(v, set()).discard(m)
+                    sumiram.setdefault(m, []).append(pv.get('name', ''))
+            elif dentro:
+                vendo_m.add(v); _visto_por.setdefault(v, set()).add(m)
+                mandar_foto(m, v, pv)
+
+    for sid_dest, lista in pacotes.items():
+        socketio.emit('mb', lista, room=sid_dest)
+    for sid_dest, nomes in sumiram.items():
+        socketio.emit('mh', nomes, room=sid_dest)
+
+def loop_visao_movimento():
+    while True:
+        socketio.sleep(VISAO_FLUSH_SEG)
+        try:
+            _flush_visao()
+        except Exception:
+            traceback.print_exc()
+
 MOVE_BALDE_MAX = 4.0
 
 def _corrigir_posicao(sid, p):
@@ -3153,12 +3323,10 @@ def handle_m(data):
             # estavam os mobs dos chunks que acabaram de ficar perto).
             emit('sync_area_data', montar_sync_area(sid, new_room), room=sid)
             
-        payload = [p_name, x, y, d_int]
-        destinos = set(salas_vizinhas(new_room))
-        if old_room and old_room != new_room:
-            destinos |= set(salas_vizinhas(old_room))
-        for r in destinos:
-            emit('m', payload, room=r, include_self=False)
+        # Nao manda mais na hora pra area inteira: entra no pacote de
+        # movimento (ver loop_visao_movimento), que so' vai pra quem tem esse
+        # player no raio da tela.
+        marcar_movimento(sid, (x, y, d_int))
     except Exception: pass
 
 @socketio.on('l')
@@ -3240,7 +3408,9 @@ def handle_request_area_sync(data):
             destinos = set(salas_vizinhas(sala_antiga)) | set(salas_vizinhas(new_room))
             d_int = DIR_TO_INT.get(str(data.get('direction', p.get('direction', 'down'))), 0)
             for r in destinos:
-                socketio.emit('m', [p_name, x, y, d_int], room=r, skip_sid=sid)
+                # (a posicao nova vai pelo pacote de movimento: quem nao ve
+                # mais o player recebe "sumiu", quem passa a ver recebe ele ja'
+                # no lugar novo)
                 if floor_anterior != floor:
                     socketio.emit('player_status_updated', {"name": p_name, "floor": floor, "pos_x": x, "pos_y": y}, room=r, skip_sid=sid)
             p['_floor_broadcast'] = floor
@@ -3248,6 +3418,7 @@ def handle_request_area_sync(data):
             
         p['room'], p['pos_x'], p['pos_y'], p['floor'] = new_room, x, y, floor
         room = new_room
+        marcar_movimento(sid)
         
         if not room: return
 
@@ -3427,6 +3598,7 @@ def handle_update_status(data):
                 sx, sy = _spawn_do_player(p)
                 if (p.get('pos_x'), p.get('pos_y')) != (sx, sy):
                     p['pos_x'], p['pos_y'], p['floor'] = sx, sy, 1
+                    marcar_movimento(sid)
                     nova_sala = get_chunk(sx, sy, 1)
                     if p.get('room') != nova_sala:
                         if p.get('room'): leave_room(p['room'])
@@ -4273,6 +4445,7 @@ socketio.start_background_task(trade_invite_cleanup_loop)
 socketio.start_background_task(mob_cleanup_loop)
 socketio.start_background_task(mob_ai_loop)
 socketio.start_background_task(npc_ai_loop)
+socketio.start_background_task(loop_visao_movimento)
 eventlet.spawn(db_writer_worker)
 
 if __name__ == '__main__':

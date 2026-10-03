@@ -105,6 +105,12 @@ public class WorldScreen extends ScreenAdapter {
     private final float spawnX, spawnY;
     private final Jogador local;
     private final Map<String, Jogador> remotos = new HashMap<>();
+    // Players online mas fora do raio da tela (o servidor so' manda movimento
+    // de quem esta perto, ver servidor.py::_flush_visao). Ficam guardados aqui
+    // (skin/classe) e voltam pra "remotos" quando o servidor manda a posicao
+    // deles de novo ('mb'). Fora de "remotos" nao sao desenhados, nao colidem,
+    // nao contam na lista do chat - nada.
+    private final Map<String, Jogador> remotosForaDeVisao = new HashMap<>();
     private final Map<String, NPCVisual> npcs = new LinkedHashMap<>();
 
     /** Mob do servidor (IA/HP/morte/respawn rodam la; aqui so' desenha) -
@@ -1643,6 +1649,7 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("player_left", (nomeEvt, data) -> {
             if (data == null) return;
             remotos.remove(data.getString("name", ""));
+            remotosForaDeVisao.remove(data.getString("name", ""));
             skinsJogadores.remove(data.getString("name", ""));
             vidaRemotos.remove(data.getString("name", ""));
             remotosMortos.remove(data.getString("name", ""));
@@ -1747,6 +1754,28 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null || !data.isArray() || data.size < 8) return;
             aplicarTroca(data.get(0).asString(), data.get(1).asFloat(), data.get(2).asFloat(), direcaoDoInt(data.get(3).asInt()));
             aplicarTroca(data.get(4).asString(), data.get(5).asFloat(), data.get(6).asFloat(), direcaoDoInt(data.get(7).asInt()));
+        });
+
+        // Pacote de movimento (10x por segundo, so' de quem esta no raio da
+        // tela): [[nome, x, y, dir, flags], ...]. flags: 1 = aparecer/
+        // reposicionar direto (entrou no raio, respawn, teleporte), 2 = morto.
+        socket.on("mb", (nomeEvt, data) -> {
+            if (data == null || !data.isArray()) return;
+            for (JsonValue e = data.child; e != null; e = e.next) {
+                if (!e.isArray() || e.size < 5) continue;
+                aplicarMovimentoRemoto(e.get(0).asString(), e.get(1).asFloat(), e.get(2).asFloat(),
+                    direcaoDoInt(e.get(3).asInt()), e.get(4).asInt());
+            }
+        });
+        // Sairam do raio da tela: somem (guardados ate' voltarem).
+        socket.on("mh", (nomeEvt, data) -> {
+            if (data == null || !data.isArray()) return;
+            for (JsonValue e = data.child; e != null; e = e.next) {
+                String nome = e.asString();
+                Jogador j = remotos.remove(nome);
+                if (j != null) remotosForaDeVisao.put(nome, j);
+                if (nome.equals(amigoMarcado)) amigoMarcado = null;
+            }
         });
 
         socket.on("m", (nomeEvt, data) -> {
@@ -1995,13 +2024,15 @@ public class WorldScreen extends ScreenAdapter {
     private void adicionarRemotoSeNovo(JsonValue p) {
         if (p == null) return;
         String nome = p.getString("name", "");
-        if (nome.isEmpty() || nome.equals(local.nome) || remotos.containsKey(nome)) return;
+        if (nome.isEmpty() || nome.equals(local.nome) || remotos.containsKey(nome) || remotosForaDeVisao.containsKey(nome)) return;
         String classe = p.has("class_name") ? p.getString("class_name") : "Knight";
         float rawX = p.getFloat("pos_x", -1f);
         float rawY = p.getFloat("pos_y", -1f);
         float mx = rawX != -1f ? conversor.rawParaMundoX(rawX) : spawnX;
         float my = rawY != -1f ? conversor.rawParaMundoY(rawY) : spawnY;
-        remotos.put(nome, new Jogador(nome, classe, mx, my));
+        // Comeca fora da visao: so' aparece quando o servidor mandar a
+        // posicao atual dele no pacote de movimento ('mb').
+        remotosForaDeVisao.put(nome, new Jogador(nome, classe, mx, my));
         definirSkins(nome, p.get("skins"));
         if (p.has("current_hp") && p.has("max_hp")) {
             vidaRemotos.put(nome, new float[]{p.getFloat("current_hp", 1f), p.getFloat("max_hp", 1f)});
@@ -2273,9 +2304,9 @@ public class WorldScreen extends ScreenAdapter {
         if (chat.isVisivel()) {
             java.util.List<String> nomes = new java.util.ArrayList<>();
             nomes.add(nomeVisivel(local.nome));
-            // So' quem esta na mesma area das mensagens do Local (chunk de
-            // 800px crus + os 8 vizinhos, igual servidor.py::emit_area).
-            for (Jogador j : remotos.values()) if (naMesmaArea(j)) nomes.add(nomeVisivel(j.nome));
+            // "remotos" ja' e' so' quem esta no raio da tela - os mesmos que
+            // recebem as mensagens do chat Local (servidor.py::handle_c).
+            for (Jogador j : remotos.values()) nomes.add(nomeVisivel(j.nome));
             chat.atualizarJogadores(nomes);
         }
         atualizarVisibilidadeJoystick();
@@ -2405,6 +2436,39 @@ public class WorldScreen extends ScreenAdapter {
             if ((int) Math.floor(jx / Jogador.TILE) == tileX && (int) Math.floor((jy - 1f) / Jogador.TILE) == tileY) return j;
         }
         return null;
+    }
+
+    private void aplicarMovimentoRemoto(String nome, float rawX, float rawY, String direcao, int flags) {
+        Jogador j = remotos.get(nome);
+        if (j == null) {
+            j = remotosForaDeVisao.remove(nome);
+            if (j == null) return; // ainda nao chegou o player_joined dele
+            remotos.put(nome, j);
+            flags |= 1; // estava fora da visao: posicao velha, vai direto
+        }
+        float mx = conversor.rawParaMundoX(rawX);
+        float my = conversor.rawParaMundoY(rawY);
+        boolean morto = (flags & 2) != 0;
+        if ((flags & 1) != 0) {
+            // Aparecer/reposicionar: sem animacao de passo nem cadaver.
+            j.x = mx;
+            j.y = my;
+            j.movendo = false;
+            j.direcao = direcao;
+            if (morto) remotosMortos.add(nome); else remotosMortos.remove(nome);
+            return;
+        }
+        // Passo normal. Morto nao anda: se mexeu, renasceu (cadaver fica).
+        if (remotosMortos.remove(nome)) deixarCadaver(j);
+        float alvoAtualX = j.posicaoSalvarX(), alvoAtualY = j.posicaoSalvarY();
+        if (Math.abs(mx - alvoAtualX) + Math.abs(my - alvoAtualY) > Jogador.TILE * 2.5f) {
+            j.x = mx; // pulou passos (pacote atrasado): vai direto
+            j.y = my;
+            j.movendo = false;
+            j.direcao = direcao;
+        } else {
+            j.definirAlvo(mx, my, direcao);
+        }
     }
 
     /** Aplica a posicao que o servidor mandou (troca de lugar): anda 1 SQM se
@@ -3453,16 +3517,6 @@ public class WorldScreen extends ScreenAdapter {
         font.setColor(corDaVida(pct));
         font.draw(batch, nomeVisivel, nomeX, nomeY);
         font.setColor(anterior);
-    }
-
-    private static final float CHUNK_SIZE = 800f; // igual servidor.py::CHUNK_SIZE (coordenada crua)
-
-    private boolean naMesmaArea(Jogador j) {
-        int cxL = (int) Math.floor(conversor.mundoParaRawX(local.x) / CHUNK_SIZE);
-        int cyL = (int) Math.floor(conversor.mundoParaRawY(local.y) / CHUNK_SIZE);
-        int cx = (int) Math.floor(conversor.mundoParaRawX(j.x) / CHUNK_SIZE);
-        int cy = (int) Math.floor(conversor.mundoParaRawY(j.y) / CHUNK_SIZE);
-        return Math.abs(cx - cxL) <= 1 && Math.abs(cy - cyL) <= 1;
     }
 
     private void emitirCanalChat(String evento, String canal) {
