@@ -4,8 +4,12 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.NinePatch;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Button;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -26,10 +30,10 @@ import java.util.Map;
  * Chat cheio (cobre a tela toda, PC e mobile), refeito igual aos prints de
  * referencia que o usuario mandou (ver ~/Area de trabalho/prints): campo de
  * mensagem + "+"/"-" no topo, log + lista de jogadores lado a lado no meio,
- * abas (Local/Global/extras) + Close embaixo. So' Local e Global existem de
- * fabrica (sem Trade, a pedido do usuario) - "+" abre uma lista pra adicionar
- * uma aba extra (English/Portuguese/Spanish/Help), "-" fecha a aba extra
- * ATUAL (Local/Global nunca fecham). Ainda nao fala com o servidor de
+ * abas (Local/extras) + Close embaixo. So' Local existe de fabrica (sem
+ * Trade nem Global, a pedido do usuario) - "+" abre uma barra de icones pra
+ * adicionar uma aba extra (English/Portuguese/Spanish/Help), "-" fecha a aba
+ * extra ATUAL (Local nunca fecha). Ainda nao fala com o servidor de
  * verdade (nenhuma das abas tem um canal de rede próprio ainda) - cada aba
  * so' guarda seu proprio log local, igual o ChatUI antigo (mesma ideia do
  * chatlogic.gd otimizado: 1 Label que cresce, nao 1 Label por mensagem).
@@ -38,11 +42,17 @@ public class ChatUI {
 
     private static final int MAX_MENSAGENS = 60;
     private static final String ABA_LOCAL = "Local";
-    private static final String ABA_GLOBAL = "Global";
-    private static final String[] ABAS_ADICIONAVEIS = {"English", "Portuguese", "Spanish", "Help"};
+    // Aba extra -> icone no atlas (Help usa a mesma bandeira do mob voltando pra casa).
+    private static final String[][] ABAS_ADICIONAVEIS = {
+        {"Portuguese", "ui/Brazil"},
+        {"Spanish", "ui/Spain"},
+        {"English", "ui/America"},
+        {"Help", "ui/items/Flag"},
+    };
 
     private final Stage stage;
     private final Skin skin;
+    private final TextureAtlas atlas; // pode ser null (TesteGame) - ai os botoes viram texto
     private final Table janela;
     private final TextField campoTexto;
     private final Label logLabel;
@@ -53,7 +63,7 @@ public class ChatUI {
     private final Table linhaAbas;
     private final Table popupAdicionar;
 
-    /** Ordem de insercao importa (Local/Global sempre primeiro, extras depois
+    /** Ordem de insercao importa (Local sempre primeiro, extras depois
      * na ordem que foram adicionadas) - LinkedHashMap preserva isso. */
     private final Map<String, Array<String>> mensagensPorAba = new LinkedHashMap<>();
     private String abaAtual = ABA_LOCAL;
@@ -75,12 +85,16 @@ public class ChatUI {
     }
 
     public ChatUI(Stage stage, Skin skin, float larguraTela, float alturaTela, String nomeJogadorLocal, String classeJogadorLocal) {
+        this(stage, skin, null, larguraTela, alturaTela, nomeJogadorLocal, classeJogadorLocal);
+    }
+
+    public ChatUI(Stage stage, Skin skin, TextureAtlas atlas, float larguraTela, float alturaTela, String nomeJogadorLocal, String classeJogadorLocal) {
         this.stage = stage;
         this.skin = skin;
+        this.atlas = atlas;
         this.nomeJogadorLocal = nomeJogadorLocal;
         this.corJogadorLocal = corDaClasse(classeJogadorLocal);
         mensagensPorAba.put(ABA_LOCAL, new Array<>());
-        mensagensPorAba.put(ABA_GLOBAL, new Array<>());
 
         campoTexto = new TextField("", skin);
         campoTexto.setMessageText("");
@@ -211,39 +225,49 @@ public class ChatUI {
         janela.setVisible(false);
     }
 
+    /** Barra retangular com 1 botao de icone por aba extra (bandeiras +
+     * Help), centralizada na tela. Clicar fora dela fecha. */
     private Table criarPopupAdicionar() {
         Table popup = new Table();
         popup.setBackground(skin.getDrawable("popup-painel"));
         popup.pad(10);
-        // Largura fixa de volta (nao mais esticando) - a pedido do usuario,
-        // que preferiu manter o tamanho do botao e so' encolher o TEXTO que
-        // nao cabia. Fonte trocada pra "botao-pequeno-font" (martel 20px, ja
-        // existe no skin) - a "cinza-popup" padrao usa fonteBotao (32px),
-        // grande demais pra "Portuguese" caber em 200px sem vazar.
-        popup.defaults().width(200).height(56).padBottom(8);
-        for (String nome : ABAS_ADICIONAVEIS) {
-            TextButton botao = new TextButton(nome, skin, "cinza-popup");
-            botao.getLabel().setStyle(new Label.LabelStyle(skin.getFont("botao-pequeno-font"), botao.getLabel().getStyle().fontColor));
+        // enabled (Table vem childrenOnly): clique no fundo do painel entre os
+        // icones nao pode "vazar" pra ancora e fechar a barra.
+        popup.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        TextButton.TextButtonStyle estiloBotao = skin.get("cinza-popup", TextButton.TextButtonStyle.class);
+        for (String[] aba : ABAS_ADICIONAVEIS) {
+            final String nome = aba[0];
+            TextureRegion icone = atlas != null ? atlas.findRegion(aba[1]) : null;
+            Button botao;
+            if (icone != null) {
+                botao = new Button(estiloBotao);
+                // 32px: bandeiras de 16px em 2x e a Flag (32px) em 1x - escala
+                // inteira, sem pixel torto (atlas e' Nearest).
+                botao.add(new Image(icone)).size(32);
+            } else {
+                TextButton tb = new TextButton(nome, estiloBotao);
+                tb.getLabel().setStyle(new Label.LabelStyle(skin.getFont("botao-pequeno-font"), tb.getLabel().getStyle().fontColor));
+                botao = tb;
+            }
             botao.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     adicionarAba(nome);
                     popupAdicionar.setVisible(false);
                 }
             });
-            popup.add(botao).row();
+            popup.add(botao).minWidth(56).height(56).pad(0, 4, 0, 4);
         }
-        TextButton cancelar = new TextButton("Cancel", skin, "vermelho-popup");
-        cancelar.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { popupAdicionar.setVisible(false); }
-        });
-        popup.add(cancelar).padBottom(0);
 
-        // Centralizada na tela (a pedido do usuario) - antes ficava ancorada
-        // no canto superior direito, embaixo do botao "+".
         Table ancora = new Table();
         ancora.setFillParent(true);
+        ancora.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         ancora.center();
         ancora.add(popup);
+        ancora.addListener(new ClickListener() {
+            @Override public void clicked(InputEvent event, float x, float y) {
+                if (event.getTarget() == ancora) ancora.setVisible(false);
+            }
+        });
         return ancora;
     }
 
@@ -252,34 +276,22 @@ public class ChatUI {
         abaAtual = nome;
         reconstruirAbas();
         reconstruirLog();
-        atualizarCampoTexto();
     }
 
-    /** Local/Global nunca fecham (a pedido do usuario) - "-" so' tem efeito
-     * numa aba extra (English/Portuguese/Spanish/Help) adicionada via "+". */
+    /** Local nunca fecha (a pedido do usuario) - "-" so' tem efeito numa aba
+     * extra (English/Portuguese/Spanish/Help) adicionada via "+". */
     private void fecharAbaAtual() {
-        if (abaAtual.equals(ABA_LOCAL) || abaAtual.equals(ABA_GLOBAL)) return;
+        if (abaAtual.equals(ABA_LOCAL)) return;
         mensagensPorAba.remove(abaAtual);
         abaAtual = ABA_LOCAL;
         reconstruirAbas();
         reconstruirLog();
-        atualizarCampoTexto();
     }
 
     private void trocarAba(String nome) {
         abaAtual = nome;
         reconstruirAbas();
         reconstruirLog();
-        atualizarCampoTexto();
-    }
-
-    /** Global e' so' leitura (a pedido do usuario) - desabilita o campo de
-     * mensagem enquanto essa aba estiver selecionada, soltando o foco de
-     * teclado se estava digitando nela quando a troca aconteceu. */
-    private void atualizarCampoTexto() {
-        boolean global = abaAtual.equals(ABA_GLOBAL);
-        campoTexto.setDisabled(global);
-        if (global && estaDigitando()) stage.setKeyboardFocus(null);
     }
 
     private void reconstruirAbas() {
@@ -294,7 +306,7 @@ public class ChatUI {
             // (ex: "Portuguese") vazavam do botao de 110px fixo (bug
             // reportado pelo usuario); pad lateral de verdade na propria
             // celula do label faz o botao crescer o suficiente pra caber,
-            // sem encolher as abas curtas (Local/Global/Help) que ja cabiam.
+            // sem encolher as abas curtas (Local/Help) que ja cabiam.
             botao.getLabelCell().padLeft(10).padRight(10);
             linhaAbas.add(botao).minWidth(110).height(48).padRight(6);
         }

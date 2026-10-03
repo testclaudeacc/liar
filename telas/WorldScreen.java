@@ -808,7 +808,7 @@ public class WorldScreen extends ScreenAdapter {
         painelOptions.setVisible(false);
         uiStage.addActor(painelOptions);
 
-        chat = new ChatUI(uiStage, skin, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), nomeVisivel(local.nome), local.classe);
+        chat = new ChatUI(uiStage, skin, atlas, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), nomeVisivel(local.nome), local.classe);
         chat.setVisivel(false);
 
         texJoystickBase = atlas.findRegion("ui/Joystick");
@@ -2341,7 +2341,8 @@ public class WorldScreen extends ScreenAdapter {
         }
         // Bandeira enquanto volta pra casa (desistiu do alvo).
         if (!mob.morto && mob.voltando && regiaoFlag != null) {
-            batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 2f, 8f, 8f);
+            // altura - 6f (era - 2f): ficava alto demais acima da cabeca.
+            batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 6f, 8f, 8f);
         }
         // Barra de vida (logo acima da cabeca; o nome vai por cima dela).
         if (!mob.morto) {
