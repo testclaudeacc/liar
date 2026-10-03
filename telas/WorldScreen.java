@@ -1778,6 +1778,14 @@ public class WorldScreen extends ScreenAdapter {
             }
         });
 
+        // Virou pro lado sem andar - formato antigo do servidor ([nome, dir,
+        // x, y], direto pra area). O servidor novo manda isso dentro do 'mb'.
+        socket.on("l", (nomeEvt, data) -> {
+            if (data == null || !data.isArray() || data.size < 2) return;
+            Jogador j = remotos.get(data.get(0).asString());
+            if (j != null && !j.movendo) j.direcao = direcaoDoInt(data.get(1).asInt());
+        });
+
         socket.on("m", (nomeEvt, data) -> {
             if (data == null || !data.isArray() || data.size < 4) return;
             Jogador j = remotos.get(data.get(0).asString());
