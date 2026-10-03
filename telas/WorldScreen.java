@@ -783,7 +783,7 @@ public class WorldScreen extends ScreenAdapter {
         texJoystickKnob = atlas.findRegion("ui/Joystick_Middle");
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
-        hud = new HudVitais(uiStage, skin, atlas);
+        hud = new HudVitais(uiStage, atlas, escala);
         janelaLoot = new JanelaLoot(uiStage, skin, atlas, bookMenu::iconeDoItem, this::pegarLoot);
         criarPainelMorte();
         dialogoNPC = new DialogoNPCUI(uiStage, skin, atlas.findRegion("ui/currency/Silver"), escala);
