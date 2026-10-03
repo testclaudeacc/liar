@@ -584,7 +584,9 @@ MOB_TICK_SEG = 0.05
 DIR_TO_INT = {'down': 0, 'up': 1, 'left': 2, 'right': 3}
 ASTAR_LIMITE_NOS = 4000
 MOB_SPEED_PADRAO = 1.0
-MOB_COOLDOWN_PADRAO = 3.0
+# Intervalo entre golpes (player e mob): uma "cadencia" de ataque.
+ATAQUE_COOLDOWN_SEG = 2.385
+MOB_COOLDOWN_PADRAO = ATAQUE_COOLDOWN_SEG
 MAPAS_ARQUIVO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mapas_colisao.json')
 mapas_colisao = {}  # map_id -> {'fp', 'x0', 'y0', 'w', 'h', 'bits': bytes}
 
@@ -1946,7 +1948,8 @@ def handle_hit_mob(data):
         if not (proj.startswith('res://') and proj.endswith(('.tres', '.res', '.png')) and '..' not in proj and '::' not in proj): proj = ''
 
         now = time.time()
-        if now - p.get('last_attack_time', 0) < 1.0: return
+        # Pequena folga (0.1s) pra latencia: o client manda a cada ~2.4s.
+        if now - p.get('last_attack_time', 0) < ATAQUE_COOLDOWN_SEG - 0.1: return
         p['last_attack_time'] = now
         
         precisa_municao = p.get('class_name') == "Ranger"

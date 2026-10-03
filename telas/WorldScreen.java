@@ -239,7 +239,11 @@ public class WorldScreen extends ScreenAdapter {
     // cada ~1s enquanto estiver no alcance (o servidor so' aceita 1 hit/s).
     private String alvoMob = null;
     private float esperaAtaque = 0f;
-    private static final float INTERVALO_ATAQUE = 1.05f;
+    // Cadencia de ataque (servidor.py::ATAQUE_COOLDOWN_SEG = 2.385s, mesmo valor
+    // pro player e pros mobs) + uma folga pra latencia.
+    private static final float INTERVALO_ATAQUE = 2.4f;
+    // HP {atual, maximo} dos players remotos, pra cor do nome.
+    private final Map<String, float[]> vidaRemotos = new HashMap<>();
     private static final int ALCANCE_RANGED_SQM = 6; // igual servidor.py::ALCANCE_RANGED_SQM
 
     /** Animacao de efeito (tira de quadros de 16px) tocando uma vez num ponto. */
@@ -1188,6 +1192,9 @@ public class WorldScreen extends ScreenAdapter {
                 numerosDano.add(new NumeroDano(j.x, j.y + 4f, String.valueOf(data.getInt("damage", 0)), false));
                 tocarEfeito(data.getString("hit_type", "physical_hit"), j.x, j.y);
             }
+            if (!alvo.equals(local.nome) && data.has("new_hp")) {
+                vidaRemotos.put(alvo, new float[]{data.getFloat("new_hp", 1f), data.getFloat("max_hp", 1f)});
+            }
             if (alvo.equals(local.nome)) {
                 float hpNovo = data.getFloat("new_hp", hud.hpAtual());
                 hud.definir(hpNovo, data.getFloat("max_hp", -1f), -1f, -1f);
@@ -1285,6 +1292,7 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             remotos.remove(data.getString("name", ""));
             skinsJogadores.remove(data.getString("name", ""));
+            vidaRemotos.remove(data.getString("name", ""));
         });
 
         // Skins: confirmacao das minhas (depois do Equip na aba Vanity) e
@@ -1293,6 +1301,16 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             definirSkins(local.nome, data.get("skins"));
             bookMenu.atualizarSkinsEquipadas(data.get("skins"));
+        });
+        // HP dos outros players (servidor.py::broadcast_hp) - so' pra cor do nome.
+        socket.on("player_status_updated", (nomeEvt, data) -> {
+            if (data == null || !data.has("current_hp")) return;
+            String nome = data.getString("name", "");
+            float[] vida = vidaRemotos.get(nome);
+            if (vida == null) vida = new float[]{1f, 1f};
+            vida[0] = data.getFloat("current_hp", vida[0]);
+            vida[1] = data.getFloat("max_hp", vida[1]);
+            vidaRemotos.put(nome, vida);
         });
         socket.on("player_skins_updated", (nomeEvt, data) -> {
             if (data == null) return;
@@ -1573,6 +1591,9 @@ public class WorldScreen extends ScreenAdapter {
         float my = rawY != -1f ? conversor.rawParaMundoY(rawY) : spawnY;
         remotos.put(nome, new Jogador(nome, classe, mx, my));
         definirSkins(nome, p.get("skins"));
+        if (p.has("current_hp") && p.has("max_hp")) {
+            vidaRemotos.put(nome, new float[]{p.getFloat("current_hp", 1f), p.getFloat("max_hp", 1f)});
+        }
     }
 
     /** Mantem o viewport da camera do tamanho real da tela (chamada todo
@@ -2445,11 +2466,14 @@ public class WorldScreen extends ScreenAdapter {
         font.setColor(anterior);
     }
 
+    /** Cor do nome/barra pela vida: verde cheio, verde claro, amarelo,
+     * vermelho e vermelho escuro conforme o HP cai. */
     private static Color corDaVida(float pct) {
-        if (pct > 0.75f) return new Color(0.2f, 0.85f, 0.2f, 1f);
-        if (pct > 0.5f) return new Color(0.6f, 0.85f, 0.2f, 1f);
-        if (pct > 0.25f) return Color.ORANGE;
-        return Color.RED;
+        if (pct > 0.95f) return new Color(0f, 0.75f, 0f, 1f);
+        if (pct > 0.60f) return new Color(0.38f, 0.75f, 0.38f, 1f);
+        if (pct > 0.30f) return new Color(0.75f, 0.75f, 0f, 1f);
+        if (pct > 0.10f) return new Color(0.75f, 0.19f, 0.19f, 1f);
+        return new Color(0.75f, 0f, 0f, 1f);
     }
 
     /** Dano subindo ~24px e sumindo no fim (mob.gd::exibir_numero_dano). */
@@ -2457,7 +2481,7 @@ public class WorldScreen extends ScreenAdapter {
         Color anterior = new Color(font.getColor());
         for (NumeroDano n : numerosDano) {
             float t = n.tempo / DURACAO_NUMERO_DANO;
-            float subida = 24f * (1f - (1f - t) * (1f - t)); // ease-out
+            float subida = 10f * (1f - (1f - t) * (1f - t)); // ease-out, sobe pouco
             float alfa = t < 0.55f ? 1f : 1f - (t - 0.55f) / 0.45f;
             layout.setText(font, n.texto);
             float x = Math.round((n.x - layout.width / 2f) / camera.zoom) * camera.zoom;
@@ -2516,7 +2540,18 @@ public class WorldScreen extends ScreenAdapter {
         float nomeYBruto = ancoraY + altura + 7f;
         float nomeX = Math.round(nomeXBruto / camera.zoom) * camera.zoom;
         float nomeY = Math.round(nomeYBruto / camera.zoom) * camera.zoom;
+        // Nome na cor da vida (igual os mobs).
+        float pct = 1f;
+        if (j == local) {
+            pct = hud.hpMax() > 0f ? hud.hpAtual() / hud.hpMax() : 1f;
+        } else {
+            float[] vida = vidaRemotos.get(j.nome);
+            if (vida != null && vida[1] > 0f) pct = vida[0] / vida[1];
+        }
+        Color anterior = new Color(font.getColor());
+        font.setColor(corDaVida(pct));
         font.draw(batch, nomeVisivel, nomeX, nomeY);
+        font.setColor(anterior);
     }
 
     private static String nomeVisivel(String nome) {
