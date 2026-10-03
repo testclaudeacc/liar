@@ -133,6 +133,24 @@ ITEM_DB = {
 }
 
 SLOT_MUNICAO = "Hand"
+
+def slot_do_item(item_path):
+    """Slot em que o item pode ser equipado (None = nao equipavel). Usa "slot"
+    do ITEM_DB se existir; senao deduz do caminho - mesma regra do client
+    (BookMenuUI.slotDoItem)."""
+    if not isinstance(item_path, str): return None
+    slot = ITEM_DB.get(item_path, {}).get("slot")
+    if slot in SLOTS_VALIDOS: return slot
+    if "/Weapons/" in item_path or item_path.endswith("/Sword.tres"): return "MainHand"
+    if "/SecondHand/" in item_path: return "Hand"
+    nome = item_path.rsplit("/", 1)[-1].lower()
+    if "helm" in nome or "hat" in nome: return "Helm"
+    if "neck" in nome or "amulet" in nome: return "Necklace"
+    if "chest" in nome or "armor" in nome or "robe" in nome: return "Chest"
+    if "glove" in nome: return "Gloves"
+    if "boot" in nome: return "Boots"
+    if "ring" in nome: return "Ring"
+    return None
 MAX_STACK_MUNICAO_PADRAO = 100
 
 CAP_INICIAL = 100.0
@@ -2267,6 +2285,8 @@ def handle_equip_item(data):
         inventario = p.get('inventory', [])
         alvo = encontrar_instancia(inventario, instance_id)
         if alvo is None: return  
+        # Item so' entra no slot dele (ex: arma nao vai no Helm).
+        if slot_do_item(alvo.get('item')) != slot: return
         equipados = p.get('equipped_items', {})
         anterior = equipados.get(slot)
 

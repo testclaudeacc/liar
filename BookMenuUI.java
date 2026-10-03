@@ -221,11 +221,7 @@ public final class BookMenuUI {
                 .padLeft(esquerda ? 0f : BOTAO_ABA).padRight(esquerda ? BOTAO_ABA : 0f);
             botao.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                    if ("Exit".equals(nome)) {
-                        setVisible(false);
-                    } else {
-                        selecionarSecao(nome);
-                    }
+                    acionarBotao(nome);
                 }
             });
             botoes.put(nome, botao);
@@ -1279,23 +1275,48 @@ public final class BookMenuUI {
         }
     }
 
-    // Atalhos do teclado com o menu aberto: 1 = Bag, 2 = Equip, ... (Esc fecha, ver WorldScreen).
+    // Atalhos do teclado com o menu aberto: seguem a ordem dos botoes na tela
+    // (coluna direita de cima pra baixo, depois a esquerda). 1 = Equip,
+    // 2 = Bag, 3 = Skills, ... 9 = Rank, 0 = Exit (Esc tambem fecha, ver WorldScreen).
     private static final String[] ORDEM_ATALHOS = {
-        "Bag", "Equip", "Skills", "Vanity", "Spells", "Party", "Friends", "Map", "Rank"
+        "Equip", "Bag", "Skills", "Vanity", "Spells", "Party", "Friends", "Map", "Rank", "Exit"
+    };
+    private static final int[][] TECLAS_ATALHOS = {
+        {com.badlogic.gdx.Input.Keys.NUM_1, com.badlogic.gdx.Input.Keys.NUMPAD_1},
+        {com.badlogic.gdx.Input.Keys.NUM_2, com.badlogic.gdx.Input.Keys.NUMPAD_2},
+        {com.badlogic.gdx.Input.Keys.NUM_3, com.badlogic.gdx.Input.Keys.NUMPAD_3},
+        {com.badlogic.gdx.Input.Keys.NUM_4, com.badlogic.gdx.Input.Keys.NUMPAD_4},
+        {com.badlogic.gdx.Input.Keys.NUM_5, com.badlogic.gdx.Input.Keys.NUMPAD_5},
+        {com.badlogic.gdx.Input.Keys.NUM_6, com.badlogic.gdx.Input.Keys.NUMPAD_6},
+        {com.badlogic.gdx.Input.Keys.NUM_7, com.badlogic.gdx.Input.Keys.NUMPAD_7},
+        {com.badlogic.gdx.Input.Keys.NUM_8, com.badlogic.gdx.Input.Keys.NUMPAD_8},
+        {com.badlogic.gdx.Input.Keys.NUM_9, com.badlogic.gdx.Input.Keys.NUMPAD_9},
+        {com.badlogic.gdx.Input.Keys.NUM_0, com.badlogic.gdx.Input.Keys.NUMPAD_0},
     };
 
-    /** Trata as teclas 1-9 (linha de cima ou numpad). Retorna true se consumiu. */
-    public boolean teclaAtalho(int keycode) {
-        if (!isVisible()) return false;
-        int indice = -1;
-        if (keycode >= com.badlogic.gdx.Input.Keys.NUM_1 && keycode <= com.badlogic.gdx.Input.Keys.NUM_9) {
-            indice = keycode - com.badlogic.gdx.Input.Keys.NUM_1;
-        } else if (keycode >= com.badlogic.gdx.Input.Keys.NUMPAD_1 && keycode <= com.badlogic.gdx.Input.Keys.NUMPAD_9) {
-            indice = keycode - com.badlogic.gdx.Input.Keys.NUMPAD_1;
+    /**
+     * Chamado todo frame pelo WorldScreen.render() - por polling (como o ENTER
+     * do chat) porque o keyDown do InputProcessor pode ser engolido pelo uiStage.
+     * Cada tecla faz o mesmo que clicar no botao correspondente.
+     */
+    public void processarAtalhos() {
+        if (!isVisible()) return;
+        for (int i = 0; i < ORDEM_ATALHOS.length; i++) {
+            for (int tecla : TECLAS_ATALHOS[i]) {
+                if (Gdx.input.isKeyJustPressed(tecla)) {
+                    acionarBotao(ORDEM_ATALHOS[i]);
+                    return;
+                }
+            }
         }
-        if (indice < 0 || indice >= ORDEM_ATALHOS.length) return false;
-        selecionarSecao(ORDEM_ATALHOS[indice]);
-        return true;
+    }
+
+    private void acionarBotao(String nome) {
+        if ("Exit".equals(nome)) {
+            setVisible(false);
+        } else {
+            selecionarSecao(nome);
+        }
     }
 
     public void alternar() {

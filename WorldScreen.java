@@ -454,8 +454,6 @@ public class WorldScreen extends ScreenAdapter {
                     alternarBookMenu();
                     return true;
                 }
-                // 1-9 trocam a aba do book menu aberto (ver BookMenuUI.teclaAtalho).
-                if (!chat.estaDigitando() && bookMenu.teclaAtalho(keycode)) return true;
                 if (keycode == Input.Keys.ESCAPE) {
                     // Fecha a interface ativa antes de abrir Settings.
                     if (dialogoNPC.isVisible()) dialogoNPC.fechar();
@@ -1226,6 +1224,12 @@ public class WorldScreen extends ScreenAdapter {
         // comentario no keyDown(ENTER) do construtor pra entender o motivo.
         if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER) && chat.isVisivel() && !chat.estaDigitando()) {
             chat.focarCampoTexto();
+        }
+        // Teclas 0-9 com o book menu aberto (ver BookMenuUI.processarAtalhos).
+        if (!chat.estaDigitando()) {
+            boolean estavaAberto = bookMenu.isVisible();
+            bookMenu.processarAtalhos();
+            if (estavaAberto && !bookMenu.isVisible()) atualizarVisibilidadeJoystick();
         }
 
         // !chat.isVisivel() trava o movimento com a JANELA do chat aberta,
