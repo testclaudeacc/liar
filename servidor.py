@@ -2767,7 +2767,14 @@ def handle_register_map(data):
         admin = _eh_admin(p_reg)
 
         guardado = conteudo_mapas.get(map_id)
-        if guardado is None or (admin and guardado.get('fp') != fp):
+        if map_id in MAPAS_DO_SERVIDOR:
+            # Mapa lido do .tmx pelo servidor: o client nao muda nada. Se a
+            # grade dele for diferente, o client esta com outro World.tmx.
+            if fp != guardado.get('fp') and fp not in _fp_divergente_avisado:
+                _fp_divergente_avisado.add(fp)
+                print(f"[MAPA] AVISO: client com colisao diferente do servidor (fp {fp[:8]} != "
+                      f"{guardado.get('fp', '')[:8]}). Atualize o World.tmx de um dos dois.")
+        elif guardado is None or (admin and guardado.get('fp') != fp):
             spawn = data.get('spawn')
             try:
                 spawn = [float(spawn[0]), float(spawn[1])] if isinstance(spawn, list) and len(spawn) == 2 \
@@ -2823,7 +2830,7 @@ def handle_register_map(data):
         grade = mapas_colisao.get(map_id)
         # Grade de colisao: so' pede se ainda nao tem nenhuma, ou se e' um
         # admin com versao nova do mapa (ver handle_map_grid).
-        if grade is None or (admin and grade.get('fp') != fp):
+        if map_id not in MAPAS_DO_SERVIDOR and (grade is None or (admin and grade.get('fp') != fp)):
             emit('need_map_grid', {'map': map_id}, room=sid)
         # Estado atual dos mobs (HP/posição/flag/morte) pra quem acabou de
         # entrar: no join eles ainda podiam não estar registrados.
@@ -2843,6 +2850,7 @@ def handle_map_grid(data):
         w, h = int(data.get('w', 0)), int(data.get('h', 0))
         if not map_id or w <= 0 or h <= 0 or w * h > 4_000_000: return
         fp = str(data.get('fp', ''))[:64]
+        if map_id in MAPAS_DO_SERVIDOR: return  # grade vem do .tmx do servidor
         atual = mapas_colisao.get(map_id)
         if atual is not None and atual.get('fp') == fp: return  # já tenho essa versão
         # Grade ja' existe: so' admin troca (senao um client modificado
@@ -4200,6 +4208,40 @@ def mob_cleanup_loop():
                 socketio.emit('mob_respawn', {'mob_id': m_id})
 
 carregar_mapas()
+
+# ---- Mapa lido pelo proprio servidor (World.tmx) ----
+# Com o .tmx (e os .tsx) na pasta do servidor, a colisao, os mobs, os NPCs e
+# o spawn saem DAQUI - o que o client manda no register_map/map_grid e'
+# ignorado (so' serve pra conferir se a versao do mapa bate). Sem o arquivo,
+# cai no modo antigo (1o registro travado, ver handle_register_map).
+MAPA_TMX = os.getenv('MAPA_TMX', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'maps', 'World.tmx'))
+MAPA_ID_SERVIDOR = os.getenv('MAPA_ID', 'res://Inverted Realms.scn')  # igual WorldScreen.MAP_ID_SERVIDOR
+MAPAS_DO_SERVIDOR = set()
+_fp_divergente_avisado = set()
+
+def carregar_mapa_do_servidor():
+    if not os.path.exists(MAPA_TMX):
+        print(f"[MAPA] {MAPA_TMX} nao encontrado: usando o mapa enviado pelo 1o client (modo antigo).")
+        return
+    try:
+        import mapa_tiled
+        dados = mapa_tiled.carregar_mapa(MAPA_TMX)
+    except Exception:
+        traceback.print_exc()
+        print("[MAPA] Falha ao ler o .tmx: usando o mapa enviado pelo 1o client (modo antigo).")
+        return
+    grade = dados['grade']
+    mapas_colisao[MAPA_ID_SERVIDOR] = grade
+    conteudo_mapas[MAPA_ID_SERVIDOR] = {'fp': grade['fp'], 'mobs': dados['mobs'],
+                                        'npcs': dados['npcs'], 'spawn': dados['spawn']}
+    MAPAS_DO_SERVIDOR.add(MAPA_ID_SERVIDOR)
+    for m in active_mobs.values():
+        m['path'] = None
+        m['alcance'] = {}
+    print(f"[MAPA] {os.path.basename(MAPA_TMX)} lido pelo servidor: grade {grade['w']}x{grade['h']} "
+          f"(fp {grade['fp'][:8]}), {len(dados['mobs'])} mob(s), {len(dados['npcs'])} NPC(s), spawn {dados['spawn']}")
+
+carregar_mapa_do_servidor()
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(autosave_loop)
 socketio.start_background_task(loot_cleanup_loop)
