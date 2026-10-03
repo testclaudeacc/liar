@@ -52,6 +52,10 @@ NPC_DB = {
     "kharon": {"name": "Kharon"},
 }
 NPC_WANDER_RADIUS_SQM = 5
+# Mob parado (sem alvo) passeia perto de casa, numa area menor que a do NPC.
+MOB_WANDER_RADIUS_SQM = 3
+MOB_WANDER_MIN_WAIT = 5.0
+MOB_WANDER_MAX_WAIT = 10.0
 NPC_WANDER_MIN_WAIT = 5.0
 NPC_WANDER_MAX_WAIT = 10.0
 NPC_STEP_SECONDS = 1.0 / 2.2
@@ -1171,6 +1175,38 @@ def _mob_tick(mob_id, m, now):
     if melhor is not None:
         m['target_sid'] = melhor
         m['sem_caminho'] = 0.0
+        return
+
+    _mob_passear(mob_id, m, origem, now)
+
+def _mob_passear(mob_id, m, origem, now):
+    """Sem alvo: igual o NPC (_npc_tick), da' 1 passo aleatorio de tempos em
+    tempos, sem sair de MOB_WANDER_RADIUS_SQM da casa dele (menor que a do
+    NPC). Cada mob tem o proprio relogio aleatorio (5-10s), pra nao andarem
+    todos juntos."""
+    if 'next_wander_at' not in m:
+        m['next_wander_at'] = now + random.uniform(MOB_WANDER_MIN_WAIT, MOB_WANDER_MAX_WAIT)
+        return
+    if now < m['next_wander_at']: return
+    m['next_wander_at'] = now + random.uniform(MOB_WANDER_MIN_WAIT, MOB_WANDER_MAX_WAIT)
+    grade = mapas_colisao.get(m.get('mapa'))
+    casa = m.get('spawn')
+    if grade is None or casa is None: return
+    ocupados = _tiles_ocupados(excluir_mob=mob_id)
+    destinos = [(origem[0] + dx, origem[1] + dy) for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0))]
+    random.shuffle(destinos)
+    for destino in destinos:
+        if max(abs(destino[0] - casa[0]), abs(destino[1] - casa[1])) > MOB_WANDER_RADIUS_SQM: continue
+        if destino in ocupados or eh_parede(grade, destino) or borda_bloqueada(grade, origem, destino): continue
+        _virar_para(m, origem, destino)
+        m['pos_x'], m['pos_y'] = centro_tile(destino)
+        passo = 1.0 / max(0.1, float(m.get('speed', MOB_SPEED_PADRAO)))
+        m['move_until'] = now + passo
+        m['path'] = None
+        m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
+        _mob_emitir_estado(mob_id, m, passo)
+        m['next_wander_at'] = m['move_until'] + random.uniform(MOB_WANDER_MIN_WAIT, MOB_WANDER_MAX_WAIT)
+        return
 
 def mob_focar_agressor(mob_id, m, sid):
     # Quem bate no mob vira o alvo se ele estava sem alvo ou voltando pra casa.
