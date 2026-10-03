@@ -104,6 +104,8 @@ public class ChatUI {
         boolean enviouCanal(String canal, String texto);
         /** Mensagem privada pra esse player (nome real). */
         boolean enviouPrivado(String destino, String texto);
+        /** Mensagem na aba Party (so' existe com party). */
+        boolean enviouParty(String texto);
     }
     private OuvinteCanais ouvinteCanais;
     private String abaAtual = ABA_LOCAL;
@@ -329,6 +331,7 @@ public class ChatUI {
      * conversa privada = icone da classe do outro player). */
     private String iconeDaAba(String nome) {
         if (ABA_LOCAL.equals(nome)) return ICONE_LOCAL;
+        if (ABA_PARTY.equals(nome)) return ICONE_PARTY;
         if (ehPrivada(nome)) return iconePrivada.get(nome);
         TipoAba aba = tipoDaAba(nome);
         return aba != null ? aba.icone : null;
@@ -336,8 +339,52 @@ public class ChatUI {
 
     private Color corDaAba(String nome) {
         if (ehPrivada(nome)) return COR_PRIVADA;
+        if (ABA_PARTY.equals(nome)) return COR_PARTY;
         TipoAba aba = tipoDaAba(nome);
         return aba != null ? aba.cor : COR_LOCAL;
+    }
+
+    // ---- Chat da party (servidor.py::handle_pc) ----
+    // Aparece sozinho quando entra numa party e some quando sai; "-" nao fecha.
+    public static final String ABA_PARTY = "Party";
+    private static final String ICONE_PARTY = "ui/buttons/PartyBtn";
+    private static final Color COR_PARTY = new Color(0.42f, 0.30f, 0.17f, 1f); // marrom (cor da aba Party do livro)
+    /** Cor das mensagens da party (log e balao de fala). */
+    public static final Color COR_MSG_PARTY = Color.valueOf("ffe11a");
+
+    /** membros null/vazio = sem party (a aba some). */
+    public void definirParty(List<String> membros) {
+        boolean tem = membros != null && !membros.isEmpty();
+        if (tem) {
+            if (!mensagensPorAba.containsKey(ABA_PARTY)) {
+                // Logo depois do Local.
+                Map<String, Array<String>> novo = new LinkedHashMap<>();
+                for (Map.Entry<String, Array<String>> e : mensagensPorAba.entrySet()) {
+                    novo.put(e.getKey(), e.getValue());
+                    if (e.getKey().equals(ABA_LOCAL)) novo.put(ABA_PARTY, new Array<>());
+                }
+                mensagensPorAba.clear();
+                mensagensPorAba.putAll(novo);
+            }
+            membrosPorAba.put(ABA_PARTY, new java.util.ArrayList<>(membros));
+            reconstruirAbas();
+            if (abaAtual.equals(ABA_PARTY)) reconstruirPainelJogadores();
+        } else if (mensagensPorAba.remove(ABA_PARTY) != null) {
+            membrosPorAba.remove(ABA_PARTY);
+            naoLidas.remove(ABA_PARTY);
+            if (abaAtual.equals(ABA_PARTY)) {
+                abaAtual = ABA_LOCAL;
+                reconstruirLog();
+                reconstruirPainelJogadores();
+            }
+            reconstruirAbas();
+        }
+    }
+
+    /** Mensagem da party (vinda do servidor): nome na cor da classe, texto amarelo. */
+    public void adicionarMensagemParty(String nome, Color corNome, String texto) {
+        adicionarNaAba(ABA_PARTY, hora() + " [#" + corNome.toString() + "]" + escaparMarkup(nome) + "[]: [#"
+            + COR_MSG_PARTY.toString() + "]" + escaparMarkup(texto) + "[]");
     }
 
     // ---- Conversa privada (botao de chat da janela do jogador) ----
@@ -445,7 +492,7 @@ public class ChatUI {
     /** Local nunca fecha (a pedido do usuario) - "-" so' tem efeito numa aba
      * extra (English/Portuguese/Spanish/Russian/Help) adicionada via "+". */
     private void fecharAbaAtual() {
-        if (abaAtual.equals(ABA_LOCAL)) return;
+        if (abaAtual.equals(ABA_LOCAL) || abaAtual.equals(ABA_PARTY)) return;
         mensagensPorAba.remove(abaAtual);
         membrosPorAba.remove(abaAtual);
         naoLidas.remove(abaAtual);
@@ -496,7 +543,10 @@ public class ChatUI {
         }
         if (figura == null) return criarBotaoIcone(null, nome, estilo); // sem atlas (TesteGame): texto
         Table centro = new Table();
-        centro.add(figura).size(TAMANHO_ICONE);
+        // Retrato do PV ocupa o slot quase todo (o boneco tem muita sobra
+        // transparente em volta, com 48 ficava pequeno).
+        if (ehPrivada(nome)) centro.add(figura).size(TAMANHO_SLOT - 2f, TAMANHO_SLOT - 2f);
+        else centro.add(figura).size(TAMANHO_ICONE);
         com.badlogic.gdx.scenes.scene2d.ui.Stack pilha = new com.badlogic.gdx.scenes.scene2d.ui.Stack(centro);
         int qtd = naoLidas.getOrDefault(nome, 0);
         if (qtd > 0) {
@@ -542,6 +592,7 @@ public class ChatUI {
         if (ouvinteCanais != null) {
             boolean foiProServidor = abaAtual.equals(ABA_LOCAL)
                 ? ouvinteCanais.enviouLocal(texto)
+                : abaAtual.equals(ABA_PARTY) ? ouvinteCanais.enviouParty(texto)
                 : ehPrivada(abaAtual)
                     ? ouvinteCanais.enviouPrivado(abaAtual.substring(PREFIXO_PRIVADA.length()), texto)
                     : ouvinteCanais.enviouCanal(abaAtual, texto);
@@ -642,7 +693,9 @@ public class ChatUI {
     /** Chats extras abertos agora (pra reentrar nos canais apos reconectar). */
     public List<String> canaisAbertos() {
         List<String> canais = new java.util.ArrayList<>();
-        for (String nome : mensagensPorAba.keySet()) if (!nome.equals(ABA_LOCAL)) canais.add(nome);
+        for (String nome : mensagensPorAba.keySet()) {
+            if (!nome.equals(ABA_LOCAL) && !nome.equals(ABA_PARTY) && !ehPrivada(nome)) canais.add(nome);
+        }
         return canais;
     }
 

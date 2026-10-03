@@ -1337,10 +1337,39 @@ public final class BookMenuUI {
     }
 
     /** Personagem montado com as camadas do rascunho, nas 4 direcoes. */
+    // Previews andando parados: os 2 quadros de passo de cada direcao, na
+    // mesma ordem do mundo (WorldScreen.FRAME_ANDAR_*). Baixo, esquerda,
+    // direita, cima.
+    private static final int[][] ANDAR_PREVIEW = {{4, 5}, {7, 6}, {9, 8}, {1, 2}};
+    private static final float TEMPO_QUADRO_PREVIEW = 0.22f;
+
+    /** Camada do preview trocando de quadro sozinha. Todas comecam juntas
+     * (tempo global), entao as camadas ficam sincronizadas. */
+    private static final class QuadroAndando extends Image {
+        private final TextureRegionDrawable[] quadros;
+        private int atual = -1;
+        QuadroAndando(com.badlogic.gdx.graphics.g2d.TextureRegion tira, int[] indices) {
+            quadros = new TextureRegionDrawable[indices.length];
+            for (int k = 0; k < indices.length; k++) quadros[k] = new TextureRegionDrawable(SkinsUtil.quadro(tira, indices[k]));
+            trocar();
+        }
+        private void trocar() {
+            long ms = com.badlogic.gdx.utils.TimeUtils.millis();
+            int idx = (int) ((ms / (long) (TEMPO_QUADRO_PREVIEW * 1000f)) % quadros.length);
+            if (idx != atual) {
+                atual = idx;
+                setDrawable(quadros[idx]);
+            }
+        }
+        @Override public void act(float delta) {
+            super.act(delta);
+            trocar();
+        }
+    }
+
     private void montarPreviewVanity() {
         vanityPreview.clearChildren();
-        int[] direcoes = {SkinsUtil.FRAME_BAIXO, SkinsUtil.FRAME_ESQUERDA, SkinsUtil.FRAME_DIREITA, SkinsUtil.FRAME_CIMA};
-        for (int i = 0; i < direcoes.length; i++) {
+        for (int i = 0; i < ANDAR_PREVIEW.length; i++) {
             Stack pilha = new Stack();
             float altura = 17f;
             for (String cat : SkinsUtil.ORDEM_CAMADAS) {
@@ -1348,7 +1377,7 @@ public final class BookMenuUI {
                 String caminho = escolhida != null ? escolhida[0] : "base".equals(cat) ? SkinsUtil.BASE_PADRAO : null;
                 TextureAtlas.AtlasRegion tira = SkinsUtil.regiao(atlas, caminho);
                 if (tira == null) continue;
-                Image camada = new Image(new TextureRegionDrawable(SkinsUtil.quadro(tira, direcoes[i])));
+                Image camada = new QuadroAndando(tira, ANDAR_PREVIEW[i]);
                 camada.setScaling(Scaling.stretch);
                 if (escolhida != null) camada.setColor(SkinsUtil.cor(escolhida[1]));
                 // Cada camada no tamanho dela (16 x altura da tira), ancorada
@@ -1637,8 +1666,9 @@ public final class BookMenuUI {
         if (lider) linha.add(iconeAtlas("ui/party/Leader", 26f)).size(26f).padRight(4);
         if (classe != null) linha.add(iconeAtlas(iconeClasse(classe), 26f)).size(26f).padRight(4);
         if (acaoConfirmar != null) linha.add(botaoIconeParty("ui/Confirm", acaoConfirmar)).size(30f).padRight(2);
+        // Sem X (nao sou lider, linha de outro): os icones encostam na direita.
         if (acaoX != null) linha.add(botaoIconeParty("ui/Negate", acaoX)).size(30f).padRight(6);
-        else linha.add().size(30f).padRight(6);
+        else linha.getCells().peek().padRight(10);
         if (classe != null) {
             linha.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
                 @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {

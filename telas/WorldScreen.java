@@ -268,6 +268,7 @@ public class WorldScreen extends ScreenAdapter {
     private static class Fala {
         final String nome, texto;
         final Color corNome;
+        Color corTexto = null; // null = branco (Local); amarelo = party
         final float duracao;
         float tempo = 0f;
         Fala(String nome, String texto, Color corNome) {
@@ -918,6 +919,11 @@ public class WorldScreen extends ScreenAdapter {
                 }));
                 return true;
             }
+            @Override public boolean enviouParty(String texto) {
+                if (!socket.isConnected()) return false;
+                socket.emitRaw("pc", GameSocket.obj(jw -> jw.set("msg", texto)));
+                return true;
+            }
             @Override public boolean enviouCanal(String canal, String texto) {
                 if (!socket.isConnected()) return false;
                 socket.emitRaw("cc", GameSocket.obj(jw -> {
@@ -968,6 +974,12 @@ public class WorldScreen extends ScreenAdapter {
             }
         });
         bookMenu.definirAoMudarAmigos(this::atualizarEstadoPainel);
+        // Aba Party do chat acompanha a party (aparece ao entrar, some ao sair).
+        bookMenu.definirAoMudarParty(() -> {
+            List<String> nomes = new ArrayList<>();
+            for (BookMenuUI.MembroParty m : bookMenu.membrosParty()) nomes.add(m.nome);
+            chat.definirParty(nomes);
+        });
         // Clicar num amigo na aba Friends: fecha o livro e abre a janela dele.
         bookMenu.definirAoClicarAmigo(nome -> {
             bookMenu.setVisible(false);
@@ -1349,7 +1361,10 @@ public class WorldScreen extends ScreenAdapter {
             float alturaQuadro = 0f;
             for (TextureRegion q : quadros) alturaQuadro = Math.max(alturaQuadro, q.getRegionHeight());
             float escala = Math.min(getWidth() / FRAME_LARGURA, getHeight() / alturaQuadro);
-            if (escala >= 1f) escala = (float) Math.floor(escala);
+            // Escala inteira (pixel art certinho) quando da' 2x ou mais; entre
+            // 1x e 2x, de meio em meio (senao caia pra 1x e ficava minusculo).
+            if (escala >= 2f) escala = (float) Math.floor(escala);
+            else if (escala >= 1f) escala = (float) Math.floor(escala * 2f) / 2f;
             float w = FRAME_LARGURA * escala;
             float x = getX() + (getWidth() - w) / 2f;
             float y = getY() + (getHeight() - alturaQuadro * escala) / 2f;
@@ -1398,7 +1413,7 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     // ---- Coroa/escudo da party: na altura do balao, mas a ESQUERDA do player ----
-    private static final float TAM_ICONE_PARTY = 10f;
+    private static final float TAM_ICONE_PARTY = 16f;
 
     private void desenharIconeParty(Jogador j) {
         String lider = bookMenu.liderParty();
@@ -1406,8 +1421,9 @@ public class WorldScreen extends ScreenAdapter {
         if (!bookMenu.estaNaParty(j.nome) || (j == local ? localMorto : estaMorto(j))) return;
         TextureRegion icone = j.nome.equals(lider) ? iconeLiderParty : iconeMembroParty;
         // Balao: x+2 a direita do centro; aqui o espelho dele.
-        float ix = Math.round(j.x / camera.zoom) * camera.zoom - 2f - TAM_ICONE_PARTY;
-        float iy = Math.round(j.y / camera.zoom) * camera.zoom + 8.5f;
+        // Centro vertical igual o do balao (y+9.5, ~8 de altura).
+        float ix = Math.round(j.x / camera.zoom) * camera.zoom - 5f - TAM_ICONE_PARTY;
+        float iy = Math.round(j.y / camera.zoom) * camera.zoom + 13.5f - TAM_ICONE_PARTY / 2f;
         batch.draw(icone, ix, iy, TAM_ICONE_PARTY, TAM_ICONE_PARTY);
     }
 
@@ -1771,6 +1787,20 @@ public class WorldScreen extends ScreenAdapter {
             chat.adicionarMensagemLocal(nomeVisivel(nome), cor, texto);
             avisarMensagemNova(nome);
             falas.put(nome, new Fala(nome, texto, cor));
+        });
+        // Chat da party: {name, msg, class}. Log na aba Party e balao de fala
+        // amarelo em cima de quem falou (so' se ele estiver na minha tela).
+        socket.on("pc", (nomeEvt, data) -> {
+            if (data == null || chat == null) return;
+            String nome = data.getString("name", "");
+            String texto = data.getString("msg", "");
+            if (ignorados.contains(nome)) return;
+            Color cor = ChatUI.corDaClasse(data.getString("class", "Knight"));
+            chat.adicionarMensagemParty(nome, cor, texto);
+            avisarMensagemNova(nome);
+            Fala f = new Fala(nome, texto, cor);
+            f.corTexto = ChatUI.COR_MSG_PARTY;
+            falas.put(nome, f);
         });
         // Chat de idioma: {channel, name, msg (ja censurada), class}.
         socket.on("cc", (nomeEvt, data) -> {
@@ -3813,7 +3843,8 @@ public class WorldScreen extends ScreenAdapter {
             float ancoraX = Math.round(j.x / camera.zoom) * camera.zoom;
             float ancoraY = Math.round(j.y / camera.zoom) * camera.zoom;
             String texto = "[#" + f.corNome.toString() + "]" + nomeVisivel(f.nome).replace("[", "[[") + ":[] "
-                + f.texto.replace("[", "[[");
+                + (f.corTexto != null ? "[#" + f.corTexto.toString() + "]" : "") + f.texto.replace("[", "[[")
+                + (f.corTexto != null ? "[]" : "");
             layout.setText(font, texto, Color.WHITE, LARGURA_FALA, Align.center, true);
             float x = Math.round((ancoraX - LARGURA_FALA / 2f) / camera.zoom) * camera.zoom;
             // Logo acima do nome (que fica em ancoraY + altura + 7).

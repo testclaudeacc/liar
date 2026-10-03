@@ -49,6 +49,7 @@ public final class HudVitais {
     private static final float FATOR_TEXTO = MOBILE ? 1.35f : 1f;
     private final Texture pixel;
     private final BitmapFont fonte;
+    private final BitmapFont fonteNotificacao; // menor e com contorno mais fino
     private final Table raiz = new Table();
     private final Barra hp, mp, xp;
     // Barrinha cinza de municao (icone da flecha + quantidade), abaixo do XP.
@@ -100,7 +101,8 @@ public final class HudVitais {
         pm.fill();
         pixel = new Texture(pm);
         pm.dispose();
-        fonte = gerarFonte(escala);
+        fonte = gerarFonte(escala, 14, false);
+        fonteNotificacao = gerarFonte(escala, 12, true);
         Label.LabelStyle estilo = new Label.LabelStyle(fonte, Color.WHITE);
 
         hp = criarBarra(estilo, COR_HP, 314);
@@ -162,15 +164,15 @@ public final class HudVitais {
         painelMunicao.setVisible(false);
 
         // ---- Notificacao (amigo on/off, convite de party/trade, avisos) ----
-        TextureAtlas.AtlasRegion regNotif = atlas.findRegion("ui/ChatNotify");
+        TextureAtlas.AtlasRegion regNotif = atlas.findRegion("ui/NotificationIcon");
         iconeNotificacaoPadrao = regNotif;
         iconeNotificacao.setScaling(Scaling.fit);
         if (regNotif != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(regNotif));
-        textoNotificacao = new Label("", estilo);
+        textoNotificacao = new Label("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
         Table internoNotif = new Table();
         internoNotif.setBackground(cor(COR_MUNICAO));
         internoNotif.left();
-        internoNotif.add(iconeNotificacao).size(px(24)).padLeft(px(4)).padRight(px(6));
+        internoNotif.add(iconeNotificacao).size(px(20)).padLeft(px(4)).padRight(px(6));
         internoNotif.add(textoNotificacao).left().expandX().padRight(px(8));
         painelNotificacao.setBackground(cor(Color.BLACK));
         painelNotificacao.pad(px(1));
@@ -196,7 +198,7 @@ public final class HudVitais {
 
     /** Tahoma Bold no tamanho da print, com contorno preto de 2px de tela
      * (1px ficava fino demais). Gerada na resolucao real e reduzida pro stage. */
-    private static BitmapFont gerarFonte(float escala) {
+    private static BitmapFont gerarFonte(float escala, int tamanho, boolean contornoFino) {
         com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator gerador =
             new com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator(
                 com.badlogic.gdx.Gdx.files.internal("fonts/TAHOMAB0.TTF"));
@@ -206,9 +208,10 @@ public final class HudVitais {
         // com o FATOR inteiro ficava grande demais pra barra. A borda acompanha
         // o tamanho (2px pra 14px, igual o PC) - fixa em 2px, numa fonte
         // gerada bem maior na tela do celular, a letra parecia fina.
-        p.size = Math.round(14 * FATOR_TEXTO * escala);
+        p.size = Math.round(tamanho * FATOR_TEXTO * escala);
         // PC com borda um pouco mais fina (a pedido do usuario); mobile mantem.
-        p.borderWidth = MOBILE ? Math.max(2, Math.round(p.size / 7f)) : Math.max(1, Math.round(p.size / 10f));
+        p.borderWidth = contornoFino ? Math.max(1, Math.round(p.size / (MOBILE ? 12f : 16f)))
+            : MOBILE ? Math.max(2, Math.round(p.size / 7f)) : Math.max(1, Math.round(p.size / 10f));
         p.borderColor = Color.BLACK;
         p.minFilter = Texture.TextureFilter.Linear;
         p.magFilter = Texture.TextureFilter.Linear;
@@ -378,5 +381,6 @@ public final class HudVitais {
     public void dispose() {
         pixel.dispose();
         fonte.dispose();
+        fonteNotificacao.dispose();
     }
 }

@@ -2384,6 +2384,26 @@ def handle_pm(data):
         socketio.emit('pm', payload, room=sid)
     except Exception: traceback.print_exc()
 
+# Chat da party (aba Party): vai pra todos os membros da party, em qualquer
+# lugar do mapa. Quem estiver perto ve o balao de fala (amarelo) - isso e'
+# decidido no client (so' desenha se o player estiver na tela dele). Nao
+# aparece no chat Local de ninguem.
+@socketio.on('pc')
+def handle_pc(data):
+    try:
+        sid = request.sid
+        if sid not in online_players or not isinstance(data, dict): return
+        party, _pid = _get_party(sid)
+        if not party: return
+        p = online_players[sid]
+        msg = _filtrar_mensagem_chat(sid, p, data.get('msg', ''))
+        if msg is None: return
+        payload = {'name': p.get('name', ''), 'msg': msg, 'class': p.get('class_name', 'Knight')}
+        for membro in list(party['members']):
+            if membro in online_players:
+                socketio.emit('pc', payload, room=membro)
+    except Exception: traceback.print_exc()
+
 # Chat de idioma (Portuguese/Spanish/...): vai pra todo mundo que tem o canal
 # aberto, em qualquer lugar do mapa (igual grupo). So' quem esta no canal fala nele.
 @socketio.on('cc')
@@ -4476,7 +4496,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-03 party+notificacoes"
+VERSAO_SERVIDOR = "2026-10-03 party chat"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR}")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(autosave_loop)
