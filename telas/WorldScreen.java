@@ -253,6 +253,22 @@ public class WorldScreen extends ScreenAdapter {
     private BitmapFont fonteDestaque;
     private static final float ESCALA_DESTAQUE = 1.5f; // em relacao ao nome
     private final List<TextoFlutuante> textosFlutuantes = new ArrayList<>();
+
+    /** Fala do chat Local em cima da cabeca: "Nome: mensagem" (nome na cor da
+     * classe, mensagem em branco). Uma por jogador - a nova substitui a velha. */
+    private static class Fala {
+        final String nome, texto;
+        final Color corNome;
+        final float duracao;
+        float tempo = 0f;
+        Fala(String nome, String texto, Color corNome) {
+            this.nome = nome; this.texto = texto; this.corNome = corNome;
+            // Mensagem longa fica mais tempo pra dar tempo de ler.
+            this.duracao = Math.min(10f, 4f + texto.length() * 0.06f);
+        }
+    }
+    private final Map<String, Fala> falas = new HashMap<>(); // nome real do jogador -> fala
+    private static final float LARGURA_FALA = 110f; // quebra de linha (unidades de mundo)
     // Sobe por 1.2s, fica parado 5s (da' tempo de tirar print) e some em 0.5s.
     private static final float TEXTO_SUBIDA = 1.2f, TEXTO_PARADO = 5f, TEXTO_SUMINDO = 0.5f;
     private static final float DURACAO_TEXTO_FLUTUANTE = TEXTO_SUBIDA + TEXTO_PARADO + TEXTO_SUMINDO;
@@ -812,6 +828,14 @@ public class WorldScreen extends ScreenAdapter {
         chat.setOuvinteCanais(new ChatUI.OuvinteCanais() {
             @Override public void entrou(String canal) { emitirCanalChat("chat_join", canal); }
             @Override public void saiu(String canal) { emitirCanalChat("chat_leave", canal); }
+            @Override public boolean enviouLocal(String texto) {
+                if (!socket.isConnected()) return false;
+                // Formato que servidor.py::handle_c espera: ["mensagem"].
+                JsonValue lista = new JsonValue(JsonValue.ValueType.array);
+                lista.addChild(new JsonValue(texto));
+                socket.emitRaw("c", lista.toJson(JsonWriter.OutputType.json));
+                return true;
+            }
         });
         chat.setVisivel(false);
 
@@ -1233,6 +1257,23 @@ public class WorldScreen extends ScreenAdapter {
 
         socket.on("player_joined", (nomeEvt, data) -> adicionarRemotoSeNovo(data));
 
+        // Chat Local: [nome, mensagem (ja censurada), classe] de quem esta na
+        // area (inclusive o proprio jogador, que recebe a dele de volta).
+        socket.on("c", (nomeEvt, data) -> {
+            if (data == null || !data.isArray() || data.size < 2 || chat == null) return;
+            String nome = data.get(0).asString();
+            String texto = data.get(1).asString();
+            Color cor = ChatUI.corDaClasse(data.size > 2 ? data.get(2).asString() : "Knight");
+            if (nome == null || texto == null) return;
+            chat.adicionarMensagemLocal(nomeVisivel(nome), cor, texto);
+            falas.put(nome, new Fala(nome, texto, cor));
+        });
+        // Aviso do servidor so' pra esse jogador (ex: anti-spam).
+        socket.on("chat_system", (nomeEvt, data) -> {
+            if (data == null || chat == null) return;
+            chat.adicionarMensagemSistema(data.getString("text", ""));
+        });
+
         // Membros de um chat extra (Portuguese/Spanish/...), igual grupo: o
         // servidor manda a lista toda vez que alguem entra/sai do canal.
         socket.on("chat_members", (nomeEvt, data) -> {
@@ -1428,16 +1469,22 @@ public class WorldScreen extends ScreenAdapter {
         // de outros players da area - o servidor manda pra area toda).
         socket.on("player_leveled_up", (nomeEvt, data) -> {
             if (data == null) return;
-            Jogador j = jogadorPorNome(data.getString("name", ""));
+            String nome = data.getString("name", "");
+            Jogador j = jogadorPorNome(nome);
             if (j != null) textosFlutuantes.add(new TextoFlutuante(j, "Level " + data.getInt("level", 0) + "!",
                 new Color(1f, 0.84f, 0.2f, 1f)));
+            // Aviso no chat Local de todo mundo da area (o servidor ja manda pra area toda).
+            if (chat != null) chat.adicionarMensagemSistema(nomeVisivel(nome) + " has reached Level " + data.getInt("level", 0) + "!");
         });
         socket.on("player_skill_leveled_up", (nomeEvt, data) -> {
             if (data == null) return;
-            Jogador j = jogadorPorNome(data.getString("name", ""));
+            String nome = data.getString("name", "");
+            Jogador j = jogadorPorNome(nome);
             String skill = data.getString("skill_name", "");
             if (j != null) textosFlutuantes.add(new TextoFlutuante(j,
                 nomeSkill(skill) + " " + data.getInt("new_level", 0) + "!", corSkill(skill)));
+            if (chat != null) chat.adicionarMensagemSistema(nomeVisivel(nome) + " has reached " + nomeSkill(skill)
+                + " level " + data.getInt("new_level", 0) + "!");
         });
         socket.on("player_skins_updated", (nomeEvt, data) -> {
             if (data == null) return;
@@ -1762,6 +1809,12 @@ public class WorldScreen extends ScreenAdapter {
             l.tempo += delta;
             if (l.tempo >= DURACAO_LOOT_FLUTUANTE) lootsFlutuantes.remove(i);
         }
+        java.util.Iterator<Fala> itFalas = falas.values().iterator();
+        while (itFalas.hasNext()) {
+            Fala f = itFalas.next();
+            f.tempo += delta;
+            if (f.tempo >= f.duracao) itFalas.remove();
+        }
         for (int i = textosFlutuantes.size() - 1; i >= 0; i--) {
             TextoFlutuante t = textosFlutuantes.get(i);
             t.tempo += delta;
@@ -1918,6 +1971,7 @@ public class WorldScreen extends ScreenAdapter {
         batch.begin();
         desenharNome(local);
         for (Jogador j : remotos.values()) desenharNome(j);
+        desenharFalas();
         for (NPCVisual npc : npcs.values()) desenharNomeNPC(npc);
         for (MobVisual mob : mobs.values()) desenharNomeMob(mob);
         desenharNumerosDano();
@@ -2818,6 +2872,32 @@ public class WorldScreen extends ScreenAdapter {
             fonteDestaque.setColor(t.cor.r, t.cor.g, t.cor.b, Math.max(0f, alfa));
             fonteDestaque.draw(batch, t.texto, x, y);
         }
+        font.setColor(anterior);
+    }
+
+    /** Fala do chat Local em cima do nome do jogador, quebrando linha em
+     * LARGURA_FALA e crescendo pra cima. Markup so' ligado aqui (o "[" que o
+     * jogador digitou vira "[[", escapado). */
+    private void desenharFalas() {
+        if (falas.isEmpty()) return;
+        Color anterior = new Color(font.getColor());
+        boolean markupAnterior = font.getData().markupEnabled;
+        font.getData().markupEnabled = true;
+        for (Fala f : falas.values()) {
+            Jogador j = jogadorPorNome(f.nome);
+            if (j == null) continue;
+            float altura = quadroAtual(animacaoBase, j).getRegionHeight() * ESCALA_SPRITE;
+            float ancoraX = Math.round(j.x / camera.zoom) * camera.zoom;
+            float ancoraY = Math.round(j.y / camera.zoom) * camera.zoom;
+            String texto = "[#" + f.corNome.toString() + "]" + nomeVisivel(f.nome).replace("[", "[[") + ":[] "
+                + f.texto.replace("[", "[[");
+            layout.setText(font, texto, Color.WHITE, LARGURA_FALA, Align.center, true);
+            float x = Math.round((ancoraX - LARGURA_FALA / 2f) / camera.zoom) * camera.zoom;
+            // Logo acima do nome (que fica em ancoraY + altura + 7).
+            float y = Math.round((ancoraY + altura + 14f + layout.height) / camera.zoom) * camera.zoom;
+            font.draw(batch, layout, x, y);
+        }
+        font.getData().markupEnabled = markupAnterior;
         font.setColor(anterior);
     }
 

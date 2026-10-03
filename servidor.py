@@ -3,6 +3,7 @@ eventlet.monkey_patch()
 
 import os
 import json
+import re
 import psycopg2
 from psycopg2 import pool
 import smtplib
@@ -1773,6 +1774,56 @@ def handle_join_game(data):
     finally:
         if conn: db_pool.putconn(conn)
 
+# ---- Chat local ----
+CHAT_MAX_CARACTERES = 200          # igual o maxLength do campo no client (ChatUI)
+CHAT_SPAM_MAX_MSGS = 3             # mais que isso dentro da janela = spam
+CHAT_SPAM_JANELA_SEG = 4.0
+
+# Censura "engracada": troca o palavrao por algo que ainda da' pra entender,
+# em vez de ****. Frases/palavras compostas primeiro (casam antes das partes).
+TROCAS_PALAVROES = [
+    # Ingles
+    ("motherfuckers", "mother huggers"), ("motherfucker", "mother hugger"),
+    ("niggers", "hard workers"), ("niggas", "hard workers"),
+    ("nigger", "hard worker"), ("nigga", "hard worker"),
+    ("bullshit", "bull poop"), ("assholes", "butt nuggets"), ("asshole", "butt nugget"),
+    ("fucking", "fudging"), ("fucked", "fudged"), ("fucker", "fudger"), ("fuck", "fudge"),
+    ("shit", "poop"), ("bitches", "sweeties"), ("bitch", "sweetie"),
+    ("cunt", "cupcake"), ("dick", "pickle"), ("cock", "rooster"), ("pussy", "kitty"),
+    ("bastard", "rascal"), ("whore", "princess"), ("slut", "princess"),
+    ("faggot", "fabulous person"), ("fag", "fabulous person"),
+    ("retarded", "silly goose"), ("retard", "silly goose"),
+    ("damn", "dang"), ("ass", "butt"), ("kys", "have a nice day"),
+    # Portugues
+    ("puta que pariu", "pudim que caiu"), ("filho da puta", "filho da fada"),
+    ("foda-se", "fofura"), ("caralho", "caramba"), ("porra", "poxa"),
+    ("merda", "meleca"), ("putas", "fadas"), ("puta", "fada"),
+    ("buceta", "borboleta"), ("boceta", "borboleta"), ("arrombado", "abençoado"),
+    ("cacete", "cacilda"), ("viado", "colega"), ("foder", "fofar"), ("fuder", "fofar"),
+    ("foda", "fofa"), ("cu", "bumbum"),
+    # Espanhol
+    ("mierda", "miércoles"), ("joder", "jolines"), ("coño", "coco"),
+    ("pendejo", "panqueque"), ("cabrón", "campeón"), ("cabron", "campeon"),
+    ("gilipollas", "piruleta"),
+]
+_RE_PALAVROES = re.compile(
+    r"(?<!\w)(" + "|".join(re.escape(p) for p, _ in TROCAS_PALAVROES) + r")(?!\w)",
+    re.IGNORECASE)
+_MAPA_PALAVROES = {p: t for p, t in TROCAS_PALAVROES}
+
+def censurar(msg):
+    def trocar(m):
+        original = m.group(0)
+        troca = _MAPA_PALAVROES[original.lower()]
+        # Mantem o "grito": PALAVRAO -> TROCA, Palavrao -> Troca.
+        if original.isupper() and len(original) > 1: return troca.upper()
+        if original[0].isupper(): return troca[0].upper() + troca[1:]
+        return troca
+    return _RE_PALAVROES.sub(trocar, msg)
+
+def chat_sistema(sid, texto):
+    socketio.emit('chat_system', {'text': texto}, room=sid)
+
 @socketio.on('c')
 def handle_c(data):
     try:
@@ -1780,17 +1831,30 @@ def handle_c(data):
         if sid not in online_players: return
         p = online_players[sid]
         if not isinstance(data, list) or len(data) == 0: return
-        msg = str(data[0]).strip()
+        msg = str(data[0]).strip()[:CHAT_MAX_CARACTERES]
         if not msg: return
-        
+
+        # Anti-spam: mais de CHAT_SPAM_MAX_MSGS na janela -> descarta e avisa
+        # so' quem mandou.
+        agora = time.time()
+        recentes = [t for t in p.get('chat_times', []) if agora - t < CHAT_SPAM_JANELA_SEG]
+        if len(recentes) >= CHAT_SPAM_MAX_MSGS:
+            p['chat_times'] = recentes
+            chat_sistema(sid, "You are sending messages too fast. Please slow down.")
+            return
+        recentes.append(agora)
+        p['chat_times'] = recentes
+
+        msg = censurar(msg)
         room = p.get('room')
         payload = [p.get('name', ''), msg, p.get('class_name', 'Knight')]
         # Mesma área do movimento ('m'): o chunk do player + os 8 vizinhos.
         # Antes ia só pro chunk (800px) exato dele: quem estava do lado, mas
         # do outro lado da borda do chunk, via o player andar e nunca recebia
         # a mensagem nem o balão.
+        # Inclui quem mandou: ele recebe de volta a versao ja censurada.
         if room:
-            emit_area('c', payload, room, skip_sid=sid)
+            emit_area('c', payload, room)
     except Exception: traceback.print_exc()
 
 def _emit_membros_canal(canal):

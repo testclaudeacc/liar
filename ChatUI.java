@@ -42,6 +42,9 @@ import java.util.Map;
 public class ChatUI {
 
     private static final int MAX_MENSAGENS = 60;
+    /** Igual servidor.py::CHAT_MAX_CARACTERES - passou disso o campo para de digitar. */
+    public static final int MAX_CARACTERES = 200;
+    private static final Color COR_SISTEMA = new Color(1f, 0.82f, 0.3f, 1f);
     private static final String ABA_LOCAL = "Local";
     /** Aba extra: icone no atlas + cor de fundo do slot (no "+" e embaixo). */
     private static final class TipoAba {
@@ -91,6 +94,10 @@ public class ChatUI {
     public interface OuvinteCanais {
         void entrou(String canal);
         void saiu(String canal);
+        /** Mandou mensagem na aba Local. True = foi pro servidor, que devolve
+         * ja censurada pra todos (inclusive quem mandou) - ai nao adiciona
+         * aqui direto pra nao duplicar. */
+        boolean enviouLocal(String texto);
     }
     private OuvinteCanais ouvinteCanais;
     private String abaAtual = ABA_LOCAL;
@@ -101,7 +108,7 @@ public class ChatUI {
     // duplicado aqui (so' 4 cores) porque AuthScreen.CLASSES e' privado e
     // fica num pacote diferente (telas vs raiz) - nao compensa expor so'
     // por isso.
-    private static Color corDaClasse(String classe) {
+    public static Color corDaClasse(String classe) {
         if (classe == null) return Color.WHITE;
         switch (classe) {
             case "Mage": return new Color(0.68f, 0.28f, 1.0f, 1f);
@@ -125,6 +132,7 @@ public class ChatUI {
 
         campoTexto = new TextField("", skin);
         campoTexto.setMessageText("");
+        campoTexto.setMaxLength(MAX_CARACTERES);
 
         // Fonte trocada pra "simbolo-font" (dejavu-sans.condensed, gerada
         // direto em 34px - ver UiSkin) - o martel usado por "verde-popup"/
@@ -433,7 +441,10 @@ public class ChatUI {
 
     private void enviarMensagem(String texto) {
         if (texto == null || texto.trim().isEmpty()) return;
-        adicionarMensagemDeTeste(nomeJogadorLocal, corJogadorLocal, texto.trim());
+        texto = texto.trim();
+        if (texto.length() > MAX_CARACTERES) texto = texto.substring(0, MAX_CARACTERES);
+        if (abaAtual.equals(ABA_LOCAL) && ouvinteCanais != null && ouvinteCanais.enviouLocal(texto)) return;
+        adicionarNaAba(abaAtual, linhaDeJogador(nomeJogadorLocal, corJogadorLocal, texto));
     }
 
     /** Formato pedido pelo usuario: "[HH:MM] Nome: mensagem", com o horario
@@ -445,13 +456,40 @@ public class ChatUI {
      * antes). Color::toString() devolve hex RRGGBBAA, formato que a tag
      * markup [#...] entende direto. */
     public void adicionarMensagemDeTeste(String nome, Color corNome, String texto) {
+        adicionarNaAba(abaAtual, linhaDeJogador(nome, corNome, texto));
+    }
+
+    /** Mensagem de um jogador no chat Local (vinda do servidor), qualquer que
+     * seja a aba selecionada agora. */
+    public void adicionarMensagemLocal(String nome, Color corNome, String texto) {
+        adicionarNaAba(ABA_LOCAL, linhaDeJogador(nome, corNome, texto));
+    }
+
+    /** Aviso do sistema no chat Local (sem nome): level/skill up, anti-spam... */
+    public void adicionarMensagemSistema(String texto) {
+        adicionarNaAba(ABA_LOCAL, hora() + " [#" + COR_SISTEMA.toString() + "]" + escaparMarkup(texto) + "[]");
+    }
+
+    private static String hora() {
         java.util.Calendar agora = java.util.Calendar.getInstance();
-        String hora = String.format("%02d:%02d", agora.get(java.util.Calendar.HOUR_OF_DAY), agora.get(java.util.Calendar.MINUTE));
-        String linha = "[GREEN][" + hora + "][] [#" + corNome.toString() + "]" + nome + "[]: " + texto;
-        Array<String> msgs = mensagensPorAba.get(abaAtual);
+        return "[GREEN][" + String.format("%02d:%02d", agora.get(java.util.Calendar.HOUR_OF_DAY), agora.get(java.util.Calendar.MINUTE)) + "][]";
+    }
+
+    private static String linhaDeJogador(String nome, Color corNome, String texto) {
+        return hora() + " [#" + corNome.toString() + "]" + escaparMarkup(nome) + "[]: " + escaparMarkup(texto);
+    }
+
+    /** "[" digitado pelo jogador viraria tag de cor no markup - "[[" e' o escape. */
+    private static String escaparMarkup(String texto) {
+        return texto.replace("[", "[[");
+    }
+
+    private void adicionarNaAba(String aba, String linha) {
+        Array<String> msgs = mensagensPorAba.get(aba);
+        if (msgs == null) return;
         msgs.add(linha);
         if (msgs.size > MAX_MENSAGENS) msgs.removeIndex(0);
-        reconstruirLog();
+        if (aba.equals(abaAtual)) reconstruirLog();
     }
 
     private void reconstruirLog() {
