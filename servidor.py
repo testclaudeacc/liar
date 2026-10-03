@@ -1,5 +1,14 @@
 import eventlet
 eventlet.monkey_patch()
+# psycopg2 bloqueia o processo inteiro durante cada consulta (o eventlet nao
+# consegue trocar de tarefa no meio dela): login, join e o autosave de todo
+# mundo congelavam o jogo de todos. O psycogreen deixa as consultas
+# "cooperativas" (pip install psycogreen).
+try:
+    from psycogreen.eventlet import patch_psycopg
+    patch_psycopg()
+except ImportError:
+    print("[AVISO] psycogreen nao instalado: o banco vai travar o servidor durante as consultas (pip install psycogreen)")
 
 import os
 import json
@@ -814,7 +823,8 @@ def _tile_de_nascimento(mob_id, m):
     if alcance <= 0: return centro
     grade = mapas_colisao.get(m.get('mapa'))
     if grade is None: return centro
-    ocupados = _tiles_ocupados(excluir_mob=mob_id)
+    cx, cy = centro_tile(centro)
+    ocupados = _tiles_ocupados(excluir_mob=mob_id, sala=get_chunk(cx, cy, MOB_FLOOR))
     livres = [(centro[0] + dx, centro[1] + dy)
               for dx in range(-alcance, alcance + 1) for dy in range(-alcance, alcance + 1)]
     livres = [t for t in livres if not eh_parede(grade, t) and t not in ocupados]
@@ -973,7 +983,9 @@ def npc_ai_loop():
     while True:
         socketio.sleep(NPC_TICK_SECONDS)
         now = time.time()
+        ativas = _salas_ativas()
         for npc_id, npc in list(active_npcs.items()):
+            if npc.get('room') not in ativas: continue  # ninguem vendo: parado
             try:
                 _npc_tick(npc_id, npc, now)
             except Exception:
@@ -988,16 +1000,61 @@ def _mob_encarar(mob_id, m, origem, t_alvo):
     if m['direction'] != antes:
         _mob_emitir_estado(mob_id, m)
 
-def _tiles_ocupados(excluir_mob=None, excluir_sid=None):
+# ---- Indice por area (refeito a cada tick da IA dos mobs) ----
+# sala -> ids/sids que estao nela. Evita varrer TODOS os mobs/players do
+# servidor a cada passo/busca: com centenas de players e mobs isso era
+# milhoes de checagens por segundo. As posicoes continuam lidas ao vivo do
+# dict de cada um; o indice so' diz QUEM olhar (a area 3x3 de chunks em
+# volta cobre quem andou de chunk desde o ultimo tick).
+_mobs_por_sala = {}
+_players_por_sala = {}
+
+def _reindexar_areas():
+    global _mobs_por_sala, _players_por_sala
+    mobs = {}
+    for m_id, m in active_mobs.items():
+        sala = m.get('room')
+        if sala: mobs.setdefault(sala, []).append(m_id)
+    players = {}
+    for sid, p in online_players.items():
+        sala = p.get('room')
+        if sala: players.setdefault(sala, []).append(sid)
+    _mobs_por_sala, _players_por_sala = mobs, players
+
+def _mobs_perto(sala):
+    for r in salas_vizinhas(sala):
+        for m_id in _mobs_por_sala.get(r, ()):
+            m = active_mobs.get(m_id)
+            if m is not None: yield m_id, m
+
+def _sids_perto(sala):
+    for r in salas_vizinhas(sala):
+        for sid in _players_por_sala.get(r, ()):
+            if sid in online_players: yield sid
+
+def _tiles_ocupados(excluir_mob=None, excluir_sid=None, sala=None):
+    # sala: so' olha a area 3x3 em volta (bem mais barato). Sem sala, o
+    # servidor inteiro (so' em lugar raro, fora dos loops).
     ocupados = set()
-    for o_id, o in active_mobs.items():
+    mobs = _mobs_perto(sala) if sala else active_mobs.items()
+    for o_id, o in mobs:
         if o_id == excluir_mob or o.get('hp', 1) <= 0 or 'pos_x' not in o: continue
         ocupados.add(tile_do_mob(o))
-    for o_sid, p in online_players.items():
-        if o_sid == excluir_sid or p.get('is_dead'): continue
+    sids = _sids_perto(sala) if sala else online_players.keys()
+    for o_sid in sids:
+        p = online_players.get(o_sid)
+        if p is None or o_sid == excluir_sid or p.get('is_dead'): continue
         if int(p.get('floor', 1) or 1) != MOB_FLOOR: continue
         ocupados.add(tile_de(p.get('pos_x', 0), p.get('pos_y', 0)))
     return ocupados
+
+def _salas_ativas():
+    """Salas com algum player nela ou do lado (o que aparece na tela de
+    alguem). Mob/NPC fora disso fica parado feito estatua."""
+    ativas = set()
+    for sala in _players_por_sala:
+        ativas.update(salas_vizinhas(sala))
+    return ativas
 
 def _alcanca(m, sid, origem, destino, now):
     # "Dá pra chegar no player?" — só paredes (criaturas andam). Cache 0.5s.
@@ -1039,7 +1096,7 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
     grade = mapas_colisao.get(m.get('mapa'))
     if grade is None: return False
     origem = tile_do_mob(m)
-    ocupados = _tiles_ocupados(excluir_mob=mob_id)
+    ocupados = _tiles_ocupados(excluir_mob=mob_id, sala=m.get('room'))
     cache = m.get('path')
     caminho = None
     if cache and cache['fim'] == destino and cache.get('adj') == ate_adjacente and cache['caminho'] and cache['caminho'][0] == origem and now - cache['t'] < PATH_RECALC_SEG:
@@ -1164,7 +1221,7 @@ def _mob_tick(mob_id, m, now):
     # num andar diferente (só continua perseguindo quem virou alvo ANTES de
     # trocar de andar, no bloco acima).
     melhor, melhor_dist = None, DETECCAO_SQM * TILE
-    for sid in list(online_players.keys()):
+    for sid in list(_sids_perto(m['room'])) if m.get('room') else list(online_players.keys()):
         p = _player_alvo_valido(sid, m)
         if p is None: continue
         d = _dist_px(m, p)
@@ -1192,7 +1249,7 @@ def _mob_passear(mob_id, m, origem, now):
     grade = mapas_colisao.get(m.get('mapa'))
     casa = m.get('spawn')
     if grade is None or casa is None: return
-    ocupados = _tiles_ocupados(excluir_mob=mob_id)
+    ocupados = _tiles_ocupados(excluir_mob=mob_id, sala=m.get('room'))
     destinos = [(origem[0] + dx, origem[1] + dy) for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0))]
     random.shuffle(destinos)
     for destino in destinos:
@@ -1224,7 +1281,14 @@ def mob_ai_loop():
     while True:
         socketio.sleep(MOB_TICK_SEG)
         now = time.time()
+        _reindexar_areas()
+        ativas = _salas_ativas()
         for mob_id, m in list(active_mobs.items()):
+            # Longe de todo mundo: estatua (nao anda, nao procura alvo, nao
+            # passeia). Volta a agir quando alguem chega perto.
+            if m.get('room') not in ativas:
+                m['last_tick'] = now
+                continue
             try:
                 _mob_tick(mob_id, m, now)
             except Exception:
@@ -1821,8 +1885,11 @@ def handle_join_game(data):
         stats_payload['char_leveled_up'] = False
         emit('sync_stats', stats_payload, room=sid)
         # current_hp/max_hp já resolvidos (-1 = cheio) pra barra do remote nascer certa.
-        emit('current_players', {o_sid: dados_publicos_player(o_p) for o_sid, o_p in online_players.items()}, room=sid)
-        emit('player_joined', dados_publicos_player(data), broadcast=True, include_self=False)
+        # So' o resumo publico (nome/classe/posicao/skin/HP). Antes ia o dict
+        # inteiro de cada player (inventario, skills, user_id...): pesado com
+        # muita gente online e vazava dado privado pros outros clients.
+        emit('current_players', {o_sid: resumo_player_area(o_p) for o_sid, o_p in online_players.items()}, room=sid)
+        emit('player_joined', resumo_player_area(data), broadcast=True, include_self=False)
 
         emit('sync_area_data', montar_sync_area(sid, room), room=sid)
         
@@ -2711,7 +2778,7 @@ def handle_m(data):
         # Mob vivo tambem bloqueia o SQM (nao da pra atravessar).
         mob_no_caminho = andar_p == MOB_FLOOR and any(
             o.get('hp', 1) > 0 and 'pos_x' in o and tile_do_mob(o) == destino_tile
-            for o in active_mobs.values())
+            for _, o in (_mobs_perto(p['room']) if p.get('room') else active_mobs.items()))
         if npc_no_caminho or mob_no_caminho:
             emit('sync_local_player', {
                 'pos_x': p.get('pos_x', -1), 'pos_y': p.get('pos_y', -1),
@@ -3744,7 +3811,7 @@ def mob_cleanup_loop():
             # esse SQM vira a "casa" dele nessa vida (pra onde volta/leash).
             # Usa o SQM ja' avisado (se ninguem parou em cima dele nesse meio tempo).
             nascimento = m_data.pop('nascimento_reservado', None)
-            if nascimento is None or nascimento in _tiles_ocupados(excluir_mob=m_id):
+            if nascimento is None or nascimento in _tiles_ocupados(excluir_mob=m_id, sala=m_data.get('room')):
                 nascimento = _tile_de_nascimento(m_id, m_data)
             if nascimento is not None:
                 m_data['spawn'] = nascimento
@@ -3770,4 +3837,6 @@ eventlet.spawn(db_writer_worker)
 
 if __name__ == '__main__':
     init_db()
-    socketio.run(app, host='0.0.0.0', port=3000, debug=True)
+    # debug=False em producao (o debug deixa tudo mais lento e expoe detalhes
+    # de erro). Pra desenvolver: DEBUG_SERVIDOR=1 python3 servidor.py
+    socketio.run(app, host='0.0.0.0', port=3000, debug=os.getenv('DEBUG_SERVIDOR') == '1')
