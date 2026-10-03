@@ -35,7 +35,9 @@ public final class BookMenuUI {
     private static final float COLUNA_LARGURA = BOTAO_SIZE + BOTAO_ABA;
     private static final float JANELA_LARGURA = 520f;
     private static final float JANELA_ALTURA = 410f;
-    private static final int COLUNAS_INVENTARIO = 7;
+    private static final int COLUNAS_INVENTARIO = 6;
+    private static final float COLUNA_BAG = 133f;
+    private static final float TAM_BOTAO_ACAO = 52f;
 
     private final Table root = new Table();
     private final Map<String, Button> botoes = new LinkedHashMap<>();
@@ -49,9 +51,7 @@ public final class BookMenuUI {
     private final Table equipPage = new Table();
     private final Table skillsPage = new Table();
     private final Table inventoryGrid = new Table();
-    private final Label itemName;
-    private final Label itemQuantity;
-    private final Label itemFavorite;
+    private final Table bagDetalhes = new Table();
     private final Label capacityLabel;
     private final Label actionStatus;
     private final Map<String, Label> currencyLabels = new LinkedHashMap<>();
@@ -126,13 +126,13 @@ public final class BookMenuUI {
             new Color(0.08f, 0.38f, 0.32f, 1f), new Color(0.35f, 0.92f, 0.72f, 1f), 2),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
         skin.add("bag-slot", UiSkin.retangulo(
-            new Color(0.025f, 0.028f, 0.03f, 1f), new Color(0.12f, 0.13f, 0.14f, 1f), 1),
+            new Color(0.15f, 0.15f, 0.15f, 1f), new Color(0.21f, 0.21f, 0.21f, 1f), 2),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
         skin.add("bag-slot-hover", UiSkin.retangulo(
-            new Color(0.07f, 0.08f, 0.085f, 1f), new Color(0.26f, 0.28f, 0.3f, 1f), 1),
+            new Color(0.18f, 0.18f, 0.18f, 1f), new Color(0.32f, 0.32f, 0.32f, 1f), 2),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
         skin.add("bag-slot-selected", UiSkin.retangulo(
-            new Color(0.17f, 0.2f, 0.2f, 1f), new Color(0.95f, 0.65f, 0.24f, 1f), 2),
+            new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.95f, 0.65f, 0.24f, 1f), 2),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
         skin.add("bag-detail", UiSkin.retangulo(
             new Color(0.025f, 0.028f, 0.03f, 1f), new Color(0.12f, 0.13f, 0.14f, 1f), 1),
@@ -165,11 +165,7 @@ public final class BookMenuUI {
         mainWindow.pad(14);
         mainWindow.top().left();
         tituloSecao = new Label("Bag", skin, "subtitulo");
-        itemName = new Label("", skin, "default");
-        itemName.setWrap(true);
-        itemQuantity = new Label("", skin, "hud");
-        itemFavorite = new Label("", skin, "hud");
-        capacityLabel = new Label("Capacity: 0 / 0", skin, "hud");
+        capacityLabel = new Label("Capacity 0/0", skin, "hud");
         actionStatus = new Label("", skin, "hud");
         construirPaginaBag(skin);
         construirPaginaEquip(skin);
@@ -261,75 +257,76 @@ public final class BookMenuUI {
     }
 
     private void construirPaginaBag(Skin skin) {
-        bagPage.defaults().top();
+        bagPage.top().left();
         inventoryGrid.top().left();
+        bagDetalhes.top().left();
 
-        Table detalhes = new Table();
-        detalhes.setBackground(skin.getDrawable("bag-detail"));
-        detalhes.top().left().pad(8);
-        detalhes.add(itemName).growX().left().padBottom(10).row();
-        detalhes.add(itemQuantity).growX().left().padBottom(5).row();
-        detalhes.add(itemFavorite).growX().left().padBottom(5).row();
-        detalhes.add(new Table()).growY();
-
+        // Favoritar/lixeira (ou confirmar/cancelar a exclusao) no rodape da coluna esquerda.
         actionButtons = new Table();
-        actionButtons.center();
-        favoriteButton = criarBotaoAcao("ui/Star", () -> alternarFavorito());
-        trashButton = criarBotaoAcao("ui/Trash", () -> iniciarExclusao());
-        actionButtons.add(favoriteButton).size(48).padRight(5);
-        actionButtons.add(trashButton).size(48);
+        favoriteButton = criarBotaoAcao("ui/Star", new Color(0.16f, 0.16f, 0.04f, 1f),
+            new Color(0.32f, 0.32f, 0.1f, 1f), () -> alternarFavorito());
+        trashButton = criarBotaoAcao("ui/Trash", new Color(0.18f, 0.05f, 0.05f, 1f),
+            new Color(0.38f, 0.1f, 0.1f, 1f), () -> iniciarExclusao());
+        actionButtons.add(favoriteButton).size(TAM_BOTAO_ACAO).padRight(10);
+        actionButtons.add(trashButton).size(TAM_BOTAO_ACAO);
         deleteConfirmation = new Table();
-        deleteConfirmation.center();
-        Button confirmar = criarBotaoAcao("ui/Confirm", () -> confirmarExclusao());
-        Button cancelar = criarBotaoAcao("ui/Negate", () -> cancelarExclusao());
-        deleteConfirmation.add(confirmar).size(42).padRight(5);
-        deleteConfirmation.add(cancelar).size(42);
+        Button confirmar = criarBotaoAcao("ui/Confirm", new Color(0.05f, 0.18f, 0.05f, 1f),
+            new Color(0.12f, 0.4f, 0.12f, 1f), () -> confirmarExclusao());
+        Button cancelar = criarBotaoAcao("ui/Negate", new Color(0.18f, 0.05f, 0.05f, 1f),
+            new Color(0.38f, 0.1f, 0.1f, 1f), () -> cancelarExclusao());
+        deleteConfirmation.add(confirmar).size(TAM_BOTAO_ACAO).padRight(10);
+        deleteConfirmation.add(cancelar).size(TAM_BOTAO_ACAO);
         deleteConfirmation.setVisible(false);
+        Stack botoesAcao = new Stack(actionButtons, deleteConfirmation);
 
+        actionStatus.setFontScale(0.62f);
+        actionStatus.setAlignment(Align.center);
         actionBar = new Table();
-        actionBar.center();
-        actionBar.add(actionStatus).growX().center().height(14).padBottom(3).row();
-        actionBar.add(actionButtons).center().height(48).row();
-        actionBar.add(deleteConfirmation).center().height(42);
+        actionBar.add(actionStatus).growX().center().padBottom(3).row();
+        actionBar.add(botoesAcao).center();
 
-        Table painelGrade = new Table();
-        painelGrade.pad(7);
+        Table colunaEsquerda = new Table();
+        colunaEsquerda.top().left();
+        colunaEsquerda.setBackground(UiSkin.retangulo(
+            new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        colunaEsquerda.add(bagDetalhes).grow().top().left().pad(8, 8, 8, 8).row();
+        colunaEsquerda.add(separadorEquip()).growX().height(1).row();
+        colunaEsquerda.add(actionBar).growX().pad(4, 4, 5, 4);
+
         ScrollPane scroll = new ScrollPane(inventoryGrid, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
         scroll.setOverscroll(false, false);
         scroll.setFlickScroll(true);
-        painelGrade.add(scroll).grow();
 
-        Table colunaDireita = new Table();
-        colunaDireita.add(painelGrade).grow().row();
-        capacityLabel.setText("Capacity: 0 / 100");
-        capacityLabel.setColor(new Color(0.72f, 0.72f, 0.72f, 1f));
-        colunaDireita.add(capacityLabel).center().padTop(5).padBottom(5).row();
+        capacityLabel.setFontScale(0.8f);
+        capacityLabel.setColor(new Color(0.65f, 0.65f, 0.65f, 1f));
 
         Table moedas = new Table();
-        moedas.pad(5, 4, 5, 4);
+        moedas.left();
         String[] tiposMoeda = {"Copper", "Silver", "Gold", "Platinum"};
         for (String tipo : tiposMoeda) {
-            Table moeda = new Table();
             Image icone = new Image(new TextureRegionDrawable(atlas.findRegion("ui/currency/" + tipo)));
             icone.setScaling(Scaling.fit);
             Label quantidade = new Label("0", skin, "hud");
+            quantidade.setFontScale(0.7f);
             quantidade.setColor(corMoeda(tipo));
-            moeda.add(icone).size(18).padRight(2);
-            moeda.add(quantidade).minWidth(28).left();
-            moedas.add(moeda).expandX().center();
+            moedas.add(icone).size(24).padRight(4);
+            moedas.add(quantidade).left().padRight(10);
             currencyLabels.put(tipo, quantidade);
         }
-        colunaDireita.add(moedas).growX().height(32);
 
-        Table colunaEsquerda = new Table();
-        colunaEsquerda.top();
-        colunaEsquerda.add(detalhes).growX().growY().row();
-        colunaEsquerda.add(actionBar).growX().height(68).padTop(6);
+        Table colunaDireita = new Table();
+        colunaDireita.top().left();
+        colunaDireita.setBackground(UiSkin.retangulo(
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
+        colunaDireita.add(scroll).grow().pad(12, 12, 6, 12).row();
+        colunaDireita.add(capacityLabel).center().padBottom(8).row();
+        colunaDireita.add(moedas).left().padLeft(8).padBottom(10);
 
-        bagPage.add(colunaEsquerda).width(138).growY().padTop(7).padRight(7);
+        bagPage.add(colunaEsquerda).width(COLUNA_BAG).growY();
         bagPage.add(colunaDireita).grow();
+        atualizarCapacidade(0f, 100f);
         atualizarDetalhes(null);
         atualizarGrade();
     }
@@ -366,7 +363,7 @@ public final class BookMenuUI {
         ITEM_STATS.put("res://sprites/items/Knight/Weapons/StarterSword.tres", new EquipStats("Basic Sword", "Sword", 0, "Knight", 1, 5, 10, 0, "Melee", 5));
         ITEM_STATS.put("res://sprites/items/Knight/SecondHand/StarterShield.tres", new EquipStats("Basic Shield", "Shield", 0, "Knight", 1, 5, 10, 0, "", 0));
         ITEM_STATS.put("res://sprites/items/Mage/Weapons/StarterStaff.tres", new EquipStats("Basic Staff", "Staff", 0, "Mage", 1, 0, 0, 10, "Magic", 2));
-        ITEM_STATS.put("res://sprites/items/Mage/SecondHand/StarterBook.tres", new EquipStats("Basic Book", "Book", 0, "Mage", 0, 0, 0, 10, "Magic", 5));
+        ITEM_STATS.put("res://sprites/items/Mage/SecondHand/StarterBook.tres", new EquipStats("Apprentice Book", "Book", 0, "Mage", 0, 0, 0, 10, "Magic", 5));
         ITEM_STATS.put("res://sprites/items/Ranger/Weapons/StarterBow.tres", new EquipStats("Basic Bow", "Bow", 0, "Ranger", 1, 0, 5, 0, "Focus", 5));
         ITEM_STATS.put("res://sprites/items/Ranger/SecondHand/StarterArrow.tres", new EquipStats("Basic Arrow", "Arrow", 0, "Ranger", 0, 0, 0, 0, "Focus", 5));
     }
@@ -627,8 +624,9 @@ public final class BookMenuUI {
         // Fonte fina ("hud", sem contorno) reduzida; linhas na altura natural
         // da fonte (sem sobrepor) e sem espaco extra entre elas.
         Label nome = new Label(nomeExibicao(itemPath), skin, "hud");
-        nome.setFontScale(0.85f);
-        bloco.add(nome).left().padBottom(2).row();
+        nome.setFontScale(0.74f);
+        nome.setWrap(true);
+        bloco.add(nome).growX().left().padBottom(1).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
         if (dados == null) return;
         EquipStats base = compararCom == null ? null : ITEM_STATS.get(compararCom);
@@ -637,7 +635,7 @@ public final class BookMenuUI {
         // Vermelho = classe errada (o servidor pune quem equipa item de outra classe).
         boolean classeCerta = "All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass);
         bloco.add(linhaStat(dados.reqClass + " " + dados.tipo,
-            classeCerta ? COR_REQUISITO : Color.valueOf("ff4a4a"))).left().row();
+            classeCerta ? corClasse(dados.reqClass) : Color.valueOf("ff4a4a"))).left().row();
         adicionarLinhaStat(bloco, "Attack", dados.bonusDamage, base == null ? 0 : base.bonusDamage, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Defense", dados.defense, base == null ? 0 : base.defense, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Stamina", dados.stamina, base == null ? 0 : base.stamina, comparar, COR_STAMINA);
@@ -661,7 +659,7 @@ public final class BookMenuUI {
 
     private Label linhaStat(String texto, Color cor) {
         Label label = new Label(texto, skin, "hud");
-        label.setFontScale(0.72f);
+        label.setFontScale(0.62f);
         label.setColor(cor);
         return label;
     }
@@ -708,6 +706,8 @@ public final class BookMenuUI {
             }
         }
         atualizarDetalhesEquip();
+        // A comparacao (+x) dos detalhes da Bag depende do que esta equipado.
+        if (favoriteButton != null) atualizarDetalhes(itemSelecionado());
     }
 
     // ===================== SKILLS =====================
@@ -1039,7 +1039,7 @@ public final class BookMenuUI {
                     atualizarGrade();
                 }
             });
-            inventoryGrid.add(slot).size(42).pad(1);
+            inventoryGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
             if ((i + 1) % COLUNAS_INVENTARIO == 0) inventoryGrid.row();
         }
     }
@@ -1071,36 +1071,38 @@ public final class BookMenuUI {
 
     private void atualizarDetalhes(InventoryItem item) {
         if (item == null) {
-            itemName.setText("");
-            itemQuantity.setText("");
-            itemFavorite.setText("");
+            bagDetalhes.clearChildren();
             actionStatus.setText("");
             favoriteButton.setDisabled(true);
             trashButton.setDisabled(true);
             return;
         }
-        itemName.setText(nomeExibicao(item.itemPath));
-        itemQuantity.setText(item.quantity > 1 ? "Quantity: " + item.quantity : "");
-        itemFavorite.setText(item.favorite ? "Favorite" : "");
+        // Mesmos detalhes da aba Equip; equipamento compara com o que esta no slot dele.
+        String slot = slotDoItem(item.itemPath);
+        String equipado = slot == null ? null : equippedItemPaths.get(slot);
+        preencherBlocoStats(bagDetalhes, item.itemPath,
+            ITEM_STATS.containsKey(item.itemPath) ? (equipado == null ? "" : equipado) : null);
+        if (item.quantity > 1) bagDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
+        if (item.favorite) bagDetalhes.add(linhaStat("Favorite", new Color(1f, 0.82f, 0.24f, 1f))).left().row();
         actionStatus.setText("");
         favoriteButton.setDisabled(item.instanceId.isEmpty());
         trashButton.setDisabled(item.instanceId.isEmpty() || item.favorite);
-        favoriteButton.setColor(item.favorite ? new Color(1f, 0.82f, 0.24f, 1f) : Color.WHITE);
         cancelarExclusao();
     }
 
-    private Button criarBotaoAcao(String regiao, Runnable acao) {
+    private Button criarBotaoAcao(String regiao, Color fundo, Color borda, Runnable acao) {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
-        estilo.up = skin.getDrawable("bag-slot");
-        estilo.over = skin.getDrawable("bag-slot-hover");
-        estilo.down = skin.getDrawable("bag-slot-selected");
+        estilo.up = UiSkin.retangulo(fundo, borda, 2);
+        estilo.over = UiSkin.retangulo(fundo.cpy().mul(1.5f, 1.5f, 1.5f, 1f), borda.cpy().mul(1.4f, 1.4f, 1.4f, 1f), 2);
+        estilo.down = UiSkin.retangulo(fundo.cpy().mul(2f, 2f, 2f, 1f), borda.cpy().mul(1.8f, 1.8f, 1.8f, 1f), 2);
+        estilo.disabled = UiSkin.retangulo(new Color(0.1f, 0.1f, 0.1f, 1f), new Color(0.2f, 0.2f, 0.2f, 1f), 2);
         Button botao = new Button(estilo);
         Image icone = new Image(new TextureRegionDrawable(atlas.findRegion(regiao)));
         icone.setScaling(Scaling.fit);
-        botao.add(icone).size(24);
+        botao.add(icone).size(TAM_BOTAO_ACAO - 16f);
         botao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                acao.run();
+                if (!botao.isDisabled()) acao.run();
             }
         });
         return botao;
@@ -1214,10 +1216,15 @@ public final class BookMenuUI {
         currencyLabels.get("Platinum").setText(String.valueOf(platinum));
     }
 
+    private static String formatarPeso(float valor) {
+        return valor == Math.floor(valor) ? String.valueOf((int) valor)
+            : String.format(java.util.Locale.US, "%.1f", valor);
+    }
+
     public void atualizarCapacidade(float usada, float maxima) {
         capacityUsed = usada;
         capacityMaximum = maxima;
-        capacityLabel.setText(String.format("Capacity: %.1f / %.0f", usada, maxima));
+        capacityLabel.setText("Capacity " + formatarPeso(usada) + "/" + formatarPeso(maxima));
         atualizarTextoCapacidade();
     }
 
@@ -1247,7 +1254,7 @@ public final class BookMenuUI {
             tituloSecao.setVisible(comTitulo);
             mainWindow.clearChildren();
             // Equip ocupa o painel inteiro (colunas encostam na borda).
-            mainWindow.pad("Equip".equals(secao) ? 1 : 14);
+            mainWindow.pad("Equip".equals(secao) || "Bag".equals(secao) ? 1 : 14);
             if (comTitulo) {
                 mainWindow.add(tituloSecao).growX().left().padBottom(9).row();
             }
