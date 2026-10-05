@@ -362,6 +362,7 @@ public final class HudVitais {
 
     public float hpAtual() { return hpAtual; }
     public float hpMax() { return hpMax; }
+    public float mpAtual() { return mpAtual; }
 
     private void atualizar() {
         preencher(hp, hpMax > 0f ? hpAtual / hpMax : 0f);

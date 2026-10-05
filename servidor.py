@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.2"
+SERVER_VERSION = "v0.3"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -115,6 +115,8 @@ def rolar_currency(mob_type_id):
     return random.randint(minimo, maximo)
 
 CRIT_CHANCE = 0.10
+# Chance do ataque básico do player errar o mob (dano 0, "Miss" no client).
+MISS_CHANCE_PLAYER = 0.05
 BLOCK_CHANCE = 0.10
 DEFENSE_AFK_WINDOW = 12.0
 PUNICAO_CLASSE_HP = 1.0
@@ -160,7 +162,7 @@ ITEM_DB = {
     "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"name": "Basic Music Sheet", "type": "Music Sheet", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 5.0},
     "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 5.0},
     "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 5.0},
-    "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "cap": 5.0},
+    "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "mana_cost": 3, "cap": 5.0},
     "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 5, "cap": 5.0},
     "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 5.0},
     "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "max_stack": 9999, "cap": 0.1},
@@ -178,7 +180,7 @@ ALCANCE_RANGED_SQM = 5
 # stats e slot) - mandado no sync_local_player, assim o client nao precisa
 # de uma copia propria e o que aparece na tela e' sempre o valor real.
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
-                       "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo")
+                       "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost")
 
 def montar_item_db_cliente():
     db = {}
@@ -317,6 +319,14 @@ def adicionar_municao_ao_jogador(p, item_path, qty):
         n = min(max_stack, restante)
         inventario.append(criar_instancia_item(item_path, n))
         restante -= n
+
+def custo_mana_arma(p):
+    # Mana gasta por ataque básico ("mana_cost" da arma da mão principal,
+    # ex: varinha/cajado). 0 = arma não gasta mana.
+    inst = p.get('equipped_items', {}).get('MainHand')
+    if not isinstance(inst, dict): return 0
+    try: return max(0, int(ITEM_DB.get(inst.get('item'), {}).get('mana_cost', 0)))
+    except (TypeError, ValueError): return 0
 
 def tem_municao_equipada(p):
     inst = p.get('equipped_items', {}).get(SLOT_MUNICAO)
@@ -2699,6 +2709,19 @@ def handle_hit_mob(data):
             if max(abs(tp[0] - tm[0]), abs(tp[1] - tm[1])) > 2: return
         # Mesma regra do mob pro player: andar diferente, sem golpe (nem aggro).
         if int(p.get('floor', 1) or 1) != MOB_FLOOR: return
+        # Arma que gasta mana (varinha): sem mana suficiente, não ataca. Só
+        # cobra depois de validar alcance/andar (golpe recusado não gasta).
+        custo_mana = custo_mana_arma(p)
+        if custo_mana > 0:
+            max_hp_m, max_mp_m = calcular_max_vitais(p)
+            try: mp_atual = float(p.get('current_mp', -1))
+            except (TypeError, ValueError): mp_atual = -1.0
+            if mp_atual < 0: mp_atual = max_mp_m
+            if mp_atual < custo_mana:
+                emit('sync_vitals', {'current_mp': mp_atual, 'max_mp': max_mp_m, 'no_mana': True}, room=sid)
+                return
+            p['current_mp'] = mp_atual - custo_mana
+            emit('sync_vitals', {'current_mp': p['current_mp'], 'max_mp': max_mp_m}, room=sid)
         mob_data['last_activity'] = now
         p['last_successful_hit'] = now  # libera o treino da skill da classe
         mob_focar_agressor(mob_id, mob_data, sid)
@@ -2724,6 +2747,9 @@ def handle_hit_mob(data):
         is_crit = random.random() < CRIT_CHANCE
         if is_crit: dano_final *= 2
         if reduzido: dano_final = max(1, int(dano_final * DANO_RANGED_COLADO_MULT))
+        # Miss: o golpe sai (gasta mana/flecha, puxa aggro), mas não tira vida.
+        is_miss = random.random() < MISS_CHANCE_PLAYER
+        if is_miss: dano_final, is_crit, reduzido = 0, False, False
         
         if precisa_municao:
             restante_municao, esgotou_municao = consumir_municao(p)
@@ -2744,7 +2770,7 @@ def handle_hit_mob(data):
         room = p.get('room')
         atacante_id = p.get('name', '')
         
-        emit_area('mob_damaged', {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'hit_type': hit_type, 'is_crit': is_crit, 'reduced': reduzido, 'attacker_id': atacante_id, 'w_type': w_type, 'proj': proj, 'owner': ''}, room)
+        emit_area('mob_damaged', {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'hit_type': hit_type, 'is_crit': is_crit, 'reduced': reduzido, 'is_miss': is_miss, 'attacker_id': atacante_id, 'w_type': w_type, 'proj': proj, 'owner': ''}, room)
         
         if is_dead:
             xp_total = MOB_DB.get(mob_type_id, {}).get("xp", 40)

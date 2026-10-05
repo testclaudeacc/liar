@@ -1963,7 +1963,10 @@ public class WorldScreen extends ScreenAdapter {
             mob.maxHp = Math.max(1f, data.getFloat("max_hp", mob.maxHp));
             mob.hp = Math.max(0f, data.getFloat("new_hp", mob.hp));
             boolean critico = data.getBoolean("is_crit", false);
-            NumeroDano numero = new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (critico ? "!" : ""), critico);
+            boolean errou = data.getBoolean("is_miss", false);
+            NumeroDano numero = new NumeroDano(mob.x, mob.y, errou ? "Miss" : data.getInt("damage", 0) + (critico ? "!" : ""), critico);
+            // Miss do player no mob: mesmo amarelo do "Miss" do mob no player.
+            if (errou) numero.cor = new Color(1f, 0.9f, 0.1f, 1f);
             // Ranged colado num mob de outro player: dano cortado, numero amarelo.
             if (data.getBoolean("reduced", false)) numero.cor = new Color(1f, 0.9f, 0.1f, 1f);
             // Efeito de hit; a distancia, primeiro o projetil sai do atacante.
@@ -2012,6 +2015,8 @@ public class WorldScreen extends ScreenAdapter {
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             // Flecha gasta (o servidor manda a quantidade restante a cada tiro).
+            // Varinha sem mana: o servidor recusou o golpe.
+            if (data.getBoolean("no_mana", false)) avisarSemMana();
             if (data.has("ammo_qty") && caminhoMunicao != null) {
                 int antes = quantidadeMunicao;
                 quantidadeMunicao = data.getInt("ammo_qty", quantidadeMunicao);
@@ -3457,6 +3462,15 @@ public class WorldScreen extends ScreenAdapter {
     private String caminhoMunicao = null;
     private int quantidadeMunicao = 0;
     private boolean avisouSemMunicao = false;
+    private boolean avisouSemMana = false;
+
+    /** Aviso (uma vez ate' a mana voltar) de que a varinha nao tem mana pra atacar. */
+    private void avisarSemMana() {
+        if (avisouSemMana) return;
+        avisouSemMana = true;
+        chat.adicionarMensagemSistema("You don't have enough mana.", new Color(1f, 0.25f, 0.25f, 1f));
+        hud.notificar("You don't have enough mana.", COR_NOTIF_AVISO, null);
+    }
 
     /** Le a flecha equipada (item + qty) e mostra/esconde a barrinha da HUD. */
     private void atualizarMunicao(JsonValue equipados) {
@@ -3680,6 +3694,13 @@ public class WorldScreen extends ScreenAdapter {
             }
             return;
         }
+        // Arma que gasta mana (varinha) sem mana suficiente nao ataca.
+        int custoMana = bookMenu.custoManaArmaEquipada();
+        if (custoMana > 0 && hud.mpAtual() < custoMana) {
+            avisarSemMana();
+            return;
+        }
+        avisouSemMana = false;
         if (classeRanged()) {
             float dx = local.x - alvo.x, dy = local.y - alvo.y;
             if (dx * dx + dy * dy > (float) (ALCANCE_RANGED_SQM * Jogador.TILE) * (ALCANCE_RANGED_SQM * Jogador.TILE)) return;

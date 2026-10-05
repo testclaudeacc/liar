@@ -7,5 +7,5 @@ package com.teste.game.rede;
  */
 public class ServerConfig {
     public static final String BASE_URL = "http://192.168.18.124:3000";
-    public static final String CLIENT_VERSION = "v0.2"; // igual servidor.py::SERVER_VERSION
+    public static final String CLIENT_VERSION = "v0.3"; // igual servidor.py::SERVER_VERSION
 }

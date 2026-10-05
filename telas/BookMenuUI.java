@@ -362,7 +362,7 @@ public final class BookMenuUI {
         final String nome, tipo, slot;
         final int reqLevel;
         final String reqClass;
-        final int bonusDamage, defense, stamina, mana, fourthStatValue;
+        final int bonusDamage, defense, stamina, mana, fourthStatValue, manaCost;
         final String fourthStatType;
 
         EquipStats(JsonValue d) {
@@ -377,6 +377,7 @@ public final class BookMenuUI {
             this.mana = d.getInt("mana", 0);
             this.fourthStatType = d.getString("fourth_stat_type", "");
             this.fourthStatValue = d.getInt("fourth_stat_value", 0);
+            this.manaCost = d.getInt("mana_cost", 0);
         }
     }
 
@@ -684,6 +685,8 @@ public final class BookMenuUI {
             adicionarLinhaStat(bloco, dados.fourthStatType, dados.fourthStatValue, anterior, comparar,
                 corQuartoStat(dados.fourthStatType));
         }
+        // Mana gasta por ataque (varinha). Sem "(+n)": nao e' bonus, e' custo.
+        if (dados.manaCost > 0) bloco.add(linhaStat("Mana per hit " + dados.manaCost, COR_MANA)).left().row();
     }
 
     private void adicionarLinhaStat(Table bloco, String nome, int valor, int anterior, boolean comparar, Color cor) {
@@ -736,6 +739,13 @@ public final class BookMenuUI {
         rotulo.setAlignment(Align.bottomLeft);
         float descent = rotulo.getStyle().font.getDescent() * escalaFonte; // negativo
         marcadores.add(rotulo).left().bottom().padLeft(1f).padBottom(descent);
+    }
+
+    /** Mana gasta por ataque basico pela arma da mao principal (0 = nao gasta). */
+    public int custoManaArmaEquipada() {
+        String caminho = equippedItemPaths.get("MainHand");
+        EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        return dados == null ? 0 : dados.manaCost;
     }
 
     /** Quantidade de um item equipado mudou (ex: flecha gasta, sync_vitals ammo_qty). */
