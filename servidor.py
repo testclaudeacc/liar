@@ -741,6 +741,14 @@ SEM_CAMINHO_SEG = 1.5
 # Focando o mesmo alvo esse tempo sem conseguir bater: o próximo player que
 # bater no mob rouba o foco (anti-abuso).
 TROCA_ALVO_SEM_HIT_SEG = 4.0
+# Caminho até o alvo trancado só por criaturas (ex: corredor com outro mob
+# na frente) por esse tempo: desiste e volta pra casa com flag, igual quando
+# a parede bloqueia. Um pouco mais que SEM_CAMINHO_SEG pra não desistir só
+# porque o mob da frente ainda está terminando o passo.
+BLOQUEADO_CRIATURA_SEG = 2.0
+# Ranged (cajado/arco/arma de bard) batendo colado (1 SQM) num mob que está
+# focando OUTRO player: dano cortado (anti "ficar colado no lure do knight").
+DANO_RANGED_COLADO_MULT = 0.5
 PATH_RECALC_SEG = 0.3
 # Distância máxima (em SQMs) que o mob pode se afastar do spawn perseguindo
 # alguém. Ultrapassou: em vez de voltar andando (às vezes por um mapa
@@ -1215,6 +1223,7 @@ def _alcanca(m, sid, origem, destino, now):
 def _mob_voltar_pra_casa(mob_id, m):
     m['target_sid'] = None
     m['sem_caminho'] = 0.0
+    m['bloqueado_criatura'] = 0.0
     m['path'] = None
     voltando = m.get('spawn') is not None and tile_do_mob(m) != m['spawn']
     if voltando != m.get('returning'):
@@ -1351,12 +1360,21 @@ def _mob_tick(mob_id, m, now):
         t_alvo = tile_de(alvo.get('pos_x', 0), alvo.get('pos_y', 0))
         if _adjacente(origem, t_alvo):
             m['sem_caminho'] = 0.0
+            m['bloqueado_criatura'] = 0.0
             _mob_encarar(mob_id, m, origem, t_alvo)
             return
         if _alcanca(m, alvo_sid, origem, t_alvo, now):
             m['sem_caminho'] = 0.0
-            if not _mob_dar_passo(mob_id, m, t_alvo, now, ate_adjacente=True):
-                _mob_encarar(mob_id, m, origem, t_alvo)  # bloqueado por criatura: espera olhando pro alvo
+            if _mob_dar_passo(mob_id, m, t_alvo, now, ate_adjacente=True):
+                m['bloqueado_criatura'] = 0.0
+            else:
+                # Bloqueado por criatura (outro mob/player no caminho): espera
+                # olhando pro alvo, mas se continuar trancado desiste com flag.
+                m['bloqueado_criatura'] = m.get('bloqueado_criatura', 0) + dt
+                if m['bloqueado_criatura'] >= BLOQUEADO_CRIATURA_SEG:
+                    _mob_voltar_pra_casa(mob_id, m)
+                else:
+                    _mob_encarar(mob_id, m, origem, t_alvo)
         else:
             m['sem_caminho'] = m.get('sem_caminho', 0) + dt
             if m['sem_caminho'] >= SEM_CAMINHO_SEG:
@@ -2682,6 +2700,12 @@ def handle_hit_mob(data):
         mob_data['last_activity'] = now
         p['last_successful_hit'] = now  # libera o treino da skill da classe
         mob_focar_agressor(mob_id, mob_data, sid)
+        # Ranged colado (SQM do lado) num mob que continua focando OUTRO
+        # player (ex: lure do knight): metade do dano e número amarelo. Se o
+        # mob é dele (ou acabou de virar, em mob_focar_agressor), sem corte.
+        tp_r = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+        reduzido = (p.get('class_name') in CLASSES_RANGED and _adjacente(tile_do_mob(mob_data), tp_r)
+                    and mob_data.get('target_sid') != sid)
 
         skills = p.get('skills', {})
         p_class = p.get('class_name', 'Knight')
@@ -2697,6 +2721,7 @@ def handle_hit_mob(data):
         
         is_crit = random.random() < CRIT_CHANCE
         if is_crit: dano_final *= 2
+        if reduzido: dano_final = max(1, int(dano_final * DANO_RANGED_COLADO_MULT))
         
         if precisa_municao:
             restante_municao, esgotou_municao = consumir_municao(p)
@@ -2717,7 +2742,7 @@ def handle_hit_mob(data):
         room = p.get('room')
         atacante_id = p.get('name', '')
         
-        emit_area('mob_damaged', {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'hit_type': hit_type, 'is_crit': is_crit, 'attacker_id': atacante_id, 'w_type': w_type, 'proj': proj, 'owner': ''}, room)
+        emit_area('mob_damaged', {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'hit_type': hit_type, 'is_crit': is_crit, 'reduced': reduzido, 'attacker_id': atacante_id, 'w_type': w_type, 'proj': proj, 'owner': ''}, room)
         
         if is_dead:
             xp_total = MOB_DB.get(mob_type_id, {}).get("xp", 40)

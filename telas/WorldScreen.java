@@ -1964,6 +1964,8 @@ public class WorldScreen extends ScreenAdapter {
             mob.hp = Math.max(0f, data.getFloat("new_hp", mob.hp));
             boolean critico = data.getBoolean("is_crit", false);
             NumeroDano numero = new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (critico ? "!" : ""), critico);
+            // Ranged colado num mob de outro player: dano cortado, numero amarelo.
+            if (data.getBoolean("reduced", false)) numero.cor = new Color(1f, 0.9f, 0.1f, 1f);
             // Efeito de hit; a distancia, primeiro o projetil sai do atacante.
             String efeito = data.getString("hit_type", "physical_hit");
             Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
@@ -3352,8 +3354,8 @@ public class WorldScreen extends ScreenAdapter {
         }
         // Bandeira enquanto volta pra casa (desistiu do alvo).
         if (!mob.morto && mob.voltando && regiaoFlag != null) {
-            // altura - 6f (era - 2f): ficava alto demais acima da cabeca.
-            batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 6f, 8f, 8f);
+            // 12x12 (era 8x8, pequena demais); mesma base de antes (altura - 6f).
+            batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 6f, 12f, 12f);
         }
         // Barra de vida (logo acima da cabeca; o nome vai por cima dela).
         if (!mob.morto) {
@@ -3651,6 +3653,7 @@ public class WorldScreen extends ScreenAdapter {
                 if (pr.numero != null) {
                     // Numero no lugar onde o mob esta agora (ele pode ter andado).
                     NumeroDano n = new NumeroDano(pr.alvo.x, pr.alvo.y, pr.numero.texto, pr.numero.critico);
+                    n.cor = pr.numero.cor;
                     numerosDano.add(n);
                 }
             }
