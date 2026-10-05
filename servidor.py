@@ -422,16 +422,10 @@ def calc_player_stats(player_class, level, skills, bonus_dmg=0, bonus_def=0):
     dmg += adc * 0.5
     defense += adc * 0.5
     
-    if player_class == "Knight":
-        dmg += skills.get("melee", 10) * 0.5
-        defense += skills.get("defense", 10) * 1.0
-    elif player_class == "Ranger":
-        dmg += skills.get("distance", 10) * 0.75
-        defense += skills.get("defense", 10) * 0.75
-    elif player_class in ["Mage", "Bard"]:
-        main_skill = skills.get("magic", 10) if player_class == "Mage" else skills.get("musicality", 10)
-        dmg += main_skill * 1.0
-        defense += skills.get("defense", 10) * 0.5
+    # Skill base (a da classe + defense): 1 de dano e 1 de redução por nível,
+    # igual pra todas as classes. ADC (acima) e itens continuam à parte.
+    dmg += skills.get(SKILL_DA_CLASSE.get(player_class, 'melee'), 10) * 1.0
+    defense += skills.get("defense", 10) * 1.0
     return int(dmg), float(defense)
 
 def _slots_com_classe_invalida(p):
