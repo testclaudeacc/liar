@@ -48,7 +48,9 @@ def _conferir_senha(hash_salvo, senha):
 load_dotenv()
 GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
-SERVER_VERSION = "v0.1"
+# Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
+# DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
+SERVER_VERSION = "v0.2"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -1662,7 +1664,7 @@ def ping(): return jsonify({"status": "online"}), 200
 def check_version():
     dados = _json_requisicao()
     if dados.get('version', '') == SERVER_VERSION: return jsonify({"valid": True, "mensagem": "Version OK."}), 200
-    return jsonify({"valid": False, "erro": "Client out of date."}), 426
+    return jsonify({"valid": False, "erro": "Version outdated, please update your game"}), 426
 
 @app.route('/register', methods=['POST'])
 def register():

@@ -482,7 +482,7 @@ public class AuthScreen extends ScreenAdapter {
                         telaLogin();
                     }
                 } else {
-                    String erro = body != null && body.has("erro") ? body.getString("erro") : "Client out of date.";
+                    String erro = body != null && body.has("erro") ? body.getString("erro") : "Version outdated, please update your game";
                     telaErro(erro, AuthScreen.this::telaMenuPrincipal);
                 }
             }
