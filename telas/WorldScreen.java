@@ -775,9 +775,12 @@ public class WorldScreen extends ScreenAdapter {
                 float wy = coords.y;
                 
                 if (!localMorto && cliqueEmBag(wx, wy)) return true;
-                // Clique no proprio SQM nao faz nada (antes o sprite de um mob
-                // logo abaixo invadia o SQM do player e o clique desmirava ele).
-                if (tileX(wx) == tileX(local.x) && (int) Math.floor(wy / Jogador.TILE) == tileY(local.y)) return true;
+                // Clique no proprio SQM: desfoca o alvo travado (e consome o
+                // clique - o sprite de um mob logo abaixo invade o SQM do player).
+                if (tileX(wx) == tileX(local.x) && (int) Math.floor(wy / Jogador.TILE) == tileY(local.y)) {
+                    if (!localMorto) alvoMob = null;
+                    return true;
+                }
                 if (!localMorto && cliqueEmMob(wx, wy)) return true;
                 if (cliqueEmJogador(wx, wy)) return true;
 
@@ -833,9 +836,9 @@ public class WorldScreen extends ScreenAdapter {
                     return true;
                 }
                 if (keycode == Input.Keys.ESCAPE) {
-                    // Janela de loot e alvo saem antes de qualquer outra coisa.
+                    // Janela do player sai antes de qualquer outra coisa. ESC nao
+                    // tira mais o alvo (so' clicar no proprio SQM ou no mob).
                     if (painelJogador.isVisivel()) { painelJogador.fechar(); return true; }
-                    if (alvoMob != null) { alvoMob = null; return true; }
                     if (amigoMarcado != null) { amigoMarcado = null; return true; }
                     // Fecha a interface ativa antes de abrir Settings.
                     if (dialogoNPC.isVisible()) dialogoNPC.fechar();

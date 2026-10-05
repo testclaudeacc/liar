@@ -738,6 +738,9 @@ DETECCAO_SQM = 5
 # desistir na hora só porque o alvo mudou de andar no meio da perseguição.
 PERSISTE_SQM = 8
 SEM_CAMINHO_SEG = 1.5
+# Focando o mesmo alvo esse tempo sem conseguir bater: o próximo player que
+# bater no mob rouba o foco (anti-abuso).
+TROCA_ALVO_SEM_HIT_SEG = 4.0
 PATH_RECALC_SEG = 0.3
 # Distância máxima (em SQMs) que o mob pode se afastar do spawn perseguindo
 # alguém. Ultrapassou: em vez de voltar andando (às vezes por um mapa
@@ -1272,6 +1275,7 @@ def _mob_atacar(mob_id, m, target_sid, now):
     if target_player is None: return
     target_name = target_player.get('name', '')
     m['next_attack'] = now + max(0.3, float(m.get('cooldown', MOB_COOLDOWN_PADRAO)))
+    m['ultimo_golpe'] = now
     mob_attack_damage = MOB_DB.get(m.get('type_id'), {}).get("attack", 3.0)
     p_class = target_player.get('class_name', 'Knight')
     bonus_itens = somar_bonus_combate_equipados(target_player.get('equipped_items', {}))
@@ -1375,7 +1379,7 @@ def _mob_tick(mob_id, m, now):
         if _adjacente(origem, t_p) or _alcanca(m, sid, origem, t_p, now):
             melhor, melhor_dist = sid, d
     if melhor is not None:
-        m['target_sid'] = melhor
+        _mob_definir_alvo(m, melhor, now)
         m['sem_caminho'] = 0.0
         return
 
@@ -1410,13 +1414,30 @@ def _mob_passear(mob_id, m, origem, now):
         m['next_wander_at'] = m['move_until'] + random.uniform(MOB_WANDER_MIN_WAIT, MOB_WANDER_MAX_WAIT)
         return
 
+def _mob_definir_alvo(m, sid, now=None):
+    # Troca de alvo zera o relógio de "focando sem bater" (ver mob_focar_agressor).
+    if m.get('target_sid') != sid:
+        m['alvo_desde'] = time.time() if now is None else now
+    m['target_sid'] = sid
+
+def _mob_preso_sem_bater(m, now):
+    # Mob focando o mesmo alvo há TROCA_ALVO_SEM_HIT_SEG sem conseguir bater
+    # (desde que mirou ou desde o último golpe, o que for mais recente).
+    ultimo = max(m.get('alvo_desde', 0), m.get('ultimo_golpe', 0))
+    return now - ultimo >= TROCA_ALVO_SEM_HIT_SEG
+
 def mob_focar_agressor(mob_id, m, sid):
     # Quem bate no mob vira o alvo se ele estava sem alvo ou voltando pra casa.
+    # Também troca de alvo se o mob está focando alguém há 4s sem conseguir
+    # bater (anti-abuso: um player "segurando" o mob longe enquanto outro bate).
     if m.get('hp', 1) <= 0: return
-    if m.get('target_sid') is not None and not m.get('returning'): return
+    now = time.time()
+    atual = m.get('target_sid')
+    if atual == sid: return
+    if atual is not None and not m.get('returning') and not _mob_preso_sem_bater(m, now): return
     p = _player_alvo_valido(sid, m)
     if p is None or _dist_px(m, p) > (DETECCAO_SQM + PERSISTE_SQM) * TILE: return
-    m['target_sid'] = sid
+    _mob_definir_alvo(m, sid, now)
     m['sem_caminho'] = 0.0
     if m.get('returning'):
         m['returning'] = False
