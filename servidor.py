@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.3"
+SERVER_VERSION = "v0.4"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -166,6 +166,8 @@ ITEM_DB = {
     "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 5, "cap": 5.0},
     "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 5.0},
     "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "max_stack": 9999, "cap": 0.1},
+    # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
+    "res://sprites/items/Food/Cookie.tres": {"name": "Cookie", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "stackable": True, "max_stack": 100, "cap": 0.1},
 }
 
 SLOT_MUNICAO = "Hand"
@@ -180,7 +182,8 @@ ALCANCE_RANGED_SQM = 5
 # stats e slot) - mandado no sync_local_player, assim o client nao precisa
 # de uma copia propria e o que aparece na tela e' sempre o valor real.
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
-                       "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost")
+                       "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
+                       "fullness", "stackable")
 
 def montar_item_db_cliente():
     db = {}
@@ -220,7 +223,9 @@ STARTING_EQUIPMENT = {
     "Mage":  [{"item": "res://sprites/items/Mage/Weapons/StarterStaff.tres", "slot": "MainHand"}, {"item": "res://sprites/items/Mage/SecondHand/StarterBook.tres", "slot": "Hand"}],
     "Bard": [{"item": "res://sprites/items/Bard/Weapons/StarterFlute.tres", "slot": "MainHand"}, {"item": "res://sprites/items/Bard/SecondHand/StarterSheet.tres", "slot": "Hand"}],
 }
-STARTING_INVENTORY = {"Knight": [], "Ranger": [], "Mage": [], "Bard": []}
+# Item da bag inicial: caminho, ou (caminho, quantidade) pra empilhavel.
+COOKIE = "res://sprites/items/Food/Cookie.tres"
+STARTING_INVENTORY = {c: [(COOKIE, 10)] for c in ("Knight", "Ranger", "Mage", "Bard")}
 
 def montar_kit_inicial(class_name):
     equipped = {}
@@ -229,9 +234,10 @@ def montar_kit_inicial(class_name):
         item_path = validate_item(entrada.get("item"))
         if item_path and slot in SLOTS_VALIDOS: equipped[slot] = criar_instancia_item(item_path, entrada.get("qty", 1))
     inventory = []
-    for item_path in STARTING_INVENTORY.get(class_name, []):
+    for entrada in STARTING_INVENTORY.get(class_name, []):
+        item_path, qty = entrada if isinstance(entrada, tuple) else (entrada, 1)
         item_path = validate_item(item_path)
-        if item_path: inventory.append(criar_instancia_item(item_path))
+        if item_path: inventory.append(criar_instancia_item(item_path, qty))
     return inventory, equipped
 
 def obter_dados_item(item_path):
@@ -264,8 +270,12 @@ def somar_bonus_combate_equipados(equipped_items):
 def eh_municao(item_path):
     return bool(ITEM_DB.get(item_path, {}).get("ammo", False))
 
+def eh_empilhavel(item_path):
+    # Flecha ou qualquer item com "stackable" (ex: comida): guarda "qty".
+    return eh_municao(item_path) or bool(ITEM_DB.get(item_path, {}).get("stackable", False))
+
 def obter_max_stack(item_path):
-    if not eh_municao(item_path): return 1
+    if not eh_empilhavel(item_path): return 1
     return max(1, int(ITEM_DB.get(item_path, {}).get("max_stack", MAX_STACK_MUNICAO_PADRAO)))
 
 def obter_cap_unitario_item(item_path):
@@ -276,7 +286,7 @@ def obter_cap_instancia(inst):
     item_path = inst.get('item')
     cap_unit = obter_cap_unitario_item(item_path)
     if cap_unit <= 0: return 0.0
-    if eh_municao(item_path):
+    if eh_empilhavel(item_path):
         return cap_unit * max(1, int(inst.get('qty', 1)))
     return cap_unit
 
@@ -293,7 +303,7 @@ def calcular_cap_maximo(level):
 
 def criar_instancia_item(item_path, qty=1):
     inst = {"id": uuid.uuid4().hex, "item": item_path, "favorite": False}
-    if eh_municao(item_path): inst["qty"] = max(1, min(int(qty), obter_max_stack(item_path)))
+    if eh_empilhavel(item_path): inst["qty"] = max(1, min(int(qty), obter_max_stack(item_path)))
     return inst
 
 def adicionar_municao_ao_jogador(p, item_path, qty):
@@ -353,7 +363,7 @@ def normalizar_instancia(entrada):
         if not isinstance(instance_id, str) or not instance_id: instance_id = uuid.uuid4().hex
         favorite = bool(entrada.get("favorite", False))
         inst = {"id": instance_id, "item": item_path, "favorite": favorite}
-        if eh_municao(item_path):
+        if eh_empilhavel(item_path):
             try: qty = int(entrada.get("qty", 1))
             except (TypeError, ValueError): qty = 1
             inst["qty"] = max(1, min(qty, obter_max_stack(item_path)))
@@ -1348,6 +1358,8 @@ def _mob_tick(mob_id, m, now):
         return
 
     if alvo_sid is not None:
+        # Mob focando o player: mantém ele em battle.
+        marcar_batalha(alvo_sid, online_players.get(alvo_sid), now)
         # Perseguição: NÃO exige o mesmo andar (só existir e estar vivo) —
         # assim o mob ainda vai atrás de quem subiu a escada fugindo, em vez
         # de travar/desistir na hora só por causa do andar (o andar já barra
@@ -1890,7 +1902,7 @@ def handle_connect():
 def handle_disconnect():
     sid = request.sid
     _baldes_eventos.pop(sid, None)
-    _remover_da_visao(sid)
+    if sid not in online_players: _remover_da_visao(sid)
     ip = _ip_da_conexao.pop(sid, None)
     if ip is not None:
         restante = _conexoes_por_ip.get(ip, 1) - 1
@@ -1909,6 +1921,12 @@ def handle_disconnect():
         _queue_save(player)
 
         if room: leave_room(room)
+        # Em battle: o corpo continua no jogo (visível, apanhando) até o
+        # battle acabar - battle_loop tira ele depois (_remover_corpo_ausente).
+        if player.get('em_batalha') and not player.get('is_dead'):
+            player['corpo_ausente'] = True
+            return
+        _remover_da_visao(sid)
         emit('player_left', {"name": p_name}, broadcast=True, include_self=False)
         players_by_name.pop(p_name, None)
         del online_players[sid]
@@ -2067,6 +2085,13 @@ def handle_join_game(data):
         # Uma sessao por conta: quem ja estava logado nela e' derrubado (o
         # client dele mostra "Someone logged in your account." e volta pro
         # menu) e quem acabou de entrar fica.
+        # Corpo de OUTRO personagem da conta ainda em battle (deslogou no meio
+        # da luta): não deixa entrar com outro char pra "sumir" com ele.
+        for existing_sid, player in online_players.items():
+            if (player.get('corpo_ausente') and str(player.get('user_id')) == str(user_id)
+                    and player.get('name') != p_name):
+                emit('force_disconnect', {"reason": f"{player.get('name')} is still in battle. Try again in a few seconds."}, room=sid)
+                return
         for existing_sid, player in list(online_players.items()):
             if str(player.get('user_id')) == str(user_id) and existing_sid != sid:
                 _remover_do_party(existing_sid, motivo="relogged")
@@ -2083,8 +2108,13 @@ def handle_join_game(data):
                 # em vez de voltar posicao/itens/xp pro ultimo save.
                 if player.get('name') == p_name:
                     for chave in ('pos_x', 'pos_y', 'direction', 'floor', 'inventory', 'equipped_items',
-                                  'skills', 'level', 'exp', 'kills', 'currency', 'npc_dialogue_state'):
+                                  'skills', 'level', 'exp', 'kills', 'currency', 'npc_dialogue_state',
+                                  'battle_until'):
                         if chave in player: data[chave] = player[chave]
+                    # Voltou pro corpo (ou derrubou a outra sessão) no meio do
+                    # battle: os mobs que miravam o sid antigo passam pro novo.
+                    for m in active_mobs.values():
+                        if m.get('target_sid') == existing_sid: m['target_sid'] = sid
 
                 emit('force_disconnect', {"reason": "Someone logged in your account."}, room=existing_sid)
                 room_to_leave = player.get('room')
@@ -2112,6 +2142,8 @@ def handle_join_game(data):
         online_players[sid] = data
         players_by_name[p_name] = sid
         marcar_movimento(sid)  # aparece pra quem esta perto e ve quem esta perto
+        if data.get('battle_until', 0) > time.time():
+            marcar_batalha(sid, data)  # relogou ainda em battle: icone já aparece
 
         # item_db vai so' no payload (nao fica guardado em online_players).
         max_hp_join, max_mp_join = calcular_max_vitais(data)
@@ -2718,6 +2750,7 @@ def handle_hit_mob(data):
             emit('sync_vitals', {'current_mp': p['current_mp'], 'max_mp': max_mp_m}, room=sid)
         mob_data['last_activity'] = now
         p['last_successful_hit'] = now  # libera o treino da skill da classe
+        marcar_batalha(sid, p, now)
         mob_focar_agressor(mob_id, mob_data, sid)
         # Ranged colado (SQM do lado) num mob que continua focando OUTRO
         # player (ex: lure do knight): metade do dano e número amarelo. Se o
@@ -3079,7 +3112,7 @@ def handle_collect_loot(data):
             qty = max(1, int(entrada.get("qty", 1)))
             cap_unit = obter_cap_unitario_item(item_path)
 
-            if eh_municao(item_path):
+            if eh_empilhavel(item_path):
                 if cap_unit <= 0: qty_pegar = qty
                 else: qty_pegar = min(qty, int(math.floor((cap_disponivel + 1e-6) / cap_unit)))
                 
@@ -4066,7 +4099,7 @@ def _validar_oferta(sid, offer):
         inst = encontrar_instancia(inventario, instance_id)
         if inst is None: return None
         item_path = inst.get('item')
-        if eh_municao(item_path):
+        if eh_empilhavel(item_path):
             try: qty = int(entrada.get('qty', 1))
             except (TypeError, ValueError): return None
             if qty <= 0 or qty > int(inst.get('qty', 1)): return None
@@ -4257,7 +4290,7 @@ def _executar_trade(trade_id):
     def _cap_apos_troca(p, insts_saindo, offer_saindo_items, offer_entrando_items):
         cap = calcular_cap_usado(p)
         for inst, entrada in zip(insts_saindo, offer_saindo_items):
-            cap -= obter_cap_instancia(inst) if not eh_municao(inst.get('item')) else obter_cap_unitario_item(inst.get('item')) * entrada['qty']
+            cap -= obter_cap_instancia(inst) if not eh_empilhavel(inst.get('item')) else obter_cap_unitario_item(inst.get('item')) * entrada['qty']
         for entrada in offer_entrando_items:
             cap += obter_cap_unitario_item(entrada['item']) * entrada['qty']
         return cap
@@ -4273,12 +4306,12 @@ def _executar_trade(trade_id):
     # tudo já ter sido validado acima - nada disso pode falhar a partir daqui.
     def _transferir(origem_inv, destino_p, insts, offer_items):
         for inst, entrada in zip(insts, offer_items):
-            if eh_municao(inst.get('item')) and entrada['qty'] < int(inst.get('qty', 1)):
+            if eh_empilhavel(inst.get('item')) and entrada['qty'] < int(inst.get('qty', 1)):
                 inst['qty'] = int(inst.get('qty', 1)) - entrada['qty']
                 adicionar_municao_ao_jogador(destino_p, inst.get('item'), entrada['qty'])
             else:
                 origem_inv.remove(inst)
-                if eh_municao(inst.get('item')):
+                if eh_empilhavel(inst.get('item')):
                     adicionar_municao_ao_jogador(destino_p, inst.get('item'), entrada['qty'])
                 else:
                     # "favorite" é preferência de quem marcou, não do item em
@@ -4462,6 +4495,90 @@ def get_regen_amount(level):
     lvl = int(level or 1)
     return REGEN_BASE + REGEN_POR_5_LEVELS * (lvl // 5)
 
+# =========================================================================
+# FOME (Fullness) e BATTLE
+# =========================================================================
+# Fullness fica em skills['fullness'] (0..FULLNESS_MAX, salvo junto com as
+# skills). Comer um item com "fullness" no ITEM_DB enche a barra; ela cai
+# FULLNESS_DECAI_POR por FULLNESS_DECAI_SEG online. Em 0 o client mostra o
+# icone de fome do lado do HP (por enquanto sem outro efeito).
+FULLNESS_MAX = 50
+FULLNESS_DECAI_SEG = 60.0
+FULLNESS_DECAI_POR = 1
+
+def obter_fullness(p):
+    try: return max(0, min(FULLNESS_MAX, int(p.get('skills', {}).get('fullness', 0))))
+    except (TypeError, ValueError): return 0
+
+def _definir_fullness(p, valor):
+    skills = p.get('skills')
+    if not isinstance(skills, dict): skills = {}; p['skills'] = skills
+    skills['fullness'] = max(0, min(FULLNESS_MAX, int(valor)))
+
+@socketio.on('eat_food')
+def handle_eat_food(data):
+    try:
+        sid = request.sid
+        p = online_players.get(sid)
+        if p is None or p.get('is_dead') or not isinstance(data, dict): return
+        inventario = p.get('inventory', [])
+        inst = encontrar_instancia(inventario, str(data.get('instance_id', '')))
+        if inst is None: return
+        try: enche = int(ITEM_DB.get(inst.get('item'), {}).get('fullness', 0))
+        except (TypeError, ValueError): enche = 0
+        if enche <= 0: return
+        atual = obter_fullness(p)
+        if atual + enche > FULLNESS_MAX:
+            emit('food_result', {'ok': False, 'reason': 'full'}, room=sid)
+            return
+        qty = int(inst.get('qty', 1))
+        if qty > 1: inst['qty'] = qty - 1
+        else: inventario.remove(inst)
+        _definir_fullness(p, atual + enche)
+        p['_fullness_acc'] = 0.0  # acabou de comer: o proximo "tique" de fome recomeça
+        _queue_save(p)
+        emit('food_result', {'ok': True, 'fullness': obter_fullness(p)}, room=sid)
+        emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(inventario), 'equipped_items': p.get('equipped_items', {})}, room=sid)
+        emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+    except Exception: traceback.print_exc()
+
+# Battle: entra quando um mob mira o player (ou o player bate num mob) e sai
+# BATTLE_SEG depois da última vez. Desconectar em battle deixa o corpo no
+# jogo (continua apanhando, pode morrer) até o battle acabar - não dá pra
+# fugir de luta/PvP fechando o jogo.
+BATTLE_SEG = 30.0
+
+def marcar_batalha(sid, p, now=None):
+    if p is None: return
+    now = time.time() if now is None else now
+    p['battle_until'] = now + BATTLE_SEG
+    if not p.get('em_batalha'):
+        p['em_batalha'] = True
+        if not p.get('corpo_ausente'):
+            socketio.emit('battle_state', {'in_battle': True}, room=sid)
+
+def _remover_corpo_ausente(sid, p):
+    # Battle acabou pro corpo de quem já desconectou: agora sai de verdade.
+    _remover_da_visao(sid)
+    _queue_save(p)
+    p_name = p.get('name', '')
+    socketio.emit('player_left', {"name": p_name})
+    if players_by_name.get(p_name) == sid: players_by_name.pop(p_name, None)
+    online_players.pop(sid, None)
+
+def battle_loop():
+    while True:
+        socketio.sleep(1.0)
+        now = time.time()
+        for sid, p in list(online_players.items()):
+            try:
+                if not p.get('em_batalha') or now < p.get('battle_until', 0): continue
+                p['em_batalha'] = False
+                if p.get('corpo_ausente'): _remover_corpo_ausente(sid, p)
+                else: socketio.emit('battle_state', {'in_battle': False}, room=sid)
+            except Exception:
+                traceback.print_exc()
+
 def regen_loop():
     while True:
         socketio.sleep(5.0) 
@@ -4476,6 +4593,15 @@ def regen_loop():
                 if current_hp < 0: current_hp = max_hp; p['current_hp'] = current_hp
                 if current_mp < 0: current_mp = max_mp; p['current_mp'] = current_mp
                 if current_hp <= 0: continue
+
+                # Fome: cai FULLNESS_DECAI_POR a cada FULLNESS_DECAI_SEG.
+                if obter_fullness(p) > 0:
+                    p['_fullness_acc'] = p.get('_fullness_acc', 0.0) + 5.0
+                    if p['_fullness_acc'] >= FULLNESS_DECAI_SEG:
+                        p['_fullness_acc'] = 0.0
+                        _definir_fullness(p, obter_fullness(p) - FULLNESS_DECAI_POR)
+                        if not p.get('corpo_ausente'):
+                            socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
 
                 regen = get_regen_amount(p.get('level', 1))
                 curou = False
@@ -4609,6 +4735,7 @@ carregar_mapa_do_servidor()
 VERSAO_SERVIDOR = "2026-10-03 trade v2"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR}")
 socketio.start_background_task(regen_loop)
+socketio.start_background_task(battle_loop)
 socketio.start_background_task(autosave_loop)
 socketio.start_background_task(loot_cleanup_loop)
 socketio.start_background_task(trade_invite_cleanup_loop)

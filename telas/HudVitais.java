@@ -80,6 +80,14 @@ public final class HudVitais {
     }
     private float hpAtual = 1f, hpMax = 1f, mpAtual = 1f, mpMax = 1f;
 
+    // Quadradinhos de status a direita da barra de HP: fome (marrom) e battle.
+    // Ficam lado a lado nessa ordem; sem a fome, o de battle ocupa o lugar dela.
+    private static final Color COR_FOME = new Color(0.36f, 0.22f, 0.12f, 1f);    // marrom
+    private static final Color COR_BATALHA = new Color(0.42f, 0.08f, 0.08f, 1f); // vermelho escuro
+    private final Table iconesStatus = new Table();
+    private Table quadradoFome, quadradoBatalha;
+    private boolean comFome = false, emBatalha = false;
+
     private static final class Barra {
         final Image preenchimento;
         final Table alinhador;
@@ -145,9 +153,16 @@ public final class HudVitais {
         painelXp.pad(px(1));
         painelXp.add(pilhaXp).size(px(260), px(32));
 
+        quadradoFome = quadradoStatus(atlas, "sheet/r18_c14", COR_FOME);
+        quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c6", COR_BATALHA);
+        Table linhaTopo = new Table();
+        linhaTopo.top().left();
+        linhaTopo.add(painel).top().left();
+        // Alinhado com a barra de HP (borda 2px + pad 3px do painel).
+        linhaTopo.add(iconesStatus).top().left().padLeft(px(4)).padTop(px(5));
         raiz.setFillParent(true);
         raiz.top().left().padLeft(px(17)).padTop(px(13));
-        raiz.add(painel).left().row();
+        raiz.add(linhaTopo).left().row();
         raiz.add(painelXp).left().padTop(px(6)).row();
 
         // ---- Municao (so' aparece com flecha equipada) ----
@@ -266,6 +281,41 @@ public final class HudVitais {
         comSombra.add(pilha).size(barra.largura, px(34));
         return pai.add(comSombra);
     }
+
+    /** Quadrado 34x34 (altura da barra de HP) com borda preta e o icone no meio. */
+    private Table quadradoStatus(TextureAtlas atlas, String regiao, Color fundo) {
+        Table interno = new Table();
+        interno.setBackground(cor(fundo));
+        Image img = icone(atlas, regiao);
+        if (img != null) interno.add(img).size(px(26));
+        Table quadrado = new Table();
+        quadrado.setBackground(cor(Color.BLACK));
+        quadrado.pad(px(1));
+        quadrado.add(interno).size(px(32));
+        return quadrado;
+    }
+
+    private void reorganizarStatus() {
+        iconesStatus.clearChildren();
+        if (comFome) iconesStatus.add(quadradoFome).padRight(px(4));
+        if (emBatalha) iconesStatus.add(quadradoBatalha).padRight(px(4));
+    }
+
+    /** Icone de fome: aparece com a barra de Fullness zerada. */
+    public void definirFome(boolean comFome) {
+        if (this.comFome == comFome) return;
+        this.comFome = comFome;
+        reorganizarStatus();
+    }
+
+    /** Icone de battle (um mob mirou o player ou ele bateu num mob). */
+    public void definirBatalha(boolean emBatalha) {
+        if (this.emBatalha == emBatalha) return;
+        this.emBatalha = emBatalha;
+        reorganizarStatus();
+    }
+
+    public boolean emBatalha() { return emBatalha; }
 
     /** Valores negativos = "nao mudou". */
     public void definir(float hpAtual, float hpMax, float mpAtual, float mpMax) {

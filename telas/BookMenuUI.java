@@ -362,7 +362,7 @@ public final class BookMenuUI {
         final String nome, tipo, slot;
         final int reqLevel;
         final String reqClass;
-        final int bonusDamage, defense, stamina, mana, fourthStatValue, manaCost;
+        final int bonusDamage, defense, stamina, mana, fourthStatValue, manaCost, fullness;
         final String fourthStatType;
 
         EquipStats(JsonValue d) {
@@ -378,6 +378,7 @@ public final class BookMenuUI {
             this.fourthStatType = d.getString("fourth_stat_type", "");
             this.fourthStatValue = d.getInt("fourth_stat_value", 0);
             this.manaCost = d.getInt("mana_cost", 0);
+            this.fullness = d.getInt("fullness", 0);
         }
     }
 
@@ -548,7 +549,7 @@ public final class BookMenuUI {
         for (int i = 0; i < inventoryItems.size(); i++) {
             String caminho = inventoryItems.get(i).itemPath;
             String slotItem = slotDoItem(caminho);
-            if (slotItem == null && !ITEM_STATS.containsKey(caminho)) continue;
+            if (slotItem == null) continue; // comida etc. nao vai pra lista de equipar
             // Filtro: com um slot selecionado, so' mostra o que entra nele.
             if (!selectedSlot.isEmpty() && !selectedSlot.equals(slotItem)) continue;
             equipCandidatos.add(i);
@@ -671,6 +672,12 @@ public final class BookMenuUI {
         if (dados == null) return;
         EquipStats base = compararCom == null ? null : ITEM_STATS.get(compararCom);
         boolean comparar = compararCom != null;
+        if (dados.fullness > 0) {
+            // Comida: so' "Food" e quanto cada um enche a barra de Fullness.
+            bloco.add(linhaStat("Food", COR_FOME)).left().row();
+            bloco.add(linhaStat("Fullness " + dados.fullness, COR_FOME)).left().row();
+            return;
+        }
         bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
         // Vermelho = classe errada (o servidor pune quem equipa item de outra classe).
         boolean classeCerta = "All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass);
@@ -884,6 +891,8 @@ public final class BookMenuUI {
     private static final Color COR_BARRA_XP = Color.valueOf("f5b82e");
     private static final Color COR_DEFESA = Color.valueOf("6ab7ff");
     private static final Color COR_FOME = Color.valueOf("f0a35a");
+    /** Mesmo valor de servidor.py::FULLNESS_MAX. */
+    public static final float FULLNESS_MAX = 50f;
     private static final Color COR_BARRA_FOME = Color.valueOf("8a4b2a");
 
     private static Color corSkillPrincipal(String chaveServidor) {
@@ -996,7 +1005,7 @@ public final class BookMenuUI {
 
     /**
      * Campos opcionais lidos de "skills" (o servidor ainda nao manda todos):
-     * fullness/hunger (0-100), crit_chance, block_chance e total_exp.
+     * fullness (0-FULLNESS_MAX), crit_chance, block_chance e total_exp.
      */
     public void atualizarSkills(JsonValue skills, int level, int exp, int kills) {
         this.ultimasSkills = skills;
@@ -1022,8 +1031,9 @@ public final class BookMenuUI {
         float pctDefesa = necessarioDefesa > 0 ? (float) hitsDefesa / necessarioDefesa : 0f;
         atualizarBarra(barraDefesa, nivelDefesa, pctDefesa);
 
-        float fullness = skills != null ? skills.getFloat("fullness", skills.getFloat("hunger", 0f)) : 0f;
-        atualizarBarra(barraFome, 0, fullness / 100f);
+        float fullness = skills != null ? skills.getFloat("fullness", 0f) : 0f;
+        atualizarBarra(barraFome, 0, fullness / FULLNESS_MAX);
+        barraFome.percentLabel.setText(Math.round(fullness) + "/" + Math.round(FULLNESS_MAX));
 
         float crit = skills != null ? skills.getFloat("crit_chance", 10f) : 10f;
         float block = skills != null ? skills.getFloat("block_chance", 10f) : 10f;
@@ -1537,6 +1547,7 @@ public final class BookMenuUI {
         if (lower.contains("sword")) return atlas.findRegion("ui/items/StarterSword");
         if (lower.contains("shield")) return atlas.findRegion("ui/items/StarterShield");
         if (lower.contains("bow")) return atlas.findRegion("ui/items/StarterBow");
+        if (lower.contains("cookie")) return atlas.findRegion("sheet/r17_c13");
         if (lower.contains("staff")) return atlas.findRegion("ui/items/StarterStaff");
         if (lower.contains("flute")) return atlas.findRegion("ui/items/StarterFlute");
         if (lower.contains("book")) return atlas.findRegion("ui/items/StarterBook");
@@ -1562,6 +1573,20 @@ public final class BookMenuUI {
             ITEM_STATS.containsKey(item.itemPath) ? (equipado == null ? "" : equipado) : null);
         if (item.quantity > 1) bagDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
         if (item.favorite) bagDetalhes.add(linhaStat("Favorite", new Color(1f, 0.82f, 0.24f, 1f))).left().row();
+        EquipStats comida = ITEM_STATS.get(item.itemPath);
+        if (comida != null && comida.fullness > 0 && !item.instanceId.isEmpty()) {
+            TextButton.TextButtonStyle estiloComer = new TextButton.TextButtonStyle(
+                skin.get("verde", TextButton.TextButtonStyle.class));
+            estiloComer.font = skin.getFont("botao-pequeno-font");
+            TextButton comer = new TextButton("Eat", estiloComer);
+            String id = item.instanceId;
+            comer.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    if (socket.isConnected()) socket.emitRaw("eat_food", GameSocket.obj(w -> w.set("instance_id", id)));
+                }
+            });
+            bagDetalhes.add(comer).left().size(90, 34).padTop(6).row();
+        }
         favoriteButton.setDisabled(item.instanceId.isEmpty());
         trashButton.setDisabled(false);
     }

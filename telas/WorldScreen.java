@@ -906,7 +906,9 @@ public class WorldScreen extends ScreenAdapter {
         painelSettings = new Table();
         painelSettings.setFillParent(true);
         painelSettings.center();
-        painelSettings.add(criarConteudoSettings());
+        conteudoSettingsNormal = criarConteudoSettings();
+        conteudoConfirmarSaida = criarConfirmacaoSaidaEmBatalha();
+        painelSettings.add(conteudoSettingsNormal);
         painelSettings.setVisible(false);
         uiStage.addActor(painelSettings);
 
@@ -1493,6 +1495,41 @@ public class WorldScreen extends ScreenAdapter {
     private final float LARGURA_BOTAO_SETTINGS = mobile ? 200f : 160f;
     private final float ALTURA_BOTAO_SETTINGS = mobile ? 70f : 56f;
 
+    private Table conteudoSettingsNormal, conteudoConfirmarSaida;
+
+    private void mostrarConteudoSettings(Table conteudo) {
+        painelSettings.clearChildren();
+        painelSettings.add(conteudo);
+    }
+
+    /** "Sair mesmo em battle?" - no lugar do popup de Settings. */
+    private Table criarConfirmacaoSaidaEmBatalha() {
+        Table conteudo = new Table();
+        conteudo.setBackground(skin.getDrawable("popup-painel"));
+        conteudo.pad(15, 14, 15, 14);
+        Label aviso = new Label("Your soul may rest, but your body will remain in battle. Continue?", skin, "default");
+        aviso.setWrap(true);
+        aviso.setAlignment(Align.center);
+        conteudo.add(aviso).width(LARGURA_BOTAO_SETTINGS * 1.8f).colspan(2).padBottom(14).row();
+        TextButton sim = new TextButton("Yes", skin, "vermelho-popup");
+        sim.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                sim.setDisabled(true);
+                salvarPosicaoESair();
+            }
+        });
+        TextButton nao = new TextButton("No", skin, "verde-popup");
+        nao.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                mostrarConteudoSettings(conteudoSettingsNormal);
+            }
+        });
+        float largura = LARGURA_BOTAO_SETTINGS * 0.8f;
+        conteudo.add(nao).width(largura).height(ALTURA_BOTAO_SETTINGS).padRight(10);
+        conteudo.add(sim).width(largura).height(ALTURA_BOTAO_SETTINGS);
+        return conteudo;
+    }
+
     private Table criarConteudoSettings() {
         Table conteudo = new Table();
         conteudo.setBackground(skin.getDrawable("popup-painel"));
@@ -1522,6 +1559,11 @@ public class WorldScreen extends ScreenAdapter {
         TextButton botaoExit = new TextButton("Exit", skin, "vermelho-popup");
         botaoExit.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                // Em battle: avisa que o corpo fica no jogo ate' o battle acabar.
+                if (hud.emBatalha()) {
+                    mostrarConteudoSettings(conteudoConfirmarSaida);
+                    return;
+                }
                 botaoExit.setDisabled(true);
                 salvarPosicaoESair();
             }
@@ -1616,6 +1658,7 @@ public class WorldScreen extends ScreenAdapter {
 
     private void alternarSettings() {
         boolean abrindo = !painelSettings.isVisible() && !painelOptions.isVisible();
+        if (abrindo) mostrarConteudoSettings(conteudoSettingsNormal);
         painelSettings.setVisible(abrindo);
         painelOptions.setVisible(false);
         atualizarVisibilidadeJoystick();
@@ -1628,6 +1671,7 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void fecharSettings() {
+        mostrarConteudoSettings(conteudoSettingsNormal);
         painelSettings.setVisible(false);
         painelOptions.setVisible(false);
         atualizarVisibilidadeJoystick();
@@ -2212,6 +2256,15 @@ public class WorldScreen extends ScreenAdapter {
 
         socket.on("position_saved", (nomeEvt, data) -> finalizarSaidaAposSalvar());
 
+        // Entrou/saiu de battle (servidor.py::marcar_batalha / battle_loop).
+        socket.on("battle_state", (nomeEvt, data) -> {
+            if (data == null) return;
+            hud.definirBatalha(data.getBoolean("in_battle", false));
+        });
+        socket.on("food_result", (nomeEvt, data) -> {
+            if (data == null || data.getBoolean("ok", false)) return;
+            if ("full".equals(data.getString("reason", ""))) hud.notificar("You are full.", COR_NOTIF_AVISO, null);
+        });
         socket.on("inventory_synced", (nomeEvt, data) -> {
             if (data == null) return;
             bookMenu.atualizarInventario(data.get("inventory"));
@@ -2233,6 +2286,8 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             bookMenu.atualizarCapacidade(data.getFloat("cap_atual", 0f), data.getFloat("cap_maximo", 100f));
             bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getInt("exp", 0), data.getInt("kills", 0));
+            JsonValue skillsFome = data.get("skills");
+            hud.definirFome((skillsFome != null ? skillsFome.getFloat("fullness", 0f) : 0f) <= 0f);
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
