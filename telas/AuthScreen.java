@@ -770,6 +770,17 @@ public class AuthScreen extends ScreenAdapter {
                         }
                     }
                     currentSlotIndex = Math.max(0, Math.min(currentSlotIndex, MAX_SLOTS - 1));
+                    // Corpo ainda em battle no servidor: entra direto nele.
+                    String emBatalha = body != null && body.isObject() ? body.getString("in_battle", null) : null;
+                    if (emBatalha != null) {
+                        for (int i = 0; i < MAX_SLOTS; i++) {
+                            if (slots[i] != null && emBatalha.equals(slots[i].name)) {
+                                currentSlotIndex = i;
+                                playListener.onPlay(currentUserId, slots[i]);
+                                return;
+                            }
+                        }
+                    }
                     telaSelecaoPersonagem();
                 } else if (statusCode == 401) {
                     // Token vencido/invalido (ou senha trocada): pede login de novo.

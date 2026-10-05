@@ -1857,7 +1857,11 @@ def get_characters():
                 "skills": json.loads(row[11]) if row[11] else {},
                 "time_played": row[12] if row[12] else 0
             })
-        return jsonify({"characters": char_list}), 200
+        # Personagem com o corpo ainda em battle (deslogou no meio da luta):
+        # o client entra direto nele, sem passar pela seleção.
+        em_batalha = next((p.get('name') for p in list(online_players.values())
+                           if p.get('corpo_ausente') and str(p.get('user_id')) == str(user_id)), None)
+        return jsonify({"characters": char_list, "in_battle": em_batalha}), 200
     except Exception as e: return _erro_interno(e)
     finally:
         if conn: db_pool.putconn(conn)
