@@ -3352,11 +3352,6 @@ public class WorldScreen extends ScreenAdapter {
         if (!mob.morto && mob.tempoTargetHit > 0f && regiaoTargetHit != null) {
             batch.draw(regiaoTargetHit, ancoraX - regiaoTargetHit.getRegionWidth() / 2f, ancoraY);
         }
-        // Bandeira enquanto volta pra casa (desistiu do alvo).
-        if (!mob.morto && mob.voltando && regiaoFlag != null) {
-            // 12x12 (era 8x8, pequena demais); mesma base de antes (altura - 6f).
-            batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 6f, 12f, 12f);
-        }
         // Barra de vida (logo acima da cabeca; o nome vai por cima dela).
         if (!mob.morto) {
             float barraLargura = 14f;
@@ -3887,6 +3882,11 @@ public class WorldScreen extends ScreenAdapter {
         font.setColor(corDaVida(mob.hp / mob.maxHp));
         font.draw(batch, mob.nome, nomeX, nomeY);
         font.setColor(anterior);
+        // Bandeira enquanto volta pra casa (desistiu do alvo). Desenhada aqui
+        // (depois do nome e da barra de vida) pra ficar por cima dos dois.
+        if (mob.voltando && regiaoFlag != null) {
+            batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 10f, 12f, 12f);
+        }
     }
 
     /** Cor do nome/barra pela vida: verde cheio, verde claro, amarelo,
