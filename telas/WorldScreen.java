@@ -1267,6 +1267,8 @@ public class WorldScreen extends ScreenAdapter {
     private static final Color COR_NOTIF_ON = new Color(0.45f, 1f, 0.45f, 1f);
     private static final Color COR_NOTIF_OFF = new Color(0.75f, 0.75f, 0.75f, 1f);
     private static final Color COR_NOTIF_PARTY = Color.valueOf("f5e02a");
+    /** Mesmos valores de servidor.py::FOME_LIMITE / FOME_MULT_VELOCIDADE. */
+    private static final float FOME_LIMITE = 10f, FOME_MULT_VELOCIDADE = 0.9f;
     private static final Color COR_NOTIF_AVISO = new Color(1f, 0.35f, 0.35f, 1f);
 
     /** Clique na notificacao de convite: abre o livro na aba Party. */
@@ -2286,8 +2288,11 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             bookMenu.atualizarCapacidade(data.getFloat("cap_atual", 0f), data.getFloat("cap_maximo", 100f));
             bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getInt("exp", 0), data.getInt("kills", 0));
+            // Com fome (Fullness < 10, servidor.py::FOME_LIMITE): icone e 10% mais lento.
             JsonValue skillsFome = data.get("skills");
-            hud.definirFome((skillsFome != null ? skillsFome.getFloat("fullness", 0f) : 0f) <= 0f);
+            boolean comFome = (skillsFome != null ? skillsFome.getFloat("fullness", BookMenuUI.FULLNESS_MAX) : BookMenuUI.FULLNESS_MAX) < FOME_LIMITE;
+            hud.definirFome(comFome);
+            local.multVelocidade = comFome ? FOME_MULT_VELOCIDADE : 1f;
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));

@@ -30,6 +30,8 @@ public class Jogador {
 
     private float origemX, origemY, destinoX, destinoY, progresso;
     private float duracao = TEMPO_PASSO;
+    /** Velocidade do player local (1 = normal; com fome fica mais lento). */
+    public float multVelocidade = 1f;
 
     // Player remoto: os passos chegam do servidor em pacotes (10x/s), entao
     // chegam "tremidos" (ate' ~0.1s antes/depois). Tocar cada um na hora que
@@ -65,7 +67,7 @@ public class Jogador {
         origemX = x; origemY = y;
         destinoX = x + dx; destinoY = y + dy;
         progresso = 0f;
-        duracao = TEMPO_PASSO;
+        duracao = TEMPO_PASSO / Math.max(0.1f, multVelocidade);
         movendo = true;
     }
 

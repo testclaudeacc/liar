@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.4"
+SERVER_VERSION = "v0.5"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -463,6 +463,8 @@ def _montar_payload_sync_stats(p):
     if punido:
         new_dmg = PUNICAO_CLASSE_DANO
         speed_multiplier = PUNICAO_CLASSE_SPEED
+    if esta_com_fome(p):
+        new_dmg = max(1, int(new_dmg * FOME_MULT_DANO))
 
     return {
         'skills': skills, 'base_damage': new_dmg, 'defense_value': new_def,
@@ -2071,6 +2073,8 @@ def handle_join_game(data):
         real_inventory = normalizar_inventario(json.loads(row[8]) if row[8] else [])
         real_equipped = normalizar_equipados(json.loads(row[9]) if row[9] else {})
         real_skills = json.loads(row[10]) if row[10] else {}
+        if not isinstance(real_skills, dict): real_skills = {}
+        real_skills.setdefault('fullness', FULLNESS_MAX)  # personagem novo/antigo começa cheio
 
         data['name'] = p_name; data['class_name'] = row[0]; data['level'] = row[1]; data['exp'] = row[2] if row[2] is not None else 0
         data['pos_x'] = row[3] if row[3] is not None else -1; data['pos_y'] = row[4] if row[4] is not None else -1
@@ -2770,6 +2774,7 @@ def handle_hit_mob(data):
         else:
             bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}))
             base_dmg, _ = calc_player_stats(p_class, p.get('level', 1), skills, bonus_dmg=bonus_itens['bonus_damage'])
+        if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
         
         min_dano = max(1, int(base_dmg * 0.85))
         max_dano = max(min_dano, int(base_dmg * 1.15))
@@ -4503,15 +4508,23 @@ def get_regen_amount(level):
 # FOME (Fullness) e BATTLE
 # =========================================================================
 # Fullness fica em skills['fullness'] (0..FULLNESS_MAX, salvo junto com as
-# skills). Comer um item com "fullness" no ITEM_DB enche a barra; ela cai
-# FULLNESS_DECAI_POR por FULLNESS_DECAI_SEG online. Em 0 o client mostra o
-# icone de fome do lado do HP (por enquanto sem outro efeito).
+# skills; personagem sem o campo começa cheio). Comer um item com "fullness"
+# no ITEM_DB enche a barra; ela cai FULLNESS_DECAI_POR a cada
+# FULLNESS_DECAI_SEG online. Abaixo de FOME_LIMITE o player está com fome:
+# ícone do lado do HP, sem regen de HP/MP, FOME_MULT_DANO no dano e
+# FOME_MULT_VELOCIDADE na velocidade (aplicada no client).
 FULLNESS_MAX = 50
 FULLNESS_DECAI_SEG = 60.0
 FULLNESS_DECAI_POR = 1
+FOME_LIMITE = 10
+FOME_MULT_DANO = 0.9
+FOME_MULT_VELOCIDADE = 0.9
+
+def esta_com_fome(p):
+    return obter_fullness(p) < FOME_LIMITE
 
 def obter_fullness(p):
-    try: return max(0, min(FULLNESS_MAX, int(p.get('skills', {}).get('fullness', 0))))
+    try: return max(0, min(FULLNESS_MAX, int(p.get('skills', {}).get('fullness', FULLNESS_MAX))))
     except (TypeError, ValueError): return 0
 
 def _definir_fullness(p, valor):
@@ -4607,6 +4620,8 @@ def regen_loop():
                         if not p.get('corpo_ausente'):
                             socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
 
+                # Com fome: sem regen de HP/MP.
+                if esta_com_fome(p): continue
                 regen = get_regen_amount(p.get('level', 1))
                 curou = False
 

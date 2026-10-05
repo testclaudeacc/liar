@@ -1031,7 +1031,7 @@ public final class BookMenuUI {
         float pctDefesa = necessarioDefesa > 0 ? (float) hitsDefesa / necessarioDefesa : 0f;
         atualizarBarra(barraDefesa, nivelDefesa, pctDefesa);
 
-        float fullness = skills != null ? skills.getFloat("fullness", 0f) : 0f;
+        float fullness = skills != null ? skills.getFloat("fullness", FULLNESS_MAX) : FULLNESS_MAX;
         atualizarBarra(barraFome, 0, fullness / FULLNESS_MAX);
         barraFome.percentLabel.setText(Math.round(fullness) + "/" + Math.round(FULLNESS_MAX));
 
