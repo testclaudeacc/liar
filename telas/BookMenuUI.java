@@ -3033,7 +3033,7 @@ public final class BookMenuUI {
                 Image img = new Image(icone);
                 img.setScaling(Scaling.fit);
                 if (qtd <= 0) img.setColor(1f, 1f, 1f, 0.3f);
-                centro.add(img).size(TAM_SLOT_ATALHO * 0.68f);
+                centro.add(img).size(TAM_SLOT_ATALHO * 0.86f);
             }
             pilha.add(centro);
             if (qtd > 0) {

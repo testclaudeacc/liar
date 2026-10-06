@@ -355,16 +355,19 @@ public final class HotbarUI {
                     Image img = new Image(icone);
                     img.setScaling(Scaling.fit);
                     if (qtd <= 0) img.setColor(1f, 1f, 1f, 0.3f); // acabou: so' transparente, sem numero
-                    centro.add(img).size(tamanhoSlot(i) * (MOBILE ? 0.58f : 0.68f));
+                    // Icone maior (o sprite do item ja' tem sobra transparente em volta).
+                    centro.add(img).size(tamanhoSlot(i) * (MOBILE ? 0.74f : 0.86f));
                 }
                 pilha.add(centro);
                 if (qtd > 0) {
                     Label numero = new Label(String.valueOf(qtd), skin, "hud");
                     numero.setFontScale(MOBILE ? 0.75f : 0.65f);
                     Table canto = new Table();
-                    // Redondo: o numero vai embaixo no meio (o canto e' vazio).
-                    if (MOBILE) { canto.bottom(); canto.add(numero).padBottom(4); }
-                    else { canto.bottom().right(); canto.add(numero).pad(0, 0, 2, 4); }
+                    // Quantidade no canto de baixo a direita (no redondo, um pouco
+                    // pra dentro pra nao sair do circulo).
+                    canto.bottom().right();
+                    float dentro = MOBILE ? tamanhoSlot(i) * 0.12f : 0f;
+                    canto.add(numero).pad(0, 0, 2 + dentro, 4 + dentro);
                     pilha.add(canto);
                 }
             }
