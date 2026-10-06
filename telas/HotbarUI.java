@@ -21,9 +21,9 @@ import com.badlogic.gdx.utils.Scaling;
  * servidor (servidor.py::set_hotbar). Clicar/tocar num slot ou apertar a
  * tecla usa o atalho (servidor.py::use_hotbar).
  *
- * PC: uma linha no centro de baixo. Celular: botoes redondos, 1-4 num 2x2
- * no canto de baixo a direita (a esquerda ja' tem o joystick) e 5-8 num 2x2
- * na direita de cima, abaixo dos botoes do topo.
+ * PC: uma linha no centro de baixo. Celular: botoes redondos no lado
+ * direito (a esquerda ja' tem o joystick): 1-4 num arco em volta do canto
+ * de baixo e 5-8 numa coluna na borda, acima do arco.
  */
 public final class HotbarUI {
 
@@ -31,7 +31,7 @@ public final class HotbarUI {
 
     private static final boolean MOBILE = Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
         || Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
-    private static final float TAM_SLOT = MOBILE ? 64f : 54f;
+    private static final float TAM_SLOT = MOBILE ? 50f : 54f;
     private static final float ESPACO = MOBILE ? 6f : 5f;
     /** Tom do "apertado" (clique ou tecla): escurece e volta. */
     private static final Color COR_APERTADO = new Color(0.55f, 0.55f, 0.55f, 1f);
@@ -40,6 +40,13 @@ public final class HotbarUI {
     private final BookMenuUI livro;
     private final AoUsar aoUsar;
     private final Table raiz = new Table();
+    /** Celular: os botoes ficam soltos (posicao calculada), nao numa tabela. */
+    private final com.badlogic.gdx.scenes.scene2d.Group grupoMobile = new com.badlogic.gdx.scenes.scene2d.Group() {
+        @Override public void act(float delta) {
+            super.act(delta);
+            posicionarMobile();
+        }
+    };
     private final Button[] slots = new Button[BookMenuUI.SLOTS_ATALHO];
     private final Stack[] conteudos = new Stack[BookMenuUI.SLOTS_ATALHO];
 
@@ -66,35 +73,40 @@ public final class HotbarUI {
             });
             slots[i] = slot;
         }
-        raiz.setFillParent(true);
         if (MOBILE) {
-            // Celular: 1-4 num 2x2 no canto de baixo a direita; 5-8 num 2x2 na
-            // direita de cima, logo abaixo dos botoes do topo (chat/menu/config).
-            Table cima = grade2x2(4), baixo = grade2x2(0);
-            raiz.top().right();
-            raiz.add(cima).right().padTop(TOPO_MOBILE).padRight(18).row();
-            raiz.add().expandY().row();
-            raiz.add(baixo).right().padBottom(18).padRight(18);
+            for (Button slot : slots) grupoMobile.addActor(slot);
+            grupoMobile.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.childrenOnly);
+            // Por baixo das outras telas (livro, chat, settings), igual a HUD.
+            stage.getRoot().addActorAt(0, grupoMobile);
         } else {
+            raiz.setFillParent(true);
             raiz.bottom().pad(0, 0, 10, 0);
             for (Button slot : slots) raiz.add(slot).size(TAM_SLOT).pad(ESPACO / 2f);
+            stage.getRoot().addActorAt(0, raiz);
         }
-        // Por baixo das outras telas (livro, chat, settings), igual a HUD.
-        stage.getRoot().addActorAt(0, raiz);
         atualizar();
     }
 
-    /** Altura ocupada no topo pelos botoes de chat/menu/config (108 no
-     * celular) e a linha de fps embaixo deles. */
-    private static final float TOPO_MOBILE = 150f;
+    // Posicoes no celular, tiradas do desenho de referencia (tela 960x540):
+    // centro de cada botao = (distancia da borda DIREITA, altura a partir de
+    // BAIXO). 1-4 descem em diagonal a partir da borda direita ate' o chao;
+    // 5-8 sobem numa coluna na borda, acima do 1 (abaixo dos botoes do topo).
+    private static final float[][] POSICOES_MOBILE = {
+        {48f, 140f}, {140f, 130f}, {208f, 85f}, {252f, 28f},
+        {48f, 197f}, {48f, 254f}, {48f, 311f}, {48f, 368f},
+    };
 
-    private Table grade2x2(int primeiro) {
-        Table t = new Table();
-        for (int i = 0; i < 4; i++) {
-            t.add(slots[primeiro + i]).size(TAM_SLOT).pad(ESPACO / 2f);
-            if (i == 1) t.row();
+    private void posicionarMobile() {
+        com.badlogic.gdx.scenes.scene2d.Stage stage = grupoMobile.getStage();
+        if (stage == null) return;
+        float w = stage.getWidth();
+        for (int i = 0; i < slots.length && i < POSICOES_MOBILE.length; i++) {
+            centrar(slots[i], w - POSICOES_MOBILE[i][0], POSICOES_MOBILE[i][1]);
         }
-        return t;
+    }
+
+    private static void centrar(Button b, float x, float y) {
+        b.setBounds(x - TAM_SLOT / 2f, y - TAM_SLOT / 2f, TAM_SLOT, TAM_SLOT);
     }
 
     /** Botao redondo (celular): circulo com borda, gerado em alta resolucao
@@ -190,5 +202,8 @@ public final class HotbarUI {
         return true;
     }
 
-    public void setVisivel(boolean visivel) { raiz.setVisible(visivel); }
+    public void setVisivel(boolean visivel) {
+        raiz.setVisible(visivel);
+        grupoMobile.setVisible(visivel);
+    }
 }
