@@ -828,8 +828,15 @@ public class WorldScreen extends ScreenAdapter {
                     mostrarColisao = !mostrarColisao;
                     return true;
                 }
-                // Open Bag (padrao E): fala com NPC perto, senao abre o livro.
+                // Open Bag (padrao B): abre o livro direto na Bag (fecha se ja' esta aberto).
                 if (keycode == Controles.tecla("bag")) {
+                    if (chat.estaDigitando()) return false;
+                    if (bookMenu.isVisible()) alternarBookMenu();
+                    else bookMenu.abrirSecao("Bag");
+                    return true;
+                }
+                // Open Menu (padrao E): fala com NPC perto, senao abre/fecha o livro.
+                if (keycode == Controles.tecla("menu")) {
                     if (chat.estaDigitando()) return false;
                     if (dialogoNPC.isVisible()) {
                         dialogoNPC.avancarOuFechar();
@@ -1693,6 +1700,11 @@ public class WorldScreen extends ScreenAdapter {
                 atualizarTamanhoJoystick();
             })).width(210).height(48);
             secao.add(botoes).left().padTop(12).row();
+            secao.add(new Label("Buttons: add, remove, move, resize and set directions", skin, "opcoes-label")).left().padTop(18).row();
+            secao.add(botaoPequeno("Edit buttons", () -> {
+                fecharSettings();
+                hotbar.entrarEdicao(null);
+            })).left().width(210).height(48).padTop(10).row();
             atualizarTamanhoJoystick();
         }
         return secao;

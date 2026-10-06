@@ -2879,6 +2879,16 @@ public final class BookMenuUI {
         if (aoMudarAtalhos != null) aoMudarAtalhos.run();
     }
 
+    /** No celular, slot de botao FIXO so' aceita comida/pocao (Controles). */
+    private boolean podeIrNoSlot(String caminho, int slot) {
+        if (!usavelNoAtalho(caminho)) return false;
+        boolean mobile = Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
+            || Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
+        if (!mobile || !Controles.slotFixoMobile(slot)) return true;
+        EquipStats dados = ITEM_STATS.get(caminho);
+        return dados != null && dados.fullness > 0; // comida (pocao entra aqui quando existir)
+    }
+
     /** Item que pode ir num slot da barra (por enquanto: comida). */
     private boolean usavelNoAtalho(String caminho) {
         EquipStats dados = ITEM_STATS.get(caminho);
@@ -2890,7 +2900,7 @@ public final class BookMenuUI {
         spellsPage.top().left();
 
         spellsPage.add(linhaStat("Hotbar (keys 1-9)", Color.LIGHT_GRAY)).left().row();
-        spellsPage.add(linhaStat("Mobile: 1-6 = drag buttons, 7-9 = food & potions", Color.GRAY)).left().padBottom(4).row();
+        spellsPage.add(linhaStat("Mobile buttons: Settings > Controls > Edit buttons", Color.GRAY)).left().padBottom(4).row();
         Table linha = new Table();
         linha.left();
         for (int i = 0; i < SLOTS_ATALHO; i++) {
@@ -2911,8 +2921,8 @@ public final class BookMenuUI {
             Table opcoes = new Table();
             opcoes.left();
             java.util.LinkedHashSet<String> caminhos = new java.util.LinkedHashSet<>();
-            for (InventoryItem it : inventoryItems) if (usavelNoAtalho(it.itemPath)) caminhos.add(it.itemPath);
             final int slot = slotAtalhoEscolhendo;
+            for (InventoryItem it : inventoryItems) if (podeIrNoSlot(it.itemPath, slot)) caminhos.add(it.itemPath);
             for (String caminho : caminhos) {
                 opcoes.add(slotAtalho(caminho, caminho.equals(atalhos[slot]), null, () -> escolherAtalho(slot, caminho)))
                     .size(TAM_SLOT_ATALHO).padRight(6);
