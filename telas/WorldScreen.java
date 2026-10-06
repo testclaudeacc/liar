@@ -1966,6 +1966,10 @@ public class WorldScreen extends ScreenAdapter {
             String nomeMob = mob != null ? mob.nome : data.getString("mob_type", "monster");
             chat.adicionarMensagemSistema(nomeVisivel(data.getString("name", "")) + " was killed by " + nomeMob + ".",
                 new Color(1f, 0.25f, 0.25f, 1f));
+            // Eu morri: mostra quem matou na tela de morte.
+            if (data.getString("name", "").equals(local.nome) && textoMortoPor != null) {
+                textoMortoPor.setText("Slain by " + nomeMob);
+            }
         });
 
         // Aviso do servidor so' pra esse jogador (anti-spam/mute). "red" =
@@ -3898,23 +3902,55 @@ public class WorldScreen extends ScreenAdapter {
 
     // ---- Morte / renascer do player local ----
 
+    private Table conteudoMorte;
+    private Image fundoMorte;
+    private Label textoMortoPor;
+
+    /** Tela de morte: escurece a tela aos poucos (vinheta preta), e no meio
+     * aparece a caveira, "YOU DIED" grande em vermelho, quem matou e o botao
+     * de renascer - tudo entrando com fade. */
     private void criarPainelMorte() {
         painelMorte = new Table();
         painelMorte.setFillParent(true);
-        Table caixa = new Table();
-        caixa.setBackground(UiSkin.retangulo(new Color(0.1f, 0.02f, 0.02f, 0.92f), new Color(0.6f, 0.1f, 0.1f, 1f), 1));
-        caixa.pad(18);
-        Label titulo = new Label("You are dead", skin, "subtitulo");
-        titulo.setColor(new Color(1f, 0.3f, 0.3f, 1f));
-        TextButton renascer = new TextButton("Respawn", skin, "default");
+
+        fundoMorte = new Image(UiSkin.retangulo(new Color(0.04f, 0f, 0f, 1f), new Color(0.04f, 0f, 0f, 1f), 0));
+        fundoMorte.setFillParent(true);
+
+        conteudoMorte = new Table();
+        TextureRegion caveira = atlas.findRegion("sheet/r83_c11");
+        if (caveira != null) {
+            Image icone = new Image(caveira);
+            icone.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+            icone.setColor(new Color(0.85f, 0.15f, 0.15f, 1f));
+            conteudoMorte.add(icone).size(mobile ? 72 : 56).padBottom(6).row();
+        }
+        Label titulo = new Label("YOU DIED", skin, "titulo");
+        titulo.setFontScale(mobile ? 0.75f : 0.6f);
+        titulo.setColor(new Color(0.82f, 0.08f, 0.08f, 1f));
+        conteudoMorte.add(titulo).row();
+
+        // Linha fina vermelha separando o titulo do resto.
+        Image linha = new Image(UiSkin.retangulo(new Color(0.55f, 0.06f, 0.06f, 1f), new Color(0.55f, 0.06f, 0.06f, 1f), 0));
+        conteudoMorte.add(linha).width(mobile ? 340 : 280).height(2).padTop(4).padBottom(10).row();
+
+        textoMortoPor = new Label("", skin, "subtitulo");
+        textoMortoPor.setColor(new Color(0.78f, 0.72f, 0.72f, 1f));
+        textoMortoPor.setFontScale(mobile ? 0.8f : 0.65f);
+        conteudoMorte.add(textoMortoPor).padBottom(22).row();
+
+        TextButton renascer = new TextButton("Respawn", skin, "vermelho-popup");
         renascer.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 renascerLocal();
             }
         });
-        caixa.add(titulo).padBottom(14).row();
-        caixa.add(renascer).width(200).height(56);
-        painelMorte.add(caixa);
+        conteudoMorte.add(renascer).width(LARGURA_BOTAO_SETTINGS).height(ALTURA_BOTAO_SETTINGS);
+
+        Table centro = new Table();
+        centro.setFillParent(true);
+        centro.add(conteudoMorte);
+        painelMorte.addActor(fundoMorte);
+        painelMorte.addActor(centro);
         painelMorte.setVisible(false);
         uiStage.addActor(painelMorte);
     }
@@ -3923,6 +3959,16 @@ public class WorldScreen extends ScreenAdapter {
         if (localMorto) return;
         localMorto = true;
         alvoMob = null;
+        if (textoMortoPor.getText().length() == 0) textoMortoPor.setText("You have been slain.");
+        // Fundo escurece em ~1s; o texto/botao aparecem logo depois (fade).
+        fundoMorte.clearActions();
+        fundoMorte.getColor().a = 0f;
+        fundoMorte.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.alpha(0.72f, 1.0f));
+        conteudoMorte.clearActions();
+        conteudoMorte.getColor().a = 0f;
+        conteudoMorte.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.sequence(
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.delay(0.5f),
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.fadeIn(0.7f, com.badlogic.gdx.math.Interpolation.pow2Out)));
         painelMorte.setVisible(true);
     }
 
@@ -3933,6 +3979,7 @@ public class WorldScreen extends ScreenAdapter {
         deixarCadaver(local); // antes de sair do estado morto (usa o quadro de morte)
         localMorto = false;
         painelMorte.setVisible(false);
+        textoMortoPor.setText("");
         local.x = spawnX;
         local.y = spawnY;
         local.movendo = false;
