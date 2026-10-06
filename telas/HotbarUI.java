@@ -211,13 +211,13 @@ public final class HotbarUI {
         atualizarPainel();
     }
 
-    private TextButton botaoPainel(String texto, boolean destaque, Runnable acao) {
-        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
-        e.font = skin.getFont("botao-pequeno-font");
-        e.fontColor = Color.WHITE;
-        Color borda = destaque ? COR_SELECAO : new Color(0.4f, 0.4f, 0.4f, 1f);
-        e.up = UiSkin.retangulo(new Color(0.14f, 0.14f, 0.14f, 1f), borda, 2);
-        e.down = UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), borda, 2);
+    /** Botao do painel nas cores do jogo: "verde-popup", "vermelho-popup" ou
+     * "cinza-popup". "+"/"-" usam a fonte de simbolo (igual o +/- do chat:
+     * a fonte normal dos botoes nao tem esses simbolos). */
+    private TextButton botaoPainel(String texto, String estilo, Runnable acao) {
+        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(skin.get(estilo, TextButton.TextButtonStyle.class));
+        boolean simbolo = "+".equals(texto) || "-".equals(texto);
+        e.font = skin.getFont(simbolo ? "simbolo-font" : "botao-pequeno-font");
         TextButton b = new TextButton(texto, e);
         b.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) { acao.run(); }
@@ -235,16 +235,16 @@ public final class HotbarUI {
         Table linha1 = new Table();
         linha1.defaults().height(44).pad(3);
         linha1.add(new Label("Buttons " + layout.size() + "/" + Controles.MAX_BOTOES_MOBILE, skin, "opcoes-label")).padRight(10);
-        linha1.add(botaoPainel("+ Add", false, () -> {
+        linha1.add(botaoPainel("+ Add", "verde-popup", () -> {
             if (layout.size() >= Controles.MAX_BOTOES_MOBILE) return;
             layout.add(new Controles.BotaoMobile(300f, 220f, 76f));
             layoutMudou(layout.size() - 1);
         })).width(110);
-        linha1.add(botaoPainel("Reset", false, () -> {
+        linha1.add(botaoPainel("Reset", "cinza-popup", () -> {
             layout = Controles.layoutPadrao();
             layoutMudou(-1);
         })).width(100).padLeft(16);
-        linha1.add(botaoPainel("Done", true, this::sairEdicao)).width(100);
+        linha1.add(botaoPainel("Done", "verde-popup", this::sairEdicao)).width(100);
         caixa.add(linha1).row();
 
         if (selecionado < 0) {
@@ -254,17 +254,17 @@ public final class HotbarUI {
             final Controles.BotaoMobile c = layout.get(i);
             Table linha2 = new Table();
             linha2.defaults().height(44).pad(3);
-            linha2.add(new Label("Button " + (i + 1) + "   Size", skin, "opcoes-label")).padRight(8);
-            linha2.add(botaoPainel("-", false, () -> {
+            linha2.add(new Label("Size", skin, "opcoes-label")).padRight(8);
+            linha2.add(botaoPainel("-", "vermelho-popup", () -> {
                 c.tamanho = Math.max(Controles.TAM_BOTAO_MIN, c.tamanho - 8f);
                 layoutMudou(i);
             })).width(48);
             linha2.add(new Label(String.valueOf(Math.round(c.tamanho)), skin, "opcoes-label")).width(48);
-            linha2.add(botaoPainel("+", false, () -> {
+            linha2.add(botaoPainel("+", "verde-popup", () -> {
                 c.tamanho = Math.min(Controles.TAM_BOTAO_MAX, c.tamanho + 8f);
                 layoutMudou(i);
             })).width(48);
-            linha2.add(botaoPainel("Delete", false, () -> {
+            linha2.add(botaoPainel("Delete", "vermelho-popup", () -> {
                 if (layout.size() <= 1) return; // pelo menos 1 botao
                 layout.remove(i);
                 layoutMudou(-1);
