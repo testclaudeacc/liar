@@ -16,6 +16,7 @@ As contas sao feitas no espaco "mundo", igualzinho ao Java, e so' convertidas
 pro "cru" no fim - assim os mesmos arredondamentos dao o mesmo resultado.
 
 Uso: carregar_mapa('maps/World.tmx') -> dict (ver final do arquivo).
+Tambem le o speed_modifier dos tiles (MapaPropriedades.velocidadeEm).
 """
 
 import base64
@@ -32,6 +33,9 @@ PADDING_SQM = 2
 LIMIAR_FINO = 0.3
 LIMIAR_COBERTURA = 0.6
 CAMADAS_COLISAO = ("Ground", "Buildings1", "Buildings2", "Roofs", "Pillars")
+# Mesma ordem de MapaPropriedades.CAMADAS_VELOCIDADE: a 1a camada com
+# speed_modifier na celula decide.
+CAMADAS_VELOCIDADE = ("Ground", "Buildings1")
 
 FLIP_H = 0x80000000
 FLIP_V = 0x40000000
@@ -271,6 +275,21 @@ def carregar_mapa(caminho_tmx):
 
     grade = _rasterizar(hitboxes, bordas, altura_px)
 
+    # ---- speed_modifier por SQM ----
+    # {(col, linha): mult} so' com os SQMs != 1.0. (col, linha) do Tiled e'
+    # o mesmo SQM que o servidor usa (tile_de no espaco "cru").
+    velocidades = {}
+    for nome in reversed(CAMADAS_VELOCIDADE):  # a 1a da lista sobrescreve as outras
+        c = camadas_por_nome.get(nome)
+        if c is None: continue
+        for pos, bruto in _gids_da_camada(c, largura, altura).items():
+            tile = tile_do_gid(bruto & MASCARA_GID)
+            if tile is None or 'speed_modifier' not in tile.props: continue
+            try: mult = float(tile.props['speed_modifier'])
+            except ValueError: continue
+            if mult > 0: velocidades[pos] = mult
+    velocidades = {pos: v for pos, v in velocidades.items() if v != 1.0}
+
     # ---- Objetos (SpawnPoints, NPCSpawns, MobSpawns) ----
     def objetos(nome_camada):
         for grupo in raiz.findall('objectgroup'):
@@ -315,7 +334,7 @@ def carregar_mapa(caminho_tmx):
         mobs.append({'id': f"{mob_id}_{_java_round(cru_x)}_{_java_round(cru_y)}", 'type': mob_id,
                      'spawn_range': alcance, 'respawn_time': respawn})
 
-    return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru}
+    return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru, 'velocidades': velocidades}
 
 
 def _rasterizar(hitboxes, bordas, altura_px):

@@ -1269,6 +1269,7 @@ public class WorldScreen extends ScreenAdapter {
     private static final Color COR_NOTIF_PARTY = Color.valueOf("f5e02a");
     /** Mesmos valores de servidor.py::FOME_LIMITE / FOME_MULT_VELOCIDADE. */
     private static final float FOME_LIMITE = 10f, FOME_MULT_VELOCIDADE = 0.9f;
+    private float multFome = 1f;
     private static final Color COR_NOTIF_AVISO = new Color(1f, 0.35f, 0.35f, 1f);
 
     /** Clique na notificacao de convite: abre o livro na aba Party. */
@@ -2292,7 +2293,7 @@ public class WorldScreen extends ScreenAdapter {
             JsonValue skillsFome = data.get("skills");
             boolean comFome = (skillsFome != null ? skillsFome.getFloat("fullness", BookMenuUI.FULLNESS_MAX) : BookMenuUI.FULLNESS_MAX) < FOME_LIMITE;
             hud.definirFome(comFome);
-            local.multVelocidade = comFome ? FOME_MULT_VELOCIDADE : 1f;
+            multFome = comFome ? FOME_MULT_VELOCIDADE : 1f;
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
@@ -2969,6 +2970,9 @@ public class WorldScreen extends ScreenAdapter {
         Jogador noCaminho = livre ? jogadorOcupaTile(alvoX, alvoY) : null;
         if (livre && noCaminho == null) {
             tempoInsistindo = 0f;
+            // Velocidade do passo: fome x speed_modifier do SQM de onde sai
+            // (o servidor confere com a mesma conta, servidor.py::mult_velocidade_player).
+            local.multVelocidade = multFome * mapa.propriedades.velocidadeEm(local.x, local.y);
             local.iniciarPasso(dx, dy, direcao);
             enviarMove(alvoX, alvoY, direcao);
             return;

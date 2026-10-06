@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.5"
+SERVER_VERSION = "v0.6"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -3400,7 +3400,22 @@ def _corrigir_posicao(sid, p):
         'pos_x': p.get('pos_x', -1), 'pos_y': p.get('pos_y', -1),
         'direction': p.get('direction', 'down')
     }, room=sid)
-MOVE_RECARGA_POR_SEG = 4.0
+# O balde recarrega na velocidade em que o client anda de verdade
+# (Jogador.WALKSPEED_SQM_SEC) vezes a fome e o speed_modifier do SQM, com
+# MOVE_FOLGA de margem pra rede. Mais rapido que isso (speed hack, ou
+# ignorar a fome/lama) esvazia o balde e o passo volta.
+MOVE_SQM_POR_SEG = 2.2
+MOVE_FOLGA = 1.05
+# {map_id: {(tx, ty): mult}} - so' os SQMs com speed_modifier != 1
+# (mapa_tiled.py). Consulta O(1) por passo.
+velocidade_tiles = {}
+
+def mult_velocidade_player(p):
+    mult = FOME_MULT_VELOCIDADE if esta_com_fome(p) else 1.0
+    if int(p.get('floor', 1) or 1) == 1 and not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
+        vel = velocidade_tiles.get(p.get('mapa'))
+        if vel: mult *= vel.get(tile_de(p.get('pos_x', 0), p.get('pos_y', 0)), 1.0)
+    return mult
 
 @socketio.on('m')
 def handle_m(data):
@@ -3412,12 +3427,13 @@ def handle_m(data):
         if not p_name: return
         
         # Limite de passos por "balde": até MOVE_BALDE_MAX passos de rajada,
-        # recarregando MOVE_RECARGA_POR_SEG por segundo. Antes era "no mínimo
+        # recarregando na velocidade do player (MOVE_SQM_POR_SEG). Antes era "no mínimo
         # 0.28s entre passos": quando a rede entregava dois passos juntos o
         # segundo era jogado fora e a posição do player no servidor (e na tela
         # dos outros, e pra IA dos mobs) ficava 1 SQM atrás.
         now = time.time()
-        balde = min(MOVE_BALDE_MAX, p.get('_move_balde', MOVE_BALDE_MAX) + (now - p.get('last_move_time', now)) * MOVE_RECARGA_POR_SEG)
+        recarga = MOVE_SQM_POR_SEG * MOVE_FOLGA * mult_velocidade_player(p)
+        balde = min(MOVE_BALDE_MAX, p.get('_move_balde', MOVE_BALDE_MAX) + (now - p.get('last_move_time', now)) * recarga)
         p['last_move_time'] = now
         if balde < 1.0:
             # Andando rapido demais (speed hack): o passo nao vale e o client
@@ -4740,12 +4756,14 @@ def carregar_mapa_do_servidor():
     mapas_colisao[MAPA_ID_SERVIDOR] = grade
     conteudo_mapas[MAPA_ID_SERVIDOR] = {'fp': grade['fp'], 'mobs': dados['mobs'],
                                         'npcs': dados['npcs'], 'spawn': dados['spawn']}
+    velocidade_tiles[MAPA_ID_SERVIDOR] = dados.get('velocidades', {})
     MAPAS_DO_SERVIDOR.add(MAPA_ID_SERVIDOR)
     for m in active_mobs.values():
         m['path'] = None
         m['alcance'] = {}
     print(f"[MAPA] {os.path.basename(MAPA_TMX)} lido pelo servidor: grade {grade['w']}x{grade['h']} "
-          f"(fp {grade['fp'][:8]}), {len(dados['mobs'])} mob(s), {len(dados['npcs'])} NPC(s), spawn {dados['spawn']}")
+          f"(fp {grade['fp'][:8]}), {len(dados['mobs'])} mob(s), {len(dados['npcs'])} NPC(s), spawn {dados['spawn']}, "
+          f"{len(velocidade_tiles[MAPA_ID_SERVIDOR])} SQM(s) com speed_modifier")
 
 carregar_mapa_do_servidor()
 
