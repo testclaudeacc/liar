@@ -87,6 +87,8 @@ public final class HudVitais {
     private final Table iconesStatus = new Table();
     private Table quadradoFome, quadradoBatalha;
     private boolean comFome = false, emBatalha = false;
+    private final Table dica = new Table();
+    private Label textoDica;
 
     private static final class Barra {
         final Image preenchimento;
@@ -153,8 +155,10 @@ public final class HudVitais {
         painelXp.pad(px(1));
         painelXp.add(pilhaXp).size(px(260), px(32));
 
-        quadradoFome = quadradoStatus(atlas, "sheet/r18_c14", COR_FOME);
-        quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c6", COR_BATALHA);
+        quadradoFome = quadradoStatus(atlas, "sheet/r18_c14", COR_FOME,
+            "Hungry\nYou are 10% slower, deal 10% less damage and don't regenerate HP/MP. Eat something to recover.");
+        quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c6", COR_BATALHA,
+            "In battle\nIf you log out now, your body stays in the game until the battle ends (30s without fighting).");
         Table linhaTopo = new Table();
         linhaTopo.top().left();
         linhaTopo.add(painel).top().left();
@@ -205,6 +209,18 @@ public final class HudVitais {
         colunaInferior.left().top();
         raiz.add(colunaInferior).left().padTop(px(6));
         reorganizarInferior();
+        // Popup das explicacoes dos icones de status (fome/battle).
+        textoDica = new Label("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
+        textoDica.setWrap(true);
+        Table internoDica = new Table();
+        internoDica.setBackground(cor(COR_MUNICAO));
+        internoDica.add(textoDica).width(px(MOBILE ? 260 : 230)).pad(px(6));
+        dica.setBackground(cor(Color.BLACK));
+        dica.pad(px(1));
+        dica.add(internoDica);
+        dica.setVisible(false);
+        dica.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+        stage.addActor(dica);
         // Sempre por baixo de qualquer outra tela (BookMenu, chat, settings...).
         stage.getRoot().addActorAt(0, raiz);
         atualizar();
@@ -282,20 +298,55 @@ public final class HudVitais {
         return pai.add(comSombra);
     }
 
-    /** Quadrado 34x34 (altura da barra de HP) com borda preta e o icone no meio. */
-    private Table quadradoStatus(TextureAtlas atlas, String regiao, Color fundo) {
+    /** Quadrado 42x42 com borda preta e o icone no meio. Mouse em cima (PC)
+     * ou dedo segurando (celular) mostra a explicacao; saiu/soltou, some. */
+    private Table quadradoStatus(TextureAtlas atlas, String regiao, Color fundo, String explicacao) {
         Table interno = new Table();
         interno.setBackground(cor(fundo));
         Image img = icone(atlas, regiao);
-        if (img != null) interno.add(img).size(px(26));
+        if (img != null) interno.add(img).size(px(32));
         Table quadrado = new Table();
         quadrado.setBackground(cor(Color.BLACK));
         quadrado.pad(px(1));
-        quadrado.add(interno).size(px(32));
+        quadrado.add(interno).size(px(40));
+        quadrado.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        quadrado.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer,
+                                        com.badlogic.gdx.scenes.scene2d.Actor de) {
+                if (pointer == -1) mostrarDica(quadrado, explicacao); // -1 = mouse, sem clique
+            }
+            @Override public void exit(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer,
+                                       com.badlogic.gdx.scenes.scene2d.Actor para) {
+                if (pointer == -1 && (para == null || !para.isDescendantOf(quadrado))) esconderDica();
+            }
+            @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, int botao) {
+                mostrarDica(quadrado, explicacao);
+                return true;
+            }
+            @Override public void touchUp(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, int botao) {
+                esconderDica();
+            }
+        });
         return quadrado;
     }
 
+    /** Popup da explicacao, logo abaixo do icone (por cima de tudo). */
+    private void mostrarDica(Table icone, String texto) {
+        textoDica.setText(texto);
+        dica.pack();
+        com.badlogic.gdx.math.Vector2 p = icone.localToStageCoordinates(new com.badlogic.gdx.math.Vector2(0, 0));
+        Stage stage = icone.getStage();
+        float x = p.x;
+        if (stage != null) x = Math.max(px(4), Math.min(x, stage.getWidth() - dica.getWidth() - px(4)));
+        dica.setPosition(x, p.y - dica.getHeight() - px(4));
+        dica.setVisible(true);
+        dica.toFront();
+    }
+
+    private void esconderDica() { dica.setVisible(false); }
+
     private void reorganizarStatus() {
+        esconderDica();
         iconesStatus.clearChildren();
         if (comFome) iconesStatus.add(quadradoFome).padRight(px(4));
         if (emBatalha) iconesStatus.add(quadradoBatalha).padRight(px(4));
@@ -429,6 +480,7 @@ public final class HudVitais {
 
     public void setVisivel(boolean visivel) {
         raiz.setVisible(visivel);
+        if (!visivel) esconderDica();
     }
 
     public void dispose() {

@@ -132,7 +132,7 @@ public class MapaPropriedades {
     }
 
     private static final String[] CAMADAS_COLISAO_E_LUZ = {"Ground", "Buildings1", "Buildings2", "Roofs", "Pillars"};
-    private static final String[] CAMADAS_VELOCIDADE = {"Ground", "Buildings1"};
+    private final Map<Long, Float> velocidadePorCelula = new HashMap<>();
 
     // Forma e' "fina" se um lado for <= 30% do tile (~4.8px de 16) e o lado
     // oposto cobrir pelo menos 60% do tile (~9.6px) - bate com os valores
@@ -163,6 +163,7 @@ public class MapaPropriedades {
             Object camada = mapa.getLayers().get(CAMADAS_COLISAO_E_LUZ[i]);
             if (camada instanceof TiledMapTileLayer) camadas[i] = (TiledMapTileLayer) camada;
         }
+        carregarVelocidades(camadas);
         int[][] anulaAPartirDe = calcularAnulacaoPorCelula(camadas);
         for (int i = 0; i < camadas.length; i++) {
             if (camadas[i] != null) escanearColisaoELuz(camadas[i], i, anulaAPartirDe);
@@ -425,21 +426,42 @@ public class MapaPropriedades {
         return new Rectangle(minX, minY, maxX - minX, maxY - minY);
     }
 
-    /** speed_modifier do tile sob (mundoX, mundoY), 1.0 se nenhuma camada
-     * tiver a property ali. Consulta direta (sem cache) - quem usa decide a
-     * frequencia (por SQM cruzado, nao por frame). */
+    /** speed_modifier do SQM sob (mundoX, mundoY) - pes do player/mob, na
+     * base do SQM -, 1.0 se nenhum tile ali tiver a property. Pre-calculado
+     * no construtor (velocidadePorCelula). */
     public float velocidadeEm(float mundoX, float mundoY) {
         int cx = (int) Math.floor(mundoX / tileWidth);
-        int cy = (int) Math.floor(mundoY / tileHeight);
-        for (String nome : CAMADAS_VELOCIDADE) {
-            Object camada = mapa.getLayers().get(nome);
-            if (!(camada instanceof TiledMapTileLayer)) continue;
-            TiledMapTileLayer.Cell cell = ((TiledMapTileLayer) camada).getCell(cx, cy);
-            if (cell == null || cell.getTile() == null) continue;
-            Float mod = cell.getTile().getProperties().get("speed_modifier", Float.class);
-            if (mod != null) return mod;
+        // +meio SQM: a ancora fica exatamente na borda de baixo do SQM, e um
+        // arredondamento de float ali caia no SQM de baixo.
+        int cy = (int) Math.floor((mundoY + tileHeight / 2f) / tileHeight);
+        Float mod = velocidadePorCelula.get(chaveCelula(cx, cy));
+        return mod != null ? mod : 1f;
+    }
+
+    private static long chaveCelula(int cx, int cy) { return ((long) cx << 32) ^ (cy & 0xffffffffL); }
+
+    /** Todas as camadas de tile (mesmas da colisao); a mais de CIMA com
+     * speed_modifier na celula decide (ex: ponte em cima de lama). A
+     * property pode estar como float, int ou string no Tiled. Mesma regra de
+     * mapa_tiled.py no servidor. */
+    private void carregarVelocidades(TiledMapTileLayer[] camadas) {
+        for (TiledMapTileLayer camada : camadas) {
+            if (camada == null) continue;
+            for (int cx = 0; cx < camada.getWidth(); cx++) {
+                for (int cy = 0; cy < camada.getHeight(); cy++) {
+                    TiledMapTileLayer.Cell cell = camada.getCell(cx, cy);
+                    if (cell == null || cell.getTile() == null) continue;
+                    Object valor = cell.getTile().getProperties().get("speed_modifier");
+                    if (valor == null) continue;
+                    float mod;
+                    try { mod = valor instanceof Number ? ((Number) valor).floatValue() : Float.parseFloat(valor.toString().trim()); }
+                    catch (NumberFormatException e) { continue; }
+                    if (mod > 0f) velocidadePorCelula.put(chaveCelula(cx, cy), mod);
+                }
+            }
         }
-        return 1f;
+        velocidadePorCelula.values().removeIf(v -> v == 1f);
+        Gdx.app.log("Mapa", velocidadePorCelula.size() + " SQM(s) com speed_modifier");
     }
 
     /** Propriedade numerica do Tiled (int/float/string, dependendo de como

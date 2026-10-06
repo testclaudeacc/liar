@@ -33,9 +33,9 @@ PADDING_SQM = 2
 LIMIAR_FINO = 0.3
 LIMIAR_COBERTURA = 0.6
 CAMADAS_COLISAO = ("Ground", "Buildings1", "Buildings2", "Roofs", "Pillars")
-# Mesma ordem de MapaPropriedades.CAMADAS_VELOCIDADE: a 1a camada com
-# speed_modifier na celula decide.
-CAMADAS_VELOCIDADE = ("Ground", "Buildings1")
+# speed_modifier: todas as camadas de colisao; a mais de CIMA com a property
+# na celula decide (igual MapaPropriedades.carregarVelocidades).
+CAMADAS_VELOCIDADE = CAMADAS_COLISAO
 
 FLIP_H = 0x80000000
 FLIP_V = 0x40000000
@@ -279,13 +279,13 @@ def carregar_mapa(caminho_tmx):
     # {(col, linha): mult} so' com os SQMs != 1.0. (col, linha) do Tiled e'
     # o mesmo SQM que o servidor usa (tile_de no espaco "cru").
     velocidades = {}
-    for nome in reversed(CAMADAS_VELOCIDADE):  # a 1a da lista sobrescreve as outras
+    for nome in CAMADAS_VELOCIDADE:  # de baixo pra cima: a de cima sobrescreve
         c = camadas_por_nome.get(nome)
         if c is None: continue
         for pos, bruto in _gids_da_camada(c, largura, altura).items():
             tile = tile_do_gid(bruto & MASCARA_GID)
             if tile is None or 'speed_modifier' not in tile.props: continue
-            try: mult = float(tile.props['speed_modifier'])
+            try: mult = float(str(tile.props['speed_modifier']).strip())
             except ValueError: continue
             if mult > 0: velocidades[pos] = mult
     velocidades = {pos: v for pos, v in velocidades.items() if v != 1.0}

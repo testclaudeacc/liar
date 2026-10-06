@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.6"
+SERVER_VERSION = "v0.7"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -1264,6 +1264,15 @@ def _mob_desaparece_por_perseguicao(mob_id, m, now):
     if room:
         emit_area('mob_vanish', {'mob_id': mob_id, 'pos_x': m.get('pos_x', 0), 'pos_y': m.get('pos_y', 0)}, room)
 
+def _duracao_passo_mob(m, origem):
+    # Tempo de 1 passo do mob: speed dele x speed_modifier do SQM de onde sai
+    # (mesma tabela dos players, velocidade_tiles). O client recebe essa
+    # duração no mob_state, então a animação acompanha.
+    mult = 1.0
+    vel = velocidade_tiles.get(m.get('mapa'))
+    if vel: mult = vel.get(origem, 1.0)
+    return 1.0 / max(0.1, float(m.get('speed', MOB_SPEED_PADRAO)) * mult)
+
 def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
     # ate_adjacente: perseguindo um player (para em volta dele, ver
     # astar_ate_adjacente). Sem ele vai até o próprio destino (volta pro spawn).
@@ -1290,7 +1299,7 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
         return False
     _virar_para(m, origem, proximo)
     m['pos_x'], m['pos_y'] = centro_tile(proximo)
-    passo = 1.0 / max(0.1, float(m.get('speed', MOB_SPEED_PADRAO)))
+    passo = _duracao_passo_mob(m, origem)
     m['move_until'] = now + passo
     m['path']['caminho'] = caminho[1:]
     m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
@@ -1444,7 +1453,7 @@ def _mob_passear(mob_id, m, origem, now):
         if destino in ocupados or eh_parede(grade, destino) or borda_bloqueada(grade, origem, destino): continue
         _virar_para(m, origem, destino)
         m['pos_x'], m['pos_y'] = centro_tile(destino)
-        passo = 1.0 / max(0.1, float(m.get('speed', MOB_SPEED_PADRAO)))
+        passo = _duracao_passo_mob(m, origem)
         m['move_until'] = now + passo
         m['path'] = None
         m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
