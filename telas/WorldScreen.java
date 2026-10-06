@@ -3008,13 +3008,22 @@ public class WorldScreen extends ScreenAdapter {
             // (o servidor confere com a mesma conta, servidor.py::mult_velocidade_player).
             local.multVelocidade = multFome * mapa.propriedades.velocidadeEm(local.x, local.y);
             local.iniciarPasso(dx, dy, direcao);
+            ultimoPassoDx = Math.signum(dx);
+            ultimoPassoDy = Math.signum(dy);
             enviarMove(alvoX, alvoY, direcao);
             return;
         }
         if (!direcao.equals(local.direcao)) enviarVirada(direcao);
         local.direcao = direcao;
-        // Troca de lugar (abaixo) so' em passo reto: na diagonal so' vira.
-        if (diagonal) { tempoInsistindo = 0f; alvoInsistindo = null; return; }
+        // Troca de lugar (abaixo) so' em passo reto: na diagonal so' vira (e
+        // guarda a diagonal, senao o sprite ficaria alternando a cada frame).
+        if (diagonal) {
+            ultimoPassoDx = Math.signum(dx);
+            ultimoPassoDy = Math.signum(dy);
+            tempoInsistindo = 0f;
+            alvoInsistindo = null;
+            return;
+        }
         // Outro player parado no caminho: insistindo (segurando a direcao
         // contra ele) por TEMPO_INSISTIR_TROCA, pede pro servidor trocar de
         // lugar (ele so' aceita se o outro estiver parado/afk ha' um tempo).
@@ -3033,13 +3042,20 @@ public class WorldScreen extends ScreenAdapter {
         }
     }
 
-    /** Sprite na diagonal (igual Tibia): se ja' esta virado pra um dos dois
-     * lados do movimento, continua; senao usa o lado horizontal. */
+    /** Sprite na diagonal: ao ENTRAR na diagonal vira pro lado novo (o que
+     * foi somado). Ex: andando pra direita (right) e indo pra baixo-direita
+     * vira down; andando pra baixo (down) e indo pra baixo-direita vira right.
+     * Continuando na mesma diagonal, mantem (nao fica trocando a cada passo). */
     private String direcaoDiagonal(float dx, float dy) {
         String horizontal = dx < 0 ? "left" : "right", vertical = dy > 0 ? "up" : "down";
-        if (local.direcao.equals(horizontal) || local.direcao.equals(vertical)) return local.direcao;
+        if (Math.signum(dx) == ultimoPassoDx && Math.signum(dy) == ultimoPassoDy) return local.direcao;
+        if (local.direcao.equals(horizontal)) return vertical;
+        if (local.direcao.equals(vertical)) return horizontal;
         return horizontal;
     }
+
+    /** Direcao (sinal de x/y) do ultimo passo dado pelo player local. */
+    private float ultimoPassoDx = 0f, ultimoPassoDy = 0f;
 
     /** Diagonal passa se pelo menos um dos dois caminhos em "L" nao cruza
      * cerca fina (parede solida na quina nao bloqueia, igual Tibia). Mesma
