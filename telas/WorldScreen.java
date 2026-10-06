@@ -2428,6 +2428,17 @@ public class WorldScreen extends ScreenAdapter {
             // Aviso no chat Local de todo mundo da area (o servidor ja manda pra area toda).
             if (chat != null) chat.adicionarMensagemSistema(nomeVisivel(nome) + " has reached Level " + data.getInt("level", 0) + "!");
         });
+        // Textinho de acao em cima da cabeca (servidor.py::texto_de_acao): comer
+        // ("Om Noom"), e depois magias/pocoes/quests. Vem pra area toda.
+        socket.on("action_text", (nomeEvt, data) -> {
+            if (data == null) return;
+            Jogador j = jogadorPorNome(data.getString("name", ""));
+            if (j == null) return;
+            Color cor;
+            try { cor = Color.valueOf(data.getString("color", "ff9a1f")); }
+            catch (RuntimeException e) { cor = new Color(1f, 0.6f, 0.12f, 1f); }
+            textosFlutuantes.add(new TextoFlutuante(j, data.getString("text", ""), cor));
+        });
         socket.on("player_skill_leveled_up", (nomeEvt, data) -> {
             if (data == null) return;
             String nome = data.getString("name", "");

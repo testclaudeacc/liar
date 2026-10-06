@@ -161,14 +161,30 @@ public final class BookMenuUI {
                 setOrigin(getWidth() / 2f, getHeight() / 2f);
             }
         };
-        Table leftTab = criarColuna(atlas, new String[][]{
+        // Celular: o X (fechar) vai pro topo da coluna da direita (mais facil
+        // de alcancar), e Spells passa pro fim da esquerda. PC: como era.
+        boolean xEmCima = Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
+            || Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
+        Table leftTab = criarColuna(atlas, xEmCima ? new String[][]{
+            {"Party", "ui/buttons/PartyBtn"},
+            {"Friends", "ui/buttons/FriendsBtn"},
+            {"Map", "ui/buttons/MapBtn"},
+            {"Rank", "ui/buttons/RankBtn"},
+            {"Spells", "ui/buttons/SpellsBtn"}
+        } : new String[][]{
             {"Party", "ui/buttons/PartyBtn"},
             {"Friends", "ui/buttons/FriendsBtn"},
             {"Map", "ui/buttons/MapBtn"},
             {"Rank", "ui/buttons/RankBtn"},
             {"Exit", "ui/buttons/CloseBtn"}
         }, true);
-        Table rightTab = criarColuna(atlas, new String[][]{
+        Table rightTab = criarColuna(atlas, xEmCima ? new String[][]{
+            {"Exit", "ui/buttons/CloseBtn"},
+            {"Equip", "ui/buttons/EquipMenuBtn"},
+            {"Bag", "ui/buttons/InventoryBtn"},
+            {"Skills", "ui/buttons/SkillsBtn"},
+            {"Vanity", "ui/buttons/SkinsBtn"}
+        } : new String[][]{
             {"Equip", "ui/buttons/EquipMenuBtn"},
             {"Bag", "ui/buttons/InventoryBtn"},
             {"Skills", "ui/buttons/SkillsBtn"},

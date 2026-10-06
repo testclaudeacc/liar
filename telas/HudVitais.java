@@ -176,7 +176,7 @@ public final class HudVitais {
         linhaTopo.top().left();
         linhaTopo.add(painel).top().left();
         // Alinhado com a barra de HP (borda 2px + pad 3px do painel).
-        linhaTopo.add(iconesStatus).top().left().padLeft(px(4)).padTop(px(5));
+        linhaTopo.add(iconesStatus).top().left().padLeft(px(9)).padTop(px(10));
         raiz.setFillParent(true);
         raiz.top().left().padLeft(px(17)).padTop(px(13));
         raiz.add(linhaTopo).left().row();

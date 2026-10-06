@@ -4607,6 +4607,13 @@ def handle_eat_food(data):
         if inst is not None: _comer(sid, p, inst)
     except Exception: traceback.print_exc()
 
+# Textinho de acao em cima da cabeca do player (igual OT de Tibia), pra todo
+# mundo que esta perto: comer ("Om Noom"), e depois magias, pocoes, quests...
+# cor = hex RGB (laranja por padrao).
+def texto_de_acao(p, texto, cor="ff9a1f"):
+    if not p or not p.get('room'): return
+    emit_area('action_text', {'name': p.get('name', ''), 'text': str(texto)[:40], 'color': cor}, p.get('room'))
+
 def _comer(sid, p, inst):
     # Come 1 unidade da instância (botão Eat na bag ou atalho da hotbar).
     inventario = p.get('inventory', [])
@@ -4624,6 +4631,7 @@ def _comer(sid, p, inst):
     p['_fullness_acc'] = 0.0  # acabou de comer: o proximo "tique" de fome recomeça
     _queue_save(p)
     emit('food_result', {'ok': True, 'fullness': obter_fullness(p)}, room=sid)
+    texto_de_acao(p, "Om Noom")
     emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(inventario), 'equipped_items': p.get('equipped_items', {})}, room=sid)
     emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
 
