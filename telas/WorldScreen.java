@@ -3207,9 +3207,10 @@ public class WorldScreen extends ScreenAdapter {
         Jogador noCaminho = livre ? jogadorOcupaTile(alvoX, alvoY) : null;
         if (livre && noCaminho == null) {
             tempoInsistindo = 0f;
-            // Velocidade do passo: fome x speed_modifier do SQM de onde sai
-            // (o servidor confere com a mesma conta, servidor.py::mult_velocidade_player).
+            // Speed_modifier muda no MEIO do passo: 1a metade na velocidade do
+            // SQM de saida, 2a na do de chegada (servidor.py::fator_tempo_passo).
             local.multVelocidade = multFome * mapa.propriedades.velocidadeEm(local.x, local.y);
+            local.multVelocidadeDestino = multFome * mapa.propriedades.velocidadeEm(alvoX, alvoY);
             local.iniciarPasso(dx, dy, direcao);
             ultimoPassoDx = Math.signum(dx);
             ultimoPassoDy = Math.signum(dy);

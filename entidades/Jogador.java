@@ -29,9 +29,14 @@ public class Jogador {
     public boolean movendo = false;
 
     private float origemX, origemY, destinoX, destinoY, progresso;
-    private float duracao = TEMPO_PASSO;
+    /** Duracao de cada METADE do passo (o speed_modifier do SQM de saida vale
+     * na 1a metade e o do SQM de chegada na 2a - muda no meio do passo). */
+    private float duracao1 = TEMPO_PASSO / 2f, duracao2 = TEMPO_PASSO / 2f;
     /** Velocidade do player local (1 = normal; com fome fica mais lento). */
     public float multVelocidade = 1f;
+    /** Player local: velocidade no SQM de destino do proximo passo (fome x
+     * speed_modifier). multVelocidade e' a do SQM de onde sai. */
+    public float multVelocidadeDestino = 1f;
 
     // Player remoto: os passos chegam do servidor em pacotes (10x/s), entao
     // chegam "tremidos" (ate' ~0.1s antes/depois). Tocar cada um na hora que
@@ -67,7 +72,9 @@ public class Jogador {
         origemX = x; origemY = y;
         destinoX = x + dx; destinoY = y + dy;
         progresso = 0f;
-        duracao = TEMPO_PASSO / Math.max(0.1f, multVelocidade) * fatorDiagonal(dx, dy);
+        float base = TEMPO_PASSO * fatorDiagonal(dx, dy) / 2f;
+        duracao1 = base / Math.max(0.1f, multVelocidade);
+        duracao2 = base / Math.max(0.1f, multVelocidadeDestino);
         movendo = true;
     }
 
@@ -111,7 +118,7 @@ public class Jogador {
         origemX = x; origemY = y;
         destinoX = alvoX; destinoY = alvoY;
         progresso = 0f;
-        duracao = dur * fatorDiagonal(alvoX - x, alvoY - y);
+        duracao1 = duracao2 = dur * fatorDiagonal(alvoX - x, alvoY - y) / 2f;
         movendo = true;
     }
 
@@ -139,9 +146,21 @@ public class Jogador {
                 iniciarAlvo((Float) prox[0], (Float) prox[1], (String) prox[2], dur);
                 continue;
             }
-            progresso += restante / duracao;
+            // 1a metade (ate' 0.5) no ritmo de duracao1, 2a no de duracao2.
+            if (progresso < 0.5f) {
+                float falta = (0.5f - progresso) * 2f * duracao1;
+                if (restante < falta) {
+                    progresso += restante / (2f * duracao1);
+                    x = origemX + (destinoX - origemX) * progresso;
+                    y = origemY + (destinoY - origemY) * progresso;
+                    return 0f;
+                }
+                restante -= falta;
+                progresso = 0.5f;
+            }
+            progresso += restante / (2f * duracao2);
             if (progresso >= 1f) {
-                restante = (progresso - 1f) * duracao;
+                restante = (progresso - 1f) * 2f * duracao2;
                 x = destinoX;
                 y = destinoY;
                 progresso = 1f;

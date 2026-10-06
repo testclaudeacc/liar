@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.13"
+SERVER_VERSION = "v0.14"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -1276,14 +1276,14 @@ def _mob_desaparece_por_perseguicao(mob_id, m, now):
     if room:
         emit_area('mob_vanish', {'mob_id': mob_id, 'pos_x': m.get('pos_x', 0), 'pos_y': m.get('pos_y', 0)}, room)
 
-def _duracao_passo_mob(m, origem):
+def _duracao_passo_mob(m, origem, destino):
     # Tempo de 1 passo do mob: speed dele x speed_modifier do SQM de onde sai
     # (mesma tabela dos players, velocidade_tiles). O client recebe essa
     # duração no mob_state, então a animação acompanha.
-    mult = 1.0
-    vel = velocidade_tiles.get(m.get('mapa'))
-    if vel: mult = vel.get(origem, 1.0)
-    return 1.0 / max(0.1, float(m.get('speed', MOB_SPEED_PADRAO)) * mult)
+    vel = velocidade_tiles.get(m.get('mapa')) or {}
+    # Metade do passo na velocidade do SQM de saida, metade na do de chegada.
+    fator = 0.5 / max(0.05, vel.get(origem, 1.0)) + 0.5 / max(0.05, vel.get(destino, 1.0))
+    return fator / max(0.1, float(m.get('speed', MOB_SPEED_PADRAO)))
 
 def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
     # ate_adjacente: perseguindo um player (para em volta dele, ver
@@ -1311,7 +1311,7 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
         return False
     _virar_para(m, origem, proximo)
     m['pos_x'], m['pos_y'] = centro_tile(proximo)
-    passo = _duracao_passo_mob(m, origem)
+    passo = _duracao_passo_mob(m, origem, proximo)
     m['move_until'] = now + passo
     m['path']['caminho'] = caminho[1:]
     m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
@@ -1468,7 +1468,7 @@ def _mob_passear(mob_id, m, origem, now):
         if destino in ocupados or eh_parede(grade, destino) or borda_bloqueada(grade, origem, destino): continue
         _virar_para(m, origem, destino)
         m['pos_x'], m['pos_y'] = centro_tile(destino)
-        passo = _duracao_passo_mob(m, origem)
+        passo = _duracao_passo_mob(m, origem, destino)
         m['move_until'] = now + passo
         m['path'] = None
         m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
@@ -3451,10 +3451,23 @@ velocidade_tiles = {}
 
 def mult_velocidade_player(p):
     mult = FOME_MULT_VELOCIDADE if esta_com_fome(p) else 1.0
-    if int(p.get('floor', 1) or 1) == 1 and not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
-        vel = velocidade_tiles.get(p.get('mapa'))
-        if vel: mult *= vel.get(tile_de(p.get('pos_x', 0), p.get('pos_y', 0)), 1.0)
+    if not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
+        mult *= mult_tile(p, tile_de(p.get('pos_x', 0), p.get('pos_y', 0)))
     return mult
+
+def mult_tile(p, tile):
+    # speed_modifier do SQM (so' no andar 1, onde o mapa do servidor vale).
+    if int(p.get('floor', 1) or 1) != 1: return 1.0
+    vel = velocidade_tiles.get(p.get('mapa'))
+    return vel.get(tile, 1.0) if vel else 1.0
+
+def fator_tempo_passo(p, de, para):
+    # Quanto um passo de "de" pra "para" demora em relacao a um passo normal:
+    # a 1a metade anda na velocidade do SQM de saida e a 2a na do de chegada
+    # (o speed_modifier entra/sai no meio do passo - igual o client,
+    # Jogador.iniciarPasso). Inclui a fome.
+    fome = FOME_MULT_VELOCIDADE if esta_com_fome(p) else 1.0
+    return (0.5 / max(0.05, mult_tile(p, de)) + 0.5 / max(0.05, mult_tile(p, para))) / fome
 
 @socketio.on('m')
 def handle_m(data):
@@ -3482,7 +3495,10 @@ def handle_m(data):
             o_b = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
             if abs(destino_tile[0] - o_b[0]) == 1 and abs(destino_tile[1] - o_b[1]) == 1: custo = CUSTO_DIAGONAL
         now = time.time()
-        recarga = MOVE_SQM_POR_SEG * MOVE_FOLGA * mult_velocidade_player(p)
+        # O balde recarrega no ritmo do ULTIMO passo dado (o tempo desde ele
+        # e' a duracao dele, que depende dos 2 SQMs - ver fator_tempo_passo).
+        fator = p.get('_fator_passo') or (1.0 / max(0.05, mult_velocidade_player(p)))
+        recarga = MOVE_SQM_POR_SEG * MOVE_FOLGA / fator
         balde = min(MOVE_BALDE_MAX, p.get('_move_balde', MOVE_BALDE_MAX) + (now - p.get('last_move_time', now)) * recarga)
         p['last_move_time'] = now
         if balde < custo:
@@ -3538,6 +3554,8 @@ def handle_m(data):
             _corrigir_posicao(sid, p)
             return
         
+        if not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
+            p['_fator_passo'] = fator_tempo_passo(p, tile_de(p.get('pos_x', 0), p.get('pos_y', 0)), destino_tile)
         p['pos_x'], p['pos_y'], p['direction'] = x, y, DIR_MAP.get(d_int, 'down')
         
         old_room = p.get('room')
@@ -4922,7 +4940,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-06 diagonal"
+VERSAO_SERVIDOR = "2026-10-07 speed meio do passo"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)
