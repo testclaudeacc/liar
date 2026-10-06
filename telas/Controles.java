@@ -51,6 +51,9 @@ public final class Controles {
     private static final Map<String, Integer> teclas = new LinkedHashMap<>();
     private static boolean carregado = false;
 
+    /** Moving style: 8 direcoes (com diagonal) ou 4 (sem). */
+    private static boolean oitoDirecoes = true;
+
     // Joystick (celular)
     public static final float JOYSTICK_ESCALA_MIN = 0.6f, JOYSTICK_ESCALA_MAX = 1.6f;
     private static float joystickEscala = 1f;
@@ -76,6 +79,7 @@ public final class Controles {
                 break;
             }
         }
+        oitoDirecoes = p.getBoolean("oito_direcoes", true);
         joystickEscala = Math.max(JOYSTICK_ESCALA_MIN, Math.min(JOYSTICK_ESCALA_MAX, p.getFloat("joystick_escala", 1f)));
         joystickX = p.getFloat("joystick_x", -1f);
         joystickY = p.getFloat("joystick_y", -1f);
@@ -84,6 +88,7 @@ public final class Controles {
     private static void salvar() {
         Preferences p = prefs();
         for (Map.Entry<String, Integer> e : teclas.entrySet()) p.putInteger("tecla_" + e.getKey(), e.getValue());
+        p.putBoolean("oito_direcoes", oitoDirecoes);
         p.putFloat("joystick_escala", joystickEscala);
         p.putFloat("joystick_x", joystickX);
         p.putFloat("joystick_y", joystickY);
@@ -143,6 +148,15 @@ public final class Controles {
         if (keycode >= Input.Keys.NUMPAD_0 && keycode <= Input.Keys.NUMPAD_9) return "N" + (keycode - Input.Keys.NUMPAD_0);
         String nome = Input.Keys.toString(keycode);
         return nome != null ? nome : "?";
+    }
+
+    // ---- Moving style ----
+    public static boolean oitoDirecoes() { carregar(); return oitoDirecoes; }
+
+    public static void definirOitoDirecoes(boolean oito) {
+        carregar();
+        oitoDirecoes = oito;
+        salvar();
     }
 
     // ---- Joystick ----

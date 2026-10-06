@@ -980,6 +980,7 @@ public class WorldScreen extends ScreenAdapter {
             socket.emitRaw("use_hotbar", GameSocket.obj(jw -> jw.set("index", indice)));
         });
         bookMenu.definirAoMudarAtalhos(hotbar::atualizar);
+        hotbar.definirJoystick(joystick); // editor de controles: joystick + botoes juntos
         bookMenu.definirNomeLocal(local.nome);
         painelJogador = new PainelJogadorUI(uiStage, skin, atlas, new PainelJogadorUI.Ouvinte() {
             @Override public void alternarAmigo(String nome) {
@@ -1599,14 +1600,14 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     // ===================== CONTROLES (Settings) =====================
-    // PC: tecla de cada acao (hotbar 1-9, Open Bag, Open Chat, Write) - clica
-    // no botao da tecla e aperta a nova (ESC cancela). Celular: tamanho e
-    // posicao do joystick. Tudo salvo no aparelho (Controles).
+    // Moving style (4/8 direcoes) nos dois. PC: tecla de cada acao (hotbar
+    // 1-9, Open Menu, Open Bag, Open Chat, Write) - clica no botao da tecla e
+    // aperta a nova (ESC cancela). Celular: "Edit controls" abre o editor
+    // (HotbarUI) do joystick e dos botoes juntos. Tudo salvo no aparelho (Controles).
 
     private final java.util.Map<String, TextButton> botoesTecla = new java.util.HashMap<>();
     private String acaoCapturando = null;
-    private Label avisoControles, valorTamanhoJoystick;
-    private Table painelEditarJoystick;
+    private Label avisoControles;
 
     private TextButton.TextButtonStyle estiloTecla(boolean capturando) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
@@ -1633,6 +1634,19 @@ public class WorldScreen extends ScreenAdapter {
         Table secao = new Table();
         secao.left().top();
         secao.add(new Label("Controls", skin, "secao")).left().row();
+        // Moving style: 8 direcoes (com diagonal) ou 4 (sem) - PC e celular.
+        Table linhaMov = new Table();
+        linhaMov.add(new Label("Moving style", skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
+        SelectBox<String> estiloMov = new SelectBox<>(skin, "zoom-select");
+        estiloMov.setItems("8 directions", "4 directions");
+        estiloMov.setSelectedIndex(Controles.oitoDirecoes() ? 0 : 1);
+        estiloMov.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                Controles.definirOitoDirecoes(estiloMov.getSelectedIndex() == 0);
+            }
+        });
+        linhaMov.add(estiloMov).width(180).height(36);
+        secao.add(linhaMov).left().padTop(10).row();
         if (!mobile) {
             secao.add(new Label("Click a key, then press the new one (ESC cancels)", skin, "opcoes-label")).left().padTop(4).row();
             Table grade = new Table();
@@ -1683,29 +1697,11 @@ public class WorldScreen extends ScreenAdapter {
                 }
             });
         } else {
-            secao.add(new Label("Joystick: size and position", skin, "opcoes-label")).left().padTop(4).row();
-            Table linha = new Table();
-            linha.add(new Label("Size", skin, "opcoes-label")).padRight(12);
-            linha.add(botaoPequeno("-", () -> mudarTamanhoJoystick(-0.1f))).size(56, 48);
-            valorTamanhoJoystick = new Label("", skin, "opcoes-label");
-            valorTamanhoJoystick.setAlignment(Align.center);
-            linha.add(valorTamanhoJoystick).width(90);
-            linha.add(botaoPequeno("+", () -> mudarTamanhoJoystick(0.1f))).size(56, 48);
-            secao.add(linha).left().padTop(12).row();
-            Table botoes = new Table();
-            botoes.add(botaoPequeno("Move joystick", this::comecarMoverJoystick)).width(210).height(48).padRight(12);
-            botoes.add(botaoPequeno("Reset joystick", () -> {
-                Controles.restaurarJoystick();
-                joystick.aplicarConfig();
-                atualizarTamanhoJoystick();
-            })).width(210).height(48);
-            secao.add(botoes).left().padTop(12).row();
-            secao.add(new Label("Hotbar buttons: add (up to 9), remove, move and resize", skin, "opcoes-label")).left().padTop(18).row();
-            secao.add(botaoPequeno("Edit buttons", () -> {
+            secao.add(new Label("Joystick and hotbar buttons: move, resize, add or remove", skin, "opcoes-label")).left().padTop(14).row();
+            secao.add(botaoPequeno("Edit controls", () -> {
                 fecharSettings();
                 hotbar.entrarEdicao(null);
             })).left().width(210).height(48).padTop(10).row();
-            atualizarTamanhoJoystick();
         }
         return secao;
     }
@@ -1730,40 +1726,6 @@ public class WorldScreen extends ScreenAdapter {
             e.getValue().setText(e.getKey().equals(acaoCapturando) ? "Press a key..." : Controles.nomeTecla(Controles.tecla(e.getKey())));
         }
         if (hotbar != null) hotbar.atualizar(); // o numero da tecla em cada slot
-    }
-
-    private void mudarTamanhoJoystick(float delta) {
-        Controles.definirJoystickEscala(Controles.joystickEscala() + delta);
-        joystick.aplicarConfig();
-        atualizarTamanhoJoystick();
-    }
-
-    private void atualizarTamanhoJoystick() {
-        if (valorTamanhoJoystick != null) valorTamanhoJoystick.setText(Math.round(Controles.joystickEscala() * 100f) + "%");
-    }
-
-    /** Fecha o Settings e deixa arrastar o joystick; "Done" salva e volta. */
-    private void comecarMoverJoystick() {
-        fecharSettings();
-        joystick.setEditando(true);
-        if (painelEditarJoystick == null) {
-            painelEditarJoystick = new Table();
-            painelEditarJoystick.setFillParent(true);
-            painelEditarJoystick.top().padTop(120);
-            Table caixa = new Table();
-            caixa.setBackground(skin.getDrawable("popup-painel"));
-            caixa.pad(12, 18, 12, 18);
-            caixa.add(new Label("Drag the joystick to where you want it", skin, "opcoes-label")).padRight(16);
-            caixa.add(botaoPequeno("Done", () -> {
-                joystick.setEditando(false);
-                painelEditarJoystick.setVisible(false);
-            })).width(120).height(48);
-            painelEditarJoystick.add(caixa);
-            painelEditarJoystick.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.childrenOnly);
-            uiStage.addActor(painelEditarJoystick);
-        }
-        painelEditarJoystick.setVisible(true);
-        painelEditarJoystick.toFront();
     }
 
     /** Tela cheia (CanvasLayer/OptionsMenu): TopBar com titulo, conteudo com
@@ -3164,6 +3126,8 @@ public class WorldScreen extends ScreenAdapter {
         int h = (direita ? 1 : 0) - (esquerda ? 1 : 0);
         dx = h * Jogador.TILE;
         dy = v * Jogador.TILE;
+        // Moving style "4 directions": duas teclas juntas = so' a vertical (como era).
+        if (h != 0 && v != 0 && !Controles.oitoDirecoes()) { h = 0; dx = 0; }
         if (h != 0 && v != 0) direcao = direcaoDiagonal(dx, dy);
         else if (v > 0) direcao = "up";
         else if (v < 0) direcao = "down";

@@ -73,6 +73,7 @@ public class Joystick {
                 if (editando) {
                     pegaX = x;
                     pegaY = y;
+                    if (aoTocarEditando != null) aoTocarEditando.run();
                     return true;
                 }
                 atualizar(x, y);
@@ -161,6 +162,16 @@ public class Joystick {
 
     public boolean isEditando() { return editando; }
 
+    /** Editor de controles: avisa quando tocam no joystick (pra seleciona-lo). */
+    private Runnable aoTocarEditando;
+    public void setAoTocarEditando(Runnable r) { aoTocarEditando = r; }
+
+    /** Destaque (laranja) quando esta selecionado no editor. */
+    public void setSelecionado(boolean sel) {
+        base.setColor(sel ? new com.badlogic.gdx.graphics.Color(1f, 0.75f, 0.4f, 1f) : com.badlogic.gdx.graphics.Color.WHITE);
+        if (!editando) base.getColor().a = IDLE_ALPHA;
+    }
+
     private void resetarKnob() {
         base.getColor().a = editando ? 1f : IDLE_ALPHA;
         vetor.set(0f, 0f);
@@ -178,10 +189,26 @@ public class Joystick {
         return ((Math.round(ang / 45f) % 8) + 8) % 8;
     }
 
-    public boolean isDireita() { int s = setor(); return s == 7 || s == 0 || s == 1; }
-    public boolean isCima() { int s = setor(); return s == 1 || s == 2 || s == 3; }
-    public boolean isEsquerda() { int s = setor(); return s == 3 || s == 4 || s == 5; }
-    public boolean isBaixo() { int s = setor(); return s == 5 || s == 6 || s == 7; }
+    // Moving style "4 directions" (Controles): so' o eixo dominante, sem diagonal.
+    private boolean ativo() { return vetor.len2() >= LIMIAR_DIRECAO * LIMIAR_DIRECAO; }
+    private boolean horizontalDomina() { return Math.abs(vetor.x) >= Math.abs(vetor.y); }
+
+    public boolean isDireita() {
+        if (!Controles.oitoDirecoes()) return ativo() && horizontalDomina() && vetor.x > 0;
+        int s = setor(); return s == 7 || s == 0 || s == 1;
+    }
+    public boolean isCima() {
+        if (!Controles.oitoDirecoes()) return ativo() && !horizontalDomina() && vetor.y > 0;
+        int s = setor(); return s == 1 || s == 2 || s == 3;
+    }
+    public boolean isEsquerda() {
+        if (!Controles.oitoDirecoes()) return ativo() && horizontalDomina() && vetor.x < 0;
+        int s = setor(); return s == 3 || s == 4 || s == 5;
+    }
+    public boolean isBaixo() {
+        if (!Controles.oitoDirecoes()) return ativo() && !horizontalDomina() && vetor.y < 0;
+        int s = setor(); return s == 5 || s == 6 || s == 7;
+    }
 
     public void setVisivel(boolean visivel) {
         base.setVisible(visivel);

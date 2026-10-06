@@ -143,7 +143,20 @@ public final class HotbarUI {
     // =====================================================================
 
     private boolean editando = false;
+    /** Indice do botao selecionado, SEL_JOYSTICK ou -1 (nada). */
     private int selecionado = -1;
+    private static final int SEL_JOYSTICK = -2;
+    private Joystick joystick;
+
+    /** O editor tambem move/redimensiona o joystick (tudo numa tela so'). */
+    public void definirJoystick(Joystick j) {
+        joystick = j;
+        if (j != null) j.setAoTocarEditando(() -> {
+            if (!editando) return;
+            selecionado = SEL_JOYSTICK;
+            atualizarPainel();
+        });
+    }
     private Table painelEdicao;
     private Runnable aoSairEdicao;
 
@@ -182,6 +195,7 @@ public final class HotbarUI {
         aoSairEdicao = aoSair;
         editando = true;
         selecionado = -1;
+        if (joystick != null) joystick.setEditando(true);
         if (painelEdicao == null) {
             painelEdicao = new Table();
             painelEdicao.setFillParent(true);
@@ -199,9 +213,16 @@ public final class HotbarUI {
         editando = false;
         selecionado = -1;
         Controles.salvarLayoutMobile(layout);
+        if (joystick != null) { joystick.setEditando(false); joystick.setSelecionado(false); }
         if (painelEdicao != null) painelEdicao.setVisible(false);
         atualizar();
         if (aoSairEdicao != null) aoSairEdicao.run();
+    }
+
+    private void mudarTamanhoJoystick(float delta) {
+        Controles.definirJoystickEscala(Controles.joystickEscala() + delta);
+        if (joystick != null) joystick.aplicarConfig();
+        atualizarPainel();
     }
 
     private void layoutMudou(int selecionar) {
@@ -242,13 +263,24 @@ public final class HotbarUI {
         })).width(110);
         linha1.add(botaoPainel("Reset", "cinza-popup", () -> {
             layout = Controles.layoutPadrao();
+            Controles.restaurarJoystick();
+            if (joystick != null) joystick.aplicarConfig();
             layoutMudou(-1);
         })).width(100).padLeft(16);
         linha1.add(botaoPainel("Done", "verde-popup", this::sairEdicao)).width(100);
         caixa.add(linha1).row();
 
-        if (selecionado < 0) {
-            caixa.add(new Label("Tap a button to edit it, drag to move it", skin, "opcoes-label")).padTop(4).row();
+        if (joystick != null) joystick.setSelecionado(selecionado == SEL_JOYSTICK);
+        if (selecionado == SEL_JOYSTICK) {
+            Table linha2 = new Table();
+            linha2.defaults().height(44).pad(3);
+            linha2.add(new Label("Joystick size", skin, "opcoes-label")).padRight(8);
+            linha2.add(botaoPainel("-", "vermelho-popup", () -> mudarTamanhoJoystick(-0.1f))).width(48);
+            linha2.add(new Label(Math.round(Controles.joystickEscala() * 100f) + "%", skin, "opcoes-label")).width(64);
+            linha2.add(botaoPainel("+", "verde-popup", () -> mudarTamanhoJoystick(0.1f))).width(48);
+            caixa.add(linha2).row();
+        } else if (selecionado < 0) {
+            caixa.add(new Label("Tap a button or the joystick to edit it, drag to move it", skin, "opcoes-label")).padTop(4).row();
         } else {
             final int i = selecionado;
             final Controles.BotaoMobile c = layout.get(i);
