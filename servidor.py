@@ -1331,6 +1331,7 @@ def _mob_atacar(mob_id, m, target_sid, now):
                                  'attacker_mob_id': mob_id}, target_player.get('room'))
     if hp_atual <= 0:
         target_player['is_dead'] = True
+        sair_da_batalha(target_sid, target_player)
         emit_area('player_status_updated', {"name": target_name, "is_dead": True}, target_player.get('room'), skip_sid=target_sid)
         # Aviso "X has been killed by <mob>" no chat de quem está perto (o
         # próprio morto incluso). O client pega o nome exibido do mob pelo id.
@@ -4524,12 +4525,14 @@ def handle_get_friends_list(data):
         if conn: db_pool.putconn(conn)
 
 # --- BACKGROUND TASKS ---
-REGEN_BASE = 5.0       
-REGEN_POR_5_LEVELS = 5.0  
+# Regen a cada 5s: 1 ponto por REGEN_POR_PONTOS de vida/mana MÁXIMA (mínimo
+# 1). Assim quem tem mais HP (knight) recupera mais HP e quem tem mais mana
+# (mage) mais mana - antes era igual pra todo mundo (só pelo level) e o mage,
+# com pouco HP, recuperava proporcionalmente demais e tankava muito.
+REGEN_POR_PONTOS = 50.0
 
-def get_regen_amount(level):
-    lvl = int(level or 1)
-    return REGEN_BASE + REGEN_POR_5_LEVELS * (lvl // 5)
+def get_regen_amount(maximo):
+    return max(1.0, math.floor(float(maximo) / REGEN_POR_PONTOS))
 
 # =========================================================================
 # FOME (Fullness) e BATTLE
@@ -4596,7 +4599,7 @@ BATTLE_SEG = 30.0
 BATTLE_PARADO_SEG = 3.0  # > ATAQUE_COOLDOWN_SEG (o auto-ataque do player renova a cada ~2.4s)
 
 def marcar_batalha(sid, p, now=None):
-    if p is None: return
+    if p is None or p.get('is_dead'): return
     now = time.time() if now is None else now
     p['battle_until'] = now + BATTLE_SEG
     # Avisa só quando muda: entrou em battle, ou voltou a lutar no meio da
@@ -4607,6 +4610,18 @@ def marcar_batalha(sid, p, now=None):
     p['_battle_contando'] = False
     if avisar and not p.get('corpo_ausente'):
         socketio.emit('battle_state', {'in_battle': True, 'counting': False, 'seconds': BATTLE_SEG}, room=sid)
+
+def sair_da_batalha(sid, p):
+    # Morreu: o battle acaba na hora (o corpo de quem deslogou sai do jogo).
+    if p is None: return
+    estava = p.get('em_batalha')
+    p['em_batalha'] = False
+    p['_battle_contando'] = False
+    p['battle_until'] = 0
+    if p.get('corpo_ausente'):
+        _remover_corpo_ausente(sid, p)
+    elif estava:
+        socketio.emit('battle_state', {'in_battle': False}, room=sid)
 
 def _remover_corpo_ausente(sid, p):
     # Battle acabou pro corpo de quem já desconectou: agora sai de verdade.
@@ -4667,11 +4682,10 @@ def regen_loop():
 
                 # Com fome: sem regen de HP/MP.
                 if esta_com_fome(p): continue
-                regen = get_regen_amount(p.get('level', 1))
                 curou = False
 
-                if current_hp < max_hp: current_hp = min(max_hp, current_hp + regen); p['current_hp'] = current_hp; curou = True
-                if current_mp < max_mp: current_mp = min(max_mp, current_mp + regen); p['current_mp'] = current_mp; curou = True
+                if current_hp < max_hp: current_hp = min(max_hp, current_hp + get_regen_amount(max_hp)); p['current_hp'] = current_hp; curou = True
+                if current_mp < max_mp: current_mp = min(max_mp, current_mp + get_regen_amount(max_mp)); p['current_mp'] = current_mp; curou = True
 
                 if curou:
                     socketio.emit('sync_vitals', {'current_hp': current_hp, 'current_mp': current_mp,
