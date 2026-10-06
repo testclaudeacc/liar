@@ -216,7 +216,9 @@ public final class HudVitais {
         internoDica.setBackground(cor(COR_MUNICAO));
         internoDica.add(textoDica).width(px(MOBILE ? 260 : 230)).pad(px(6));
         dica.setBackground(cor(Color.BLACK));
-        dica.pad(px(1));
+        // Borda em pixels de tela INTEIROS (px(1) no celular dava 1.7px e a
+        // borda sumia de um lado).
+        dica.pad(Math.max(1, Math.round(FATOR)) / escala);
         dica.add(internoDica);
         dica.setVisible(false);
         dica.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
@@ -338,12 +340,18 @@ public final class HudVitais {
         Stage stage = icone.getStage();
         float x = p.x;
         if (stage != null) x = Math.max(px(4), Math.min(x, stage.getWidth() - dica.getWidth() - px(4)));
-        dica.setPosition(x, p.y - dica.getHeight() - px(4));
+        // Posicao e tamanho encaixados na grade de pixels da tela: em fracao de
+        // pixel a borda da esquerda e a de baixo saiam cortadas.
+        dica.setSize(pixelInteiro(dica.getWidth()), pixelInteiro(dica.getHeight()));
+        dica.setPosition(pixelInteiro(x), pixelInteiro(p.y - dica.getHeight() - px(4)));
         dica.setVisible(true);
         dica.toFront();
     }
 
     private void esconderDica() { dica.setVisible(false); }
+
+    /** Arredonda (unidades do stage) pro pixel de tela mais proximo. */
+    private float pixelInteiro(float v) { return Math.round(v * escala) / escala; }
 
     private void reorganizarStatus() {
         esconderDica();
