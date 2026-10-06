@@ -2895,14 +2895,9 @@ public final class BookMenuUI {
         if (aoMudarAtalhos != null) aoMudarAtalhos.run();
     }
 
-    /** No celular, slot de botao FIXO so' aceita comida/pocao (Controles). */
+    /** Item que pode ir nesse slot (igual no PC e no celular). */
     private boolean podeIrNoSlot(String caminho, int slot) {
-        if (!usavelNoAtalho(caminho)) return false;
-        boolean mobile = Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
-            || Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
-        if (!mobile || !Controles.slotFixoMobile(slot)) return true;
-        EquipStats dados = ITEM_STATS.get(caminho);
-        return dados != null && dados.fullness > 0; // comida (pocao entra aqui quando existir)
+        return usavelNoAtalho(caminho);
     }
 
     /** Item que pode ir num slot da barra (por enquanto: comida). */
@@ -2951,7 +2946,6 @@ public final class BookMenuUI {
         spellsPage.top().left();
         int visiveis = slotsVisiveis();
         if (slotAtalhoEscolhendo >= visiveis) slotAtalhoEscolhendo = -1;
-        if (ehMobile()) escolhendoMagias = false; // botoes do celular: so' comida/pocao
 
         // ---- Esquerda: slots ----
         Table esquerda = painelSpells();
@@ -2984,12 +2978,10 @@ public final class BookMenuUI {
                 escolhendoMagias = false;
                 construirPaginaSpells();
             })).size(110, 34).padRight(6);
-            if (!ehMobile()) {
-                abas.add(botaoSpells("Spells", escolhendoMagias ? "verde" : "default", () -> {
-                    escolhendoMagias = true;
-                    construirPaginaSpells();
-                })).size(110, 34);
-            }
+            abas.add(botaoSpells("Spells", escolhendoMagias ? "verde" : "default", () -> {
+                escolhendoMagias = true;
+                construirPaginaSpells();
+            })).size(110, 34);
             direita.add(abas).left().padBottom(10).row();
 
             Table conteudo = new Table();

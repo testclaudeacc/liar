@@ -264,6 +264,20 @@ public class WorldScreen extends ScreenAdapter {
     private static final float ESCALA_DESTAQUE = 1.5f; // em relacao ao nome
     private final List<TextoFlutuante> textosFlutuantes = new ArrayList<>();
 
+    /** Textinho de acao (servidor.py::texto_de_acao, ex: "Om Noom"): parado em
+     * cima da cabeca do player (acompanha ele andando), um pouco menor que o
+     * nome, e some sozinho - sem a animacao de subir dos avisos de level. */
+    private static class TextoAcao {
+        final Jogador alvo;
+        final String texto;
+        final Color cor;
+        float tempo = 0f;
+        TextoAcao(Jogador alvo, String texto, Color cor) { this.alvo = alvo; this.texto = texto; this.cor = cor; }
+    }
+    private final List<TextoAcao> textosAcao = new ArrayList<>();
+    private static final float DURACAO_TEXTO_ACAO = 1.6f, SUMINDO_TEXTO_ACAO = 0.4f;
+    private static final float ESCALA_TEXTO_ACAO = 0.85f; // em relacao ao nome
+
     /** Fala do chat Local em cima da cabeca: "Nome: mensagem" (nome na cor da
      * classe, mensagem em branco). Uma por jogador - a nova substitui a velha. */
     private static class Fala {
@@ -2437,7 +2451,7 @@ public class WorldScreen extends ScreenAdapter {
             Color cor;
             try { cor = Color.valueOf(data.getString("color", "ff9a1f")); }
             catch (RuntimeException e) { cor = new Color(1f, 0.6f, 0.12f, 1f); }
-            textosFlutuantes.add(new TextoFlutuante(j, data.getString("text", ""), cor));
+            textosAcao.add(new TextoAcao(j, data.getString("text", ""), cor));
         });
         socket.on("player_skill_leveled_up", (nomeEvt, data) -> {
             if (data == null) return;
@@ -2852,6 +2866,11 @@ public class WorldScreen extends ScreenAdapter {
             c.restante -= delta;
             if (c.restante <= 0f) cadaveres.remove(i);
         }
+        for (int i = textosAcao.size() - 1; i >= 0; i--) {
+            TextoAcao t = textosAcao.get(i);
+            t.tempo += delta;
+            if (t.tempo >= DURACAO_TEXTO_ACAO) textosAcao.remove(i);
+        }
         java.util.Iterator<Fala> itFalas = falas.values().iterator();
         while (itFalas.hasNext()) {
             Fala f = itFalas.next();
@@ -3040,6 +3059,7 @@ public class WorldScreen extends ScreenAdapter {
         for (MobVisual mob : mobs.values()) desenharNomeMob(mob);
         desenharNumerosDano();
         desenharTextosFlutuantes();
+        desenharTextosAcao();
         desenharLootsFlutuantes();
         desenharBalaoInteracaoNPC(npcMaisProximoParaConversar());
         TextureRegion notifAtual = notificacaoAtual();
@@ -4302,6 +4322,28 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     /** "Level 8!" / "Magic 19!" subindo devagar em cima da cabeca e sumindo no fim. */
+    private void desenharTextosAcao() {
+        if (textosAcao.isEmpty()) return;
+        Color anterior = new Color(font.getColor());
+        font.getData().setScale(NOME_ESCALA_BASE * ESCALA_TEXTO_ACAO);
+        Map<Jogador, Integer> pilha = new HashMap<>();
+        for (TextoAcao t : textosAcao) {
+            int ordem = pilha.merge(t.alvo, 1, Integer::sum) - 1;
+            float alfa = Math.min(1f, (DURACAO_TEXTO_ACAO - t.tempo) / SUMINDO_TEXTO_ACAO);
+            float altura = quadroAtual(animacaoBase, t.alvo).getRegionHeight() * ESCALA_SPRITE;
+            float ancoraX = Math.round(t.alvo.x / camera.zoom) * camera.zoom;
+            float ancoraY = Math.round(t.alvo.y / camera.zoom) * camera.zoom;
+            layout.setText(font, t.texto);
+            float x = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
+            // Logo acima do nome (que fica em ancoraY + altura + 7).
+            float y = Math.round((ancoraY + altura + 15f + ordem * 7f) / camera.zoom) * camera.zoom;
+            font.setColor(t.cor.r, t.cor.g, t.cor.b, Math.max(0f, alfa));
+            font.draw(batch, t.texto, x, y);
+        }
+        font.getData().setScale(NOME_ESCALA_BASE);
+        font.setColor(anterior);
+    }
+
     private void desenharTextosFlutuantes() {
         Color anterior = new Color(font.getColor());
         // Varios ao mesmo tempo no mesmo player (level + skill) empilham.
