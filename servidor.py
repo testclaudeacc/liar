@@ -4621,13 +4621,15 @@ def _comer(sid, p, inst):
     except (TypeError, ValueError): enche = 0
     if enche <= 0: return
     atual = obter_fullness(p)
-    if atual + enche > FULLNESS_MAX:
+    # So' recusa com a barra cheia; perto de cheia come e enche so' o que
+    # falta (ex: 49/50 + cookie de 5 = 50), sem nunca passar de FULLNESS_MAX.
+    if atual >= FULLNESS_MAX:
         emit('food_result', {'ok': False, 'reason': 'full'}, room=sid)
         return
     qty = int(inst.get('qty', 1))
     if qty > 1: inst['qty'] = qty - 1
     else: inventario.remove(inst)
-    _definir_fullness(p, atual + enche)
+    _definir_fullness(p, min(FULLNESS_MAX, atual + enche))
     p['_fullness_acc'] = 0.0  # acabou de comer: o proximo "tique" de fome recomeça
     _queue_save(p)
     emit('food_result', {'ok': True, 'fullness': obter_fullness(p)}, room=sid)
