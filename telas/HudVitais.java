@@ -220,6 +220,11 @@ public final class HudVitais {
         // borda sumia de um lado).
         dica.pad(Math.max(1, Math.round(FATOR)) / escala);
         dica.add(internoDica);
+        // Sem arredondar pra unidade inteira do STAGE (que nao e' pixel de
+        // tela): isso empurrava o fundo de dentro meio pixel pra esquerda e
+        // ele cobria a borda da esquerda. A posicao ja' vai em pixel inteiro.
+        dica.setRound(false);
+        internoDica.setRound(false);
         dica.setVisible(false);
         dica.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
         stage.addActor(dica);
