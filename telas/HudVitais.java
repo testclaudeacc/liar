@@ -87,7 +87,20 @@ public final class HudVitais {
     private final Table iconesStatus = new Table();
     private Table quadradoFome, quadradoBatalha;
     private boolean comFome = false, emBatalha = false;
-    private final Table dica = new Table();
+    // Tempo ate' sair do battle: o servidor manda 30s a cada golpe/foco
+    // (no maximo 1x/s) e aqui vai descendo sozinho entre um aviso e outro.
+    private float batalhaRestante = 0f;
+    private Table iconeDica; // icone cujo popup esta aberto
+    private final Table dica = new Table() {
+        @Override public void act(float delta) {
+            super.act(delta);
+            if (batalhaRestante > 0f) batalhaRestante = Math.max(0f, batalhaRestante - delta);
+            if (isVisible() && iconeDica == quadradoBatalha) {
+                String texto = textoBatalha();
+                if (!texto.contentEquals(textoDica.getText())) textoDica.setText(texto);
+            }
+        }
+    };
     private Label textoDica;
 
     private static final class Barra {
@@ -157,8 +170,7 @@ public final class HudVitais {
 
         quadradoFome = quadradoStatus(atlas, "sheet/r18_c10", COR_FOME,
             "Hungry\nYou are 10% slower, deal 10% less damage and don't regenerate HP/MP. Eat something to recover.");
-        quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA,
-            "In battle\nIf you log out now, your body stays in the game until the battle ends (30s without fighting).");
+        quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA, null);
         Table linhaTopo = new Table();
         linhaTopo.top().left();
         linhaTopo.add(painel).top().left();
@@ -339,7 +351,8 @@ public final class HudVitais {
 
     /** Popup da explicacao, logo abaixo do icone (por cima de tudo). */
     private void mostrarDica(Table icone, String texto) {
-        textoDica.setText(texto);
+        iconeDica = icone;
+        textoDica.setText(texto != null ? texto : textoBatalha());
         dica.pack();
         com.badlogic.gdx.math.Vector2 p = icone.localToStageCoordinates(new com.badlogic.gdx.math.Vector2(0, 0));
         Stage stage = icone.getStage();
@@ -353,7 +366,12 @@ public final class HudVitais {
         dica.toFront();
     }
 
-    private void esconderDica() { dica.setVisible(false); }
+    private void esconderDica() { dica.setVisible(false); iconeDica = null; }
+
+    private String textoBatalha() {
+        return "In battle (" + (int) Math.ceil(batalhaRestante) + "s)\n"
+            + "If you log out now, your body stays in the game until the battle ends.";
+    }
 
     /** Arredonda (unidades do stage) pro pixel de tela mais proximo. */
     private float pixelInteiro(float v) { return Math.round(v * escala) / escala; }
@@ -372,7 +390,13 @@ public final class HudVitais {
         reorganizarStatus();
     }
 
-    /** Icone de battle (um mob mirou o player ou ele bateu num mob). */
+    /** Icone de battle (um mob mirou o player ou ele bateu num mob);
+     * segundos = quanto falta pro battle acabar (contagem regressiva). */
+    public void definirBatalha(boolean emBatalha, float segundos) {
+        batalhaRestante = emBatalha ? segundos : 0f;
+        definirBatalha(emBatalha);
+    }
+
     public void definirBatalha(boolean emBatalha) {
         if (this.emBatalha == emBatalha) return;
         this.emBatalha = emBatalha;

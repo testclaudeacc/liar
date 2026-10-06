@@ -4594,10 +4594,14 @@ def marcar_batalha(sid, p, now=None):
     if p is None: return
     now = time.time() if now is None else now
     p['battle_until'] = now + BATTLE_SEG
-    if not p.get('em_batalha'):
-        p['em_batalha'] = True
-        if not p.get('corpo_ausente'):
-            socketio.emit('battle_state', {'in_battle': True}, room=sid)
+    novo = not p.get('em_batalha')
+    p['em_batalha'] = True
+    # Avisa ao entrar e, enquanto continua lutando, no máximo 1x/s (o client
+    # mostra a contagem regressiva no popup do ícone e reinicia em 30 a cada aviso).
+    if p.get('corpo_ausente'): return
+    if novo or now - p.get('_battle_aviso', 0) >= 1.0:
+        p['_battle_aviso'] = now
+        socketio.emit('battle_state', {'in_battle': True, 'seconds': BATTLE_SEG}, room=sid)
 
 def _remover_corpo_ausente(sid, p):
     # Battle acabou pro corpo de quem já desconectou: agora sai de verdade.
