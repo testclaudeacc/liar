@@ -104,6 +104,7 @@ public class WorldScreen extends ScreenAdapter {
 
     private final float spawnX, spawnY;
     private final Jogador local;
+    private HotbarUI hotbar;
     private final Map<String, Jogador> remotos = new HashMap<>();
     // Players online mas fora do raio da tela (o servidor so' manda movimento
     // de quem esta perto, ver servidor.py::_flush_visao). Ficam guardados aqui
@@ -817,6 +818,11 @@ public class WorldScreen extends ScreenAdapter {
 
             @Override
             public boolean keyDown(int keycode) {
+                // 1-8: atalhos da barra (1-4 magias, 5-8 itens).
+                if (keycode >= Input.Keys.NUM_1 && keycode <= Input.Keys.NUM_8) {
+                    if (chat.estaDigitando() || localMorto || settingsAberta() || bookMenu.isVisible()) return false;
+                    return hotbar.usarTecla(keycode - Input.Keys.NUM_0);
+                }
                 if (keycode == Input.Keys.C) {
                     mostrarColisao = !mostrarColisao;
                     return true;
@@ -959,6 +965,15 @@ public class WorldScreen extends ScreenAdapter {
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
+        // Barra de atalhos (4 magias + 4 itens) - o conteudo vem da aba Spells.
+        hotbar = new HotbarUI(uiStage, skin, bookMenu, (tipo, indice) -> {
+            if (localMorto || !socket.isConnected()) return;
+            socket.emitRaw("use_hotbar", GameSocket.obj(jw -> {
+                jw.set("kind", tipo);
+                jw.set("index", indice);
+            }));
+        });
+        bookMenu.definirAoMudarAtalhos(hotbar::atualizar);
         bookMenu.definirNomeLocal(local.nome);
         painelJogador = new PainelJogadorUI(uiStage, skin, atlas, new PainelJogadorUI.Ouvinte() {
             @Override public void alternarAmigo(String nome) {
@@ -1223,6 +1238,7 @@ public class WorldScreen extends ScreenAdapter {
     private void atualizarVisibilidadeBotoesTopo() {
         boolean bookMenuAberto = bookMenu.isVisible();
         boolean algumAberto = chat.isVisivel() || settingsAberta() || bookMenuAberto;
+        hotbar.setVisivel(!algumAberto && !localMorto);
         botaoTopoChat.setVisible(!algumAberto);
         botaoTopoMenu.setVisible(!algumAberto);
         botaoTopoConfig.setVisible(!algumAberto);
@@ -1717,6 +1733,7 @@ public class WorldScreen extends ScreenAdapter {
                 hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
                 bookMenu.carregarItemDb(data.get("item_db"));
                 bookMenu.atualizarInventario(data.get("inventory"));
+                if (data.has("hotbar")) bookMenu.definirHotbar(data.get("hotbar"));
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
                 bookMenu.atualizarEquipados(data.get("equipped_items"));
                 atualizarMunicao(data.get("equipped_items"));
@@ -2271,7 +2288,12 @@ public class WorldScreen extends ScreenAdapter {
         });
         socket.on("food_result", (nomeEvt, data) -> {
             if (data == null || data.getBoolean("ok", false)) return;
-            if ("full".equals(data.getString("reason", ""))) hud.notificar("You are full.", COR_NOTIF_AVISO, null);
+            String motivo = data.getString("reason", "");
+            if ("full".equals(motivo)) hud.notificar("You are full.", COR_NOTIF_AVISO, null);
+            else if ("none".equals(motivo)) hud.notificar("You don't have this item.", COR_NOTIF_AVISO, null);
+        });
+        socket.on("hotbar_synced", (nomeEvt, data) -> {
+            if (data != null) bookMenu.definirHotbar(data.get("hotbar"));
         });
         socket.on("inventory_synced", (nomeEvt, data) -> {
             if (data == null) return;

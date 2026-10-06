@@ -51,6 +51,7 @@ public final class BookMenuUI {
     private final Table bagPage = new Table();
     private final Table equipPage = new Table();
     private final Table skillsPage = new Table();
+    private final Table spellsPage = new Table();
     private final Table vanityPage = new Table();
     private final Table friendsPage = new Table();
     private final Table inventoryGrid = new Table();
@@ -2824,6 +2825,7 @@ public final class BookMenuUI {
         selectedEquipCandidate = -1;
         atualizarGradeEquip();
         atualizarDetalhesEquip();
+        aoMudarBagOuAtalhos();
     }
 
     public void adicionarItens(JsonValue dados) {
@@ -2836,6 +2838,157 @@ public final class BookMenuUI {
         }
         atualizarGrade();
         atualizarGradeEquip();
+        aoMudarBagOuAtalhos();
+    }
+
+    // ===================== SPELLS (atalhos) =====================
+    // 4 slots de magia + 4 de item (comida/pocao). Clicar num slot abre a
+    // lista do que pode ir nele; escolher manda pro servidor (set_hotbar),
+    // que salva e devolve (hotbar_synced). A barra da gameplay e' a HotbarUI.
+
+    public static final int SLOTS_ATALHO = 4;
+    private final String[] atalhoMagias = {"", "", "", ""};
+    private final String[] atalhoItens = {"", "", "", ""};
+    private int slotAtalhoEscolhendo = -1; // slot de item com a lista aberta
+    private Runnable aoMudarAtalhos;
+
+    public void definirAoMudarAtalhos(Runnable r) { aoMudarAtalhos = r; }
+    public String[] hotbarMagias() { return atalhoMagias; }
+    public String[] hotbarItens() { return atalhoItens; }
+
+    /** Quantidade total de um item na bag (somando as pilhas). */
+    public int quantidadeNaBag(String caminho) {
+        int total = 0;
+        for (InventoryItem it : inventoryItems) if (it.itemPath.equals(caminho)) total += it.quantity;
+        return total;
+    }
+
+    /** {"spells": [4], "items": [4]} do servidor (sync_local_player / hotbar_synced). */
+    public void definirHotbar(JsonValue hb) {
+        if (hb == null || !hb.isObject()) return;
+        lerAtalhos(hb.get("spells"), atalhoMagias);
+        lerAtalhos(hb.get("items"), atalhoItens);
+        aoMudarBagOuAtalhos();
+    }
+
+    private static void lerAtalhos(JsonValue lista, String[] destino) {
+        for (int i = 0; i < destino.length; i++) {
+            JsonValue v = lista != null && lista.isArray() ? lista.get(i) : null;
+            destino[i] = v != null && v.isString() ? v.asString() : "";
+        }
+    }
+
+    private void aoMudarBagOuAtalhos() {
+        if ("Spells".equals(secaoAtual)) construirPaginaSpells();
+        if (aoMudarAtalhos != null) aoMudarAtalhos.run();
+    }
+
+    /** Item que pode ir num slot de item da barra (por enquanto: comida). */
+    private boolean usavelNoAtalho(String caminho) {
+        EquipStats dados = ITEM_STATS.get(caminho);
+        return dados != null && dados.fullness > 0;
+    }
+
+    private void construirPaginaSpells() {
+        spellsPage.clearChildren();
+        spellsPage.top().left();
+
+        spellsPage.add(linhaStat("Spells", Color.valueOf("b58ae0"))).left().padBottom(4).row();
+        Table linhaMagias = new Table();
+        linhaMagias.left();
+        for (int i = 0; i < SLOTS_ATALHO; i++) linhaMagias.add(slotAtalho(null, false, null)).size(TAM_SLOT_ATALHO).padRight(6);
+        spellsPage.add(linhaMagias).left().row();
+        spellsPage.add(linhaStat("You don't know any spells yet.", Color.GRAY)).left().padTop(2).padBottom(14).row();
+
+        spellsPage.add(linhaStat("Food & Potions", COR_FOME)).left().padBottom(4).row();
+        Table linhaItens = new Table();
+        linhaItens.left();
+        for (int i = 0; i < SLOTS_ATALHO; i++) {
+            final int indice = i;
+            linhaItens.add(slotAtalho(atalhoItens[i], i == slotAtalhoEscolhendo, () -> {
+                slotAtalhoEscolhendo = slotAtalhoEscolhendo == indice ? -1 : indice;
+                construirPaginaSpells();
+            })).size(TAM_SLOT_ATALHO).padRight(6);
+        }
+        spellsPage.add(linhaItens).left().row();
+
+        if (slotAtalhoEscolhendo < 0) {
+            spellsPage.add(linhaStat("Click a slot to choose what goes in it.", Color.GRAY)).left().padTop(8).row();
+        } else {
+            // Lista do que pode ir no slot: os itens usaveis da bag (sem repetir) + Clear.
+            spellsPage.add(linhaStat("Slot " + (slotAtalhoEscolhendo + 1) + ": choose an item", Color.LIGHT_GRAY))
+                .left().padTop(12).padBottom(4).row();
+            Table opcoes = new Table();
+            opcoes.left();
+            java.util.LinkedHashSet<String> caminhos = new java.util.LinkedHashSet<>();
+            for (InventoryItem it : inventoryItems) if (usavelNoAtalho(it.itemPath)) caminhos.add(it.itemPath);
+            final int slot = slotAtalhoEscolhendo;
+            for (String caminho : caminhos) {
+                opcoes.add(slotAtalho(caminho, caminho.equals(atalhoItens[slot]), () -> escolherAtalho(slot, caminho)))
+                    .size(TAM_SLOT_ATALHO).padRight(6);
+            }
+            if (caminhos.isEmpty()) opcoes.add(linhaStat("No food or potions in your bag.", Color.GRAY)).padRight(10);
+            TextButton.TextButtonStyle estiloLimpar = new TextButton.TextButtonStyle(
+                skin.get("default", TextButton.TextButtonStyle.class));
+            estiloLimpar.font = skin.getFont("botao-pequeno-font");
+            TextButton limpar = new TextButton("Clear", estiloLimpar);
+            limpar.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    escolherAtalho(slot, "");
+                }
+            });
+            opcoes.add(limpar).size(90, 34).padLeft(4);
+            spellsPage.add(opcoes).left().row();
+        }
+        spellsPage.add().grow();
+    }
+
+    private void escolherAtalho(int slot, String caminho) {
+        slotAtalhoEscolhendo = -1;
+        if (socket.isConnected()) {
+            socket.emitRaw("set_hotbar", GameSocket.obj(w -> {
+                w.set("kind", "items");
+                w.set("index", slot);
+                w.set("value", caminho);
+            }));
+        }
+        construirPaginaSpells();
+    }
+
+    private static final float TAM_SLOT_ATALHO = 52f;
+
+    /** Slot quadrado com o icone do item e a quantidade (caminho null/"" = vazio). */
+    private Button slotAtalho(String caminho, boolean selecionado, Runnable aoClicar) {
+        Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estilo.up = skinDrawable(selecionado ? "bag-slot-selected" : "bag-slot");
+        estilo.over = aoClicar != null && !selecionado ? skinDrawable("bag-slot-hover") : estilo.up;
+        Button botao = new Button(estilo);
+        if (caminho != null && !caminho.isEmpty()) {
+            Stack pilha = new Stack();
+            Table centro = new Table();
+            TextureAtlas.AtlasRegion icone = iconeDoItem(caminho);
+            if (icone != null) {
+                Image img = new Image(icone);
+                img.setScaling(Scaling.fit);
+                centro.add(img).size(TAM_SLOT_ATALHO * 0.68f);
+            }
+            pilha.add(centro);
+            Label qtd = new Label(String.valueOf(quantidadeNaBag(caminho)), skin, "hud");
+            qtd.setFontScale(0.6f);
+            Table canto = new Table();
+            canto.bottom().right();
+            canto.add(qtd).pad(0, 0, 1, 4);
+            pilha.add(canto);
+            botao.add(pilha).grow();
+        }
+        if (aoClicar != null) {
+            botao.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
+            });
+        } else {
+            botao.setDisabled(true);
+        }
+        return botao;
     }
 
     public void atualizarMoedas(long total) {
@@ -2904,7 +3057,9 @@ public final class BookMenuUI {
                 tituloSecao.setAlignment("Friends".equals(secao) || "Party".equals(secao) ? Align.center : Align.left);
                 mainWindow.add(tituloSecao).growX().left().padBottom(9).row();
             }
+            if ("Spells".equals(secao)) { slotAtalhoEscolhendo = -1; construirPaginaSpells(); }
             Table pagina = "Equip".equals(secao) ? equipPage : "Skills".equals(secao) ? skillsPage
+                : "Spells".equals(secao) ? spellsPage
                 : "Vanity".equals(secao) ? vanityPage : "Friends".equals(secao) ? friendsPage
                 : "Party".equals(secao) ? partyPage : bagPage;
             if ("Friends".equals(secao) && socket.isConnected()) socket.emitRaw("get_friends_list", "{}");

@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.9"
+SERVER_VERSION = "v0.10"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -1579,6 +1579,7 @@ def _queue_save(p, position_ack_sid=None):
         'skills': p.get('skills', {}).copy() if isinstance(p.get('skills'), dict) else {},
         'skins': p.get('skins', {}).copy() if isinstance(p.get('skins'), dict) else {},
         'npc_dialogue_state': p.get('npc_dialogue_state', {}).copy() if isinstance(p.get('npc_dialogue_state'), dict) else {},
+        'hotbar': normalizar_hotbar(p.get('hotbar')),
         'time_played': tempo_jogado,
         'position_ack_sid': position_ack_sid
     }
@@ -1601,7 +1602,7 @@ def db_writer_worker():
                 SET pos_x = %s, pos_y = %s, direction = %s, floor = %s, level = %s,
                     exp = %s, kills = %s, current_hp = %s, current_mp = %s,
                     inventory = %s, equipped_items = %s, skills = %s, skins = %s, currency = %s,
-                    time_played = %s, npc_dialogue_state = %s
+                    time_played = %s, npc_dialogue_state = %s, hotbar = %s
                 WHERE user_id = %s AND name = %s
             """
             params = (
@@ -1612,6 +1613,7 @@ def db_writer_worker():
                 json.dumps(player_data.get('skills')), json.dumps(player_data.get('skins')),
                 int(player_data.get('currency', 0)), player_data.get('time_played', 0),
                 json.dumps(player_data.get('npc_dialogue_state', {})),
+                json.dumps(normalizar_hotbar(player_data.get('hotbar'))),
                 player_data.get('user_id'), player_data.get('name')
             )
             c.execute(query, params)
@@ -1660,6 +1662,8 @@ def init_db():
         # {"kharon": true}) - pra nao repetir a fala de 1a vez (nem a
         # "quest"/pedido do NPC) toda vez que ele conversa de novo.
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS npc_dialogue_state TEXT DEFAULT '{}'")
+        # Barra de atalhos: {"spells": [4], "items": [4]} (ver normalizar_hotbar).
+        c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS hotbar TEXT DEFAULT '{}'")
         c.execute('''CREATE TABLE IF NOT EXISTS friendships (
                         id SERIAL PRIMARY KEY,
                         owner_name TEXT NOT NULL,
@@ -2076,7 +2080,7 @@ def handle_join_game(data):
         # So' guarda o que o servidor mesmo vai usar (o resto do payload do
         # client nao entra no estado do player).
         data = {'user_id': user_id, 'name': p_name, 'skins': data.get('skins')}
-        c.execute("SELECT class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, kills, current_hp, current_mp, currency, time_played, npc_dialogue_state FROM characters WHERE user_id = %s AND name = %s", (user_id, p_name))
+        c.execute("SELECT class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, kills, current_hp, current_mp, currency, time_played, npc_dialogue_state, hotbar FROM characters WHERE user_id = %s AND name = %s", (user_id, p_name))
         row = c.fetchone()
 
         if not row: return
@@ -2100,6 +2104,11 @@ def handle_join_game(data):
         # decorrido dessa sessão em cima disso, sem gravar nada extra sozinho.
         data['time_played_base'] = row[15] if row[15] is not None else 0
         data['npc_dialogue_state'] = json.loads(row[16]) if row[16] else {}
+        try: hb_salva = json.loads(row[17]) if row[17] else {}
+        except (TypeError, ValueError): hb_salva = {}
+        # Nunca configurou a barra: começa com o cookie no 1o slot de item.
+        if not hb_salva: hb_salva = {'items': [COOKIE, '', '', '']}
+        data['hotbar'] = normalizar_hotbar(hb_salva)
         data['session_start'] = time.time()
         
         # Uma sessao por conta: quem ja estava logado nela e' derrubado (o
@@ -2129,7 +2138,7 @@ def handle_join_game(data):
                 if player.get('name') == p_name:
                     for chave in ('pos_x', 'pos_y', 'direction', 'floor', 'inventory', 'equipped_items',
                                   'skills', 'level', 'exp', 'kills', 'currency', 'npc_dialogue_state',
-                                  'battle_until'):
+                                  'battle_until', 'hotbar'):
                         if chave in player: data[chave] = player[chave]
                     # Voltou pro corpo (ou derrubou a outra sessão) no meio do
                     # battle: os mobs que miravam o sid antigo passam pro novo.
@@ -4568,25 +4577,89 @@ def handle_eat_food(data):
         sid = request.sid
         p = online_players.get(sid)
         if p is None or p.get('is_dead') or not isinstance(data, dict): return
-        inventario = p.get('inventory', [])
-        inst = encontrar_instancia(inventario, str(data.get('instance_id', '')))
-        if inst is None: return
-        try: enche = int(ITEM_DB.get(inst.get('item'), {}).get('fullness', 0))
-        except (TypeError, ValueError): enche = 0
-        if enche <= 0: return
-        atual = obter_fullness(p)
-        if atual + enche > FULLNESS_MAX:
-            emit('food_result', {'ok': False, 'reason': 'full'}, room=sid)
-            return
-        qty = int(inst.get('qty', 1))
-        if qty > 1: inst['qty'] = qty - 1
-        else: inventario.remove(inst)
-        _definir_fullness(p, atual + enche)
-        p['_fullness_acc'] = 0.0  # acabou de comer: o proximo "tique" de fome recomeça
+        inst = encontrar_instancia(p.get('inventory', []), str(data.get('instance_id', '')))
+        if inst is not None: _comer(sid, p, inst)
+    except Exception: traceback.print_exc()
+
+def _comer(sid, p, inst):
+    # Come 1 unidade da instância (botão Eat na bag ou atalho da hotbar).
+    inventario = p.get('inventory', [])
+    try: enche = int(ITEM_DB.get(inst.get('item'), {}).get('fullness', 0))
+    except (TypeError, ValueError): enche = 0
+    if enche <= 0: return
+    atual = obter_fullness(p)
+    if atual + enche > FULLNESS_MAX:
+        emit('food_result', {'ok': False, 'reason': 'full'}, room=sid)
+        return
+    qty = int(inst.get('qty', 1))
+    if qty > 1: inst['qty'] = qty - 1
+    else: inventario.remove(inst)
+    _definir_fullness(p, atual + enche)
+    p['_fullness_acc'] = 0.0  # acabou de comer: o proximo "tique" de fome recomeça
+    _queue_save(p)
+    emit('food_result', {'ok': True, 'fullness': obter_fullness(p)}, room=sid)
+    emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(inventario), 'equipped_items': p.get('equipped_items', {})}, room=sid)
+    emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+
+# ---- Barra de atalhos (hotbar) ----
+# 4 slots de magia + 4 de item (comida/poção). Cada slot guarda o CAMINHO do
+# item (não a instância): usar pega a 1a unidade daquele item na bag.
+HOTBAR_SLOTS = 4
+
+def item_usavel_no_atalho(item_path):
+    # Por enquanto só comida; poção entra aqui quando existir.
+    dados = ITEM_DB.get(item_path, {})
+    try: return int(dados.get('fullness', 0)) > 0
+    except (TypeError, ValueError): return False
+
+def normalizar_hotbar(hb):
+    hb = hb if isinstance(hb, dict) else {}
+    saida = {}
+    for tipo in ('spells', 'items'):
+        lista = hb.get(tipo) if isinstance(hb.get(tipo), list) else []
+        lista = [(v if isinstance(v, str) else '') for v in lista[:HOTBAR_SLOTS]]
+        lista += [''] * (HOTBAR_SLOTS - len(lista))
+        if tipo == 'items': lista = [v if item_usavel_no_atalho(v) else '' for v in lista]
+        else: lista = ['' for _ in lista]  # ainda não existem magias
+        saida[tipo] = lista
+    return saida
+
+@socketio.on('set_hotbar')
+def handle_set_hotbar(data):
+    try:
+        sid = request.sid
+        p = online_players.get(sid)
+        if p is None or not isinstance(data, dict): return
+        tipo = data.get('kind')
+        if tipo not in ('spells', 'items'): return
+        try: i = int(data.get('index', -1))
+        except (TypeError, ValueError): return
+        if not 0 <= i < HOTBAR_SLOTS: return
+        valor = data.get('value') if isinstance(data.get('value'), str) else ''
+        hb = normalizar_hotbar(p.get('hotbar'))
+        hb[tipo][i] = valor
+        p['hotbar'] = normalizar_hotbar(hb)  # descarta o que não pode ir ali
         _queue_save(p)
-        emit('food_result', {'ok': True, 'fullness': obter_fullness(p)}, room=sid)
-        emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(inventario), 'equipped_items': p.get('equipped_items', {})}, room=sid)
-        emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+        emit('hotbar_synced', {'hotbar': p['hotbar']}, room=sid)
+    except Exception: traceback.print_exc()
+
+@socketio.on('use_hotbar')
+def handle_use_hotbar(data):
+    try:
+        sid = request.sid
+        p = online_players.get(sid)
+        if p is None or p.get('is_dead') or not isinstance(data, dict): return
+        if data.get('kind') != 'items': return  # magias: ainda não existem
+        try: i = int(data.get('index', -1))
+        except (TypeError, ValueError): return
+        if not 0 <= i < HOTBAR_SLOTS: return
+        caminho = normalizar_hotbar(p.get('hotbar'))['items'][i]
+        if not caminho: return
+        inst = next((it for it in p.get('inventory', []) if it.get('item') == caminho), None)
+        if inst is None:
+            emit('food_result', {'ok': False, 'reason': 'none'}, room=sid)
+            return
+        _comer(sid, p, inst)
     except Exception: traceback.print_exc()
 
 # Battle: entra quando um mob mira o player (ou o player bate num mob) e sai
@@ -4812,7 +4885,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-06 battle lock 30"
+VERSAO_SERVIDOR = "2026-10-06 hotbar"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)
