@@ -166,9 +166,11 @@ public class Joystick {
     private Runnable aoTocarEditando;
     public void setAoTocarEditando(Runnable r) { aoTocarEditando = r; }
 
-    /** Destaque (laranja) quando esta selecionado no editor. */
+    /** Destaque (ciano) na base e no knob quando esta selecionado no editor. */
     public void setSelecionado(boolean sel) {
-        base.setColor(sel ? new com.badlogic.gdx.graphics.Color(1f, 0.75f, 0.4f, 1f) : com.badlogic.gdx.graphics.Color.WHITE);
+        com.badlogic.gdx.graphics.Color cor = sel ? HotbarUI.COR_EDICAO : com.badlogic.gdx.graphics.Color.WHITE;
+        base.setColor(cor);
+        knob.setColor(cor);
         if (!editando) base.getColor().a = IDLE_ALPHA;
     }
 

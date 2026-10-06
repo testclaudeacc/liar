@@ -1640,6 +1640,8 @@ public class WorldScreen extends ScreenAdapter {
         SelectBox<String> estiloMov = new SelectBox<>(skin, "zoom-select");
         estiloMov.setItems("8 directions", "4 directions");
         estiloMov.setSelectedIndex(Controles.oitoDirecoes() ? 0 : 1);
+        estiloMov.setAlignment(Align.center);
+        estiloMov.getList().setAlignment(Align.center);
         estiloMov.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 Controles.definirOitoDirecoes(estiloMov.getSelectedIndex() == 0);
@@ -1648,7 +1650,6 @@ public class WorldScreen extends ScreenAdapter {
         linhaMov.add(estiloMov).width(180).height(36);
         secao.add(linhaMov).left().padTop(10).row();
         if (!mobile) {
-            secao.add(new Label("Click a key, then press the new one (ESC cancels)", skin, "opcoes-label")).left().padTop(4).row();
             Table grade = new Table();
             int coluna = 0;
             for (java.util.Map.Entry<String, String> e : Controles.NOMES.entrySet()) {
@@ -1683,21 +1684,22 @@ public class WorldScreen extends ScreenAdapter {
                     String acao = acaoCapturando;
                     cancelarCaptura();
                     if (keycode == Input.Keys.ESCAPE) return true;
-                    String trocou = Controles.definir(acao, keycode);
-                    if ("".equals(trocou)) {
+                    String outra = Controles.definir(acao, keycode);
+                    atualizarBotoesTecla();
+                    if ("".equals(outra)) {
                         avisoControles.setText(Controles.nomeTecla(keycode) + " is reserved (movement, ESC or C).");
-                    } else if (trocou != null) {
-                        avisoControles.setText(Controles.nomeTecla(keycode) + " was on " + Controles.NOMES.get(trocou)
-                            + " - swapped: it is now " + Controles.nomeTecla(Controles.tecla(trocou)) + ".");
+                        marcarConflito(acao, keycode, null);
+                    } else if (outra != null) {
+                        // Ja' usada: nao troca; as duas aparecem em vermelho.
+                        avisoControles.setText("");
+                        marcarConflito(acao, keycode, outra);
                     } else {
                         avisoControles.setText("");
                     }
-                    atualizarBotoesTecla();
                     return true;
                 }
             });
         } else {
-            secao.add(new Label("Joystick and hotbar buttons: move, resize, add or remove", skin, "opcoes-label")).left().padTop(14).row();
             secao.add(botaoPequeno("Edit controls", () -> {
                 fecharSettings();
                 hotbar.entrarEdicao(null);
@@ -1706,11 +1708,32 @@ public class WorldScreen extends ScreenAdapter {
         return secao;
     }
 
+    /** Tecla recusada: o botao da acao mostra a tecla tentada e ele (e o da
+     * acao que ja' usa essa tecla) ficam em vermelho, ate' o proximo clique. */
+    private void marcarConflito(String acao, int keycode, String outra) {
+        Color vermelho = new Color(1f, 0.3f, 0.3f, 1f);
+        TextButton b = botoesTecla.get(acao);
+        if (b != null) {
+            TextButton.TextButtonStyle e = estiloTecla(false);
+            e.fontColor = vermelho;
+            e.up = UiSkin.retangulo(new Color(0.13f, 0.13f, 0.13f, 1f), vermelho, 2);
+            b.setStyle(e);
+            b.setText(Controles.nomeTecla(keycode));
+        }
+        TextButton o = outra != null ? botoesTecla.get(outra) : null;
+        if (o != null) {
+            TextButton.TextButtonStyle e = estiloTecla(false);
+            e.fontColor = vermelho;
+            e.up = UiSkin.retangulo(new Color(0.13f, 0.13f, 0.13f, 1f), vermelho, 2);
+            o.setStyle(e);
+        }
+    }
+
     private void comecarCaptura(String acao) {
         cancelarCaptura();
         acaoCapturando = acao;
         TextButton b = botoesTecla.get(acao);
-        if (b != null) { b.setStyle(estiloTecla(true)); b.setText("Press a key..."); }
+        if (b != null) { b.setStyle(estiloTecla(true)); b.setText("Press..."); }
         if (avisoControles != null) avisoControles.setText("");
         uiStage.setKeyboardFocus(null); // a tecla chega na raiz do stage (listener acima)
     }
@@ -1723,7 +1746,7 @@ public class WorldScreen extends ScreenAdapter {
     private void atualizarBotoesTecla() {
         for (java.util.Map.Entry<String, TextButton> e : botoesTecla.entrySet()) {
             e.getValue().setStyle(estiloTecla(e.getKey().equals(acaoCapturando)));
-            e.getValue().setText(e.getKey().equals(acaoCapturando) ? "Press a key..." : Controles.nomeTecla(Controles.tecla(e.getKey())));
+            e.getValue().setText(e.getKey().equals(acaoCapturando) ? "Press..." : Controles.nomeTecla(Controles.tecla(e.getKey())));
         }
         if (hotbar != null) hotbar.atualizar(); // o numero da tecla em cada slot
     }
@@ -1764,6 +1787,8 @@ public class WorldScreen extends ScreenAdapter {
         // sem precisar de nenhuma tabela de conversao.
         botaoZoom.setItems(NOMES_ZOOM);
         botaoZoom.setSelectedIndex(indiceZoom);
+        botaoZoom.setAlignment(Align.center);
+        botaoZoom.getList().setAlignment(Align.center);
         botaoZoom.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 indiceZoom = botaoZoom.getSelectedIndex();

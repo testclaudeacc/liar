@@ -47,6 +47,8 @@ public final class HotbarUI {
     /** Tom do "apertado" (clique ou tecla): escurece e volta. */
     private static final Color COR_APERTADO = new Color(0.55f, 0.55f, 0.55f, 1f);
     private static final Color COR_SELECAO = new Color(0.95f, 0.65f, 0.24f, 1f);
+    /** Botao/joystick selecionado no editor de controles (celular). */
+    public static final Color COR_EDICAO = new Color(0.3f, 0.88f, 1f, 1f);
 
     // ---- Celular ----
 
@@ -77,7 +79,7 @@ public final class HotbarUI {
         if (MOBILE) {
             estiloSlot.up = circulo(new Color(0.15f, 0.15f, 0.15f, 0.92f), new Color(0.32f, 0.32f, 0.32f, 1f));
             estiloSlotEscolhido = new Button.ButtonStyle();
-            estiloSlotEscolhido.up = circulo(new Color(0.22f, 0.22f, 0.22f, 0.96f), COR_SELECAO);
+            estiloSlotEscolhido.up = circulo(new Color(0.22f, 0.22f, 0.22f, 0.96f), COR_EDICAO);
         } else {
             // Um pouco mais escuro que os slots da bag (a pedido do usuario).
             estiloSlot.up = UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 0.92f), new Color(0.17f, 0.17f, 0.17f, 1f), 2);
@@ -256,11 +258,13 @@ public final class HotbarUI {
         Table linha1 = new Table();
         linha1.defaults().height(44).pad(3);
         linha1.add(new Label("Buttons " + layout.size() + "/" + Controles.MAX_BOTOES_MOBILE, skin, "opcoes-label")).padRight(10);
-        linha1.add(botaoPainel("+ Add", "verde-popup", () -> {
-            if (layout.size() >= Controles.MAX_BOTOES_MOBILE) return;
-            layout.add(new Controles.BotaoMobile(300f, 220f, 76f));
-            layoutMudou(layout.size() - 1);
-        })).width(110);
+        if (layout.size() < Controles.MAX_BOTOES_MOBILE) { // 9/9: some o Add
+            linha1.add(botaoPainel("+ Add", "verde-popup", () -> {
+                if (layout.size() >= Controles.MAX_BOTOES_MOBILE) return;
+                layout.add(new Controles.BotaoMobile(300f, 220f, Controles.TAM_BOTAO_PADRAO));
+                layoutMudou(layout.size() - 1);
+            })).width(110);
+        }
         linha1.add(botaoPainel("Reset", "cinza-popup", () -> {
             layout = Controles.layoutPadrao();
             Controles.restaurarJoystick();
@@ -287,13 +291,15 @@ public final class HotbarUI {
             Table linha2 = new Table();
             linha2.defaults().height(44).pad(3);
             linha2.add(new Label("Size", skin, "opcoes-label")).padRight(8);
+            // Em % do tamanho padrao, de 10 em 10 (igual o joystick).
+            float passo = Controles.TAM_BOTAO_PADRAO * 0.1f;
             linha2.add(botaoPainel("-", "vermelho-popup", () -> {
-                c.tamanho = Math.max(Controles.TAM_BOTAO_MIN, c.tamanho - 8f);
+                c.tamanho = Math.max(Controles.TAM_BOTAO_MIN, c.tamanho - passo);
                 layoutMudou(i);
             })).width(48);
-            linha2.add(new Label(String.valueOf(Math.round(c.tamanho)), skin, "opcoes-label")).width(48);
+            linha2.add(new Label(Math.round(c.tamanho / Controles.TAM_BOTAO_PADRAO * 100f) + "%", skin, "opcoes-label")).width(64);
             linha2.add(botaoPainel("+", "verde-popup", () -> {
-                c.tamanho = Math.min(Controles.TAM_BOTAO_MAX, c.tamanho + 8f);
+                c.tamanho = Math.min(Controles.TAM_BOTAO_MAX, c.tamanho + passo);
                 layoutMudou(i);
             })).width(48);
             linha2.add(botaoPainel("Delete", "vermelho-popup", () -> {
@@ -330,7 +336,7 @@ public final class HotbarUI {
 
     private float tamanhoSlot(int i) {
         if (!MOBILE) return TAM_SLOT;
-        return i < layout.size() ? layout.get(i).tamanho : 76f;
+        return i < layout.size() ? layout.get(i).tamanho : Controles.TAM_BOTAO_PADRAO;
     }
 
     /** Atualiza o conteudo dos slots (mudou a barra ou a bag). Os botoes

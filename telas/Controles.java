@@ -13,7 +13,7 @@ import java.util.Map;
  *
  * PC: tecla de cada acao (atalhos 1-9 da hotbar, abrir bag, abrir chat,
  * escrever no chat). Duas acoes nunca ficam com a mesma tecla: escolher uma
- * tecla ja' usada troca as duas de lugar. Movimento (WASD/setas), ESC e C
+ * tecla ja' usada nao deixa (as duas aparecem em vermelho). Movimento (WASD/setas), ESC e C
  * (overlay de colisao) sao fixos e nao podem ser escolhidos.
  *
  * Celular: tamanho e posicao do joystick, e o layout dos botoes da hotbar
@@ -120,18 +120,18 @@ public final class Controles {
         return false;
     }
 
-    /** Liga a tecla na acao. Se outra acao ja' usava essa tecla, as duas
-     * trocam de tecla. Devolve a acao que trocou (ou null). Tecla reservada:
-     * nao muda nada e devolve "" (o chamador avisa). */
+    /** Liga a tecla na acao. Se outra acao ja' usa essa tecla, NAO muda nada
+     * e devolve essa outra acao (o chamador mostra as duas em vermelho).
+     * Tecla reservada: nao muda nada e devolve "". Deu certo: null. */
     public static String definir(String acao, int keycode) {
         carregar();
         if (reservada(keycode)) return "";
         String outra = acaoDaTecla(keycode);
         if (acao.equals(outra)) return null;
-        if (outra != null) teclas.put(outra, teclas.get(acao));
+        if (outra != null) return outra;
         teclas.put(acao, keycode);
         salvar();
-        return outra;
+        return null;
     }
 
     public static void restaurarPadrao() {
@@ -192,7 +192,9 @@ public final class Controles {
     }
 
     public static final int MAX_BOTOES_MOBILE = 9;
-    public static final float TAM_BOTAO_MIN = 50f, TAM_BOTAO_MAX = 130f;
+    /** Tamanho dos botoes em % de TAM_BOTAO_PADRAO, igual o joystick (60%-160%). */
+    public static final float TAM_BOTAO_PADRAO = 76f;
+    public static final float TAM_BOTAO_MIN = TAM_BOTAO_PADRAO * JOYSTICK_ESCALA_MIN, TAM_BOTAO_MAX = TAM_BOTAO_PADRAO * JOYSTICK_ESCALA_MAX;
     private static java.util.List<BotaoMobile> layoutMobile = null;
 
     /** Layout padrao: 4 botoes em arco em volta do canto de baixo a direita. */
