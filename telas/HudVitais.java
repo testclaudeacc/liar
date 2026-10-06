@@ -155,9 +155,9 @@ public final class HudVitais {
         painelXp.pad(px(1));
         painelXp.add(pilhaXp).size(px(260), px(32));
 
-        quadradoFome = quadradoStatus(atlas, "sheet/r18_c14", COR_FOME,
+        quadradoFome = quadradoStatus(atlas, "sheet/r18_c10", COR_FOME,
             "Hungry\nYou are 10% slower, deal 10% less damage and don't regenerate HP/MP. Eat something to recover.");
-        quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c6", COR_BATALHA,
+        quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA,
             "In battle\nIf you log out now, your body stays in the game until the battle ends (30s without fighting).");
         Table linhaTopo = new Table();
         linhaTopo.top().left();

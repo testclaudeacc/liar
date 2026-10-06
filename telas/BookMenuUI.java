@@ -1547,7 +1547,7 @@ public final class BookMenuUI {
         if (lower.contains("sword")) return atlas.findRegion("ui/items/StarterSword");
         if (lower.contains("shield")) return atlas.findRegion("ui/items/StarterShield");
         if (lower.contains("bow")) return atlas.findRegion("ui/items/StarterBow");
-        if (lower.contains("cookie")) return atlas.findRegion("sheet/r17_c13");
+        if (lower.contains("cookie")) return atlas.findRegion("sheet/r17_c1");
         if (lower.contains("staff")) return atlas.findRegion("ui/items/StarterStaff");
         if (lower.contains("flute")) return atlas.findRegion("ui/items/StarterFlute");
         if (lower.contains("book")) return atlas.findRegion("ui/items/StarterBook");
@@ -1571,10 +1571,12 @@ public final class BookMenuUI {
         String equipado = slot == null ? null : equippedItemPaths.get(slot);
         preencherBlocoStats(bagDetalhes, item.itemPath,
             ITEM_STATS.containsKey(item.itemPath) ? (equipado == null ? "" : equipado) : null);
-        if (item.quantity > 1) bagDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
-        if (item.favorite) bagDetalhes.add(linhaStat("Favorite", new Color(1f, 0.82f, 0.24f, 1f))).left().row();
         EquipStats comida = ITEM_STATS.get(item.itemPath);
-        if (comida != null && comida.fullness > 0 && !item.instanceId.isEmpty()) {
+        // Comida nao mostra "Quantity" (a quantidade ja' aparece no icone).
+        boolean ehComida = comida != null && comida.fullness > 0;
+        if (item.quantity > 1 && !ehComida) bagDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
+        if (item.favorite) bagDetalhes.add(linhaStat("Favorite", new Color(1f, 0.82f, 0.24f, 1f))).left().row();
+        if (ehComida && !item.instanceId.isEmpty()) {
             TextButton.TextButtonStyle estiloComer = new TextButton.TextButtonStyle(
                 skin.get("verde", TextButton.TextButtonStyle.class));
             estiloComer.font = skin.getFont("botao-pequeno-font");
