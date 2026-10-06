@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.12"
+SERVER_VERSION = "v0.13"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -864,6 +864,18 @@ def borda_bloqueada(grade, de, para):
     if dy == -1:
         return _bit_ligado(grade['bits_baixo'], w, h, para[0] - x0, para[1] - y0)
     return False
+
+def diagonal_bloqueada(grade, de, para):
+    # Passo na diagonal (player): passa se pelo menos um dos dois caminhos em
+    # "L" (horizontal+vertical ou vertical+horizontal) não cruza cerca fina.
+    # Parede sólida no canto não bloqueia (igual Tibia, dá pra cortar quina).
+    # Mesma regra do client (WorldScreen.diagonalBloqueada).
+    dx, dy = para[0] - de[0], para[1] - de[1]
+    if abs(dx) != 1 or abs(dy) != 1: return False
+    via_x, via_y = (de[0] + dx, de[1]), (de[0], de[1] + dy)
+    caminho_x = borda_bloqueada(grade, de, via_x) or borda_bloqueada(grade, via_x, para)
+    caminho_y = borda_bloqueada(grade, de, via_y) or borda_bloqueada(grade, via_y, para)
+    return caminho_x and caminho_y
 
 def astar(grade, inicio, fim, bloqueados=None, limite=ASTAR_LIMITE_NOS, bounds=None):
     # A* em grade 4-direções (igual ao AStarGrid2D DIAGONAL_MODE_NEVER +
@@ -3426,6 +3438,7 @@ def _corrigir_posicao(sid, p):
 # MOVE_FOLGA de margem pra rede. Mais rapido que isso (speed hack, ou
 # ignorar a fome/lama) esvazia o balde e o passo volta.
 MOVE_SQM_POR_SEG = 2.2
+CUSTO_DIAGONAL = math.sqrt(2.0)
 MOVE_FOLGA = 1.05
 # {map_id: {(tx, ty): mult}} - so' os SQMs com speed_modifier != 1
 # (mapa_tiled.py). Consulta O(1) por passo.
@@ -3452,23 +3465,28 @@ def handle_m(data):
         # 0.28s entre passos": quando a rede entregava dois passos juntos o
         # segundo era jogado fora e a posição do player no servidor (e na tela
         # dos outros, e pra IA dos mobs) ficava 1 SQM atrás.
+        if isinstance(data[0], str): x, y, d_int = float(data[1]), float(data[2]), int(data[3])
+        else: x, y, d_int = float(data[0]), float(data[1]), int(data[2])
+        if not (math.isfinite(x) and math.isfinite(y)): return
+        destino_tile = tile_de(x, y)
+
+        # Passo na diagonal custa √2 do balde (a diagonal leva √2 vezes mais
+        # tempo no client): andar na diagonal não deixa ninguém mais rápido.
+        custo = 1.0
+        if not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
+            o_b = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+            if abs(destino_tile[0] - o_b[0]) == 1 and abs(destino_tile[1] - o_b[1]) == 1: custo = CUSTO_DIAGONAL
         now = time.time()
         recarga = MOVE_SQM_POR_SEG * MOVE_FOLGA * mult_velocidade_player(p)
         balde = min(MOVE_BALDE_MAX, p.get('_move_balde', MOVE_BALDE_MAX) + (now - p.get('last_move_time', now)) * recarga)
         p['last_move_time'] = now
-        if balde < 1.0:
+        if balde < custo:
             # Andando rapido demais (speed hack): o passo nao vale e o client
             # e' puxado de volta pra posicao do servidor.
             p['_move_balde'] = balde
             _corrigir_posicao(sid, p)
             return
-        p['_move_balde'] = balde - 1.0
-        
-        if isinstance(data[0], str): x, y, d_int = float(data[1]), float(data[2]), int(data[3])
-        else: x, y, d_int = float(data[0]), float(data[1]), int(data[2])
-        if not (math.isfinite(x) and math.isfinite(y)): return
-
-        destino_tile = tile_de(x, y)
+        p['_move_balde'] = balde - custo
         # Morto nao anda; passo tem que ser pro SQM do lado (folga de 1 SQM a
         # mais pra latencia) e nao pode ser parede. Antes o servidor aceitava
         # qualquer x/y: teleporte pra qualquer lugar do mapa.
@@ -3490,6 +3508,9 @@ def handle_m(data):
             if not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
                 o = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
                 if abs(destino_tile[0] - o[0]) + abs(destino_tile[1] - o[1]) == 1 and borda_bloqueada(grade_p, o, destino_tile):
+                    _corrigir_posicao(sid, p)
+                    return
+                if diagonal_bloqueada(grade_p, o, destino_tile):
                     _corrigir_posicao(sid, p)
                     return
         x, y = centro_tile(destino_tile)
@@ -4886,7 +4907,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-06 hotbar 9 slots"
+VERSAO_SERVIDOR = "2026-10-06 diagonal"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)

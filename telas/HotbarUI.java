@@ -44,7 +44,7 @@ public final class HotbarUI {
     /** Canto do arco: (distancia da borda direita, altura a partir de baixo). */
     private static final float CANTO_X = 22f, CANTO_Y = 30f;
     private static final float TAM_DRAGKEY = 88f;
-    private static final float RAIO_DRAGKEYS = 202f;
+    private static final float RAIO_DRAGKEYS = 246f;
     private static final float[] ANGULOS_DRAGKEYS = {100f, 136f, 172f};
     /** Opcoes que aparecem ao segurar um dragkey: tamanho e distancia dele. */
     private static final float TAM_OPCAO = 66f;
@@ -54,8 +54,8 @@ public final class HotbarUI {
     /** Arrastou menos que isso: nenhuma opcao (soltar cancela). */
     private static final float ZONA_MORTA = 30f;
     /** Slots fixos (comida/pocao) num arco menor, dentro do dos dragkeys. */
-    private static final float TAM_FIXO = 60f;
-    private static final float RAIO_FIXOS = 100f;
+    private static final float TAM_FIXO = 78f;
+    private static final float RAIO_FIXOS = 136f;
     private static final float[] ANGULOS_FIXOS = {100f, 136f, 172f};
     private static final int PRIMEIRO_FIXO = 6; // slots 7-9
 

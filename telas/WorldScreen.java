@@ -823,11 +823,13 @@ public class WorldScreen extends ScreenAdapter {
                     if (chat.estaDigitando() || localMorto || settingsAberta() || bookMenu.isVisible()) return false;
                     return hotbar.usarTecla(keycode - Input.Keys.NUM_0);
                 }
-                if (keycode == Input.Keys.C) {
+                // F2: overlay de colisao (debug). Era C, que agora anda na diagonal.
+                if (keycode == Input.Keys.F2) {
                     mostrarColisao = !mostrarColisao;
                     return true;
                 }
-                if (keycode == Input.Keys.E) {
+                // F: falar com NPC / abrir o livro. Era E, que agora anda na diagonal.
+                if (keycode == Input.Keys.F) {
                     if (chat.estaDigitando()) return false;
                     if (dialogoNPC.isVisible()) {
                         dialogoNPC.avancarOuFechar();
@@ -2972,7 +2974,15 @@ public class WorldScreen extends ScreenAdapter {
     private void processarEntrada() {
         String direcao = null;
         float dx = 0, dy = 0;
-        if (Gdx.input.isKeyPressed(Input.Keys.UP) || Gdx.input.isKeyPressed(Input.Keys.W) || joystick.isCima()) {
+        // Diagonais: Q (cima-esquerda), E (cima-direita), Z (baixo-esquerda),
+        // C (baixo-direita). O passo leva √2 vezes mais (Jogador.FATOR_DIAGONAL).
+        boolean q = Gdx.input.isKeyPressed(Input.Keys.Q), e = Gdx.input.isKeyPressed(Input.Keys.E);
+        boolean z = Gdx.input.isKeyPressed(Input.Keys.Z), c = Gdx.input.isKeyPressed(Input.Keys.C);
+        if (q || e || z || c) {
+            dx = (q || z) ? -Jogador.TILE : Jogador.TILE;
+            dy = (q || e) ? Jogador.TILE : -Jogador.TILE;
+            direcao = direcaoDiagonal(dx, dy);
+        } else if (Gdx.input.isKeyPressed(Input.Keys.UP) || Gdx.input.isKeyPressed(Input.Keys.W) || joystick.isCima()) {
             direcao = "up"; dy = Jogador.TILE;
         } else if (Gdx.input.isKeyPressed(Input.Keys.DOWN) || Gdx.input.isKeyPressed(Input.Keys.S) || joystick.isBaixo()) {
             direcao = "down"; dy = -Jogador.TILE;
@@ -2988,8 +2998,10 @@ public class WorldScreen extends ScreenAdapter {
 
         float alvoX = local.x + dx;
         float alvoY = local.y + dy;
+        boolean diagonal = dx != 0 && dy != 0;
         boolean livre = !colisao.ehParede(alvoX, alvoY)
-            && !colisao.movimentoBloqueado(local.x, local.y, alvoX, alvoY)
+            && (diagonal ? !diagonalBloqueada(local.x, local.y, dx, dy)
+                         : !colisao.movimentoBloqueado(local.x, local.y, alvoX, alvoY))
             && !npcOcupaTile(alvoX, alvoY)
             && !mobOcupaTile(alvoX, alvoY);
         Jogador noCaminho = livre ? jogadorOcupaTile(alvoX, alvoY) : null;
@@ -3004,6 +3016,8 @@ public class WorldScreen extends ScreenAdapter {
         }
         if (!direcao.equals(local.direcao)) enviarVirada(direcao);
         local.direcao = direcao;
+        // Troca de lugar (abaixo) so' em passo reto: na diagonal so' vira.
+        if (diagonal) { tempoInsistindo = 0f; alvoInsistindo = null; return; }
         // Outro player parado no caminho: insistindo (segurando a direcao
         // contra ele) por TEMPO_INSISTIR_TROCA, pede pro servidor trocar de
         // lugar (ele so' aceita se o outro estiver parado/afk ha' um tempo).
@@ -3020,6 +3034,25 @@ public class WorldScreen extends ScreenAdapter {
             lista.addChild(new JsonValue(intDaDirecao(direcao)));
             socket.emitRaw("swap_req", lista.toJson(JsonWriter.OutputType.json));
         }
+    }
+
+    /** Sprite na diagonal (igual Tibia): se ja' esta virado pra um dos dois
+     * lados do movimento, continua; senao usa o lado horizontal. */
+    private String direcaoDiagonal(float dx, float dy) {
+        String horizontal = dx < 0 ? "left" : "right", vertical = dy > 0 ? "up" : "down";
+        if (local.direcao.equals(horizontal) || local.direcao.equals(vertical)) return local.direcao;
+        return horizontal;
+    }
+
+    /** Diagonal passa se pelo menos um dos dois caminhos em "L" nao cruza
+     * cerca fina (parede solida na quina nao bloqueia, igual Tibia). Mesma
+     * regra do servidor (servidor.py::diagonal_bloqueada). */
+    private boolean diagonalBloqueada(float x, float y, float dx, float dy) {
+        boolean caminhoX = colisao.movimentoBloqueado(x, y, x + dx, y)
+            || colisao.movimentoBloqueado(x + dx, y, x + dx, y + dy);
+        boolean caminhoY = colisao.movimentoBloqueado(x, y, x, y + dy)
+            || colisao.movimentoBloqueado(x, y + dy, x + dx, y + dy);
+        return caminhoX && caminhoY;
     }
 
     /** Virou pro lado sem andar (bloqueado): avisa o servidor pra os outros

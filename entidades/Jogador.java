@@ -67,8 +67,16 @@ public class Jogador {
         origemX = x; origemY = y;
         destinoX = x + dx; destinoY = y + dy;
         progresso = 0f;
-        duracao = TEMPO_PASSO / Math.max(0.1f, multVelocidade);
+        duracao = TEMPO_PASSO / Math.max(0.1f, multVelocidade) * fatorDiagonal(dx, dy);
         movendo = true;
+    }
+
+    /** Passo na diagonal leva √2 vezes mais (anda a mesma distancia por
+     * segundo; servidor.py::CUSTO_DIAGONAL cobra o mesmo). */
+    public static final float FATOR_DIAGONAL = (float) Math.sqrt(2.0);
+
+    private static float fatorDiagonal(float dx, float dy) {
+        return Math.abs(dx) > 0.5f && Math.abs(dy) > 0.5f ? FATOR_DIAGONAL : 1f;
     }
 
     /** Player remoto: o servidor manda a posicao alvo pronta (evento "m") -
@@ -103,7 +111,7 @@ public class Jogador {
         origemX = x; origemY = y;
         destinoX = alvoX; destinoY = alvoY;
         progresso = 0f;
-        duracao = dur;
+        duracao = dur * fatorDiagonal(alvoX - x, alvoY - y);
         movendo = true;
     }
 
