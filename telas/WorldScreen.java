@@ -868,6 +868,7 @@ public class WorldScreen extends ScreenAdapter {
                     // Janela do player sai antes de qualquer outra coisa. ESC nao
                     // tira mais o alvo (so' clicar no proprio SQM ou no mob).
                     if (painelJogador.isVisivel()) { painelJogador.fechar(); return true; }
+                    if (mapaGrandeAberto()) { fecharMapaGrande(); return true; }
                     if (amigoMarcado != null) { amigoMarcado = null; return true; }
                     // Fecha a interface ativa antes de abrir Settings.
                     if (dialogoNPC.isVisible()) dialogoNPC.fechar();
@@ -988,6 +989,7 @@ public class WorldScreen extends ScreenAdapter {
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
+        hud.definirColunaEsquerda(colunaRetrato, 10f);
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
         hotbar = new HotbarUI(uiStage, skin, bookMenu, indice -> {
             if (localMorto || !socket.isConnected()) return;
@@ -1071,34 +1073,207 @@ public class WorldScreen extends ScreenAdapter {
         iconeConfig = atlas.findRegion("ui/MenuButton");
         iconeMenu = atlas.findRegion("ui/ConfigButton");
 
-        Table barra = new Table();
-        barra.setFillParent(true);
-        barra.top().right().pad(0, 0, 0, 20);
         botaoTopoAlvo = criarBotaoTopo(null, this::abrirPainelDoAlvo);
         botaoTopoAlvo.add(new AtorAlvo()).size(ICONE_BOTAO_TOPO);
-        barra.add(botaoTopoAlvo).size(TAMANHO_BOTAO_TOPO).padRight(12);
-        botaoTopoChat = criarBotaoTopo(iconeChat, this::alternarChat);
+        botaoTopoChat = criarBotaoTopo(iconeChat, () -> { recolherBotoesTopo(); alternarChat(); });
         imagemIconeChat = (Image) botaoTopoChat.getChildren().first();
         // Icone de "mensagem nova" (chat fechado). Sem ele no atlas, usa o
         // NotificationIcon no lugar.
         iconeChatNovo = atlas.findRegion("ui/ChatNotify");
         if (iconeChatNovo == null) iconeChatNovo = atlas.findRegion("ui/NotificationIcon");
-        barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).padRight(12);
-        botaoTopoMenu = criarBotaoTopo(iconeMenu, this::alternarBookMenu);
-        barra.add(botaoTopoMenu).size(TAMANHO_BOTAO_TOPO).padRight(12);
-        // Ultimo (mais a direita, no canto de verdade) e' quem abre Settings -
-        // igual SettingsBtn no Godot, que e' o ultimo filho de TopMenu.
-        botaoTopoConfig = criarBotaoTopo(iconeConfig, this::alternarSettings);
-        barra.add(botaoTopoConfig).size(TAMANHO_BOTAO_TOPO).row();
+        botaoTopoMenu = criarBotaoTopo(iconeMenu, () -> { recolherBotoesTopo(); alternarBookMenu(); });
+        botaoTopoConfig = criarBotaoTopo(iconeConfig, () -> { recolherBotoesTopo(); alternarSettings(); });
 
+        // Os 4 botoes ficam escondidos atras do retrato do player (canto de
+        // cima a esquerda, ver criarRetrato): tocar nele abre/fecha a coluna.
+        colunaBotoesTopo = new Table();
+        colunaBotoesTopo.top();
+        for (Button b : new Button[]{botaoTopoAlvo, botaoTopoChat, botaoTopoMenu, botaoTopoConfig}) {
+            colunaBotoesTopo.add(b).size(TAMANHO_BOTAO_TOPO).padTop(8).row();
+        }
+        colunaBotoesTopo.setVisible(false);
+        colunaRetrato = new Table();
+        colunaRetrato.top().left();
+        colunaRetrato.add(criarRetrato()).size(TAMANHO_BOTAO_TOPO).row();
+        colunaRetrato.add(colunaBotoesTopo).top();
+
+        // Canto de cima a direita: minimapa (tocar abre o mapa grande) e
+        // fps/ms embaixo dele.
+        miniMapa = new MiniMapa(mapa, fonteMiniMapa, TILES_MINIMAPA, TILES_MAPA_MIN, TILES_MAPA_MAX, false, 2f);
+        miniMapa.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                abrirMapaGrande();
+            }
+        });
         labelFps = new Label("0 fps", skin, "hud");
         labelMs = new Label("0.0 ms", skin, "hud");
         Table infoDesempenho = new Table();
         infoDesempenho.add(labelFps).right().row();
         infoDesempenho.add(labelMs).right();
-        barra.add(infoDesempenho).colspan(4).right().padTop(6);
+        Table barra = new Table();
+        barra.setFillParent(true);
+        barra.top().right().pad(10, 0, 0, 20);
+        barra.add(miniMapa).size(TAMANHO_MINIMAPA).row();
+        barra.add(infoDesempenho).right().padTop(4);
+        barraMiniMapa = barra;
+        // Por baixo das janelas (livro/chat/settings), igual o HUD.
+        uiStage.getRoot().addActorAt(0, barra);
 
-        uiStage.addActor(barra);
+        criarMapaGrande();
+    }
+
+    // ---- Retrato do player + botoes / minimapa ----
+    private Table colunaRetrato, colunaBotoesTopo, barraMiniMapa;
+    private com.badlogic.gdx.scenes.scene2d.ui.Container<com.badlogic.gdx.scenes.scene2d.Actor> fotoRetrato;
+    private Image avisoRetrato;
+    private Texture texBolinha;
+    private MiniMapa miniMapa, mapaGrande;
+    private Table painelMapaGrande;
+    private final float TAMANHO_MINIMAPA = mobile ? 165f : 150f;
+    private static final float TILES_MINIMAPA = 34f, TILES_MAPA_GRANDE = 80f, TILES_MAPA_MIN = 20f, TILES_MAPA_MAX = 300f;
+
+    /** Pontinhos do minimapa: players azul, NPC amarelo, mob vermelho (voce = branco, no MiniMapa). */
+    private final MiniMapa.Fonte fonteMiniMapa = new MiniMapa.Fonte() {
+        @Override public float jogadorX() { return local.x; }
+        @Override public float jogadorY() { return local.y; }
+        @Override public void pontos(MiniMapa.Coletor c) {
+            for (NPCVisual n : npcs.values()) c.ponto(n.movimento.x, n.movimento.y, MiniMapa.COR_NPC);
+            for (MobVisual m : mobs.values()) if (m.visivel && !m.morto) c.ponto(m.x, m.y, MiniMapa.COR_MOB);
+            for (Jogador j : remotos.values()) c.ponto(j.x, j.y, MiniMapa.COR_PLAYER);
+        }
+    };
+
+    /** Retrato (rosto do personagem, com a skin atual) no estilo dos botoes
+     * do topo. Bolinha vermelha = mensagem nova no chat. */
+    private Button criarRetrato() {
+        Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estilo.up = new TextureRegionDrawable(texBotaoTopo);
+        estilo.over = new TextureRegionDrawable(texBotaoTopoHover);
+        estilo.down = new TextureRegionDrawable(texBotaoTopoClick);
+        Button botao = new Button(estilo);
+        fotoRetrato = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
+        fotoRetrato.setClip(true);
+        fotoRetrato.top();
+        fotoRetrato.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+
+        Pixmap pm = new Pixmap(32, 32, Pixmap.Format.RGBA8888);
+        pm.setColor(Color.BLACK);
+        pm.fillCircle(16, 16, 15);
+        pm.setColor(Color.WHITE); // cor vem do Image (aviso vermelho / legenda do mapa)
+        pm.fillCircle(16, 16, 12);
+        texBolinha = new Texture(pm);
+        texBolinha.setFilter(TextureFilter.Linear, TextureFilter.Linear);
+        pm.dispose();
+        avisoRetrato = new Image(texBolinha);
+        avisoRetrato.setColor(0.9f, 0.1f, 0.1f, 1f);
+        avisoRetrato.setVisible(false);
+        Table cantoAviso = new Table();
+        cantoAviso.top().right();
+        cantoAviso.add(avisoRetrato).size(TAMANHO_BOTAO_TOPO * 0.26f);
+        cantoAviso.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+
+        float interno = TAMANHO_BOTAO_TOPO * 0.70f;
+        com.badlogic.gdx.scenes.scene2d.ui.Stack pilha = new com.badlogic.gdx.scenes.scene2d.ui.Stack();
+        Table centro = new Table();
+        centro.add(fotoRetrato).size(interno);
+        pilha.add(centro);
+        pilha.add(cantoAviso);
+        botao.add(pilha).grow();
+        botao.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                colunaBotoesTopo.setVisible(!colunaBotoesTopo.isVisible());
+            }
+        });
+        return botao;
+    }
+
+    private void recolherBotoesTopo() {
+        colunaBotoesTopo.setVisible(false);
+    }
+
+    /** Troca a foto do retrato pela skin atual (so' a parte de cima: cabeca/ombros). */
+    private void atualizarRetrato(JsonValue skins) {
+        if (fotoRetrato == null) return;
+        SkinsUtil.Preview p = new SkinsUtil.Preview(atlas, skins, SkinsUtil.FRAME_BAIXO);
+        float interno = TAMANHO_BOTAO_TOPO * 0.70f;
+        float largura = interno * 1.25f;
+        float altura = largura * p.getPrefHeight() / SkinsUtil.FRAME_LARGURA;
+        fotoRetrato.setActor(p);
+        fotoRetrato.size(largura, altura);
+    }
+
+    private void criarMapaGrande() {
+        mapaGrande = new MiniMapa(mapa, fonteMiniMapa, TILES_MAPA_GRANDE, TILES_MAPA_MIN, TILES_MAPA_MAX, true, 2f);
+        painelMapaGrande = new Table();
+        painelMapaGrande.setFillParent(true);
+        painelMapaGrande.setBackground(skin.getDrawable("fundo-opcoes"));
+        painelMapaGrande.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+
+        Table topo = new Table();
+        Label titulo = new Label("Map", skin, "secao");
+        topo.add(titulo).left().expandX();
+        float tb = mobile ? 52f : 40f;
+        TextButton menos = new TextButton("-", skin, "cinza-popup");
+        TextButton mais = new TextButton("+", skin, "cinza-popup");
+        TextButton centro = new TextButton("Center", skin, "cinza-popup");
+        TextButton fechar = new TextButton("X", skin, "vermelho-popup");
+        menos.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.zoom(1.25f); }
+        });
+        mais.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.zoom(0.8f); }
+        });
+        centro.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.centralizar(); }
+        });
+        fechar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { fecharMapaGrande(); }
+        });
+        topo.add(menos).size(tb).padRight(8);
+        topo.add(mais).size(tb).padRight(8);
+        topo.add(centro).height(tb).padRight(16);
+        topo.add(fechar).size(tb);
+
+        Table legenda = new Table();
+        adicionarLegenda(legenda, MiniMapa.COR_VOCE, "You");
+        adicionarLegenda(legenda, MiniMapa.COR_PLAYER, "Players");
+        adicionarLegenda(legenda, MiniMapa.COR_NPC, "NPCs");
+        adicionarLegenda(legenda, MiniMapa.COR_MOB, "Monsters");
+
+        painelMapaGrande.pad(14, 24, 14, 24);
+        painelMapaGrande.add(topo).growX().row();
+        painelMapaGrande.add(mapaGrande).grow().padTop(10).row();
+        painelMapaGrande.add(legenda).left().padTop(8);
+        painelMapaGrande.setVisible(false);
+        uiStage.addActor(painelMapaGrande);
+    }
+
+    private void adicionarLegenda(Table legenda, Color cor, String texto) {
+        Image quadrado = new Image(new TextureRegionDrawable(new TextureRegion(texBolinha)));
+        quadrado.setColor(cor);
+        legenda.add(quadrado).size(14).padRight(5);
+        legenda.add(new Label(texto, skin, "hud")).padRight(18);
+    }
+
+    private boolean mapaGrandeAberto() {
+        return painelMapaGrande != null && painelMapaGrande.isVisible();
+    }
+
+    private void abrirMapaGrande() {
+        fecharOutrasJanelas();
+        if (chat.isVisivel()) chat.setVisivel(false);
+        recolherBotoesTopo();
+        mapaGrande.centralizar();
+        painelMapaGrande.setVisible(true);
+        painelMapaGrande.toFront();
+        uiStage.setScrollFocus(mapaGrande);
+        atualizarVisibilidadeJoystick();
+    }
+
+    private void fecharMapaGrande() {
+        painelMapaGrande.setVisible(false);
+        if (uiStage.getScrollFocus() == mapaGrande) uiStage.setScrollFocus(null);
+        atualizarVisibilidadeJoystick();
     }
 
     // Escala BASE do nome, em UNIDADE DE MUNDO (equivale a "8px de mundo" a
@@ -1248,7 +1423,7 @@ public class WorldScreen extends ScreenAdapter {
      * sempre se essa checagem so' rodasse nos callbacks daqui (bug reportado
      * pelo usuario). */
     private void atualizarVisibilidadeJoystick() {
-        joystick.setVisivel(mobile && !chat.isVisivel() && !settingsAberta() && !bookMenu.isVisible());
+        joystick.setVisivel(mobile && !chat.isVisivel() && !settingsAberta() && !bookMenu.isVisible() && !mapaGrandeAberto());
     }
 
     /** Com uma das 3 telas (chat/menu/settings) aberta, os OUTROS 2 botoes da
@@ -1260,11 +1435,13 @@ public class WorldScreen extends ScreenAdapter {
     private void atualizarVisibilidadeBotoesTopo() {
         boolean bookMenuAberto = bookMenu.isVisible();
         boolean algumAberto = chat.isVisivel() || settingsAberta() || bookMenuAberto;
+        // Abriu outra janela (tecla/atalho) com o mapa grande aberto: fecha o mapa.
+        if (algumAberto && mapaGrandeAberto()) fecharMapaGrande();
+        algumAberto = algumAberto || mapaGrandeAberto();
         hotbar.setVisivel(!algumAberto && !localMorto);
-        botaoTopoChat.setVisible(!algumAberto);
-        botaoTopoMenu.setVisible(!algumAberto);
-        botaoTopoConfig.setVisible(!algumAberto);
-        botaoTopoAlvo.setVisible(!algumAberto);
+        colunaRetrato.setVisible(!algumAberto);
+        barraMiniMapa.setVisible(!algumAberto);
+        avisoRetrato.setVisible(chatComNovidade);
         // Fundo do botao de alvo na cor da vida do alvo (cinza normal sem alvo).
         float pct = vidaDoAlvo();
         botaoTopoAlvo.setColor(pct < 0f ? Color.WHITE : corDaVida(pct));
@@ -3582,6 +3759,7 @@ public class WorldScreen extends ScreenAdapter {
             camadas.add(new CamadaSkin(anim, SkinsUtil.cor(SkinsUtil.corHex(skins, cat))));
         }
         skinsJogadores.put(nome, camadas);
+        if (nome.equals(local.nome)) atualizarRetrato(skins);
     }
 
     private void desenharNPC(NPCVisual npc) {
@@ -4514,6 +4692,9 @@ public class WorldScreen extends ScreenAdapter {
         pixelColisao.dispose();
         pixelBranco.dispose();
         hud.dispose();
+        if (miniMapa != null) miniMapa.dispose();
+        if (mapaGrande != null) mapaGrande.dispose();
+        if (texBolinha != null) texBolinha.dispose();
         uiStage.dispose();
         skin.dispose();
         atlas.dispose();

@@ -51,6 +51,9 @@ public final class HudVitais {
     private final BitmapFont fonte;
     private final BitmapFont fonteNotificacao; // menor e com contorno mais fino
     private final Table raiz = new Table();
+    private final Table conteudo = new Table();
+    private final com.badlogic.gdx.scenes.scene2d.ui.Container<com.badlogic.gdx.scenes.scene2d.Actor> colunaEsquerda =
+        new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
     private final Barra hp, mp, xp;
     // Barrinha cinza de municao (icone da flecha + quantidade), abaixo do XP.
     private final Table painelMunicao = new Table();
@@ -179,8 +182,12 @@ public final class HudVitais {
         linhaTopo.add(iconesStatus).top().left().padLeft(px(9)).padTop(px(10));
         raiz.setFillParent(true);
         raiz.top().left().padLeft(px(17)).padTop(px(13));
-        raiz.add(linhaTopo).left().row();
-        raiz.add(painelXp).left().padTop(px(6)).row();
+        // Coluna da esquerda: retrato do player + botoes (ver WorldScreen::criarRetrato).
+        raiz.add(colunaEsquerda).top().left();
+        raiz.add(conteudo).top().left();
+        conteudo.top().left();
+        conteudo.add(linhaTopo).left().row();
+        conteudo.add(painelXp).left().padTop(px(6)).row();
 
         // ---- Municao (so' aparece com flecha equipada) ----
         iconeMunicao.setScaling(Scaling.fit);
@@ -220,7 +227,7 @@ public final class HudVitais {
         });
 
         colunaInferior.left().top();
-        raiz.add(colunaInferior).left().padTop(px(6));
+        conteudo.add(colunaInferior).left().padTop(px(6));
         reorganizarInferior();
         // Popup das explicacoes dos icones de status (fome/battle).
         textoDica = new Label("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
@@ -516,6 +523,14 @@ public final class HudVitais {
         pct = Math.max(0f, Math.min(1f, pct));
         barra.alinhador.getCell(barra.preenchimento).width(barra.largura * pct);
         barra.alinhador.invalidateHierarchy();
+    }
+
+    /** Coloca algo a esquerda do painel de HP/MP (retrato + botoes), alinhado em cima. */
+    public void definirColunaEsquerda(com.badlogic.gdx.scenes.scene2d.Actor ator, float espaco) {
+        colunaEsquerda.setActor(ator);
+        colunaEsquerda.top().left();
+        raiz.getCell(colunaEsquerda).padRight(espaco);
+        raiz.invalidate();
     }
 
     public void setVisivel(boolean visivel) {

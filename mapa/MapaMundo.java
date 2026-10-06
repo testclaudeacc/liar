@@ -8,6 +8,7 @@ import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.maps.MapProperties;
+import com.badlogic.gdx.math.Matrix4;
 
 /**
  * Carrega o World.tmx (desenhado direto no Tiled, 16x16, sem passar mais
@@ -153,6 +154,29 @@ public class MapaMundo {
      * WorldScreen. */
     public void desenharTelhados(OrthographicCamera camera, float jogadorMundoX, float jogadorMundoY) {
         prepararView(camera);
+        renderTelhados(jogadorMundoX, jogadorMundoY);
+    }
+
+    /** Minimapa / mapa grande: o mesmo mapa (chao, overlays e telhados, com o
+     * telhado de onde o jogador esta escondido igual no jogo), so' que numa
+     * projecao propria (area da tela do minimapa). x/y/largura/altura = area
+     * do MUNDO que aparece. Chamado FORA de qualquer batch.begin(). */
+    public void desenharMiniMapa(Matrix4 projecao, float x, float y, float largura, float altura,
+                                 float jogadorMundoX, float jogadorMundoY) {
+        renderer.setView(projecao, x - tileWidth, y - tileHeight, largura + tileWidth * 2f, altura + tileHeight * 2f);
+        renderer.render(indicesCamadas);
+        Batch b = renderer.getBatch();
+        b.begin();
+        for (MapaPropriedades.CelulaOverlay c : propriedades.celulasOverlay) {
+            if (c.worldX + tileWidth < x || c.worldX > x + largura || c.worldY + tileHeight < y || c.worldY > y + altura) continue;
+            TextureRegion regiao = c.tile.getTextureRegion();
+            b.draw(regiao, c.worldX, c.worldY, regiao.getRegionWidth(), regiao.getRegionHeight());
+        }
+        b.end();
+        renderTelhados(jogadorMundoX, jogadorMundoY);
+    }
+
+    private void renderTelhados(float jogadorMundoX, float jogadorMundoY) {
         int jcx = (int) Math.floor(jogadorMundoX / tileWidth);
         int jcy = (int) Math.floor(jogadorMundoY / tileHeight);
 
