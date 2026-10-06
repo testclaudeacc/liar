@@ -87,14 +87,15 @@ public final class HudVitais {
     private final Table iconesStatus = new Table();
     private Table quadradoFome, quadradoBatalha;
     private boolean comFome = false, emBatalha = false;
-    // Tempo ate' sair do battle: o servidor manda 30s a cada golpe/foco
-    // (no maximo 1x/s) e aqui vai descendo sozinho entre um aviso e outro.
+    // Tempo ate' sair do battle: travado em 30 enquanto luta; o servidor avisa
+    // quando o player parou (counting) e daí desce sozinho aqui.
     private float batalhaRestante = 0f;
+    private boolean batalhaContando = false; // false = lutando, travado no maximo
     private Table iconeDica; // icone cujo popup esta aberto
     private final Table dica = new Table() {
         @Override public void act(float delta) {
             super.act(delta);
-            if (batalhaRestante > 0f) batalhaRestante = Math.max(0f, batalhaRestante - delta);
+            if (batalhaContando && batalhaRestante > 0f) batalhaRestante = Math.max(0f, batalhaRestante - delta);
             if (isVisible() && iconeDica == quadradoBatalha) {
                 String texto = textoBatalha();
                 if (!texto.contentEquals(textoDica.getText())) textoDica.setText(texto);
@@ -392,8 +393,9 @@ public final class HudVitais {
 
     /** Icone de battle (um mob mirou o player ou ele bateu num mob);
      * segundos = quanto falta pro battle acabar (contagem regressiva). */
-    public void definirBatalha(boolean emBatalha, float segundos) {
+    public void definirBatalha(boolean emBatalha, boolean contando, float segundos) {
         batalhaRestante = emBatalha ? segundos : 0f;
+        batalhaContando = emBatalha && contando;
         definirBatalha(emBatalha);
     }
 

@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.8"
+SERVER_VERSION = "v0.9"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -1346,6 +1346,10 @@ def _mob_tick(mob_id, m, now):
     # Exige o MESMO andar (_player_alvo_valido) — só perseguir não basta pra
     # bater; ver o bloco de perseguição mais abaixo.
     alvo_sid = m.get('target_sid')
+    # Mob focando o player: mantém ele em battle (antes do "esperando o
+    # passo acabar" lá embaixo, senão mob lento deixava buracos).
+    if alvo_sid is not None and not m.get('returning'):
+        marcar_batalha(alvo_sid, online_players.get(alvo_sid), now)
     alvo_combate = _player_alvo_valido(alvo_sid, m) if alvo_sid else None
     if alvo_combate is not None and not m.get('returning'):
         t_alvo = tile_de(alvo_combate.get('pos_x', 0), alvo_combate.get('pos_y', 0))
@@ -1369,8 +1373,6 @@ def _mob_tick(mob_id, m, now):
         return
 
     if alvo_sid is not None:
-        # Mob focando o player: mantém ele em battle.
-        marcar_batalha(alvo_sid, online_players.get(alvo_sid), now)
         # Perseguição: NÃO exige o mesmo andar (só existir e estar vivo) —
         # assim o mob ainda vai atrás de quem subiu a escada fugindo, em vez
         # de travar/desistir na hora só por causa do andar (o andar já barra
@@ -4589,19 +4591,22 @@ def handle_eat_food(data):
 # jogo (continua apanhando, pode morrer) até o battle acabar - não dá pra
 # fugir de luta/PvP fechando o jogo.
 BATTLE_SEG = 30.0
+# Sem renovar o battle por esse tempo = parou de lutar. Aí a contagem começa
+# do 30 cheio (o battle acaba 30s depois disso, não do último golpe).
+BATTLE_PARADO_SEG = 3.0  # > ATAQUE_COOLDOWN_SEG (o auto-ataque do player renova a cada ~2.4s)
 
 def marcar_batalha(sid, p, now=None):
     if p is None: return
     now = time.time() if now is None else now
     p['battle_until'] = now + BATTLE_SEG
-    novo = not p.get('em_batalha')
+    # Avisa só quando muda: entrou em battle, ou voltou a lutar no meio da
+    # contagem. Enquanto luta o client fica travado em 30 sem aviso nenhum;
+    # a contagem regressiva começa quando battle_loop vê que parou.
+    avisar = not p.get('em_batalha') or p.get('_battle_contando')
     p['em_batalha'] = True
-    # Avisa ao entrar e, enquanto continua lutando, no máximo 1x/s (o client
-    # mostra a contagem regressiva no popup do ícone e reinicia em 30 a cada aviso).
-    if p.get('corpo_ausente'): return
-    if novo or now - p.get('_battle_aviso', 0) >= 1.0:
-        p['_battle_aviso'] = now
-        socketio.emit('battle_state', {'in_battle': True, 'seconds': BATTLE_SEG}, room=sid)
+    p['_battle_contando'] = False
+    if avisar and not p.get('corpo_ausente'):
+        socketio.emit('battle_state', {'in_battle': True, 'counting': False, 'seconds': BATTLE_SEG}, room=sid)
 
 def _remover_corpo_ausente(sid, p):
     # Battle acabou pro corpo de quem já desconectou: agora sai de verdade.
@@ -4614,12 +4619,23 @@ def _remover_corpo_ausente(sid, p):
 
 def battle_loop():
     while True:
-        socketio.sleep(1.0)
+        socketio.sleep(0.5)
         now = time.time()
         for sid, p in list(online_players.items()):
             try:
-                if not p.get('em_batalha') or now < p.get('battle_until', 0): continue
+                if not p.get('em_batalha'): continue
+                restante = p.get('battle_until', 0) - now
+                if restante > 0:
+                    # Nada renovou o battle por BATTLE_PARADO_SEG (sem mob
+                    # focando, sem atacar): começa a contagem no client.
+                    if (not p.get('_battle_contando') and restante < BATTLE_SEG - BATTLE_PARADO_SEG
+                            and not p.get('corpo_ausente')):
+                        p['_battle_contando'] = True
+                        p['battle_until'] = now + BATTLE_SEG
+                        socketio.emit('battle_state', {'in_battle': True, 'counting': True, 'seconds': BATTLE_SEG}, room=sid)
+                    continue
                 p['em_batalha'] = False
+                p['_battle_contando'] = False
                 if p.get('corpo_ausente'): _remover_corpo_ausente(sid, p)
                 else: socketio.emit('battle_state', {'in_battle': False}, room=sid)
             except Exception:
@@ -4782,7 +4798,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-06 battle countdown"
+VERSAO_SERVIDOR = "2026-10-06 battle lock 30"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)

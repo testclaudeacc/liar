@@ -2262,7 +2262,8 @@ public class WorldScreen extends ScreenAdapter {
         // Entrou/saiu de battle (servidor.py::marcar_batalha / battle_loop).
         socket.on("battle_state", (nomeEvt, data) -> {
             if (data == null) return;
-            hud.definirBatalha(data.getBoolean("in_battle", false), data.getFloat("seconds", 30f));
+            hud.definirBatalha(data.getBoolean("in_battle", false), data.getBoolean("counting", false),
+                data.getFloat("seconds", 30f));
         });
         socket.on("food_result", (nomeEvt, data) -> {
             if (data == null || data.getBoolean("ok", false)) return;
