@@ -117,10 +117,19 @@ public class Joystick {
         knob.setPosition(base.getX() + centerX - knob.getWidth() / 2f, base.getY() + centerY - knob.getHeight() / 2f);
     }
 
-    public boolean isEsquerda() { return vetor.x < -LIMIAR_DIRECAO; }
-    public boolean isDireita() { return vetor.x > LIMIAR_DIRECAO; }
-    public boolean isCima() { return vetor.y > LIMIAR_DIRECAO; }
-    public boolean isBaixo() { return vetor.y < -LIMIAR_DIRECAO; }
+    // 8 direcoes: o angulo do knob cai num de 8 setores de 45 graus
+    // (0 = direita, 1 = cima-direita, 2 = cima, ... 7 = baixo-direita). Na
+    // diagonal os dois eixos ficam ativos e o WorldScreen anda na diagonal.
+    private int setor() {
+        if (vetor.len2() < LIMIAR_DIRECAO * LIMIAR_DIRECAO) return -1;
+        float ang = com.badlogic.gdx.math.MathUtils.atan2(vetor.y, vetor.x) * com.badlogic.gdx.math.MathUtils.radiansToDegrees;
+        return ((Math.round(ang / 45f) % 8) + 8) % 8;
+    }
+
+    public boolean isDireita() { int s = setor(); return s == 7 || s == 0 || s == 1; }
+    public boolean isCima() { int s = setor(); return s == 1 || s == 2 || s == 3; }
+    public boolean isEsquerda() { int s = setor(); return s == 3 || s == 4 || s == 5; }
+    public boolean isBaixo() { int s = setor(); return s == 5 || s == 6 || s == 7; }
 
     public void setVisivel(boolean visivel) {
         base.setVisible(visivel);

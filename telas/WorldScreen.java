@@ -823,13 +823,11 @@ public class WorldScreen extends ScreenAdapter {
                     if (chat.estaDigitando() || localMorto || settingsAberta() || bookMenu.isVisible()) return false;
                     return hotbar.usarTecla(keycode - Input.Keys.NUM_0);
                 }
-                // F2: overlay de colisao (debug). Era C, que agora anda na diagonal.
-                if (keycode == Input.Keys.F2) {
+                if (keycode == Input.Keys.C) {
                     mostrarColisao = !mostrarColisao;
                     return true;
                 }
-                // F: falar com NPC / abrir o livro. Era E, que agora anda na diagonal.
-                if (keycode == Input.Keys.F) {
+                if (keycode == Input.Keys.E) {
                     if (chat.estaDigitando()) return false;
                     if (dialogoNPC.isVisible()) {
                         dialogoNPC.avancarOuFechar();
@@ -2974,23 +2972,22 @@ public class WorldScreen extends ScreenAdapter {
     private void processarEntrada() {
         String direcao = null;
         float dx = 0, dy = 0;
-        // Diagonais: Q (cima-esquerda), E (cima-direita), Z (baixo-esquerda),
-        // C (baixo-direita). O passo leva √2 vezes mais (Jogador.FATOR_DIAGONAL).
-        boolean q = Gdx.input.isKeyPressed(Input.Keys.Q), e = Gdx.input.isKeyPressed(Input.Keys.E);
-        boolean z = Gdx.input.isKeyPressed(Input.Keys.Z), c = Gdx.input.isKeyPressed(Input.Keys.C);
-        if (q || e || z || c) {
-            dx = (q || z) ? -Jogador.TILE : Jogador.TILE;
-            dy = (q || e) ? Jogador.TILE : -Jogador.TILE;
-            direcao = direcaoDiagonal(dx, dy);
-        } else if (Gdx.input.isKeyPressed(Input.Keys.UP) || Gdx.input.isKeyPressed(Input.Keys.W) || joystick.isCima()) {
-            direcao = "up"; dy = Jogador.TILE;
-        } else if (Gdx.input.isKeyPressed(Input.Keys.DOWN) || Gdx.input.isKeyPressed(Input.Keys.S) || joystick.isBaixo()) {
-            direcao = "down"; dy = -Jogador.TILE;
-        } else if (Gdx.input.isKeyPressed(Input.Keys.LEFT) || Gdx.input.isKeyPressed(Input.Keys.A) || joystick.isEsquerda()) {
-            direcao = "left"; dx = -Jogador.TILE;
-        } else if (Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D) || joystick.isDireita()) {
-            direcao = "right"; dx = Jogador.TILE;
-        }
+        // Teclas (WASD/setas) e joystick combinados: duas direcoes juntas
+        // (ex: W + D, em qualquer ordem) = diagonal. O passo na diagonal leva
+        // √2 vezes mais (Jogador.FATOR_DIAGONAL), entao nao anda mais rapido.
+        boolean cima = Gdx.input.isKeyPressed(Input.Keys.UP) || Gdx.input.isKeyPressed(Input.Keys.W) || joystick.isCima();
+        boolean baixo = Gdx.input.isKeyPressed(Input.Keys.DOWN) || Gdx.input.isKeyPressed(Input.Keys.S) || joystick.isBaixo();
+        boolean esquerda = Gdx.input.isKeyPressed(Input.Keys.LEFT) || Gdx.input.isKeyPressed(Input.Keys.A) || joystick.isEsquerda();
+        boolean direita = Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D) || joystick.isDireita();
+        int v = (cima ? 1 : 0) - (baixo ? 1 : 0);   // cima+baixo juntos se anulam
+        int h = (direita ? 1 : 0) - (esquerda ? 1 : 0);
+        dx = h * Jogador.TILE;
+        dy = v * Jogador.TILE;
+        if (h != 0 && v != 0) direcao = direcaoDiagonal(dx, dy);
+        else if (v > 0) direcao = "up";
+        else if (v < 0) direcao = "down";
+        else if (h < 0) direcao = "left";
+        else if (h > 0) direcao = "right";
         if (direcao == null) {
             tempoInsistindo = 0f;
             return;
