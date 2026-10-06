@@ -170,7 +170,7 @@ public final class HudVitais {
         painelXp.add(pilhaXp).size(px(260), px(32));
 
         quadradoFome = quadradoStatus(atlas, "sheet/r18_c10", COR_FOME,
-            "Hungry\nYou are 10% slower, deal 10% less damage and don't regenerate HP/MP. Eat something to recover.");
+            "You are hungry! 10% less Dmg and Speed. Regen disabled");
         quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA, null);
         Table linhaTopo = new Table();
         linhaTopo.top().left();
@@ -318,17 +318,18 @@ public final class HudVitais {
         return pai.add(comSombra);
     }
 
-    /** Quadrado 42x42 com borda preta e o icone no meio. Mouse em cima (PC)
+    /** Quadrado 42x42 (52x52 no celular) com borda preta e o icone no meio. Mouse em cima (PC)
      * ou dedo segurando (celular) mostra a explicacao; saiu/soltou, some. */
     private Table quadradoStatus(TextureAtlas atlas, String regiao, Color fundo, String explicacao) {
         Table interno = new Table();
         interno.setBackground(cor(fundo));
         Image img = icone(atlas, regiao);
-        if (img != null) interno.add(img).size(px(32));
+        // No celular um pouco maior (alem do FATOR que ja' vale pra HUD toda).
+        if (img != null) interno.add(img).size(px(MOBILE ? 40 : 32));
         Table quadrado = new Table();
         quadrado.setBackground(cor(Color.BLACK));
         quadrado.pad(px(1));
-        quadrado.add(interno).size(px(40));
+        quadrado.add(interno).size(px(MOBILE ? 50 : 40));
         quadrado.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         quadrado.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
             @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer,
