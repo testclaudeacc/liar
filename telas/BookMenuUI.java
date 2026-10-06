@@ -2842,12 +2842,12 @@ public final class BookMenuUI {
     }
 
     // ===================== SPELLS (atalhos) =====================
-    // 8 slots livres (teclas 1-8): cada um recebe um item usavel (comida;
+    // 9 slots livres (teclas 1-9): cada um recebe um item usavel (comida;
     // pocao/magia quando existirem). Clicar num slot abre a lista do que pode
     // ir nele; escolher manda pro servidor (set_hotbar), que salva e devolve
     // (hotbar_synced). A barra da gameplay e' a HotbarUI.
 
-    public static final int SLOTS_ATALHO = 8;
+    public static final int SLOTS_ATALHO = 9;
     private final String[] atalhos = new String[SLOTS_ATALHO];
     { java.util.Arrays.fill(atalhos, ""); }
     private int slotAtalhoEscolhendo = -1; // slot com a lista aberta
@@ -2889,7 +2889,8 @@ public final class BookMenuUI {
         spellsPage.clearChildren();
         spellsPage.top().left();
 
-        spellsPage.add(linhaStat("Hotbar (keys 1-8)", Color.LIGHT_GRAY)).left().padBottom(4).row();
+        spellsPage.add(linhaStat("Hotbar (keys 1-9)", Color.LIGHT_GRAY)).left().row();
+        spellsPage.add(linhaStat("Mobile: 1-6 = drag buttons, 7-9 = food & potions", Color.GRAY)).left().padBottom(4).row();
         Table linha = new Table();
         linha.left();
         for (int i = 0; i < SLOTS_ATALHO; i++) {
@@ -2944,7 +2945,7 @@ public final class BookMenuUI {
         construirPaginaSpells();
     }
 
-    private static final float TAM_SLOT_ATALHO = 50f;
+    private static final float TAM_SLOT_ATALHO = 46f;
 
     /** Slot quadrado com o icone do item e a quantidade (caminho null/"" =
      * vazio; sem nenhum na bag = icone transparente e sem numero). */

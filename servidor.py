@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.11"
+SERVER_VERSION = "v0.12"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -4602,10 +4602,11 @@ def _comer(sid, p, inst):
     emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
 
 # ---- Barra de atalhos (hotbar) ----
-# 8 slots livres: cada um guarda o CAMINHO de um item usável (comida; poção
+# 9 slots livres: cada um guarda o CAMINHO de um item usável (comida; poção
 # quando existir) ou, no futuro, o id de uma magia. Usar um item pega a 1a
-# unidade dele na bag. Formato salvo: {"slots": [8 strings]}.
-HOTBAR_SLOTS = 8
+# unidade dele na bag. Formato salvo: {"slots": [9 strings]}.
+# No celular: 1-6 nos 3 dragkeys (2 cada), 7-9 fixos no canto (comida/poção).
+HOTBAR_SLOTS = 9
 
 def item_usavel_no_atalho(item_path):
     # Por enquanto só comida; poção (e magia) entram aqui quando existirem.
@@ -4885,7 +4886,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-06 hotbar 8 slots"
+VERSAO_SERVIDOR = "2026-10-06 hotbar 9 slots"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)
