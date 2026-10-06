@@ -21,9 +21,9 @@ import com.badlogic.gdx.utils.Scaling;
  * servidor (servidor.py::set_hotbar). Clicar/tocar num slot ou apertar a
  * tecla usa o atalho (servidor.py::use_hotbar).
  *
- * PC: uma linha no centro de baixo. Celular: botoes redondos no lado
- * direito (a esquerda ja' tem o joystick): 1-4 num arco em volta do canto
- * de baixo e 5-8 numa coluna na borda, acima do arco.
+ * PC: uma linha no centro de baixo. Celular: 2 botoes redondos no lado
+ * direito (a esquerda ja' tem o joystick); segurar um deles abre uma roda em
+ * "+" com 4 atalhos (1-4 ou 5-8): arrasta o dedo ate' um e solta pra usar.
  */
 public final class HotbarUI {
 
@@ -40,13 +40,15 @@ public final class HotbarUI {
     private final BookMenuUI livro;
     private final AoUsar aoUsar;
     private final Table raiz = new Table();
-    /** Celular: os botoes ficam soltos (posicao calculada), nao numa tabela. */
+    /** Celular: 2 botoes de roda (posicao calculada a cada frame). */
     private final com.badlogic.gdx.scenes.scene2d.Group grupoMobile = new com.badlogic.gdx.scenes.scene2d.Group() {
         @Override public void act(float delta) {
             super.act(delta);
             posicionarMobile();
         }
     };
+    private final Roda[] rodas = new Roda[2];
+    private Button.ButtonStyle estiloSlot, estiloSlotEscolhido;
     private final Button[] slots = new Button[BookMenuUI.SLOTS_ATALHO];
     private final Stack[] conteudos = new Stack[BookMenuUI.SLOTS_ATALHO];
 
@@ -57,8 +59,11 @@ public final class HotbarUI {
         // Mesmo cinza escuro dos slots da bag (e das outras janelas). No
         // celular os botoes sao redondos.
         Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estiloSlot = estilo;
         if (MOBILE) {
             estilo.up = circulo(new Color(0.15f, 0.15f, 0.15f, 0.92f), new Color(0.32f, 0.32f, 0.32f, 1f));
+            estiloSlotEscolhido = new Button.ButtonStyle();
+            estiloSlotEscolhido.up = circulo(new Color(0.22f, 0.22f, 0.22f, 0.96f), new Color(0.95f, 0.65f, 0.24f, 1f));
         } else {
             estilo.up = skin.getDrawable("bag-slot");
             estilo.over = skin.getDrawable("bag-slot-hover");
@@ -74,7 +79,14 @@ public final class HotbarUI {
             slots[i] = slot;
         }
         if (MOBILE) {
-            for (Button slot : slots) grupoMobile.addActor(slot);
+            // Opcoes das rodas: so' aparecem com o dedo segurando o botao.
+            for (Button slot : slots) {
+                slot.setVisible(false);
+                slot.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+                grupoMobile.addActor(slot);
+            }
+            rodas[0] = new Roda(0, "1-4");
+            rodas[1] = new Roda(4, "5-8");
             grupoMobile.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.childrenOnly);
             // Por baixo das outras telas (livro, chat, settings), igual a HUD.
             stage.getRoot().addActorAt(0, grupoMobile);
@@ -87,26 +99,113 @@ public final class HotbarUI {
         atualizar();
     }
 
-    // Posicoes no celular, tiradas do desenho de referencia (tela 960x540):
-    // centro de cada botao = (distancia da borda DIREITA, altura a partir de
-    // BAIXO). 1-4 descem em diagonal a partir da borda direita ate' o chao;
-    // 5-8 sobem numa coluna na borda, acima do 1 (abaixo dos botoes do topo).
-    private static final float[][] POSICOES_MOBILE = {
-        {48f, 140f}, {140f, 130f}, {208f, 85f}, {252f, 28f},
-        {48f, 197f}, {48f, 254f}, {48f, 311f}, {48f, 368f},
-    };
+    // ---- Celular: botoes de roda ----
+    // Segurar o botao abre uma roda em "+" com 4 atalhos (cima, direita,
+    // baixo, esquerda); arrastar o dedo ate' um deles destaca e, ao soltar,
+    // usa. Soltar no meio (sem arrastar) cancela. Roda 1 = slots 1-4 (canto
+    // de baixo a direita), roda 2 = slots 5-8 (acima dela).
+    private static final float TAM_BOTAO_RODA = 68f;
+    private static final float RAIO_RODA = 74f;
+    /** Arrastou menos que isso do centro: nenhuma opcao (soltar cancela). */
+    private static final float ZONA_MORTA = 26f;
+    /** Centro de cada botao: (distancia da borda direita, altura a partir de baixo). */
+    private static final float[][] POSICAO_RODAS = {{108f, 108f}, {108f, 288f}};
 
-    private void posicionarMobile() {
-        com.badlogic.gdx.scenes.scene2d.Stage stage = grupoMobile.getStage();
-        if (stage == null) return;
-        float w = stage.getWidth();
-        for (int i = 0; i < slots.length && i < POSICOES_MOBILE.length; i++) {
-            centrar(slots[i], w - POSICOES_MOBILE[i][0], POSICOES_MOBILE[i][1]);
+    private final class Roda {
+        final int primeiro;
+        final Button botao;
+        boolean aberta = false;
+        int escolhida = -1;
+        float centroX, centroY; // centro da roda aberta (pode ser empurrado pra caber na tela)
+
+        Roda(int primeiro, String rotulo) {
+            this.primeiro = primeiro;
+            Button.ButtonStyle estilo = new Button.ButtonStyle();
+            estilo.up = circulo(new Color(0.13f, 0.13f, 0.13f, 0.92f), new Color(0.42f, 0.42f, 0.42f, 1f));
+            botao = new Button(estilo);
+            Label texto = new Label(rotulo, skin, "hud");
+            texto.setFontScale(0.8f);
+            texto.setColor(1f, 1f, 1f, 0.75f);
+            botao.add(texto);
+            botao.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+                @Override public boolean touchDown(InputEvent e, float x, float y, int pointer, int b) {
+                    abrir();
+                    escolher(e.getStageX(), e.getStageY());
+                    return true;
+                }
+                @Override public void touchDragged(InputEvent e, float x, float y, int pointer) {
+                    escolher(e.getStageX(), e.getStageY());
+                }
+                @Override public void touchUp(InputEvent e, float x, float y, int pointer, int b) {
+                    int i = escolhida;
+                    fechar();
+                    if (i >= 0) usar(primeiro + i);
+                }
+            });
+            grupoMobile.addActor(botao);
+        }
+
+        void abrir() {
+            Stage stage = botao.getStage();
+            if (stage == null) return;
+            aberta = true;
+            escolhida = -1;
+            // Centro da roda = centro do botao, empurrado pra dentro da tela
+            // se alguma ponta do "+" fosse sair (o botao fica no canto).
+            float margem = RAIO_RODA + TAM_SLOT / 2f + 6f;
+            float bx = botao.getX() + botao.getWidth() / 2f, by = botao.getY() + botao.getHeight() / 2f;
+            centroX = Math.max(margem, Math.min(bx, stage.getWidth() - margem));
+            centroY = Math.max(margem, Math.min(by, stage.getHeight() - margem));
+            for (int i = 0; i < 4; i++) {
+                Button opcao = slots[primeiro + i];
+                float ang = (90f - 90f * i) * com.badlogic.gdx.math.MathUtils.degreesToRadians; // cima, direita, baixo, esquerda
+                opcao.setStyle(estiloSlot);
+                opcao.setBounds(centroX + RAIO_RODA * com.badlogic.gdx.math.MathUtils.cos(ang) - TAM_SLOT / 2f,
+                    centroY + RAIO_RODA * com.badlogic.gdx.math.MathUtils.sin(ang) - TAM_SLOT / 2f, TAM_SLOT, TAM_SLOT);
+                opcao.setVisible(true);
+                opcao.getColor().a = 0f;
+                opcao.addAction(Actions.fadeIn(0.08f));
+                opcao.toFront();
+            }
+        }
+
+        /** Opcao na direcao do dedo (a partir do centro da roda), ou nenhuma. */
+        void escolher(float dedoX, float dedoY) {
+            if (!aberta) return;
+            float dx = dedoX - centroX, dy = dedoY - centroY;
+            int nova = -1;
+            if (dx * dx + dy * dy >= ZONA_MORTA * ZONA_MORTA) {
+                float ang = com.badlogic.gdx.math.MathUtils.atan2(dy, dx) * com.badlogic.gdx.math.MathUtils.radiansToDegrees;
+                if (ang >= 45f && ang < 135f) nova = 0;        // cima
+                else if (ang >= -45f && ang < 45f) nova = 1;   // direita
+                else if (ang >= -135f && ang < -45f) nova = 2; // baixo
+                else nova = 3;                                 // esquerda
+            }
+            if (nova == escolhida) return;
+            escolhida = nova;
+            for (int i = 0; i < 4; i++) slots[primeiro + i].setStyle(i == escolhida ? estiloSlotEscolhido : estiloSlot);
+        }
+
+        void fechar() {
+            aberta = false;
+            escolhida = -1;
+            for (int i = 0; i < 4; i++) {
+                Button opcao = slots[primeiro + i];
+                opcao.setStyle(estiloSlot);
+                opcao.setVisible(false);
+            }
         }
     }
 
-    private static void centrar(Button b, float x, float y) {
-        b.setBounds(x - TAM_SLOT / 2f, y - TAM_SLOT / 2f, TAM_SLOT, TAM_SLOT);
+    private void posicionarMobile() {
+        Stage stage = grupoMobile.getStage();
+        if (stage == null) return;
+        float w = stage.getWidth();
+        for (int i = 0; i < rodas.length; i++) {
+            if (rodas[i] == null) continue;
+            rodas[i].botao.setBounds(w - POSICAO_RODAS[i][0] - TAM_BOTAO_RODA / 2f,
+                POSICAO_RODAS[i][1] - TAM_BOTAO_RODA / 2f, TAM_BOTAO_RODA, TAM_BOTAO_RODA);
+        }
     }
 
     /** Botao redondo (celular): circulo com borda, gerado em alta resolucao
@@ -176,6 +275,15 @@ public final class HotbarUI {
         slot.setColor(COR_APERTADO);
         slot.addAction(Actions.color(Color.WHITE, 0.18f));
         escurecerIcones(conteudos[indice]);
+        // Celular: o slot some junto com a roda, entao o "apertado" vai no botao da roda.
+        if (MOBILE) {
+            Roda r = rodas[indice / 4];
+            if (r != null) {
+                r.botao.clearActions();
+                r.botao.setColor(COR_APERTADO);
+                r.botao.addAction(Actions.color(Color.WHITE, 0.18f));
+            }
+        }
         String caminho = livro.atalhos()[indice];
         if (caminho != null && !caminho.isEmpty()) aoUsar.usar(indice);
     }
@@ -204,6 +312,7 @@ public final class HotbarUI {
 
     public void setVisivel(boolean visivel) {
         raiz.setVisible(visivel);
+        if (!visivel && grupoMobile.isVisible()) for (Roda r : rodas) if (r != null) r.fechar();
         grupoMobile.setVisible(visivel);
     }
 }
