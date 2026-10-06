@@ -17,8 +17,8 @@ import java.util.Map;
  * (overlay de colisao) sao fixos e nao podem ser escolhidos.
  *
  * Celular: tamanho e posicao do joystick, e o layout dos botoes da hotbar
- * (BotaoMobile: fixos ou de arrastar, com 1-4 direcoes; no maximo 9 atalhos
- * somados, que sao os 9 slots da hotbar, distribuidos em ordem).
+ * (BotaoMobile: 1 a 9 botoes, cada um = 1 slot, em ordem; tamanho e posicao
+ * de cada um personalizados).
  */
 public final class Controles {
 
@@ -165,49 +165,29 @@ public final class Controles {
 
     // ---- Layout dos botoes da hotbar no celular ----
 
-    /** Um botao do lado direito da tela. Fixo = 1 atalho (so' comida/pocao),
-     * tocar usa. Arrastar = 1 a 4 atalhos, um por direcao ligada (cima,
-     * direita, baixo, esquerda): segura, desliza e solta. Posicao = centro
+    /** Um botao da hotbar no celular: 1 atalho, tocar usa. Posicao = centro
      * (distancia da borda DIREITA, altura a partir de BAIXO), em unidades do stage. */
     public static final class BotaoMobile {
-        public boolean fixo;
         public float x, y, tamanho;
-        /** cima, direita, baixo, esquerda (so' vale pra botao de arrastar). */
-        public final boolean[] direcoes = new boolean[4];
 
-        public BotaoMobile(boolean fixo, float x, float y, float tamanho, boolean cima, boolean direita, boolean baixo, boolean esquerda) {
-            this.fixo = fixo; this.x = x; this.y = y; this.tamanho = tamanho;
-            direcoes[0] = cima; direcoes[1] = direita; direcoes[2] = baixo; direcoes[3] = esquerda;
+        public BotaoMobile(float x, float y, float tamanho) {
+            this.x = x; this.y = y; this.tamanho = tamanho;
         }
 
-        /** Quantos atalhos (slots) esse botao usa. */
-        public int slots() {
-            if (fixo) return 1;
-            int n = 0;
-            for (boolean d : direcoes) if (d) n++;
-            return n;
-        }
-
-        BotaoMobile copia() { return new BotaoMobile(fixo, x, y, tamanho, direcoes[0], direcoes[1], direcoes[2], direcoes[3]); }
+        BotaoMobile copia() { return new BotaoMobile(x, y, tamanho); }
     }
 
-    public static final int MAX_SLOTS_MOBILE = 9;
+    public static final int MAX_BOTOES_MOBILE = 9;
     public static final float TAM_BOTAO_MIN = 50f, TAM_BOTAO_MAX = 130f;
     private static java.util.List<BotaoMobile> layoutMobile = null;
 
-    /** Layout padrao: 3 de arrastar (cima e esquerda) em arco + 3 fixos no canto. */
+    /** Layout padrao: 4 botoes em arco em volta do canto de baixo a direita. */
     public static java.util.List<BotaoMobile> layoutPadrao() {
         java.util.List<BotaoMobile> l = new java.util.ArrayList<>();
-        float[] ang = {100f, 136f, 172f};
-        for (float a : ang) {
+        for (float a : new float[]{100f, 125f, 150f, 175f}) {
             float rad = a * com.badlogic.gdx.math.MathUtils.degreesToRadians;
-            l.add(new BotaoMobile(false, 22f - 246f * com.badlogic.gdx.math.MathUtils.cos(rad),
-                30f + 246f * com.badlogic.gdx.math.MathUtils.sin(rad), 88f, true, false, false, true));
-        }
-        for (float a : ang) {
-            float rad = a * com.badlogic.gdx.math.MathUtils.degreesToRadians;
-            l.add(new BotaoMobile(true, 22f - 136f * com.badlogic.gdx.math.MathUtils.cos(rad),
-                30f + 136f * com.badlogic.gdx.math.MathUtils.sin(rad), 78f, false, false, false, false));
+            l.add(new BotaoMobile(16f - 190f * com.badlogic.gdx.math.MathUtils.cos(rad),
+                24f + 190f * com.badlogic.gdx.math.MathUtils.sin(rad), 76f));
         }
         return l;
     }
@@ -216,7 +196,7 @@ public final class Controles {
     public static java.util.List<BotaoMobile> layoutMobile() {
         carregar();
         if (layoutMobile == null) {
-            layoutMobile = lerLayout(prefs().getString("layout_mobile", ""));
+            layoutMobile = lerLayout(prefs().getString("layout_mobile_fixo", ""));
             if (layoutMobile == null) layoutMobile = layoutPadrao();
         }
         java.util.List<BotaoMobile> copia = new java.util.ArrayList<>();
@@ -230,45 +210,33 @@ public final class Controles {
         StringBuilder sb = new StringBuilder();
         for (BotaoMobile b : layoutMobile) {
             if (sb.length() > 0) sb.append(';');
-            sb.append(b.fixo ? 'f' : 'd').append('|').append(b.x).append('|').append(b.y).append('|').append(b.tamanho).append('|');
-            for (boolean d : b.direcoes) sb.append(d ? '1' : '0');
+            sb.append(b.x).append('|').append(b.y).append('|').append(b.tamanho);
         }
         Preferences p = prefs();
-        p.putString("layout_mobile", sb.toString());
+        p.putString("layout_mobile_fixo", sb.toString());
         p.flush();
     }
 
-    /** Formato: "f|x|y|tam|0000;d|x|y|tam|1001;..." - invalido = null (padrao). */
+    /** Formato: "x|y|tam;x|y|tam;..." - invalido = null (padrao). */
     private static java.util.List<BotaoMobile> lerLayout(String texto) {
         if (texto == null || texto.isEmpty()) return null;
         try {
             java.util.List<BotaoMobile> l = new java.util.ArrayList<>();
-            int total = 0;
             for (String parte : texto.split(";")) {
                 String[] c = parte.split("\\|");
-                if (c.length != 5 || c[4].length() != 4) return null;
-                BotaoMobile b = new BotaoMobile("f".equals(c[0]), Float.parseFloat(c[1]), Float.parseFloat(c[2]),
-                    Math.max(TAM_BOTAO_MIN, Math.min(TAM_BOTAO_MAX, Float.parseFloat(c[3]))),
-                    c[4].charAt(0) == '1', c[4].charAt(1) == '1', c[4].charAt(2) == '1', c[4].charAt(3) == '1');
-                if (b.slots() == 0) return null;
-                total += b.slots();
-                l.add(b);
+                if (c.length != 3) return null;
+                l.add(new BotaoMobile(Float.parseFloat(c[0]), Float.parseFloat(c[1]),
+                    Math.max(TAM_BOTAO_MIN, Math.min(TAM_BOTAO_MAX, Float.parseFloat(c[2])))));
             }
-            return total <= MAX_SLOTS_MOBILE ? l : null;
+            return l.size() <= MAX_BOTOES_MOBILE ? l : null;
         } catch (RuntimeException e) {
             return null;
         }
     }
 
-    /** Slot (0-8) e' de um botao FIXO no layout do celular? (so' comida/pocao) */
+    /** No celular cada botao e' um slot (1o botao = slot 1...): e' de comida/pocao. */
     public static boolean slotFixoMobile(int slot) {
-        int i = 0;
-        for (BotaoMobile b : layoutMobile()) {
-            int n = b.slots();
-            if (slot >= i && slot < i + n) return b.fixo;
-            i += n;
-        }
-        return false;
+        return slot >= 0 && slot < layoutMobile().size();
     }
 
     public static void restaurarJoystick() {

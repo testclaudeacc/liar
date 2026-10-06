@@ -31,15 +31,10 @@ import java.util.List;
  *
  * PC: uma linha no centro de baixo; teclas configuraveis (Controles).
  *
- * Celular: botoes no lado direito, montados a partir do layout salvo no
- * aparelho (Controles.layoutMobile), editavel em Settings > Controls > Edit
- * buttons. Cada botao e':
- *  - FIXO: 1 atalho (so' comida/pocao), tocar usa;
- *  - de ARRASTAR: 1 a 4 atalhos, um por direcao ligada (cima, direita,
- *    baixo, esquerda) - segura, desliza pra direcao e solta (soltar sem
- *    deslizar cancela).
- * Os 9 slots vao sendo distribuidos em ordem pelos botoes (no maximo 9
- * atalhos somados).
+ * Celular: botoes redondos (botao i = slot i), tocar usa. Comeca com 4;
+ * em Settings > Controls > Edit buttons da' pra adicionar ate' 9, remover,
+ * mover arrastando e mudar o tamanho de cada um (salvo no aparelho,
+ * Controles.layoutMobile).
  */
 public final class HotbarUI {
 
@@ -54,13 +49,6 @@ public final class HotbarUI {
     private static final Color COR_SELECAO = new Color(0.95f, 0.65f, 0.24f, 1f);
 
     // ---- Celular ----
-    /** Opcoes que aparecem ao segurar um botao de arrastar. */
-    private static final float TAM_OPCAO = 66f;
-    /** Angulo de cada direcao: cima, direita, baixo, esquerda. */
-    private static final float[] ANGULOS = {90f, 0f, -90f, 180f};
-    private static final String[] NOMES_DIRECAO = {"Up", "Right", "Down", "Left"};
-    /** Arrastou menos que isso: nenhuma opcao (soltar cancela). */
-    private static final float ZONA_MORTA = 30f;
 
     private final Stage stage;
     private final Skin skin;
@@ -77,13 +65,8 @@ public final class HotbarUI {
     private final Button[] slots = new Button[BookMenuUI.SLOTS_ATALHO];
     private final Stack[] conteudos = new Stack[BookMenuUI.SLOTS_ATALHO];
     private Button.ButtonStyle estiloSlot, estiloSlotEscolhido;
-    private com.badlogic.gdx.scenes.scene2d.utils.Drawable circuloBotao, circuloBotaoSelecionado;
-
-    /** Botoes do celular montados a partir do layout. */
-    private final List<BotaoNaTela> botoes = new ArrayList<>();
-    /** Dono de cada slot no layout atual (null = slot fora do layout). */
-    private final BotaoNaTela[] donoDoSlot = new BotaoNaTela[BookMenuUI.SLOTS_ATALHO];
-    private List<Controles.BotaoMobile> layout;
+    /** Celular: botoes (1 a 9; botao i = slot i), salvo no aparelho. */
+    private List<Controles.BotaoMobile> layout = new ArrayList<>();
 
     public HotbarUI(Stage stage, Skin skin, BookMenuUI livro, AoUsar aoUsar) {
         this.stage = stage;
@@ -95,8 +78,6 @@ public final class HotbarUI {
             estiloSlot.up = circulo(new Color(0.15f, 0.15f, 0.15f, 0.92f), new Color(0.32f, 0.32f, 0.32f, 1f));
             estiloSlotEscolhido = new Button.ButtonStyle();
             estiloSlotEscolhido.up = circulo(new Color(0.22f, 0.22f, 0.22f, 0.96f), COR_SELECAO);
-            circuloBotao = circulo(new Color(0.13f, 0.13f, 0.13f, 0.92f), new Color(0.42f, 0.42f, 0.42f, 1f));
-            circuloBotaoSelecionado = circulo(new Color(0.13f, 0.13f, 0.13f, 0.92f), COR_SELECAO);
         } else {
             // Um pouco mais escuro que os slots da bag (a pedido do usuario).
             estiloSlot.up = UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 0.92f), new Color(0.17f, 0.17f, 0.17f, 1f), 2);
@@ -112,7 +93,7 @@ public final class HotbarUI {
                     if (!editando) usar(indice);
                 }
             });
-            if (MOBILE) slot.addListener(new ListenerEdicao(() -> donoDoSlot[indice]));
+            if (MOBILE) slot.addListener(new ListenerEdicao(indice));
             slots[i] = slot;
         }
         if (MOBILE) {
@@ -131,158 +112,17 @@ public final class HotbarUI {
     }
 
     // =====================================================================
-    // Celular: botoes a partir do layout
+    // Celular: botoes fixos a partir do layout
     // =====================================================================
 
-    /** Um botao do layout ja' na tela. Fixo: o proprio slot e' o botao. De
-     * arrastar: botao principal proprio + um slot por direcao ligada. */
-    private final class BotaoNaTela {
-        final Controles.BotaoMobile cfg;
-        final Button principal;
-        final int[] slotDaDirecao = {-1, -1, -1, -1};
-        boolean aberto = false;
-        int escolhida = -1; // direcao escolhida (0-3) ou -1
-
-        BotaoNaTela(Controles.BotaoMobile cfg, int primeiroSlot) {
-            this.cfg = cfg;
-            if (cfg.fixo) {
-                principal = slots[primeiroSlot];
-                principal.setStyle(estiloSlot);
-                principal.setVisible(true);
-                principal.setTouchable(Touchable.enabled);
-                donoDoSlot[primeiroSlot] = this;
-            } else {
-                Button.ButtonStyle estilo = new Button.ButtonStyle();
-                estilo.up = circuloBotao;
-                principal = new Button(estilo);
-                int s = primeiroSlot;
-                for (int d = 0; d < 4; d++) {
-                    if (!cfg.direcoes[d]) continue;
-                    slotDaDirecao[d] = s;
-                    donoDoSlot[s] = this;
-                    slots[s].setVisible(false);
-                    slots[s].setTouchable(Touchable.disabled);
-                    s++;
-                }
-                Label texto = new Label(rotuloDrag(), skin, "hud");
-                texto.setFontScale(0.9f);
-                texto.setColor(1f, 1f, 1f, 0.75f);
-                principal.add(texto);
-                principal.addListener(new InputListener() {
-                    @Override public boolean touchDown(InputEvent e, float x, float y, int pointer, int b) {
-                        if (editando) return false; // quem trata e' o ListenerEdicao
-                        abrir();
-                        return true;
-                    }
-                    @Override public void touchDragged(InputEvent e, float x, float y, int pointer) {
-                        if (!editando) escolher(e.getStageX(), e.getStageY());
-                    }
-                    @Override public void touchUp(InputEvent e, float x, float y, int pointer, int b) {
-                        if (editando) return;
-                        int d = escolhida;
-                        fechar();
-                        if (d >= 0 && slotDaDirecao[d] >= 0) usar(slotDaDirecao[d]);
-                    }
-                });
-                principal.addListener(new ListenerEdicao(() -> this));
-            }
-            grupoMobile.addActor(principal);
-        }
-
-        /** Ex: "1/2", "3/4/5/6" - os slots desse botao. */
-        String rotuloDrag() {
-            StringBuilder sb = new StringBuilder();
-            for (int d = 0; d < 4; d++) {
-                if (slotDaDirecao[d] < 0) continue;
-                if (sb.length() > 0) sb.append('/');
-                sb.append(slotDaDirecao[d] + 1);
-            }
-            return sb.toString();
-        }
-
-        float cx() { return principal.getX() + principal.getWidth() / 2f; }
-        float cy() { return principal.getY() + principal.getHeight() / 2f; }
-
-        /** Mostra as opcoes em volta (no modo edicao ficam apagadas, so' pra ver). */
-        void mostrarOpcoes(float alfa) {
-            float dist = cfg.tamanho / 2f + TAM_OPCAO / 2f + 6f;
-            for (int d = 0; d < 4; d++) {
-                int s = slotDaDirecao[d];
-                if (s < 0) continue;
-                float ang = ANGULOS[d] * MathUtils.degreesToRadians;
-                slots[s].setStyle(estiloSlot);
-                slots[s].setBounds(cx() + dist * MathUtils.cos(ang) - TAM_OPCAO / 2f,
-                    cy() + dist * MathUtils.sin(ang) - TAM_OPCAO / 2f, TAM_OPCAO, TAM_OPCAO);
-                slots[s].setVisible(true);
-                slots[s].clearActions();
-                slots[s].getColor().a = alfa;
-                slots[s].toFront();
-            }
-            principal.toFront();
-        }
-
-        void esconderOpcoes() {
-            for (int d = 0; d < 4; d++) {
-                int s = slotDaDirecao[d];
-                if (s < 0) continue;
-                slots[s].setStyle(estiloSlot);
-                slots[s].setVisible(false);
-            }
-        }
-
-        void abrir() {
-            aberto = true;
-            escolhida = -1;
-            mostrarOpcoes(0f);
-            for (int d = 0; d < 4; d++) if (slotDaDirecao[d] >= 0) slots[slotDaDirecao[d]].addAction(Actions.fadeIn(0.08f));
-        }
-
-        /** Direcao ligada mais perto da direcao do dedo, ou nenhuma. */
-        void escolher(float dedoX, float dedoY) {
-            if (!aberto) return;
-            float dx = dedoX - cx(), dy = dedoY - cy();
-            int nova = -1;
-            if (dx * dx + dy * dy >= ZONA_MORTA * ZONA_MORTA) {
-                float ang = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
-                float melhor = Float.MAX_VALUE;
-                for (int d = 0; d < 4; d++) {
-                    if (slotDaDirecao[d] < 0) continue;
-                    float dif = Math.abs(((ang - ANGULOS[d]) % 360f + 540f) % 360f - 180f);
-                    if (dif < melhor) { melhor = dif; nova = d; }
-                }
-                if (melhor > 60f) nova = -1; // dedo pra um lado sem opcao
-            }
-            if (nova == escolhida) return;
-            escolhida = nova;
-            for (int d = 0; d < 4; d++) {
-                if (slotDaDirecao[d] >= 0) slots[slotDaDirecao[d]].setStyle(d == escolhida ? estiloSlotEscolhido : estiloSlot);
-            }
-        }
-
-        void fechar() {
-            aberto = false;
-            escolhida = -1;
-            esconderOpcoes();
-        }
-    }
-
-    /** Recria os botoes do celular a partir do layout atual. */
+    /** Mostra os slots que tem botao no layout (botao i = slot i). */
     private void montarMobile() {
-        for (BotaoNaTela b : botoes) b.fechar();
-        botoes.clear();
         grupoMobile.clearChildren();
-        java.util.Arrays.fill(donoDoSlot, null);
-        for (Button s : slots) {
-            s.setVisible(false);
-            s.setTouchable(Touchable.disabled);
-            grupoMobile.addActor(s);
-        }
-        int proximo = 0;
-        for (Controles.BotaoMobile cfg : layout) {
-            int n = cfg.slots();
-            if (n <= 0 || proximo + n > slots.length) continue;
-            botoes.add(new BotaoNaTela(cfg, proximo));
-            proximo += n;
+        for (int i = 0; i < slots.length; i++) {
+            boolean temBotao = i < layout.size();
+            slots[i].setVisible(temBotao);
+            slots[i].setTouchable(temBotao ? Touchable.enabled : Touchable.disabled);
+            if (temBotao) grupoMobile.addActor(slots[i]);
         }
         atualizar();
     }
@@ -291,53 +131,45 @@ public final class HotbarUI {
         Stage st = grupoMobile.getStage();
         if (st == null) return;
         float w = st.getWidth();
-        for (BotaoNaTela b : botoes) {
-            if (b.aberto) continue; // nao mexe com o dedo em cima
-            float t = b.cfg.tamanho;
-            b.principal.setBounds(w - b.cfg.x - t / 2f, b.cfg.y - t / 2f, t, t);
-            if (!b.cfg.fixo) {
-                b.principal.getStyle().up = editando && b == selecionado ? circuloBotaoSelecionado : circuloBotao;
-                if (editando) b.mostrarOpcoes(0.45f);
-            } else {
-                b.principal.setStyle(editando && b == selecionado ? estiloSlotEscolhido : estiloSlot);
-            }
+        for (int i = 0; i < layout.size() && i < slots.length; i++) {
+            Controles.BotaoMobile b = layout.get(i);
+            slots[i].setBounds(w - b.x - b.tamanho / 2f, b.y - b.tamanho / 2f, b.tamanho, b.tamanho);
+            slots[i].setStyle(editando && i == selecionado ? estiloSlotEscolhido : estiloSlot);
         }
     }
 
     // =====================================================================
-    // Celular: editor de layout (Settings > Controls > Edit buttons)
+    // Celular: editor (Settings > Controls > Edit buttons)
     // =====================================================================
 
     private boolean editando = false;
-    private BotaoNaTela selecionado = null;
+    private int selecionado = -1;
     private Table painelEdicao;
     private Runnable aoSairEdicao;
 
-    /** Arrastar move o botao; tocar seleciona (painel mostra as opcoes dele). */
+    /** Arrastar move o botao; tocar seleciona (painel mostra tamanho/remover). */
     private final class ListenerEdicao extends InputListener {
-        final java.util.function.Supplier<BotaoNaTela> dono;
+        final int indice;
         float iniX, iniY, cfgIniX, cfgIniY;
 
-        ListenerEdicao(java.util.function.Supplier<BotaoNaTela> dono) { this.dono = dono; }
+        ListenerEdicao(int indice) { this.indice = indice; }
 
         @Override public boolean touchDown(InputEvent e, float x, float y, int pointer, int b) {
-            if (!editando) return false;
-            BotaoNaTela bt = dono.get();
-            if (bt == null) return false;
-            selecionado = bt;
+            if (!editando || indice >= layout.size()) return false;
+            selecionado = indice;
+            Controles.BotaoMobile bt = layout.get(indice);
             iniX = e.getStageX(); iniY = e.getStageY();
-            cfgIniX = bt.cfg.x; cfgIniY = bt.cfg.y;
+            cfgIniX = bt.x; cfgIniY = bt.y;
             atualizarPainel();
             return true;
         }
 
         @Override public void touchDragged(InputEvent e, float x, float y, int pointer) {
-            if (!editando) return;
-            BotaoNaTela bt = dono.get();
-            if (bt == null) return;
-            float meio = bt.cfg.tamanho / 2f;
-            bt.cfg.x = MathUtils.clamp(cfgIniX - (e.getStageX() - iniX), meio, stage.getWidth() - meio);
-            bt.cfg.y = MathUtils.clamp(cfgIniY + (e.getStageY() - iniY), meio, stage.getHeight() - meio);
+            if (!editando || indice >= layout.size()) return;
+            Controles.BotaoMobile bt = layout.get(indice);
+            float meio = bt.tamanho / 2f;
+            bt.x = MathUtils.clamp(cfgIniX - (e.getStageX() - iniX), meio, stage.getWidth() - meio);
+            bt.y = MathUtils.clamp(cfgIniY + (e.getStageY() - iniY), meio, stage.getHeight() - meio);
         }
 
         @Override public void touchUp(InputEvent e, float x, float y, int pointer, int b) {
@@ -349,7 +181,7 @@ public final class HotbarUI {
         if (!MOBILE) return;
         aoSairEdicao = aoSair;
         editando = true;
-        selecionado = null;
+        selecionado = -1;
         if (painelEdicao == null) {
             painelEdicao = new Table();
             painelEdicao.setFillParent(true);
@@ -360,39 +192,30 @@ public final class HotbarUI {
         painelEdicao.setVisible(true);
         painelEdicao.toFront();
         atualizarPainel();
-        atualizar(); // numero de cada slot aparece no editor
+        atualizar(); // numero de cada botao aparece no editor
     }
 
     private void sairEdicao() {
         editando = false;
-        selecionado = null;
+        selecionado = -1;
         Controles.salvarLayoutMobile(layout);
-        for (BotaoNaTela b : botoes) b.fechar();
         if (painelEdicao != null) painelEdicao.setVisible(false);
         atualizar();
         if (aoSairEdicao != null) aoSairEdicao.run();
     }
 
-    private int slotsUsados() {
-        int n = 0;
-        for (Controles.BotaoMobile b : layout) n += b.slots();
-        return n;
-    }
-
-    /** Mudou o layout: salva, remonta e mantem a selecao no mesmo botao. */
-    private void layoutMudou(Controles.BotaoMobile selecionar) {
+    private void layoutMudou(int selecionar) {
         Controles.salvarLayoutMobile(layout);
         montarMobile();
-        selecionado = null;
-        for (BotaoNaTela b : botoes) if (b.cfg == selecionar) selecionado = b;
+        selecionado = selecionar < layout.size() ? selecionar : -1;
         atualizarPainel();
     }
 
-    private TextButton botaoPainel(String texto, boolean ligado, Runnable acao) {
+    private TextButton botaoPainel(String texto, boolean destaque, Runnable acao) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
         e.font = skin.getFont("botao-pequeno-font");
         e.fontColor = Color.WHITE;
-        Color borda = ligado ? COR_SELECAO : new Color(0.4f, 0.4f, 0.4f, 1f);
+        Color borda = destaque ? COR_SELECAO : new Color(0.4f, 0.4f, 0.4f, 1f);
         e.up = UiSkin.retangulo(new Color(0.14f, 0.14f, 0.14f, 1f), borda, 2);
         e.down = UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), borda, 2);
         TextButton b = new TextButton(texto, e);
@@ -408,80 +231,45 @@ public final class HotbarUI {
         Table caixa = new Table();
         caixa.setBackground(skin.getDrawable("popup-painel"));
         caixa.pad(10, 14, 10, 14);
-        caixa.defaults().height(44).pad(3);
 
-        int usados = slotsUsados();
         Table linha1 = new Table();
         linha1.defaults().height(44).pad(3);
-        Label info = new Label("Slots " + usados + "/" + Controles.MAX_SLOTS_MOBILE, skin, "opcoes-label");
-        linha1.add(info).padRight(10);
-        linha1.add(botaoPainel("+ Fixed", false, () -> {
-            if (slotsUsados() >= Controles.MAX_SLOTS_MOBILE) return;
-            Controles.BotaoMobile novo = new Controles.BotaoMobile(true, 300f, 220f, 78f, false, false, false, false);
-            layout.add(novo);
-            layoutMudou(novo);
-        })).width(120);
-        linha1.add(botaoPainel("+ Drag", false, () -> {
-            if (slotsUsados() >= Controles.MAX_SLOTS_MOBILE) return;
-            Controles.BotaoMobile novo = new Controles.BotaoMobile(false, 400f, 220f, 88f, true, false, false, false);
-            layout.add(novo);
-            layoutMudou(novo);
-        })).width(120);
+        linha1.add(new Label("Buttons " + layout.size() + "/" + Controles.MAX_BOTOES_MOBILE, skin, "opcoes-label")).padRight(10);
+        linha1.add(botaoPainel("+ Add", false, () -> {
+            if (layout.size() >= Controles.MAX_BOTOES_MOBILE) return;
+            layout.add(new Controles.BotaoMobile(300f, 220f, 76f));
+            layoutMudou(layout.size() - 1);
+        })).width(110);
         linha1.add(botaoPainel("Reset", false, () -> {
             layout = Controles.layoutPadrao();
-            layoutMudou(null);
+            layoutMudou(-1);
         })).width(100).padLeft(16);
         linha1.add(botaoPainel("Done", true, this::sairEdicao)).width(100);
         caixa.add(linha1).row();
 
-        if (selecionado == null) {
+        if (selecionado < 0) {
             caixa.add(new Label("Tap a button to edit it, drag to move it", skin, "opcoes-label")).padTop(4).row();
         } else {
-            final Controles.BotaoMobile c = selecionado.cfg;
+            final int i = selecionado;
+            final Controles.BotaoMobile c = layout.get(i);
             Table linha2 = new Table();
             linha2.defaults().height(44).pad(3);
-            linha2.add(botaoPainel(c.fixo ? "Fixed" : "Drag", true, () -> {
-                if (c.fixo) {
-                    c.fixo = false;
-                    java.util.Arrays.fill(c.direcoes, false);
-                    c.direcoes[0] = true; // continua usando 1 slot
-                } else {
-                    c.fixo = true;
-                }
-                layoutMudou(c);
-            })).width(100);
+            linha2.add(new Label("Button " + (i + 1) + "   Size", skin, "opcoes-label")).padRight(8);
             linha2.add(botaoPainel("-", false, () -> {
                 c.tamanho = Math.max(Controles.TAM_BOTAO_MIN, c.tamanho - 8f);
-                layoutMudou(c);
+                layoutMudou(i);
             })).width(48);
-            linha2.add(new Label(Math.round(c.tamanho) + "", skin, "opcoes-label")).width(48);
+            linha2.add(new Label(String.valueOf(Math.round(c.tamanho)), skin, "opcoes-label")).width(48);
             linha2.add(botaoPainel("+", false, () -> {
                 c.tamanho = Math.min(Controles.TAM_BOTAO_MAX, c.tamanho + 8f);
-                layoutMudou(c);
+                layoutMudou(i);
             })).width(48);
-            if (!c.fixo) {
-                for (int d = 0; d < 4; d++) {
-                    final int dir = d;
-                    linha2.add(botaoPainel(NOMES_DIRECAO[d], c.direcoes[d], () -> {
-                        if (c.direcoes[dir]) {
-                            if (c.slots() <= 1) return; // pelo menos 1 direcao
-                            c.direcoes[dir] = false;
-                        } else {
-                            if (slotsUsados() >= Controles.MAX_SLOTS_MOBILE) return;
-                            c.direcoes[dir] = true;
-                        }
-                        layoutMudou(c);
-                    })).width(84);
-                }
-            }
             linha2.add(botaoPainel("Delete", false, () -> {
-                layout.remove(c);
-                layoutMudou(null);
-            })).width(100).padLeft(10);
+                if (layout.size() <= 1) return; // pelo menos 1 botao
+                layout.remove(i);
+                layoutMudou(-1);
+            })).width(100).padLeft(16);
             caixa.add(linha2).row();
-            String dica = c.fixo ? "Fixed: tap to use (food & potions only)"
-                : "Drag: hold, slide to a direction and release";
-            caixa.add(new Label(dica, skin, "opcoes-label")).padTop(2).row();
         }
         painelEdicao.add(caixa);
     }
@@ -510,8 +298,7 @@ public final class HotbarUI {
 
     private float tamanhoSlot(int i) {
         if (!MOBILE) return TAM_SLOT;
-        BotaoNaTela b = donoDoSlot[i];
-        return b != null && b.cfg.fixo ? b.cfg.tamanho : TAM_OPCAO;
+        return i < layout.size() ? layout.get(i).tamanho : 76f;
     }
 
     /** Atualiza o conteudo dos slots (mudou a barra ou a bag). Os botoes
@@ -561,9 +348,6 @@ public final class HotbarUI {
     private void usar(int indice) {
         apertar(slots[indice]);
         escurecerIcones(conteudos[indice]);
-        // Celular, opcao de botao de arrastar: ela some junto, entao o "apertado" vai no botao.
-        BotaoNaTela dono = MOBILE ? donoDoSlot[indice] : null;
-        if (dono != null && !dono.cfg.fixo) apertar(dono.principal);
         String caminho = livro.atalhos()[indice];
         if (caminho != null && !caminho.isEmpty()) aoUsar.usar(indice);
     }
@@ -600,7 +384,6 @@ public final class HotbarUI {
 
     public void setVisivel(boolean visivel) {
         raiz.setVisible(visivel);
-        if (!visivel && grupoMobile.isVisible()) for (BotaoNaTela b : botoes) if (!editando) b.fechar();
         grupoMobile.setVisible(visivel || editando);
     }
 }

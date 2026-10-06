@@ -1700,7 +1700,7 @@ public class WorldScreen extends ScreenAdapter {
                 atualizarTamanhoJoystick();
             })).width(210).height(48);
             secao.add(botoes).left().padTop(12).row();
-            secao.add(new Label("Buttons: add, remove, move, resize and set directions", skin, "opcoes-label")).left().padTop(18).row();
+            secao.add(new Label("Hotbar buttons: add (up to 9), remove, move and resize", skin, "opcoes-label")).left().padTop(18).row();
             secao.add(botaoPequeno("Edit buttons", () -> {
                 fecharSettings();
                 hotbar.entrarEdicao(null);
