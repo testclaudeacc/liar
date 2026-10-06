@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.10"
+SERVER_VERSION = "v0.11"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -1662,7 +1662,7 @@ def init_db():
         # {"kharon": true}) - pra nao repetir a fala de 1a vez (nem a
         # "quest"/pedido do NPC) toda vez que ele conversa de novo.
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS npc_dialogue_state TEXT DEFAULT '{}'")
-        # Barra de atalhos: {"spells": [4], "items": [4]} (ver normalizar_hotbar).
+        # Barra de atalhos: {"slots": [8]} (ver normalizar_hotbar).
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS hotbar TEXT DEFAULT '{}'")
         c.execute('''CREATE TABLE IF NOT EXISTS friendships (
                         id SERIAL PRIMARY KEY,
@@ -2107,7 +2107,7 @@ def handle_join_game(data):
         try: hb_salva = json.loads(row[17]) if row[17] else {}
         except (TypeError, ValueError): hb_salva = {}
         # Nunca configurou a barra: começa com o cookie no 1o slot de item.
-        if not hb_salva: hb_salva = {'items': [COOKIE, '', '', '']}
+        if not hb_salva: hb_salva = {'slots': [COOKIE]}
         data['hotbar'] = normalizar_hotbar(hb_salva)
         data['session_start'] = time.time()
         
@@ -4602,27 +4602,32 @@ def _comer(sid, p, inst):
     emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
 
 # ---- Barra de atalhos (hotbar) ----
-# 4 slots de magia + 4 de item (comida/poção). Cada slot guarda o CAMINHO do
-# item (não a instância): usar pega a 1a unidade daquele item na bag.
-HOTBAR_SLOTS = 4
+# 8 slots livres: cada um guarda o CAMINHO de um item usável (comida; poção
+# quando existir) ou, no futuro, o id de uma magia. Usar um item pega a 1a
+# unidade dele na bag. Formato salvo: {"slots": [8 strings]}.
+HOTBAR_SLOTS = 8
 
 def item_usavel_no_atalho(item_path):
-    # Por enquanto só comida; poção entra aqui quando existir.
+    # Por enquanto só comida; poção (e magia) entram aqui quando existirem.
     dados = ITEM_DB.get(item_path, {})
     try: return int(dados.get('fullness', 0)) > 0
     except (TypeError, ValueError): return False
 
 def normalizar_hotbar(hb):
     hb = hb if isinstance(hb, dict) else {}
-    saida = {}
-    for tipo in ('spells', 'items'):
-        lista = hb.get(tipo) if isinstance(hb.get(tipo), list) else []
-        lista = [(v if isinstance(v, str) else '') for v in lista[:HOTBAR_SLOTS]]
-        lista += [''] * (HOTBAR_SLOTS - len(lista))
-        if tipo == 'items': lista = [v if item_usavel_no_atalho(v) else '' for v in lista]
-        else: lista = ['' for _ in lista]  # ainda não existem magias
-        saida[tipo] = lista
-    return saida
+    lista = hb.get('slots')
+    if not isinstance(lista, list):
+        # Formato antigo (4 magias + 4 itens): vira os 8 slots em sequência.
+        antigas = hb.get('spells') if isinstance(hb.get('spells'), list) else []
+        itens = hb.get('items') if isinstance(hb.get('items'), list) else []
+        lista = (antigas + [''] * 4)[:4] + (itens + [''] * 4)[:4] if (antigas or itens) else []
+    lista = [(v if isinstance(v, str) and item_usavel_no_atalho(v) else '') for v in lista[:HOTBAR_SLOTS]]
+    return {'slots': lista + [''] * (HOTBAR_SLOTS - len(lista))}
+
+def _indice_hotbar(data):
+    try: i = int(data.get('index', -1))
+    except (TypeError, ValueError): return None
+    return i if 0 <= i < HOTBAR_SLOTS else None
 
 @socketio.on('set_hotbar')
 def handle_set_hotbar(data):
@@ -4630,14 +4635,11 @@ def handle_set_hotbar(data):
         sid = request.sid
         p = online_players.get(sid)
         if p is None or not isinstance(data, dict): return
-        tipo = data.get('kind')
-        if tipo not in ('spells', 'items'): return
-        try: i = int(data.get('index', -1))
-        except (TypeError, ValueError): return
-        if not 0 <= i < HOTBAR_SLOTS: return
+        i = _indice_hotbar(data)
+        if i is None: return
         valor = data.get('value') if isinstance(data.get('value'), str) else ''
         hb = normalizar_hotbar(p.get('hotbar'))
-        hb[tipo][i] = valor
+        hb['slots'][i] = valor
         p['hotbar'] = normalizar_hotbar(hb)  # descarta o que não pode ir ali
         _queue_save(p)
         emit('hotbar_synced', {'hotbar': p['hotbar']}, room=sid)
@@ -4649,11 +4651,9 @@ def handle_use_hotbar(data):
         sid = request.sid
         p = online_players.get(sid)
         if p is None or p.get('is_dead') or not isinstance(data, dict): return
-        if data.get('kind') != 'items': return  # magias: ainda não existem
-        try: i = int(data.get('index', -1))
-        except (TypeError, ValueError): return
-        if not 0 <= i < HOTBAR_SLOTS: return
-        caminho = normalizar_hotbar(p.get('hotbar'))['items'][i]
+        i = _indice_hotbar(data)
+        if i is None: return
+        caminho = normalizar_hotbar(p.get('hotbar'))['slots'][i]
         if not caminho: return
         inst = next((it for it in p.get('inventory', []) if it.get('item') == caminho), None)
         if inst is None:
@@ -4885,7 +4885,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-06 hotbar"
+VERSAO_SERVIDOR = "2026-10-06 hotbar 8 slots"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)

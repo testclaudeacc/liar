@@ -818,7 +818,7 @@ public class WorldScreen extends ScreenAdapter {
 
             @Override
             public boolean keyDown(int keycode) {
-                // 1-8: atalhos da barra (1-4 magias, 5-8 itens).
+                // 1-8: atalhos da barra.
                 if (keycode >= Input.Keys.NUM_1 && keycode <= Input.Keys.NUM_8) {
                     if (chat.estaDigitando() || localMorto || settingsAberta() || bookMenu.isVisible()) return false;
                     return hotbar.usarTecla(keycode - Input.Keys.NUM_0);
@@ -965,13 +965,10 @@ public class WorldScreen extends ScreenAdapter {
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
-        // Barra de atalhos (4 magias + 4 itens) - o conteudo vem da aba Spells.
-        hotbar = new HotbarUI(uiStage, skin, bookMenu, (tipo, indice) -> {
+        // Barra de atalhos (8 slots livres, teclas 1-8) - o conteudo vem da aba Spells.
+        hotbar = new HotbarUI(uiStage, skin, bookMenu, indice -> {
             if (localMorto || !socket.isConnected()) return;
-            socket.emitRaw("use_hotbar", GameSocket.obj(jw -> {
-                jw.set("kind", tipo);
-                jw.set("index", indice);
-            }));
+            socket.emitRaw("use_hotbar", GameSocket.obj(jw -> jw.set("index", indice)));
         });
         bookMenu.definirAoMudarAtalhos(hotbar::atualizar);
         bookMenu.definirNomeLocal(local.nome);
