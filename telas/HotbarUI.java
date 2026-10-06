@@ -118,7 +118,7 @@ public final class HotbarUI {
     /** Arrastou menos que isso do centro: nenhuma opcao (soltar cancela). */
     private static final float ZONA_MORTA = 30f;
     /** Centro do botao "5-8": (distancia da borda direita, altura a partir de baixo). */
-    private static final float[] POSICAO_RODA = {128f, 300f};
+    private static final float[] POSICAO_RODA = {172f, 322f};
 
     private float tamanhoSlot(int i) { return MOBILE && i < 4 ? TAM_FIXO : TAM_SLOT; }
 

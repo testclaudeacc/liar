@@ -1161,7 +1161,8 @@ public class WorldScreen extends ScreenAdapter {
     // sentido pro mobile (precisa caber o dedo). No PC (mouse, sem exigencia
     // de area de toque) 108 ficava grande demais - reduzido pra 72 so' la,
     // mantendo a mesma proporcao icone/botao (76/108 ~= 0.70).
-    private final float TAMANHO_BOTAO_TOPO = mobile ? 108f : 72f;
+    // Mobile reduzido de 108 pra 80 (a pedido do usuario, abre espaco pra hotbar).
+    private final float TAMANHO_BOTAO_TOPO = mobile ? 80f : 72f;
     private final float ICONE_BOTAO_TOPO = TAMANHO_BOTAO_TOPO * (76f / 108f);
 
     /** Botao Button1 (up/hover/down) com um icone centralizado por cima -
