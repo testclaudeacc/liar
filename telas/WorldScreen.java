@@ -818,16 +818,18 @@ public class WorldScreen extends ScreenAdapter {
 
             @Override
             public boolean keyDown(int keycode) {
-                // 1-9: atalhos da barra.
-                if (keycode >= Input.Keys.NUM_1 && keycode <= Input.Keys.NUM_9) {
+                // Atalhos da barra (teclas configuraveis, padrao 1-9 - Controles).
+                int slotHotbar = Controles.slotDaTecla(keycode);
+                if (slotHotbar >= 0) {
                     if (chat.estaDigitando() || localMorto || settingsAberta() || bookMenu.isVisible()) return false;
-                    return hotbar.usarTecla(keycode - Input.Keys.NUM_0);
+                    return hotbar.usarTecla(slotHotbar + 1);
                 }
                 if (keycode == Input.Keys.C) {
                     mostrarColisao = !mostrarColisao;
                     return true;
                 }
-                if (keycode == Input.Keys.E) {
+                // Open Bag (padrao E): fala com NPC perto, senao abre o livro.
+                if (keycode == Controles.tecla("bag")) {
                     if (chat.estaDigitando()) return false;
                     if (dialogoNPC.isVisible()) {
                         dialogoNPC.avancarOuFechar();
@@ -856,7 +858,7 @@ public class WorldScreen extends ScreenAdapter {
                 // Espaco abre/fecha o chat - mas so' quando NAO se esta
                 // digitando nele (senao cada espaco dentro de uma mensagem
                 // fecharia o chat no meio da digitacao).
-                if (keycode == Input.Keys.SPACE) {
+                if (keycode == Controles.tecla("chat")) {
                     if (chat.estaDigitando()) return false;
                     alternarChat();
                     return true;
@@ -1589,6 +1591,169 @@ public class WorldScreen extends ScreenAdapter {
         return conteudo;
     }
 
+    // ===================== CONTROLES (Settings) =====================
+    // PC: tecla de cada acao (hotbar 1-9, Open Bag, Open Chat, Write) - clica
+    // no botao da tecla e aperta a nova (ESC cancela). Celular: tamanho e
+    // posicao do joystick. Tudo salvo no aparelho (Controles).
+
+    private final java.util.Map<String, TextButton> botoesTecla = new java.util.HashMap<>();
+    private String acaoCapturando = null;
+    private Label avisoControles, valorTamanhoJoystick;
+    private Table painelEditarJoystick;
+
+    private TextButton.TextButtonStyle estiloTecla(boolean capturando) {
+        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
+        e.font = skin.getFont("botao-pequeno-font");
+        e.fontColor = capturando ? new Color(1f, 0.85f, 0.3f, 1f) : Color.WHITE;
+        Color borda = capturando ? new Color(0.95f, 0.65f, 0.24f, 1f) : new Color(0.38f, 0.38f, 0.38f, 1f);
+        e.up = UiSkin.retangulo(new Color(0.13f, 0.13f, 0.13f, 1f), borda, 2);
+        e.over = UiSkin.retangulo(new Color(0.19f, 0.19f, 0.19f, 1f), capturando ? borda : new Color(0.55f, 0.55f, 0.55f, 1f), 2);
+        e.down = UiSkin.retangulo(new Color(0.09f, 0.09f, 0.09f, 1f), borda, 2);
+        return e;
+    }
+
+    private TextButton botaoPequeno(String texto, Runnable acao) {
+        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(skin.get("default", TextButton.TextButtonStyle.class));
+        e.font = skin.getFont("botao-pequeno-font");
+        TextButton b = new TextButton(texto, e);
+        b.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { acao.run(); }
+        });
+        return b;
+    }
+
+    private Table criarSecaoControles() {
+        Table secao = new Table();
+        secao.left().top();
+        secao.add(new Label("Controls", skin, "secao")).left().row();
+        if (!mobile) {
+            secao.add(new Label("Click a key, then press the new one (ESC cancels)", skin, "opcoes-label")).left().padTop(4).row();
+            Table grade = new Table();
+            int coluna = 0;
+            for (java.util.Map.Entry<String, String> e : Controles.NOMES.entrySet()) {
+                final String acao = e.getKey();
+                Label nome = new Label(e.getValue(), skin, "opcoes-label");
+                TextButton tecla = new TextButton(Controles.nomeTecla(Controles.tecla(acao)), estiloTecla(false));
+                tecla.addListener(new ChangeListener() {
+                    @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                        comecarCaptura(acao);
+                    }
+                });
+                botoesTecla.put(acao, tecla);
+                grade.add(nome).align(Align.right).width(200).pad(5, 6, 5, 10);
+                grade.add(tecla).width(96).height(36).pad(5, 0, 5, 30);
+                if (++coluna % 2 == 0) grade.row();
+            }
+            secao.add(grade).left().padTop(14).row();
+            avisoControles = new Label("", skin, "opcoes-label");
+            avisoControles.setColor(1f, 0.85f, 0.3f, 1f);
+            secao.add(avisoControles).left().padTop(6).row();
+            secao.add(botaoPequeno("Reset to default", () -> {
+                cancelarCaptura();
+                Controles.restaurarPadrao();
+                atualizarBotoesTecla();
+                avisoControles.setText("Controls reset to default.");
+            })).left().width(200).height(38).padTop(8).row();
+            // Captura a proxima tecla (no uiStage: vem antes do jogo, entao a
+            // tecla escolhida nao dispara a acao dela nesse mesmo aperto).
+            uiStage.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+                @Override public boolean keyDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, int keycode) {
+                    if (acaoCapturando == null) return false;
+                    String acao = acaoCapturando;
+                    cancelarCaptura();
+                    if (keycode == Input.Keys.ESCAPE) return true;
+                    String trocou = Controles.definir(acao, keycode);
+                    if ("".equals(trocou)) {
+                        avisoControles.setText(Controles.nomeTecla(keycode) + " is reserved (movement, ESC or C).");
+                    } else if (trocou != null) {
+                        avisoControles.setText(Controles.nomeTecla(keycode) + " was on " + Controles.NOMES.get(trocou)
+                            + " - swapped: it is now " + Controles.nomeTecla(Controles.tecla(trocou)) + ".");
+                    } else {
+                        avisoControles.setText("");
+                    }
+                    atualizarBotoesTecla();
+                    return true;
+                }
+            });
+        } else {
+            secao.add(new Label("Joystick: size and position", skin, "opcoes-label")).left().padTop(4).row();
+            Table linha = new Table();
+            linha.add(new Label("Size", skin, "opcoes-label")).padRight(12);
+            linha.add(botaoPequeno("-", () -> mudarTamanhoJoystick(-0.1f))).size(56, 48);
+            valorTamanhoJoystick = new Label("", skin, "opcoes-label");
+            valorTamanhoJoystick.setAlignment(Align.center);
+            linha.add(valorTamanhoJoystick).width(90);
+            linha.add(botaoPequeno("+", () -> mudarTamanhoJoystick(0.1f))).size(56, 48);
+            secao.add(linha).left().padTop(12).row();
+            Table botoes = new Table();
+            botoes.add(botaoPequeno("Move joystick", this::comecarMoverJoystick)).width(210).height(48).padRight(12);
+            botoes.add(botaoPequeno("Reset joystick", () -> {
+                Controles.restaurarJoystick();
+                joystick.aplicarConfig();
+                atualizarTamanhoJoystick();
+            })).width(210).height(48);
+            secao.add(botoes).left().padTop(12).row();
+            atualizarTamanhoJoystick();
+        }
+        return secao;
+    }
+
+    private void comecarCaptura(String acao) {
+        cancelarCaptura();
+        acaoCapturando = acao;
+        TextButton b = botoesTecla.get(acao);
+        if (b != null) { b.setStyle(estiloTecla(true)); b.setText("Press a key..."); }
+        if (avisoControles != null) avisoControles.setText("");
+        uiStage.setKeyboardFocus(null); // a tecla chega na raiz do stage (listener acima)
+    }
+
+    private void cancelarCaptura() {
+        acaoCapturando = null;
+        atualizarBotoesTecla();
+    }
+
+    private void atualizarBotoesTecla() {
+        for (java.util.Map.Entry<String, TextButton> e : botoesTecla.entrySet()) {
+            e.getValue().setStyle(estiloTecla(e.getKey().equals(acaoCapturando)));
+            e.getValue().setText(e.getKey().equals(acaoCapturando) ? "Press a key..." : Controles.nomeTecla(Controles.tecla(e.getKey())));
+        }
+        if (hotbar != null) hotbar.atualizar(); // o numero da tecla em cada slot
+    }
+
+    private void mudarTamanhoJoystick(float delta) {
+        Controles.definirJoystickEscala(Controles.joystickEscala() + delta);
+        joystick.aplicarConfig();
+        atualizarTamanhoJoystick();
+    }
+
+    private void atualizarTamanhoJoystick() {
+        if (valorTamanhoJoystick != null) valorTamanhoJoystick.setText(Math.round(Controles.joystickEscala() * 100f) + "%");
+    }
+
+    /** Fecha o Settings e deixa arrastar o joystick; "Done" salva e volta. */
+    private void comecarMoverJoystick() {
+        fecharSettings();
+        joystick.setEditando(true);
+        if (painelEditarJoystick == null) {
+            painelEditarJoystick = new Table();
+            painelEditarJoystick.setFillParent(true);
+            painelEditarJoystick.top().padTop(120);
+            Table caixa = new Table();
+            caixa.setBackground(skin.getDrawable("popup-painel"));
+            caixa.pad(12, 18, 12, 18);
+            caixa.add(new Label("Drag the joystick to where you want it", skin, "opcoes-label")).padRight(16);
+            caixa.add(botaoPequeno("Done", () -> {
+                joystick.setEditando(false);
+                painelEditarJoystick.setVisible(false);
+            })).width(120).height(48);
+            painelEditarJoystick.add(caixa);
+            painelEditarJoystick.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.childrenOnly);
+            uiStage.addActor(painelEditarJoystick);
+        }
+        painelEditarJoystick.setVisible(true);
+        painelEditarJoystick.toFront();
+    }
+
     /** Tela cheia (CanvasLayer/OptionsMenu): TopBar com titulo, conteudo com
      * scroll (secao "Screen" + grid 2 colunas Zoom/Fullscreen) e BottomBar
      * com Back - mesma estrutura/cores do painel real. */
@@ -1652,7 +1817,8 @@ public class WorldScreen extends ScreenAdapter {
             });
             grid.add(checkFullscreen).size(32).pad(6).row();
         }
-        corpo.add(grid).left();
+        corpo.add(grid).left().row();
+        corpo.add(criarSecaoControles()).left().padTop(26).row();
 
         ScrollPane scroll = new ScrollPane(corpo);
         scroll.setFadeScrollBars(false);
@@ -2701,8 +2867,11 @@ public class WorldScreen extends ScreenAdapter {
         // estaDigitando() volta false aqui - sem essa checagem o mesmo Enter
         // refocava o campo na hora (enviava e continuava digitando, bug
         // reportado pelo usuario).
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER) && chat.isVisivel()
-                && !chat.estaDigitando() && !chatDigitandoFrameAnterior) {
+        // Write (padrao Enter): comeca a digitar no chat (abre ele se estiver fechado).
+        if (Gdx.input.isKeyJustPressed(Controles.tecla("write")) && acaoCapturando == null
+                && !chat.estaDigitando() && !chatDigitandoFrameAnterior
+                && !settingsAberta() && !bookMenu.isVisible()) {
+            if (!chat.isVisivel()) alternarChat();
             chat.focarCampoTexto();
         }
         chatDigitandoFrameAnterior = chat.estaDigitando();

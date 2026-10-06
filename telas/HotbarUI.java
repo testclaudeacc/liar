@@ -279,7 +279,8 @@ public final class HotbarUI {
             }
             if (!MOBILE) {
                 // Tecla do slot no canto de cima a esquerda.
-                Label tecla = new Label(String.valueOf(i + 1), skin, "hud");
+                // Tecla configurada pra esse slot (Settings > Controls, padrao 1-9).
+                Label tecla = new Label(Controles.nomeTecla(Controles.tecla("hotbar" + (i + 1))), skin, "hud");
                 tecla.setFontScale(0.55f);
                 tecla.setColor(1f, 1f, 1f, 0.5f);
                 Table cantoTecla = new Table();

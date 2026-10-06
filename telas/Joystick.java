@@ -28,8 +28,17 @@ public class Joystick {
     // 85 -> 100 e 170 -> 200 (~18% maior) - "um pouco maior, nao muito", a
     // pedido do usuario - a posicao (canto inferior esquerdo, perto do
     // dedao) ja estava boa e nao mudou.
-    private static final float MAX_DISTANCE = 100f;
-    private static final float DEADZONE = 20f;
+    private static final float MAX_DISTANCE_BASE = 100f;
+    private static final float DEADZONE_BASE = 20f;
+    private static final float TAM_BASE = 200f, TAM_KNOB = 56f;
+    private static final float MARGEM_PADRAO = 40f;
+    // Tamanho/posicao vem dos Controles (salvos no aparelho, tela de Settings).
+    private float escala = 1f;
+    private float MAX_DISTANCE = MAX_DISTANCE_BASE;
+    private float DEADZONE = DEADZONE_BASE;
+    /** Modo "mover joystick" (Settings): arrastar move a base em vez de andar. */
+    private boolean editando = false;
+    private float pegaX, pegaY; // onde o dedo pegou a base (modo edicao)
     private static final float IDLE_ALPHA = 0.4f;
     private static final float LIMIAR_DIRECAO = 0.35f;
 
@@ -45,12 +54,10 @@ public class Joystick {
         // de 64px), mantendo o estilo pixel-art propositalmente "quadriculado"
         // em vez de suavizado. Nearest ja' vem do atlas (graphics.atlas, ver
         // WorldScreen/pack.json) - nao precisa mais setar aqui.
-        base.setSize(200, 200);
-        knob.setSize(56, 56);
         // Canto inferior esquerdo, com uma margem - mesmo canto usado no
-        // Joystick real de player.tscn (anchor bottom-left).
-        base.setPosition(40, 40);
-        resetarKnob();
+        // Joystick real de player.tscn (anchor bottom-left) - ou onde o
+        // player arrastou (Controles).
+        aplicarConfig();
 
         // Knob fica por cima da base no stage (adicionada depois - z-order
         // mais alto, ver addActor abaixo) e cobre bem o centro dela; sem
@@ -63,17 +70,30 @@ public class Joystick {
         base.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                if (editando) {
+                    pegaX = x;
+                    pegaY = y;
+                    return true;
+                }
                 atualizar(x, y);
                 return true;
             }
 
             @Override
             public void touchDragged(InputEvent event, float x, float y, int pointer) {
+                if (editando) {
+                    moverBase(event.getStageX() - pegaX, event.getStageY() - pegaY);
+                    return;
+                }
                 atualizar(x, y);
             }
 
             @Override
             public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
+                if (editando) {
+                    Controles.definirJoystickPosicao(base.getX(), base.getY());
+                    return;
+                }
                 resetarKnob();
             }
         });
@@ -109,8 +129,40 @@ public class Joystick {
         }
     }
 
+    /** Le tamanho e posicao salvos (Controles) e reposiciona. */
+    public void aplicarConfig() {
+        escala = Controles.joystickEscala();
+        MAX_DISTANCE = MAX_DISTANCE_BASE * escala;
+        DEADZONE = DEADZONE_BASE * escala;
+        base.setSize(TAM_BASE * escala, TAM_BASE * escala);
+        knob.setSize(TAM_KNOB * escala, TAM_KNOB * escala);
+        float x = Controles.joystickX(), y = Controles.joystickY();
+        if (x < 0f || y < 0f) { x = MARGEM_PADRAO; y = MARGEM_PADRAO; }
+        moverBase(x, y);
+    }
+
+    /** Move a base (presa dentro da tela) e centraliza o knob nela. */
+    private void moverBase(float x, float y) {
+        com.badlogic.gdx.scenes.scene2d.Stage stage = base.getStage();
+        if (stage != null) {
+            x = Math.max(0f, Math.min(x, stage.getWidth() - base.getWidth()));
+            y = Math.max(0f, Math.min(y, stage.getHeight() - base.getHeight()));
+        }
+        base.setPosition(x, y);
+        resetarKnob();
+    }
+
+    /** Liga/desliga o modo "mover joystick" (arrastar move, nao anda). */
+    public void setEditando(boolean editando) {
+        this.editando = editando;
+        resetarKnob();
+        if (editando) base.getColor().a = 1f;
+    }
+
+    public boolean isEditando() { return editando; }
+
     private void resetarKnob() {
-        base.getColor().a = IDLE_ALPHA;
+        base.getColor().a = editando ? 1f : IDLE_ALPHA;
         vetor.set(0f, 0f);
         float centerX = base.getWidth() / 2f;
         float centerY = base.getHeight() / 2f;
