@@ -1293,6 +1293,8 @@ public class WorldScreen extends ScreenAdapter {
     private static final Color COR_NOTIF_PARTY = Color.valueOf("f5e02a");
     /** Mesmos valores de servidor.py::FOME_LIMITE / FOME_MULT_VELOCIDADE. */
     private static final float FOME_LIMITE = 10f, FOME_MULT_VELOCIDADE = 0.9f;
+    /** Igual servidor.py: DETECCAO_SQM (5) + PERSISTE_SQM (8) - o mob perde o player. */
+    private static final int DISTANCIA_PERDE_ALVO_SQM = 13;
     private float multFome = 1f;
     private static final Color COR_NOTIF_AVISO = new Color(1f, 0.35f, 0.35f, 1f);
 
@@ -3185,14 +3187,11 @@ public class WorldScreen extends ScreenAdapter {
         }
         if (!direcao.equals(local.direcao)) enviarVirada(direcao);
         local.direcao = direcao;
-        // Troca de lugar (abaixo) so' em passo reto: na diagonal so' vira (e
-        // guarda a diagonal, senao o sprite ficaria alternando a cada frame).
+        // Na diagonal guarda a direcao (senao o sprite ficaria alternando a
+        // cada frame). A troca de lugar (abaixo) vale reto e na diagonal.
         if (diagonal) {
             ultimoPassoDx = Math.signum(dx);
             ultimoPassoDy = Math.signum(dy);
-            tempoInsistindo = 0f;
-            alvoInsistindo = null;
-            return;
         }
         // Outro player parado no caminho: insistindo (segurando a direcao
         // contra ele) por TEMPO_INSISTIR_TROCA, pede pro servidor trocar de
@@ -3306,7 +3305,8 @@ public class WorldScreen extends ScreenAdapter {
         float my = conversor.rawParaMundoY(rawY);
         if (nome.equals(local.nome)) {
             float dx = mx - local.x, dy = my - local.y;
-            if (!local.movendo && Math.abs(dx) + Math.abs(dy) <= Jogador.TILE + 0.5f) {
+            // Do lado ou na diagonal: anda o passo (a diagonal ja' dura mais).
+            if (!local.movendo && Math.max(Math.abs(dx), Math.abs(dy)) <= Jogador.TILE + 0.5f) {
                 local.iniciarPasso(dx, dy, direcao);
             } else {
                 local.x = mx;
@@ -3986,6 +3986,15 @@ public class WorldScreen extends ScreenAdapter {
         if (alvoMob == null) return;
         MobVisual alvo = mobs.get(alvoMob);
         if (alvo == null || alvo.morto || !alvo.visivel) {
+            alvoMob = null;
+            return;
+        }
+        // Se afastou demais: desfoca. Longe do jeito que o mob perde o player
+        // (servidor.py: DETECCAO_SQM + PERSISTE_SQM), ou o mob ja' desistiu
+        // (voltando pra casa) e ficou fora do alcance do meu ataque.
+        int distAlvo = distanciaSqm(local.x, local.y, alvo.x, alvo.y);
+        int alcanceAtaque = classeRanged() ? ALCANCE_RANGED_SQM : 1;
+        if (distAlvo > DISTANCIA_PERDE_ALVO_SQM || (alvo.voltando && distAlvo > alcanceAtaque)) {
             alvoMob = null;
             return;
         }

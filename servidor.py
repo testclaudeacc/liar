@@ -2649,7 +2649,12 @@ def handle_swap_req(data):
 
         tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
         tt = tile_de(t_p.get('pos_x', 0), t_p.get('pos_y', 0))
-        if abs(tp[0] - tt[0]) + abs(tp[1] - tt[1]) != 1: return
+        # Do lado ou na diagonal (diagonal: sem cerca fina fechando os 2 caminhos).
+        if max(abs(tp[0] - tt[0]), abs(tp[1] - tt[1])) != 1: return
+        grade_s = mapas_colisao.get(p.get('mapa'))
+        if grade_s is not None and int(p.get('floor', 1) or 1) == 1:
+            if abs(tp[0] - tt[0]) + abs(tp[1] - tt[1]) == 1 and borda_bloqueada(grade_s, tp, tt): return
+            if diagonal_bloqueada(grade_s, tp, tt): return
         p['_ultimo_swap'] = now
 
         px, py = centro_tile(tp)

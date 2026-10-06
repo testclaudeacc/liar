@@ -42,13 +42,32 @@ public class Joystick {
     private static final float IDLE_ALPHA = 0.4f;
     private static final float LIMIAR_DIRECAO = 0.35f;
 
-    private final Image base;
-    private final Image knob;
+    private final ImagemBrilho base;
+    private final ImagemBrilho knob;
+
+    /** Image que pode ficar mais clara que o proprio sprite: desenha de novo
+     * por cima com mistura aditiva (brilho 0 = normal). Usado no editor de
+     * controles pra mostrar que o joystick esta selecionado. */
+    private static final class ImagemBrilho extends Image {
+        float brilho = 0f;
+        ImagemBrilho(TextureRegionDrawable d) { super(d); }
+        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
+            super.draw(batch, parentAlpha);
+            if (brilho <= 0f) return;
+            int src = batch.getBlendSrcFunc(), dst = batch.getBlendDstFunc();
+            batch.setBlendFunction(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA, com.badlogic.gdx.graphics.GL20.GL_ONE);
+            float a = getColor().a;
+            getColor().a = a * brilho;
+            super.draw(batch, parentAlpha);
+            getColor().a = a;
+            batch.setBlendFunction(src, dst);
+        }
+    }
     private final Vector2 vetor = new Vector2();
 
     public Joystick(Stage stage, TextureRegion texBase, TextureRegion texKnob) {
-        base = new Image(new TextureRegionDrawable(texBase));
-        knob = new Image(new TextureRegionDrawable(texKnob));
+        base = new ImagemBrilho(new TextureRegionDrawable(texBase));
+        knob = new ImagemBrilho(new TextureRegionDrawable(texKnob));
         // 4x o tamanho cru da textura (64->170ish, 16->48) - mesma escala de
         // ampliacao que o Godot usa (Base real e' 256 em cima de um recorte
         // de 64px), mantendo o estilo pixel-art propositalmente "quadriculado"
@@ -156,8 +175,8 @@ public class Joystick {
     /** Liga/desliga o modo "mover joystick" (arrastar move, nao anda). */
     public void setEditando(boolean editando) {
         this.editando = editando;
+        if (!editando) selecionado = false;
         resetarKnob();
-        if (editando) base.getColor().a = 1f;
     }
 
     public boolean isEditando() { return editando; }
@@ -166,16 +185,27 @@ public class Joystick {
     private Runnable aoTocarEditando;
     public void setAoTocarEditando(Runnable r) { aoTocarEditando = r; }
 
-    /** Destaque (ciano) na base e no knob quando esta selecionado no editor. */
+    /** Selecionado no editor: base e knob mais claros (tipo hover); os
+     * outros estados ficam no cinza normal. */
+    private boolean selecionado = false;
+    private static final float ALFA_EDITANDO = 0.6f;
+
     public void setSelecionado(boolean sel) {
-        com.badlogic.gdx.graphics.Color cor = sel ? HotbarUI.COR_EDICAO : com.badlogic.gdx.graphics.Color.WHITE;
-        base.setColor(cor);
-        knob.setColor(cor);
-        if (!editando) base.getColor().a = IDLE_ALPHA;
+        selecionado = sel;
+        resetarKnob();
     }
 
     private void resetarKnob() {
-        base.getColor().a = editando ? 1f : IDLE_ALPHA;
+        // Selecionado no editor: opaco e com brilho aditivo (mais claro que o
+        // sprite, tipo hover); o resto fica no cinza normal/mais apagado.
+        base.brilho = knob.brilho = editando && selecionado ? 0.45f : 0f;
+        if (editando && selecionado) {
+            base.setColor(1f, 1f, 1f, 1f);
+            knob.setColor(1f, 1f, 1f, 1f);
+        } else {
+            base.setColor(1f, 1f, 1f, editando ? ALFA_EDITANDO : IDLE_ALPHA);
+            knob.setColor(1f, 1f, 1f, editando ? ALFA_EDITANDO + 0.2f : 1f);
+        }
         vetor.set(0f, 0f);
         float centerX = base.getWidth() / 2f;
         float centerY = base.getHeight() / 2f;
