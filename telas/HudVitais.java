@@ -525,16 +525,11 @@ public final class HudVitais {
         barra.alinhador.invalidateHierarchy();
     }
 
-    /** Margem da esquerda do HUD (unidades do stage). */
-    public float margemEsquerda() { return px(17); }
-
     /** Coloca algo a esquerda do painel de HP/MP (retrato + botoes), alinhado em cima. */
     public void definirColunaEsquerda(com.badlogic.gdx.scenes.scene2d.Actor ator, float espaco) {
         colunaEsquerda.setActor(ator);
         colunaEsquerda.top().left();
-        // Colada no canto da tela: desfaz a margem do raiz so' nessa celula
-        // (o padRight devolve a margem pro resto do HUD nao andar).
-        raiz.getCell(colunaEsquerda).padLeft(-px(17)).padTop(-px(13)).padRight(espaco + px(17));
+        raiz.getCell(colunaEsquerda).padRight(espaco);
         raiz.invalidate();
     }
 

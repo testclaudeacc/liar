@@ -989,10 +989,7 @@ public class WorldScreen extends ScreenAdapter {
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
-        // A coluna fica colada no canto da tela (sem a margem do HUD); so' o
-        // retrato mantem o recuo da esquerda.
         hud.definirColunaEsquerda(colunaRetrato, 10f);
-        colunaRetrato.getCell(botaoRetrato).padLeft(hud.margemEsquerda());
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
         hotbar = new HotbarUI(uiStage, skin, bookMenu, indice -> {
             if (localMorto || !socket.isConnected()) return;
@@ -1098,14 +1095,14 @@ public class WorldScreen extends ScreenAdapter {
         colunaRetrato = new Table();
         colunaRetrato.top().left();
         botaoRetrato = criarRetrato();
-        colunaRetrato.add(botaoRetrato).size(TAMANHO_BOTAO_TOPO).left().row();
-        // Botoes colados na borda esquerda da tela; o retrato colado no topo
-        // (o recuo da esquerda dele vem do HUD, ver construirUiSettings).
-        colunaRetrato.add(colunaBotoesTopo).top().left();
+        colunaRetrato.add(botaoRetrato).size(TAMANHO_RETRATO).row();
+        // Botoes centralizados embaixo do retrato, em linha reta.
+        colunaRetrato.add(colunaBotoesTopo).top().center();
 
         // Canto de cima a direita: minimapa (tocar abre o mapa grande) e
         // fps/ms embaixo dele.
-        miniMapa = new MiniMapa(mapa, fonteMiniMapa, TILES_MINIMAPA, TILES_MAPA_MIN, TILES_MAPA_MAX, false, 2f);
+        pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(new Color(0.04f, 0.04f, 0.04f, 1f)));
+        miniMapa = new MiniMapa(mapa, pinturaMiniMapa, fonteMiniMapa, TILES_MINIMAPA, TILES_MAPA_MIN, TILES_MAPA_MAX, false, 2f);
         miniMapa.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
             @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
                 abrirMapaGrande();
@@ -1135,6 +1132,7 @@ public class WorldScreen extends ScreenAdapter {
     private Image avisoRetrato;
     private Texture texBolinha;
     private MiniMapa miniMapa, mapaGrande;
+    private MiniMapa.Pintura pinturaMiniMapa;
     private Table painelMapaGrande;
     private final float TAMANHO_MINIMAPA = mobile ? 165f : 150f;
     private static final float TILES_MINIMAPA = 34f, TILES_MAPA_GRANDE = 80f, TILES_MAPA_MIN = 20f, TILES_MAPA_MAX = 300f;
@@ -1176,13 +1174,13 @@ public class WorldScreen extends ScreenAdapter {
         avisoRetrato.setVisible(false);
         Table cantoAviso = new Table();
         cantoAviso.top().right();
-        cantoAviso.add(avisoRetrato).size(TAMANHO_BOTAO_TOPO * 0.26f);
+        cantoAviso.add(avisoRetrato).size(TAMANHO_RETRATO * 0.26f);
         cantoAviso.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
 
-        float interno = TAMANHO_BOTAO_TOPO * 0.70f;
+        float interno = TAMANHO_RETRATO * 0.70f;
         com.badlogic.gdx.scenes.scene2d.ui.Stack pilha = new com.badlogic.gdx.scenes.scene2d.ui.Stack();
         Table centro = new Table();
-        centro.add(fotoRetrato).size(interno).padBottom(TAMANHO_BOTAO_TOPO * 0.12f);
+        centro.add(fotoRetrato).size(interno).padBottom(TAMANHO_RETRATO * 0.12f);
         pilha.add(centro);
         pilha.add(cantoAviso);
         botao.add(pilha).grow();
@@ -1202,7 +1200,7 @@ public class WorldScreen extends ScreenAdapter {
     private void atualizarRetrato(JsonValue skins) {
         if (fotoRetrato == null) return;
         SkinsUtil.Preview p = new SkinsUtil.Preview(atlas, skins, SkinsUtil.FRAME_BAIXO);
-        float interno = TAMANHO_BOTAO_TOPO * 0.70f;
+        float interno = TAMANHO_RETRATO * 0.70f;
         float largura = interno * 1.25f;
         float altura = largura * p.getPrefHeight() / SkinsUtil.FRAME_LARGURA;
         fotoRetrato.setActor(p);
@@ -1210,7 +1208,7 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void criarMapaGrande() {
-        mapaGrande = new MiniMapa(mapa, fonteMiniMapa, TILES_MAPA_GRANDE, TILES_MAPA_MIN, TILES_MAPA_MAX, true, 2f);
+        mapaGrande = new MiniMapa(mapa, pinturaMiniMapa, fonteMiniMapa, TILES_MAPA_GRANDE, TILES_MAPA_MIN, TILES_MAPA_MAX, true, 2f);
         painelMapaGrande = new Table();
         painelMapaGrande.setFillParent(true);
         painelMapaGrande.setBackground(skin.getDrawable("fundo-opcoes"));
@@ -1369,6 +1367,7 @@ public class WorldScreen extends ScreenAdapter {
     // mantendo a mesma proporcao icone/botao (76/108 ~= 0.70).
     // Mobile reduzido de 108 pra 80 (a pedido do usuario, abre espaco pra hotbar).
     private final float TAMANHO_BOTAO_TOPO = mobile ? 80f : 72f;
+    private final float TAMANHO_RETRATO = TAMANHO_BOTAO_TOPO * 1.3f;
     private final float ICONE_BOTAO_TOPO = TAMANHO_BOTAO_TOPO * (76f / 108f);
 
     /** Botao Button1 (up/hover/down) com um icone centralizado por cima -
@@ -4705,6 +4704,12 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     @Override
+    public void resume() {
+        // Android pode recriar o contexto GL ao voltar: a textura do minimapa some.
+        if (pinturaMiniMapa != null) pinturaMiniMapa.recriar();
+    }
+
+    @Override
     public void dispose() {
         mapa.dispose();
         batch.dispose();
@@ -4714,6 +4719,7 @@ public class WorldScreen extends ScreenAdapter {
         pixelBranco.dispose();
         hud.dispose();
         if (miniMapa != null) miniMapa.dispose();
+        if (pinturaMiniMapa != null) pinturaMiniMapa.dispose();
         if (mapaGrande != null) mapaGrande.dispose();
         if (texBolinha != null) texBolinha.dispose();
         uiStage.dispose();

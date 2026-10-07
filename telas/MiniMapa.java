@@ -5,7 +5,6 @@ import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Actor;
@@ -15,13 +14,12 @@ import com.badlogic.gdx.scenes.scene2d.utils.ScissorStack;
 import com.teste.game.mapa.MapaMundo;
 
 /**
- * Minimapa: o mapa de verdade (MapaMundo.desenharMiniMapa) em miniatura,
- * centrado no jogador, com pontinhos por cima - voce branco, players azul,
+ * Minimapa: o mapa com 1 pixel por SQM (Pintura, cor media do tile),
+ * centrado no jogador, com 1 SQM colorido por personagem por cima - voce branco, players azul,
  * NPC amarelo, mob vermelho. O mesmo Actor serve de mapa grande (tela
  * cheia): ai' da' pra arrastar e mudar o zoom (ver WorldScreen).
  *
- * Desenha numa projecao propria em cima da area do Actor, cortado com
- * scissor - o resto da UI continua no batch normal do stage.
+ * Cortado com scissor na area do Actor.
  */
 public class MiniMapa extends Actor {
 
@@ -44,6 +42,7 @@ public class MiniMapa extends Actor {
     private static final Color COR_FUNDO = new Color(0.04f, 0.04f, 0.04f, 1f);
 
     private final MapaMundo mapa;
+    private final Pintura pintura;
     private final Fonte fonte;
     private final Texture pixel;
     private final float borda;
@@ -54,14 +53,14 @@ public class MiniMapa extends Actor {
     private float panX = 0f, panY = 0f;
     private final boolean arrastavel;
 
-    private final Matrix4 projecao = new Matrix4();
     private final Rectangle area = new Rectangle();
     private final Rectangle scissor = new Rectangle();
     private final Vector2 tmp = new Vector2();
 
-    public MiniMapa(MapaMundo mapa, Fonte fonte, float tilesVisiveis, float tilesMin, float tilesMax,
+    public MiniMapa(MapaMundo mapa, Pintura pintura, Fonte fonte, float tilesVisiveis, float tilesMin, float tilesMax,
                     boolean arrastavel, float borda) {
         this.mapa = mapa;
+        this.pintura = pintura;
         this.fonte = fonte;
         this.tilesVisiveis = tilesVisiveis;
         this.tilesMin = tilesMin;
@@ -117,10 +116,19 @@ public class MiniMapa extends Actor {
         panY = MathUtils.clamp(panY, -jy, mapa.alturaPx() - jy);
     }
 
-    /** Unidades do stage por pixel do mundo. */
+    /** Unidades do stage por pixel do mundo. SQM sempre com um numero
+     * INTEIRO de pixels de tela (os "pixels" do minimapa ficam todos iguais). */
     private float escalaMundo() {
         float interno = Math.max(1f, getWidth() - borda * 2f);
-        return interno / (tilesVisiveis * mapa.tileWidth);
+        float k = pxTelaPorUnidade();
+        float sqmPx = Math.max(1f, Math.round(interno / tilesVisiveis * k));
+        return sqmPx / k / mapa.tileWidth;
+    }
+
+    private float pxTelaPorUnidade() {
+        if (getStage() == null) return 1f;
+        com.badlogic.gdx.utils.viewport.Viewport v = getStage().getViewport();
+        return v.getScreenWidth() / v.getWorldWidth();
     }
 
     @Override
@@ -137,53 +145,99 @@ public class MiniMapa extends Actor {
         float ax = tmp.x, ay = tmp.y;
         float aw = getWidth() - borda * 2f, ah = getHeight() - borda * 2f;
         if (aw <= 0f || ah <= 0f) return;
+        float k = pxTelaPorUnidade();
         float s = escalaMundo();
+        float sqm = mapa.tileWidth * s; // 1 SQM em unidades do stage
         float cx = fonte.jogadorX() + panX;
         float cy = fonte.jogadorY() + mapa.tileHeight / 2f + panY;
-        float mundoL = aw / s, mundoA = ah / s;
+        // Origem do mapa (canto de baixo a esquerda) presa na grade de pixels da tela.
+        float origemX = Math.round((ax + aw / 2f - cx * s) * k) / k;
+        float origemY = Math.round((ay + ah / 2f - cy * s) * k) / k;
 
-        batch.end();
         area.set(ax, ay, aw, ah);
+        batch.flush();
         getStage().calculateScissors(area, scissor);
         if (ScissorStack.pushScissors(scissor)) {
-            projecao.set(getStage().getCamera().combined)
-                .translate(ax + aw / 2f, ay + ah / 2f, 0f)
-                .scale(s, s, 1f)
-                .translate(-cx, -cy, 0f);
-            mapa.desenharMiniMapa(projecao, cx - mundoL / 2f, cy - mundoA / 2f, mundoL, mundoA,
-                fonte.jogadorX(), fonte.jogadorY());
-
-            batch.begin();
-            // Pontinho do tamanho de ~1 SQM, mas nunca sumindo nem ficando enorme.
-            float tam = MathUtils.clamp(s * mapa.tileWidth * 0.8f, 3.5f, 9f);
-            float centroX = ax + aw / 2f, centroY = ay + ah / 2f;
+            batch.setColor(1f, 1f, 1f, parentAlpha);
+            for (Pintura.Pedaco p : pintura.pedacos) {
+                if (p.textura == null) continue;
+                batch.draw(p.textura, origemX + p.tileX * sqm, origemY + p.tileY * sqm, p.largura * sqm, p.altura * sqm);
+            }
+            // Cada um = 1 "pixel" do minimapa (o SQM onde esta), sem contorno.
             Coletor coletor = (mx, my, cor) -> {
-                float px = centroX + (mx - cx) * s;
-                // y dos personagens = pes (base do SQM): sobe meio SQM pro meio dele.
-                float py = centroY + (my + mapa.tileHeight / 2f - cy) * s;
-                if (px < ax - tam || px > ax + aw + tam || py < ay - tam || py > ay + ah + tam) return;
-                desenharPonto(batch, px, py, tam, cor, parentAlpha);
+                int tx = (int) Math.floor(mx / mapa.tileWidth);
+                int ty = (int) Math.floor((my + mapa.tileHeight / 2f) / mapa.tileHeight);
+                float px = origemX + tx * sqm, py = origemY + ty * sqm;
+                if (px + sqm < ax || px > ax + aw || py + sqm < ay || py > ay + ah) return;
+                batch.setColor(cor.r, cor.g, cor.b, cor.a * parentAlpha);
+                batch.draw(pixel, px, py, sqm, sqm);
             };
             fonte.pontos(coletor);
             coletor.ponto(fonte.jogadorX(), fonte.jogadorY(), COR_VOCE);
             batch.flush();
             ScissorStack.popScissors();
-        } else {
-            batch.begin();
         }
         batch.setColor(Color.WHITE);
     }
 
-    private void desenharPonto(Batch batch, float x, float y, float tam, Color cor, float alpha) {
-        // Contorno preto de 1 unidade pra ler em cima de qualquer chao.
-        float c = Math.max(1f, tam * 0.2f);
-        batch.setColor(0f, 0f, 0f, alpha);
-        batch.draw(pixel, x - tam / 2f - c, y - tam / 2f - c, tam + c * 2f, tam + c * 2f);
-        batch.setColor(cor.r, cor.g, cor.b, cor.a * alpha);
-        batch.draw(pixel, x - tam / 2f, y - tam / 2f, tam, tam);
-    }
-
     public void dispose() {
         pixel.dispose();
+    }
+
+    /**
+     * O mapa inteiro "pintado" com 1 pixel por SQM (MapaMundo.gerarPixmapMiniMapa:
+     * cor media do tile mais de cima), gerado uma vez e compartilhado entre o
+     * minimapa e o mapa grande. Em pedacos de ate' 1024x1024 (limite de
+     * textura de celular). Desenhado com Nearest: ampliado, cada SQM vira um
+     * quadrado de cor solida.
+     */
+    public static final class Pintura {
+        static final class Pedaco {
+            final int tileX, tileY, largura, altura, linhaPixmap;
+            Texture textura;
+            Pedaco(int tileX, int tileY, int largura, int altura, int linhaPixmap) {
+                this.tileX = tileX; this.tileY = tileY; this.largura = largura; this.altura = altura;
+                this.linhaPixmap = linhaPixmap;
+            }
+        }
+
+        private static final int MAX = 1024;
+        private final Pixmap pixmap; // guardado: recria as texturas se o GL for recriado (Android)
+        final java.util.List<Pedaco> pedacos = new java.util.ArrayList<>();
+
+        public Pintura(Pixmap pixmap) {
+            this.pixmap = pixmap;
+            int w = pixmap.getWidth(), h = pixmap.getHeight();
+            for (int linha = 0; linha < h; linha += MAX) {
+                int ph = Math.min(MAX, h - linha);
+                // Linha 0 do pixmap = topo do mapa; tileY conta de baixo pra cima.
+                for (int col = 0; col < w; col += MAX) {
+                    pedacos.add(new Pedaco(col, h - linha - ph, Math.min(MAX, w - col), ph, linha));
+                }
+            }
+            criarTexturas();
+        }
+
+        private void criarTexturas() {
+            for (Pedaco p : pedacos) {
+                Pixmap parte = new Pixmap(p.largura, p.altura, Pixmap.Format.RGBA8888);
+                parte.setBlending(Pixmap.Blending.None);
+                parte.drawPixmap(pixmap, 0, 0, p.tileX, p.linhaPixmap, p.largura, p.altura);
+                p.textura = new Texture(parte);
+                p.textura.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+                parte.dispose();
+            }
+        }
+
+        /** Android recriou o contexto GL: as texturas voltam vazias. */
+        public void recriar() {
+            for (Pedaco p : pedacos) if (p.textura != null) p.textura.dispose();
+            criarTexturas();
+        }
+
+        public void dispose() {
+            for (Pedaco p : pedacos) if (p.textura != null) p.textura.dispose();
+            pixmap.dispose();
+        }
     }
 }

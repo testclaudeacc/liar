@@ -8,7 +8,14 @@ import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.maps.MapProperties;
-import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.TextureData;
+import com.badlogic.gdx.maps.tiled.TiledMapTile;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Carrega o World.tmx (desenhado direto no Tiled, 16x16, sem passar mais
@@ -157,23 +164,106 @@ public class MapaMundo {
         renderTelhados(jogadorMundoX, jogadorMundoY);
     }
 
-    /** Minimapa / mapa grande: o mesmo mapa (chao, overlays e telhados, com o
-     * telhado de onde o jogador esta escondido igual no jogo), so' que numa
-     * projecao propria (area da tela do minimapa). x/y/largura/altura = area
-     * do MUNDO que aparece. Chamado FORA de qualquer batch.begin(). */
-    public void desenharMiniMapa(Matrix4 projecao, float x, float y, float largura, float altura,
-                                 float jogadorMundoX, float jogadorMundoY) {
-        renderer.setView(projecao, x - tileWidth, y - tileHeight, largura + tileWidth * 2f, altura + tileHeight * 2f);
-        renderer.render(indicesCamadas);
-        Batch b = renderer.getBatch();
-        b.begin();
-        for (MapaPropriedades.CelulaOverlay c : propriedades.celulasOverlay) {
-            if (c.worldX + tileWidth < x || c.worldX > x + largura || c.worldY + tileHeight < y || c.worldY > y + altura) continue;
-            TextureRegion regiao = c.tile.getTextureRegion();
-            b.draw(regiao, c.worldX, c.worldY, regiao.getRegionWidth(), regiao.getRegionHeight());
+    /** Minimapa: o mapa inteiro com 1 pixel por SQM. Cor de cada SQM = cor
+     * media (pixels opacos) do tile mais de cima entre Ground/Buildings1/
+     * Buildings2/overlays - sem telhados (mostra o interior das casas). Um
+     * tile pode forcar a cor com a property "minimap_color" (ex: ff0000) no
+     * .tsx. Linha 0 do pixmap = topo do mapa. */
+    public Pixmap gerarPixmapMiniMapa(Color fundo) {
+        int w = mapaLarguraTiles, h = mapaAlturaTiles;
+        int[] cores = new int[w * h];
+        Map<TiledMapTile, Integer> cache = new HashMap<>();
+        Map<Texture, Pixmap> fontes = new HashMap<>();
+        try {
+            for (int indice : indicesCamadas) {
+                if (indice < 0 || !(mapa.getLayers().get(indice) instanceof TiledMapTileLayer)) continue;
+                TiledMapTileLayer camada = (TiledMapTileLayer) mapa.getLayers().get(indice);
+                for (int y = 0; y < Math.min(h, camada.getHeight()); y++) {
+                    for (int x = 0; x < Math.min(w, camada.getWidth()); x++) {
+                        TiledMapTileLayer.Cell cell = camada.getCell(x, y);
+                        if (cell == null || cell.getTile() == null) continue;
+                        int c = corDoTile(cell.getTile(), cache, fontes);
+                        if (c != 0) cores[y * w + x] = c;
+                    }
+                }
+            }
+            for (MapaPropriedades.CelulaOverlay c : propriedades.celulasOverlay) {
+                if (c.cx < 0 || c.cy < 0 || c.cx >= w || c.cy >= h) continue;
+                int cor = corDoTile(c.tile, cache, fontes);
+                if (cor != 0) cores[c.cy * w + c.cx] = cor;
+            }
+        } finally {
+            for (Pixmap p : fontes.values()) if (p != null) p.dispose();
         }
-        b.end();
-        renderTelhados(jogadorMundoX, jogadorMundoY);
+        Pixmap pm = new Pixmap(w, h, Pixmap.Format.RGBA8888);
+        pm.setBlending(Pixmap.Blending.None);
+        int corFundo = Color.rgba8888(fundo);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int c = cores[y * w + x];
+                pm.drawPixel(x, h - 1 - y, c != 0 ? c : corFundo);
+            }
+        }
+        return pm;
+    }
+
+    /** RGBA8888 da cor media do tile (0 = todo transparente). */
+    private int corDoTile(TiledMapTile tile, Map<TiledMapTile, Integer> cache, Map<Texture, Pixmap> fontes) {
+        Integer guardada = cache.get(tile);
+        if (guardada != null) return guardada;
+        int resultado = 0;
+        Object forcada = tile.getProperties().get("minimap_color");
+        if (forcada != null) {
+            try {
+                String hex = forcada.toString().replace("#", "");
+                // Tiled grava cor como #AARRGGBB; texto simples como RRGGBB.
+                if (hex.length() == 8) hex = hex.substring(2) + hex.substring(0, 2);
+                resultado = Color.rgba8888(Color.valueOf(hex));
+            } catch (RuntimeException ignorada) { }
+        }
+        if (resultado == 0) {
+            TextureRegion regiao = tile.getTextureRegion();
+            Pixmap fonte = regiao != null ? pixmapDe(regiao.getTexture(), fontes) : null;
+            if (fonte != null) {
+                long r = 0, g = 0, b = 0, n = 0;
+                int x0 = regiao.getRegionX(), y0 = regiao.getRegionY();
+                for (int y = y0; y < y0 + regiao.getRegionHeight(); y++) {
+                    for (int x = x0; x < x0 + regiao.getRegionWidth(); x++) {
+                        int p = fonte.getPixel(x, y);
+                        if ((p & 0xff) < 128) continue;
+                        r += (p >>> 24) & 0xff;
+                        g += (p >>> 16) & 0xff;
+                        b += (p >>> 8) & 0xff;
+                        n++;
+                    }
+                }
+                if (n > 0) resultado = (int) ((r / n) << 24 | (g / n) << 16 | (b / n) << 8 | 0xff);
+            }
+        }
+        cache.put(tile, resultado);
+        return resultado;
+    }
+
+    /** Pixels de uma textura do tileset (le de novo do arquivo; null se nao der). */
+    private static Pixmap pixmapDe(Texture textura, Map<Texture, Pixmap> fontes) {
+        if (fontes.containsKey(textura)) return fontes.get(textura);
+        Pixmap p = null;
+        try {
+            TextureData dados = textura.getTextureData();
+            if (dados.getType() == TextureData.TextureDataType.Pixmap) {
+                if (!dados.isPrepared()) dados.prepare();
+                Pixmap consumido = dados.consumePixmap();
+                // Copia (o original pode ser descartado pelo TextureData).
+                p = new Pixmap(consumido.getWidth(), consumido.getHeight(), Pixmap.Format.RGBA8888);
+                p.setBlending(Pixmap.Blending.None);
+                p.drawPixmap(consumido, 0, 0);
+                if (dados.disposePixmap()) consumido.dispose();
+            }
+        } catch (RuntimeException e) {
+            p = null;
+        }
+        fontes.put(textura, p);
+        return p;
     }
 
     private void renderTelhados(float jogadorMundoX, float jogadorMundoY) {
