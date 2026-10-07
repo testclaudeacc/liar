@@ -116,6 +116,11 @@ public final class HudVitais {
         @Override public void act(float delta) {
             super.act(delta);
             if (batalhaContando && batalhaRestante > 0f) batalhaRestante = Math.max(0f, batalhaRestante - delta);
+            // Segundos do battle no canto do icone (nao mais no popup).
+            if (contadorBatalha != null) {
+                String seg = String.valueOf((int) Math.ceil(batalhaRestante));
+                if (!seg.contentEquals(contadorBatalha.getText())) contadorBatalha.setText(seg);
+            }
             if (isVisible() && iconeDica == quadradoBatalha) {
                 String texto = textoBatalha();
                 if (!texto.contentEquals(textoDica.getText())) textoDica.setText(texto);
@@ -123,6 +128,7 @@ public final class HudVitais {
         }
     };
     private Label textoDica;
+    private Label contadorBatalha;
 
     private static final class Barra {
         final Image preenchimento;
@@ -191,7 +197,9 @@ public final class HudVitais {
 
         quadradoFome = quadradoStatus(atlas, "sheet/r18_c10", COR_FOME,
             "You are hungry! 10% less Dmg and Speed. Regen disabled");
-        quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA, null);
+        contadorBatalha = new Label("", estilo);
+        contadorBatalha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+        quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA, null, contadorBatalha);
         linhaTopo = new Table();
         linhaTopo.top().left();
         celulaPainel = linhaTopo.add(painel).top().left();
@@ -346,6 +354,11 @@ public final class HudVitais {
     /** Quadrado 42x42 (52x52 no celular) com borda preta e o icone no meio. Mouse em cima (PC)
      * ou dedo segurando (celular) mostra a explicacao; saiu/soltou, some. */
     private Table quadradoStatus(TextureAtlas atlas, String regiao, Color fundo, String explicacao) {
+        return quadradoStatus(atlas, regiao, fundo, explicacao, null);
+    }
+
+    /** contador: texto no canto de baixo a direita (segundos do battle), ou null. */
+    private Table quadradoStatus(TextureAtlas atlas, String regiao, Color fundo, String explicacao, Label contador) {
         // Mesmo visual do painel de HP/MP: borda cinza de 2px, filete preto
         // e o fundo colorido; icone grande no meio.
         float lado = px(MOBILE ? 58 : 52);
@@ -359,9 +372,17 @@ public final class HudVitais {
         Table filete = new Table();
         filete.setBackground(cor(Color.BLACK));
         filete.pad(px(1));
-        filete.add(interno).grow();
+        if (contador != null) {
+            Table canto = new Table();
+            canto.bottom().right();
+            canto.add(contador).padRight(px(3)).padBottom(px(1));
+            filete.add(new Stack(interno, canto)).grow();
+        } else {
+            filete.add(interno).grow();
+        }
         Table quadrado = new Table();
-        quadrado.setBackground(cor(COR_BORDA_PAINEL));
+        // Borda na cor do proprio botao, mais escura (antes era cinza).
+        quadrado.setBackground(cor(new Color(fundo).mul(0.55f, 0.55f, 0.55f, 1f)));
         quadrado.pad(px(2));
         quadrado.add(filete).size(lado);
         quadrado.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
@@ -405,7 +426,7 @@ public final class HudVitais {
     private void esconderDica() { dica.setVisible(false); iconeDica = null; }
 
     private String textoBatalha() {
-        return "In battle (" + (int) Math.ceil(batalhaRestante) + "s)\n"
+        return "In battle\n"
             + "If you log out now, your body stays in the game until the battle ends.";
     }
 
