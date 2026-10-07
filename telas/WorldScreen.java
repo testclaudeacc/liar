@@ -1376,8 +1376,10 @@ public class WorldScreen extends ScreenAdapter {
      * anti-horario positivo), em pedacos tangentes. */
     private void arco(com.badlogic.gdx.graphics.g2d.Batch b, float cx, float cy, float raio, float espessura,
                       float angInicio, float varredura, Color c, float alpha) {
-        if (Math.abs(varredura) < 0.01f) return;
-        int n = Math.max(2, Math.round(Math.abs(varredura) / 2.5f));
+        // Raio 0/NaN ou varredura infinita (camera ainda sem tamanho no 1o
+        // frame) travava o jogo num loop de bilhoes de pedacos: ignora.
+        if (!(raio > 0.5f) || !(Math.abs(varredura) >= 0.01f) || Float.isInfinite(varredura)) return;
+        int n = Math.min(400, Math.max(2, Math.round(Math.abs(varredura) / 2.5f)));
         float passo = varredura / n;
         // Um pouquinho maior que o arco de cada pedaco (sem frestas entre eles).
         float comp = (float) (2 * Math.PI * raio * Math.abs(passo) / 360f) * 1.08f;
@@ -1399,8 +1401,8 @@ public class WorldScreen extends ScreenAdapter {
     private static final float ARCO_RAIO_SQM = 2.0f;        // raio em SQMs
     private static final float ARCO_ESPESSURA_SQM = 0.2f;
     private static final Color COR_ARCO_MP = Color.valueOf("6a3ad8");     // roxo da print
-    private static final Color COR_ARCO_TRILHO = new Color(0f, 0f, 0f, 0.45f);
-    private static final Color COR_ARCO_BORDA = new Color(0.03f, 0.03f, 0.03f, 0.9f);
+    private static final Color COR_ARCO_TRILHO = new Color(0f, 0f, 0f, 0.25f);
+    private static final Color COR_ARCO_BORDA = new Color(0.03f, 0.03f, 0.03f, 0.75f);
     private final com.badlogic.gdx.math.Vector3 tmpArco = new com.badlogic.gdx.math.Vector3();
     private final Vector2 tmpArco2 = new Vector2();
 
@@ -1425,6 +1427,7 @@ public class WorldScreen extends ScreenAdapter {
             float k = uiStage.getViewport().getScreenWidth() / uiStage.getViewport().getWorldWidth();
             float cx = Math.round(c.x * k) / k, cy = Math.round(c.y * k) / k;
             float sqm = noStage(ax + Jogador.TILE, ay + Jogador.TILE / 2f).x - c.x;
+            if (!(sqm > 1f) || sqm > 1000f) return; // camera ainda nao pronta
             float raio = sqm * ARCO_RAIO_SQM, esp = Math.max(3f, sqm * ARCO_ESPESSURA_SQM);
             float borda = Math.max(1f, esp * 0.22f);
             float hp = hud.hpMax() > 0f ? Math.max(0f, Math.min(1f, hud.hpAtual() / hud.hpMax())) : 0f;
@@ -1438,13 +1441,18 @@ public class WorldScreen extends ScreenAdapter {
 
         private void desenharArco(com.badlogic.gdx.graphics.g2d.Batch b, float cx, float cy, float raio, float esp,
                                   float borda, float inicio, float varredura, float fracao, Color cor, float alpha) {
-            // Borda passa um pouco das pontas (tampa as duas extremidades);
-            // trilho/cor ficam um pouco pra dentro dela.
+            // Fundo semi transparente: so' o contorno e' escuro (beirada de
+            // dentro, de fora e as duas pontas), o meio vazio deixa ver o jogo.
             float sinal = Math.signum(varredura);
-            float folga = (borda * 2.5f / raio) * com.badlogic.gdx.math.MathUtils.radiansToDegrees;
-            arco(b, cx, cy, raio, esp + borda * 2f, inicio - sinal * folga, varredura + sinal * folga * 2f, COR_ARCO_BORDA, alpha);
+            float folga = (borda / raio) * com.badlogic.gdx.math.MathUtils.radiansToDegrees;
+            float fim = inicio + varredura;
             arco(b, cx, cy, raio, esp, inicio, varredura, COR_ARCO_TRILHO, alpha);
             arco(b, cx, cy, raio, esp, inicio, varredura * fracao, cor, alpha);
+            arco(b, cx, cy, raio - esp / 2f - borda / 2f, borda, inicio - sinal * folga, varredura + sinal * folga * 2f, COR_ARCO_BORDA, alpha);
+            arco(b, cx, cy, raio + esp / 2f + borda / 2f, borda, inicio - sinal * folga, varredura + sinal * folga * 2f, COR_ARCO_BORDA, alpha);
+            // Pontas: um tracinho radial em cada extremidade.
+            arco(b, cx, cy, raio, esp + borda * 2f, inicio - sinal * folga, sinal * folga, COR_ARCO_BORDA, alpha);
+            arco(b, cx, cy, raio, esp + borda * 2f, fim, sinal * folga, COR_ARCO_BORDA, alpha);
         }
     }
 
