@@ -498,7 +498,8 @@ public final class HudVitais {
     private void reorganizarStatus() {
         esconderDica();
         iconesStatus.clearChildren();
-        iconesStatus.top().right();
+        if (statusNoTopo) iconesStatus.center().left();
+        else iconesStatus.top().right();
         // Em trios: 3 por linha, as linhas vao se empilhando pra baixo (6 = 3x2).
         java.util.List<Table> ativos = new java.util.ArrayList<>();
         if (comFome) ativos.add(quadradoFome);
@@ -507,6 +508,16 @@ public final class HudVitais {
             iconesStatus.add(ativos.get(i)).pad(px(3));
             if (i % 3 == 2) iconesStatus.row();
         }
+    }
+
+    private boolean statusNoTopo = false;
+
+    /** Celular: os debuffs voltam pro lado do retrato/barras de HP-MP. */
+    public void colocarStatusNoTopo() {
+        statusNoTopo = true;
+        linhaTopo.add(iconesStatus).center().left().padLeft(px(10));
+        iconesStatus.center().left();
+        centralizarNoRetrato();
     }
 
     /** Gaveta de debuffs (fome/battle...) - WorldScreen poe embaixo do minimapa. */

@@ -3103,6 +3103,18 @@ public final class BookMenuUI {
         if ("Bestiary".equals(secaoAtual) && root.isVisible()) reconstruirBestiario();
     }
 
+    /** Matou mais um (sem subir de medalha): so' troca o contador. */
+    public void atualizarKillsBestiario(String tipo, int kills) {
+        if (entradasBestiario == null || tipo == null) return;
+        for (JsonValue e = entradasBestiario.child; e != null; e = e.next) {
+            if (!tipo.equals(e.getString("type", null))) continue;
+            JsonValue k = e.get("kills");
+            if (k != null) k.set(kills, null);
+            else e.addChild("kills", new JsonValue(kills));
+        }
+        if ("Bestiary".equals(secaoAtual) && root.isVisible()) reconstruirFichaBestiario();
+    }
+
     private TextureRegion frenteDoMob(String tipo) {
         if (tipo == null || tipo.isEmpty()) return null;
         TextureAtlas.AtlasRegion tira = atlas.findRegion("sprites/mobs/" + tipo);
@@ -3238,7 +3250,15 @@ public final class BookMenuUI {
         Label rotuloKills = new Label(progresso, skin, "hud");
         rotuloKills.setFontScale(0.55f * FONTE_STATS);
         rotuloKills.setColor(Color.LIGHT_GRAY);
-        fichaBestiario.add(rotuloKills).padTop(2).row();
+        Table linhaKills = new Table();
+        TextureAtlas.AtlasRegion iconeKills = atlas.findRegion("ui/CritIcon");
+        if (iconeKills != null) {
+            Image i = new Image(new TextureRegionDrawable(iconeKills));
+            i.setScaling(Scaling.fit);
+            linhaKills.add(i).size(16).padRight(4);
+        }
+        linhaKills.add(rotuloKills);
+        fichaBestiario.add(linhaKills).padTop(2).row();
 
         if (e.has("hp")) {
             Table linhaHp = new Table();
@@ -3607,6 +3627,10 @@ public final class BookMenuUI {
             return;
         }
         if (!visible) cancelarExclusao();
+        // Abrindo de novo ja' no Bestiary: pede os numeros atualizados.
+        if (visible && !root.isVisible() && "Bestiary".equals(secaoAtual) && socket.isConnected()) {
+            socket.emitRaw("get_bestiary", "{}");
+        }
         root.setVisible(visible);
     }
 

@@ -1050,7 +1050,10 @@ public class WorldScreen extends ScreenAdapter {
         uiStage.getRoot().addActorAt(0, new ArcosVitais());
         // Em arco (padrao): o painel reto de HP/MP some. Settings > Style troca.
         hud.definirPainelVitaisVisivel(!Controles.barrasEmArco());
-        gavetaDebuffs.setActor(hud.iconesStatus());
+        // Debuffs: no PC na gaveta embaixo do minimapa; no celular do lado
+        // do retrato/barras (perto do dedo, o canto da direita ja' e' cheio).
+        if (mobile) hud.colocarStatusNoTopo();
+        else gavetaDebuffs.setActor(hud.iconesStatus());
         // % do retrato com contorno preto (fonte das barras do HUD).
         labelXpRetrato.setStyle(new Label.LabelStyle(hud.fonteComContorno(), Color.WHITE));
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
@@ -3252,6 +3255,9 @@ public class WorldScreen extends ScreenAdapter {
         // ---- Bestiary (servidor.py::montar_bestiario / bestiario_registrar_kill) ----
         socket.on("bestiary", (nomeEvt, data) -> {
             if (data != null) bookMenu.atualizarBestiario(data);
+        });
+        socket.on("bestiary_kills", (nomeEvt, data) -> {
+            if (data != null) bookMenu.atualizarKillsBestiario(data.getString("type", null), data.getInt("kills", 0));
         });
         socket.on("bestiary_unlock", (nomeEvt, data) -> {
             if (data == null) return;

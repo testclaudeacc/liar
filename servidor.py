@@ -137,6 +137,9 @@ def bestiario_registrar_kill(sid, p, tipo):
         nome = MOB_DB[tipo].get("name", tipo.capitalize())
         socketio.emit('bestiary_unlock', {"type": tipo, "name": nome, "tier": nivel_depois}, room=sid)
         socketio.emit('bestiary', montar_bestiario(p), room=sid)
+    else:
+        # So' o contador (a ficha aberta atualiza na hora).
+        socketio.emit('bestiary_kills', {"type": tipo, "kills": antes + 1}, room=sid)
 
 def bestiario_ouro(p, tipo):
     return bestiario_kills(p, tipo) >= BESTIARIO_MARCOS[-1]
@@ -534,6 +537,8 @@ def _montar_payload_sync_stats(p):
     if esta_com_fome(p):
         new_dmg = max(1, int(new_dmg * FOME_MULT_DANO))
 
+    # Sem o bestiary (vai so' no evento proprio): nao viaja em todo sync_stats.
+    skills = {k: v for k, v in skills.items() if k != 'bestiary'} if isinstance(skills, dict) else skills
     return {
         'skills': skills, 'base_damage': new_dmg, 'defense_value': new_def,
         'level': level, 'exp': p.get('exp', 0), 'kills': p.get('kills', 0),
