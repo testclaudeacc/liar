@@ -106,6 +106,8 @@ public final class HudVitais {
         final Color cor;
         final Runnable aoClicar;
         int tipo = NOTIF_AVISO;
+        TextureRegion iconeProprio; // notificarIcone: icone/cor de fundo escolhidos por quem chamou
+        Color fundoProprio;
         Notificacao(String texto, Color cor, Runnable aoClicar) {
             this.texto = texto;
             this.cor = cor;
@@ -612,6 +614,20 @@ public final class HudVitais {
 
     public void notificarTipo(int tipo, String texto) { notificarTipo(tipo, texto, null, null); }
 
+    /** Notificacao com icone e cor de fundo proprios (ex: bestiary). */
+    public void notificarIcone(String texto, TextureRegion icone, Color fundo, Runnable aoClicar) {
+        if (texto == null || texto.isEmpty()) return;
+        Notificacao n = new Notificacao(texto, Color.WHITE, aoClicar);
+        n.iconeProprio = icone;
+        n.fundoProprio = fundo;
+        if (notificacaoAtual == null) {
+            mostrarNotificacao(n);
+            return;
+        }
+        if (filaNotificacoes.size() >= MAX_FILA_NOTIFICACOES) filaNotificacoes.pollFirst();
+        filaNotificacoes.addLast(n);
+    }
+
     /** Igual notificar, com icone/cor de fundo do tipo (trade, amigo, party). */
     public void notificarTipo(int tipo, String texto, Color cor, Runnable aoClicar) {
         if (texto == null || texto.isEmpty()) return;
@@ -635,6 +651,8 @@ public final class HudVitais {
         if (n.tipo == NOTIF_TRADE && iconeNotifTrade != null) { icone = iconeNotifTrade; fundo = COR_NOTIF_TRADE; tamIcone *= 0.8f; }
         else if (n.tipo == NOTIF_AMIGO && iconeNotifAmigo != null) { icone = iconeNotifAmigo; fundo = COR_NOTIF_AMIGO; }
         else if (n.tipo == NOTIF_PARTY && iconeNotifParty != null) { icone = iconeNotifParty; fundo = COR_NOTIF_PARTY; }
+        if (n.iconeProprio != null) icone = n.iconeProprio;
+        if (n.fundoProprio != null) fundo = n.fundoProprio;
         if (icone != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(icone));
         internoNotif.setBackground(cor(new Color(fundo.r, fundo.g, fundo.b, 0.93f)));
         blocoIconeNotif.setBackground(cor(new Color(fundo).mul(0.6f, 0.6f, 0.6f, 1f)));

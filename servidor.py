@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.15"
+SERVER_VERSION = "v0.16"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -72,6 +72,74 @@ except Exception as e:
 MOB_DB = {
     "rotworm": {"hp": 50, "xp": 20, "attack": 3.0, "drops": [], "currency": {"min": 5, "max": 10}},
 }
+
+# ---------------------------------------------------------------------------
+# BESTIARY. Cada tipo do MOB_DB vira uma entrada (numero = ordem no MOB_DB).
+# Matar libera aos poucos (por personagem, contado em skills['bestiary']):
+#   1   -> descoberto: numero, imagem e nome
+#   20  -> medalha de cobre: HP
+#   100 -> medalha de prata: lootpool (so' os itens)
+#   500 -> medalha de ouro: chances do loot + 5% de dano e defesa contra ele
+# O servidor so' manda o que ja foi liberado (montar_bestiario).
+# ---------------------------------------------------------------------------
+BESTIARIO_MARCOS = (1, 20, 100, 500)
+BESTIARIO_BONUS_OURO = 0.05
+
+def bestiario_kills(p, tipo):
+    b = (p.get('skills') or {}).get('bestiary')
+    if not isinstance(b, dict): return 0
+    try: return int(b.get(tipo, 0))
+    except (TypeError, ValueError): return 0
+
+def bestiario_nivel(kills):
+    # 0 = nao descoberto, 1 = descoberto, 2 = cobre, 3 = prata, 4 = ouro
+    return sum(1 for m in BESTIARIO_MARCOS if kills >= m)
+
+def montar_bestiario(p):
+    entradas = []
+    for i, (tipo, info) in enumerate(MOB_DB.items()):
+        kills = bestiario_kills(p, tipo)
+        nivel = bestiario_nivel(kills)
+        e = {"id": i + 1, "tier": nivel}
+        if nivel >= 1:
+            e["type"] = tipo
+            e["name"] = info.get("name", tipo.capitalize())
+            e["kills"] = kills
+        if nivel >= 2:
+            e["hp"] = info.get("hp", 40)
+        if nivel >= 3:
+            loot = []
+            for d in info.get("drops", []):
+                item = validate_item(d.get("item"))
+                if not item: continue
+                linha = {"item": item}
+                if nivel >= 4: linha["chance"] = float(d.get("chance", 0.0))
+                loot.append(linha)
+            e["loot"] = loot
+        entradas.append(e)
+    return {"entries": entradas, "milestones": list(BESTIARIO_MARCOS)}
+
+def bestiario_registrar_kill(sid, p, tipo):
+    # Conta a morte; passou de um marco: avisa o client e manda o bestiary novo.
+    if tipo not in MOB_DB: return
+    skills = p.get('skills')
+    if not isinstance(skills, dict):
+        skills = {}
+        p['skills'] = skills
+    b = skills.get('bestiary')
+    if not isinstance(b, dict):
+        b = {}
+        skills['bestiary'] = b
+    antes = bestiario_kills(p, tipo)
+    b[tipo] = antes + 1
+    nivel_antes, nivel_depois = bestiario_nivel(antes), bestiario_nivel(antes + 1)
+    if nivel_depois > nivel_antes:
+        nome = MOB_DB[tipo].get("name", tipo.capitalize())
+        socketio.emit('bestiary_unlock', {"type": tipo, "name": nome, "tier": nivel_depois}, room=sid)
+        socketio.emit('bestiary', montar_bestiario(p), room=sid)
+
+def bestiario_ouro(p, tipo):
+    return bestiario_kills(p, tipo) >= BESTIARIO_MARCOS[-1]
 
 NPC_DB = {
     "kharon": {"name": "Kharon"},
@@ -1329,6 +1397,9 @@ def _mob_atacar(mob_id, m, target_sid, now):
     bonus_itens = somar_bonus_combate_equipados(target_player.get('equipped_items', {}))
     _, def_value = calc_player_stats(p_class, target_player.get('level', 1), target_player.get('skills', {}), bonus_def=bonus_itens['bonus_defense'])
     dano_final = 0 if random.random() < BLOCK_CHANCE else max(1.0, mob_attack_damage - def_value)
+    # Medalha de ouro no bestiary desse mob: -5% do dano recebido dele.
+    if dano_final > 0 and bestiario_ouro(target_player, m.get('type_id')):
+        dano_final = max(1.0, dano_final * (1.0 - BESTIARIO_BONUS_OURO))
 
     max_hp_alvo, _ = calcular_max_vitais(target_player)
     hp_atual = float(target_player.get('current_hp', -1))
@@ -1965,6 +2036,11 @@ def handle_disconnect():
         players_by_name.pop(p_name, None)
         del online_players[sid]
 
+@socketio.on('get_bestiary')
+def handle_get_bestiary(data=None):
+    p = online_players.get(request.sid)
+    if p: emit('bestiary', montar_bestiario(p), room=request.sid)
+
 @socketio.on('save_position')
 def handle_save_position(data):
     # Salva a posicao que o SERVIDOR conhece (validada passo a passo no 'm').
@@ -2191,6 +2267,7 @@ def handle_join_game(data):
         emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente(),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
+        emit('bestiary', montar_bestiario(data), room=sid)
 
         rooms_area = set(salas_vizinhas(room))
         dead_mobs = [m_id for m_id, m_data in active_mobs.items() if m_data.get('hp', 1) <= 0 and m_data.get('room') in rooms_area]
@@ -2821,6 +2898,10 @@ def handle_hit_mob(data):
         is_crit = random.random() < CRIT_CHANCE
         if is_crit: dano_final *= 2
         if reduzido: dano_final = max(1, int(dano_final * DANO_RANGED_COLADO_MULT))
+        # Medalha de ouro no bestiary desse mob: +5% de dano (arredonda no sorteio).
+        if bestiario_ouro(p, mob_data.get('type_id', mob_type_id)):
+            extra = dano_final * BESTIARIO_BONUS_OURO
+            dano_final += int(extra) + (1 if random.random() < extra - int(extra) else 0)
         # Miss: o golpe sai (gasta mana/flecha, puxa aggro), mas não tira vida.
         is_miss = random.random() < MISS_CHANCE_PLAYER
         if is_miss: dano_final, is_crit, reduzido = 0, False, False
@@ -2854,6 +2935,7 @@ def handle_hit_mob(data):
                 if participant_sid not in online_players: continue
 
                 part_p = online_players[participant_sid]
+                bestiario_registrar_kill(participant_sid, part_p, mob_data.get('type_id', mob_type_id))
 
                 current_exp = part_p.get('exp', 0) + xp_gained
                 current_level = part_p.get('level', 1)
@@ -4940,7 +5022,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-07 minimapa + retrato"
+VERSAO_SERVIDOR = "2026-10-08 bestiary"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)

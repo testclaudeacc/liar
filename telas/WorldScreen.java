@@ -1140,7 +1140,7 @@ public class WorldScreen extends ScreenAdapter {
         // esquerda do minimapa, pendurados no topo (sem girar). Config e o
         // botao do minimapa ficam atras do retrato.
         botaoTopoAlvo = criarBotaoTopo(null, this::abrirPainelDoAlvo, false);
-        botaoTopoAlvo.add(new AtorAlvo()).size(ICONE_BOTAO_TOPO);
+        botaoTopoAlvo.add(new AtorAlvo()).size(ICONE_BOTAO_TOPO * 1.25f); // um pouco maior que os outros icones
         botaoTopoChat = criarBotaoTopo(iconeChat, () -> { recolherBotoesTopo(); alternarChat(); }, false);
         imagemIconeChat = (Image) botaoTopoChat.getChildren().first();
         // Icone de "mensagem nova" (chat fechado). Sem ele no atlas, usa o
@@ -1215,6 +1215,11 @@ public class WorldScreen extends ScreenAdapter {
     // ---- Retrato do player + botoes / minimapa ----
     private Table colunaRetrato, colunaBotoesTopo, barraMiniMapa, infoDesempenho;
     private Button botaoTopoMapa;
+    // Notificacoes do bestiary: amarelo dourado escuro (descoberta/ouro),
+    // cobre e prata escuros pras medalhas.
+    private static final Color COR_NOTIF_BESTIARIO = new Color(0.5f, 0.38f, 0.04f, 1f);
+    private static final Color COR_MEDALHA_COBRE = new Color(0.42f, 0.22f, 0.1f, 1f);
+    private static final Color COR_MEDALHA_PRATA = new Color(0.3f, 0.32f, 0.36f, 1f);
     private com.badlogic.gdx.scenes.scene2d.ui.Container<Table> gavetaDebuffs;
     private boolean interfaceAberta = false; // chat/livro/settings/mapa: some com HP/MP
     private static final Color COR_BOTAO_LIGADO = new Color(0.35f, 1f, 0.35f, 1f);
@@ -3235,6 +3240,23 @@ public class WorldScreen extends ScreenAdapter {
             if (!data.getBoolean("already_taken", false)) mostrarLootPego(data);
             if (data.getBoolean("bag_esvaziada", false) || data.getBoolean("already_taken", false)) {
                 removerBag(data.getString("loot_id", ""));
+            }
+        });
+
+        // ---- Bestiary (servidor.py::montar_bestiario / bestiario_registrar_kill) ----
+        socket.on("bestiary", (nomeEvt, data) -> {
+            if (data != null) bookMenu.atualizarBestiario(data);
+        });
+        socket.on("bestiary_unlock", (nomeEvt, data) -> {
+            if (data == null) return;
+            int nivel = data.getInt("tier", 1);
+            String nome = data.getString("name", "Monster");
+            Runnable abrir = () -> bookMenu.abrirSecao("Bestiary");
+            if (nivel <= 1) {
+                hud.notificarIcone("New mob discovered!", atlas.findRegion("sheet/r15_c8"), COR_NOTIF_BESTIARIO, abrir);
+            } else {
+                Color fundo = nivel == 2 ? COR_MEDALHA_COBRE : nivel == 3 ? COR_MEDALHA_PRATA : COR_NOTIF_BESTIARIO;
+                hud.notificarIcone(nome + " knowledge upgraded", bookMenu.medalhaDoNivel(nivel), fundo, abrir);
             }
         });
 

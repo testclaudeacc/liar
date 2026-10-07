@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Button;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -169,11 +170,13 @@ public final class BookMenuUI {
             {"Party", "ui/buttons/PartyBtn"},
             {"Friends", "ui/buttons/FriendsBtn"},
             {"Rank", "ui/buttons/RankBtn"},
+            {"Bestiary", "sheet/r2_c13"},
             {"Spells", "ui/buttons/SpellsBtn"}
         } : new String[][]{
             {"Party", "ui/buttons/PartyBtn"},
             {"Friends", "ui/buttons/FriendsBtn"},
             {"Rank", "ui/buttons/RankBtn"},
+            {"Bestiary", "sheet/r2_c13"},
             {"Exit", "ui/buttons/CloseBtn"}
         }, true);
         Table rightTab = criarColuna(atlas, xEmCima ? new String[][]{
@@ -3075,6 +3078,225 @@ public final class BookMenuUI {
     // Esquerda: os slots da hotbar em grade 3x3 (celular: so' os que tem botao
     // na tela). Clicar seleciona; a direita mostra Inventory/Spells e clicar
     // num item coloca ele no slot.
+    // ===================== BESTIARY =====================
+    // Grade de mobs (numero + imagem de frente + medalha atual) e, a direita,
+    // a ficha do selecionado: foto quadrada maior com as 3 medalhas no canto,
+    // nome, e o que ja foi liberado matando (servidor.py::montar_bestiario):
+    // 20 = HP, 100 = itens do loot, 500 = chance de cada item.
+    private final Table bestiaryPage = new Table();
+    private final Table gradeBestiario = new Table();
+    private final Table fichaBestiario = new Table();
+    private JsonValue entradasBestiario;
+    private int bestiarioSelecionado = -1; // "id" da entrada
+    private static final String[] MEDALHAS = {"sheet/r30_c9", "sheet/r31_c13", "sheet/r32_c7"}; // cobre, prata, ouro
+    private static final int COLUNAS_BESTIARIO = 4;
+    private static final float SLOT_BESTIARIO = 58f;
+
+    /** Medalha do nivel (2 = cobre, 3 = prata, 4 = ouro), ou null. */
+    public TextureAtlas.AtlasRegion medalhaDoNivel(int nivel) {
+        return nivel >= 2 && nivel <= 4 ? atlas.findRegion(MEDALHAS[nivel - 2]) : null;
+    }
+
+    /** Lista do servidor: {entries: [{id, tier, type?, name?, kills?, hp?, loot?}]}. */
+    public void atualizarBestiario(JsonValue dados) {
+        entradasBestiario = dados != null ? dados.get("entries") : null;
+        if ("Bestiary".equals(secaoAtual) && root.isVisible()) reconstruirBestiario();
+    }
+
+    private TextureRegion frenteDoMob(String tipo) {
+        if (tipo == null || tipo.isEmpty()) return null;
+        TextureAtlas.AtlasRegion tira = atlas.findRegion("sprites/mobs/" + tipo);
+        if (tira == null) tira = atlas.findRegion("sprites/mobs/" + Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1));
+        if (tira == null) return null;
+        return tira.getRegionWidth() >= SkinsUtil.FRAME_LARGURA * (SkinsUtil.FRAME_BAIXO + 1)
+            ? SkinsUtil.quadro(tira, SkinsUtil.FRAME_BAIXO) : tira;
+    }
+
+    private void construirPaginaBestiario() {
+        bestiaryPage.clearChildren();
+        bestiaryPage.top().left();
+        gradeBestiario.top().left();
+        ScrollPane scroll = new ScrollPane(gradeBestiario, skin);
+        scroll.setFadeScrollBars(false);
+        scroll.setScrollingDisabled(true, false);
+        Table caixaGrade = new Table();
+        caixaGrade.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.3f, 0.3f, 0.3f, 1f), 1));
+        caixaGrade.add(scroll).grow().pad(4);
+        fichaBestiario.top();
+        fichaBestiario.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.3f, 0.3f, 0.3f, 1f), 1));
+        bestiaryPage.add(caixaGrade).width(COLUNAS_BESTIARIO * (SLOT_BESTIARIO + 4) + 26).growY().padRight(8);
+        bestiaryPage.add(fichaBestiario).grow();
+    }
+
+    private void reconstruirBestiario() {
+        if (bestiaryPage.getChildren().size == 0) construirPaginaBestiario();
+        gradeBestiario.clearChildren();
+        int coluna = 0;
+        if (entradasBestiario != null) {
+            for (JsonValue e = entradasBestiario.child; e != null; e = e.next) {
+                gradeBestiario.add(slotBestiario(e)).size(SLOT_BESTIARIO).pad(2);
+                if (++coluna % COLUNAS_BESTIARIO == 0) gradeBestiario.row();
+            }
+        }
+        reconstruirFichaBestiario();
+    }
+
+    private Table slotBestiario(JsonValue e) {
+        int id = e.getInt("id", 0), nivel = e.getInt("tier", 0);
+        boolean descoberto = nivel >= 1;
+        boolean selecionado = id == bestiarioSelecionado;
+        Table fundo = new Table();
+        fundo.setBackground(UiSkin.retangulo(
+            descoberto ? new Color(0.13f, 0.13f, 0.16f, 1f) : new Color(0.07f, 0.07f, 0.07f, 1f),
+            selecionado ? Color.valueOf("f0a028") : new Color(0.32f, 0.32f, 0.36f, 1f), selecionado ? 2 : 1));
+        if (!descoberto) return fundo; // ainda nao matou: slot vazio
+        Table camadaImagem = new Table();
+        TextureRegion frente = frenteDoMob(e.getString("type", ""));
+        if (frente != null) {
+            Image img = new Image(new TextureRegionDrawable(frente));
+            img.setScaling(Scaling.fit);
+            camadaImagem.add(img).size(SLOT_BESTIARIO * 0.62f).padTop(6);
+        }
+        Table camadaNumero = new Table();
+        camadaNumero.top().left();
+        Label numero = new Label(String.valueOf(id), skin, "hud");
+        numero.setFontScale(0.55f);
+        camadaNumero.add(numero).pad(2, 4, 0, 0);
+        Table camadaMedalha = new Table();
+        camadaMedalha.bottom().right();
+        TextureAtlas.AtlasRegion medalha = medalhaDoNivel(nivel);
+        if (medalha != null) {
+            Image m = new Image(new TextureRegionDrawable(medalha));
+            m.setScaling(Scaling.fit);
+            camadaMedalha.add(m).size(SLOT_BESTIARIO * 0.32f).pad(0, 0, 2, 2);
+        }
+        Stack pilha = new Stack(fundo, camadaImagem, camadaNumero, camadaMedalha);
+        Table slot = new Table();
+        slot.add(pilha).grow();
+        slot.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        slot.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent ev, float x, float y) {
+                bestiarioSelecionado = id;
+                reconstruirBestiario();
+            }
+        });
+        return slot;
+    }
+
+    private JsonValue entradaBestiario(int id) {
+        if (entradasBestiario == null) return null;
+        for (JsonValue e = entradasBestiario.child; e != null; e = e.next) if (e.getInt("id", 0) == id) return e;
+        return null;
+    }
+
+    private void reconstruirFichaBestiario() {
+        fichaBestiario.clearChildren();
+        JsonValue e = entradaBestiario(bestiarioSelecionado);
+        if (e == null || e.getInt("tier", 0) < 1) {
+            Label vazio = new Label("Defeat monsters to\nfill your bestiary.", skin, "hud");
+            vazio.setFontScale(0.6f * FONTE_STATS);
+            vazio.setAlignment(Align.center);
+            vazio.setColor(Color.GRAY);
+            fichaBestiario.add(vazio).expand().center();
+            return;
+        }
+        int nivel = e.getInt("tier", 0);
+        float lado = 150f;
+        // Foto quadrada do mob + as 3 medalhas no canto de cima a direita
+        // (as que ainda nao tem ficam apagadas).
+        Table foto = new Table();
+        foto.setBackground(UiSkin.retangulo(new Color(0.16f, 0.2f, 0.26f, 1f), new Color(0.45f, 0.45f, 0.5f, 1f), 2));
+        TextureRegion frente = frenteDoMob(e.getString("type", ""));
+        if (frente != null) {
+            Image img = new Image(new TextureRegionDrawable(frente));
+            img.setScaling(Scaling.fit);
+            foto.add(img).size(lado * 0.62f).padTop(lado * 0.1f);
+        }
+        Table medalhas = new Table();
+        medalhas.top().right();
+        for (int i = 0; i < 3; i++) {
+            TextureAtlas.AtlasRegion r = atlas.findRegion(MEDALHAS[i]);
+            if (r == null) continue;
+            Image m = new Image(new TextureRegionDrawable(r));
+            m.setScaling(Scaling.fit);
+            if (nivel < i + 2) m.setColor(0.25f, 0.25f, 0.25f, 0.6f); // ainda nao ganhou
+            medalhas.add(m).size(22).padLeft(1);
+        }
+        Table cantoMedalhas = new Table();
+        cantoMedalhas.top().right();
+        cantoMedalhas.add(medalhas).pad(5, 0, 0, 5);
+        fichaBestiario.add(new Stack(foto, cantoMedalhas)).size(lado).padTop(8).row();
+
+        Label nome = new Label(e.getString("name", "?"), skin, "hud");
+        nome.setFontScale(0.85f * FONTE_STATS);
+        fichaBestiario.add(nome).padTop(6).row();
+        // Mortes e quanto falta pra proxima medalha.
+        int kills = e.getInt("kills", 0);
+        int[] marcos = {1, 20, 100, 500};
+        String progresso = "Kills: " + kills;
+        for (int m : marcos) if (kills < m) { progresso += " / " + m; break; }
+        Label rotuloKills = new Label(progresso, skin, "hud");
+        rotuloKills.setFontScale(0.55f * FONTE_STATS);
+        rotuloKills.setColor(Color.LIGHT_GRAY);
+        fichaBestiario.add(rotuloKills).padTop(2).row();
+
+        if (e.has("hp")) {
+            Table linhaHp = new Table();
+            TextureAtlas.AtlasRegion iconeHp = atlas.findRegion("ui/HPIcon");
+            if (iconeHp != null) {
+                Image i = new Image(new TextureRegionDrawable(iconeHp));
+                i.setScaling(Scaling.fit);
+                linhaHp.add(i).size(20).padRight(6);
+            }
+            Label hp = new Label(String.valueOf(e.getInt("hp", 0)), skin, "hud");
+            hp.setFontScale(0.7f * FONTE_STATS);
+            linhaHp.add(hp);
+            fichaBestiario.add(linhaHp).padTop(8).row();
+        }
+        JsonValue loot = e.get("loot");
+        if (loot != null) {
+            Label titulo = new Label("Loot", skin, "hud");
+            titulo.setFontScale(0.6f * FONTE_STATS);
+            titulo.setColor(Color.valueOf("f0a028"));
+            fichaBestiario.add(titulo).padTop(8).row();
+            Table itens = new Table();
+            int n = 0;
+            for (JsonValue d = loot.child; d != null; d = d.next) {
+                Table celula = new Table();
+                TextureAtlas.AtlasRegion icone = iconeDoItem(d.getString("item", ""));
+                Table quadro = new Table();
+                quadro.setBackground(UiSkin.retangulo(new Color(0.13f, 0.13f, 0.16f, 1f), new Color(0.32f, 0.32f, 0.36f, 1f), 1));
+                if (icone != null) {
+                    Image i = new Image(new TextureRegionDrawable(icone));
+                    i.setScaling(Scaling.fit);
+                    quadro.add(i).size(30);
+                }
+                celula.add(quadro).size(38).row();
+                if (d.has("chance")) {
+                    Label chance = new Label(formatarChance(d.getFloat("chance", 0f)), skin, "hud");
+                    chance.setFontScale(0.5f * FONTE_STATS);
+                    celula.add(chance).padTop(1);
+                }
+                itens.add(celula).pad(2);
+                if (++n % 4 == 0) itens.row();
+            }
+            if (n == 0) {
+                Label nada = new Label("Nothing", skin, "hud");
+                nada.setFontScale(0.55f * FONTE_STATS);
+                nada.setColor(Color.GRAY);
+                itens.add(nada);
+            }
+            fichaBestiario.add(itens).padTop(2).row();
+        }
+        fichaBestiario.add().expandY();
+    }
+
+    private static String formatarChance(float chance) {
+        float pct = chance * 100f;
+        if (pct >= 10f || pct == Math.round(pct)) return Math.round(pct) + "%";
+        return String.format(java.util.Locale.US, pct >= 1f ? "%.1f%%" : "%.2f%%", pct);
+    }
+
     private void construirPaginaSpells() {
         spellsPage.clearChildren();
         spellsPage.top().left();
@@ -3278,7 +3500,12 @@ public final class BookMenuUI {
             Table pagina = "Equip".equals(secao) ? equipPage : "Skills".equals(secao) ? skillsPage
                 : "Spells".equals(secao) ? spellsPage
                 : "Vanity".equals(secao) ? vanityPage : "Friends".equals(secao) ? friendsPage
-                : "Party".equals(secao) ? partyPage : bagPage;
+                : "Party".equals(secao) ? partyPage
+                : "Bestiary".equals(secao) ? bestiaryPage : bagPage;
+            if ("Bestiary".equals(secao)) {
+                reconstruirBestiario();
+                if (socket.isConnected()) socket.emitRaw("get_bestiary", "{}");
+            }
             if ("Friends".equals(secao) && socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
             if ("Party".equals(secao) && socket.isConnected()) socket.emitRaw("get_party_status", "{}");
             mainWindow.add(pagina).grow();
@@ -3303,16 +3530,17 @@ public final class BookMenuUI {
             case "Friends": return Color.valueOf("c2185b");
             case "Map": return Color.valueOf("42a85a");
             case "Rank": return Color.valueOf("f5d328");
+            case "Bestiary": return Color.valueOf("f0a028"); // dourado alaranjado
             default: return Color.WHITE;
         }
     }
 
     // Atalhos do teclado com o menu aberto: seguem a ordem dos botoes na tela
     // (coluna direita de cima pra baixo, depois a esquerda). 1 = Equip,
-    // 2 = Bag, 3 = Skills, ... 8 = Rank, 0 = Exit (o Map saiu do livro: virou
+    // 2 = Bag, 3 = Skills, ... 8 = Rank, 9 = Bestiary, 0 = Exit (o Map saiu do livro: virou
     // o minimapa, botao do retrato no WorldScreen) (Esc tambem fecha, ver WorldScreen).
     private static final String[] ORDEM_ATALHOS = {
-        "Equip", "Bag", "Skills", "Vanity", "Spells", "Party", "Friends", "Rank", "Exit"
+        "Equip", "Bag", "Skills", "Vanity", "Spells", "Party", "Friends", "Rank", "Bestiary", "Exit"
     };
     private static final int[][] TECLAS_ATALHOS = {
         {com.badlogic.gdx.Input.Keys.NUM_1, com.badlogic.gdx.Input.Keys.NUMPAD_1},
@@ -3323,6 +3551,7 @@ public final class BookMenuUI {
         {com.badlogic.gdx.Input.Keys.NUM_6, com.badlogic.gdx.Input.Keys.NUMPAD_6},
         {com.badlogic.gdx.Input.Keys.NUM_7, com.badlogic.gdx.Input.Keys.NUMPAD_7},
         {com.badlogic.gdx.Input.Keys.NUM_8, com.badlogic.gdx.Input.Keys.NUMPAD_8},
+        {com.badlogic.gdx.Input.Keys.NUM_9, com.badlogic.gdx.Input.Keys.NUMPAD_9},
         {com.badlogic.gdx.Input.Keys.NUM_0, com.badlogic.gdx.Input.Keys.NUMPAD_0},
     };
 
