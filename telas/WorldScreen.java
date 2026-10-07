@@ -1046,6 +1046,8 @@ public class WorldScreen extends ScreenAdapter {
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
         hud.definirColunaEsquerda(colunaRetrato, 10f, TAMANHO_RETRATO);
+        // Arcos de HP/MP em volta do player, por baixo de qualquer janela.
+        uiStage.getRoot().addActorAt(0, new ArcosVitais());
         // % do retrato com contorno preto (fonte das barras do HUD).
         labelXpRetrato.setStyle(new Label.LabelStyle(hud.fonteComContorno(), Color.WHITE));
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
@@ -1367,6 +1369,72 @@ public class WorldScreen extends ScreenAdapter {
             float py = cy + raio * com.badlogic.gdx.math.MathUtils.sin(rad);
             b.draw(pixelBrancoRegiao(), px - comp / 2f, py - espessura / 2f, comp / 2f, espessura / 2f,
                 comp, espessura, 1f, 1f, ang - 90f);
+        }
+    }
+
+    /** Arco de "varredura" graus a partir de angInicio (graus, 0 = direita,
+     * anti-horario positivo), em pedacos tangentes. */
+    private void arco(com.badlogic.gdx.graphics.g2d.Batch b, float cx, float cy, float raio, float espessura,
+                      float angInicio, float varredura, Color c, float alpha) {
+        if (Math.abs(varredura) < 0.01f) return;
+        int n = Math.max(2, Math.round(Math.abs(varredura) / 2.5f));
+        float passo = varredura / n;
+        float comp = (float) (2 * Math.PI * raio * Math.abs(passo) / 360f) * 1.2f;
+        b.setColor(c.r, c.g, c.b, c.a * alpha);
+        for (int i = 0; i < n; i++) {
+            float ang = angInicio + (i + 0.5f) * passo;
+            float rad = ang * com.badlogic.gdx.math.MathUtils.degreesToRadians;
+            float px = cx + raio * com.badlogic.gdx.math.MathUtils.cos(rad);
+            float py = cy + raio * com.badlogic.gdx.math.MathUtils.sin(rad);
+            b.draw(pixelBrancoRegiao(), px - comp / 2f, py - espessura / 2f, comp / 2f, espessura / 2f,
+                comp, espessura, 1f, 1f, ang - 90f);
+        }
+    }
+
+    // ---- Barras curvas de HP/MP em volta do player (estilo Tibia) ----
+    // HP no arco da esquerda, MP no da direita, enchendo de baixo pra cima.
+    // As barras retas do HUD continuam (servem pra outra coisa).
+    private static final float ARCO_VARREDURA = 110f;       // graus de cada arco
+    private static final float ARCO_RAIO_SQM = 1.45f;       // raio em SQMs
+    private static final float ARCO_ESPESSURA_SQM = 0.2f;
+    private static final Color COR_ARCO_MP = Color.valueOf("6a3ad8");     // roxo da print
+    private static final Color COR_ARCO_TRILHO = new Color(0f, 0f, 0f, 0.45f);
+    private static final Color COR_ARCO_BORDA = new Color(0.03f, 0.03f, 0.03f, 0.9f);
+    private final com.badlogic.gdx.math.Vector3 tmpArco = new com.badlogic.gdx.math.Vector3();
+    private final Vector2 tmpArco2 = new Vector2();
+
+    private class ArcosVitais extends com.badlogic.gdx.scenes.scene2d.Actor {
+        ArcosVitais() { setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); }
+
+        /** Ponto do mundo -> coordenada do uiStage. */
+        private Vector2 noStage(float mx, float my) {
+            camera.project(tmpArco.set(mx, my, 0f));
+            tmpArco2.set(tmpArco.x, Gdx.graphics.getHeight() - tmpArco.y);
+            return uiStage.screenToStageCoordinates(tmpArco2);
+        }
+
+        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch b, float alpha) {
+            if (localMorto || hud == null) return;
+            // Centro do personagem (pes + meio SQM) e o tamanho de 1 SQM no stage.
+            Vector2 c = noStage(local.x, local.y + Jogador.TILE / 2f);
+            float cx = c.x, cy = c.y;
+            float sqm = noStage(local.x + Jogador.TILE, local.y + Jogador.TILE / 2f).x - cx;
+            float raio = sqm * ARCO_RAIO_SQM, esp = Math.max(3f, sqm * ARCO_ESPESSURA_SQM);
+            float borda = Math.max(1f, esp * 0.22f);
+            float hp = hud.hpMax() > 0f ? Math.max(0f, Math.min(1f, hud.hpAtual() / hud.hpMax())) : 0f;
+            float mp = hud.mpMax() > 0f ? Math.max(0f, Math.min(1f, hud.mpAtual() / hud.mpMax())) : 0f;
+            // Esquerda: de baixo (180+v/2) subindo ate' em cima (180-v/2).
+            desenharArco(b, cx, cy, raio, esp, borda, 180f + ARCO_VARREDURA / 2f, -ARCO_VARREDURA, hp, corDaVida(hp), alpha);
+            // Direita: de baixo (-v/2) subindo ate' em cima (+v/2).
+            desenharArco(b, cx, cy, raio, esp, borda, -ARCO_VARREDURA / 2f, ARCO_VARREDURA, mp, COR_ARCO_MP, alpha);
+            b.setColor(Color.WHITE);
+        }
+
+        private void desenharArco(com.badlogic.gdx.graphics.g2d.Batch b, float cx, float cy, float raio, float esp,
+                                  float borda, float inicio, float varredura, float fracao, Color cor, float alpha) {
+            arco(b, cx, cy, raio, esp + borda * 2f, inicio, varredura, COR_ARCO_BORDA, alpha);
+            arco(b, cx, cy, raio, esp, inicio, varredura, COR_ARCO_TRILHO, alpha);
+            arco(b, cx, cy, raio, esp, inicio, varredura * fracao, cor, alpha);
         }
     }
 

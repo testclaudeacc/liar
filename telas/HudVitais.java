@@ -518,6 +518,7 @@ public final class HudVitais {
 
     public float hpAtual() { return hpAtual; }
     public float hpMax() { return hpMax; }
+    public float mpMax() { return mpMax; }
     public float mpAtual() { return mpAtual; }
 
     private void atualizar() {
