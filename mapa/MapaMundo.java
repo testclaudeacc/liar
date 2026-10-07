@@ -157,23 +157,24 @@ public class MapaMundo {
         renderTelhados(jogadorMundoX, jogadorMundoY);
     }
 
-    /** Minimapa / mapa grande: o mesmo mapa (chao, overlays e telhados, com o
-     * telhado de onde o jogador esta escondido igual no jogo), so' que numa
-     * projecao propria (area da tela do minimapa). x/y/largura/altura = area
-     * do MUNDO que aparece. Chamado FORA de qualquer batch.begin(). */
-    public void desenharMiniMapa(Matrix4 projecao, float x, float y, float largura, float altura,
-                                 float jogadorMundoX, float jogadorMundoY) {
-        renderer.setView(projecao, x - tileWidth, y - tileHeight, largura + tileWidth * 2f, altura + tileHeight * 2f);
+    /** Pedaco do mapa pro minimapa (MiniMapa.Cache): chao + construcoes +
+     * overlays, SEM telhados/pilares (mostra o interior das casas, igual
+     * minimapa de Tibia). x/y/largura/altura = area do mundo que vai pro FBO.
+     * Chamado FORA de qualquer batch.begin(). */
+    public void desenharBlocoMiniMapa(Matrix4 projecao, float x, float y, float largura, float altura) {
+        // Folga: tiles mais altos que 1 SQM (arvores) de celulas vizinhas
+        // invadem o bloco e precisam entrar.
+        float folga = Math.max(tileWidth, tileHeight) * 4f;
+        renderer.setView(projecao, x - folga, y - folga, largura + folga * 2f, altura + folga * 2f);
         renderer.render(indicesCamadas);
         Batch b = renderer.getBatch();
         b.begin();
         for (MapaPropriedades.CelulaOverlay c : propriedades.celulasOverlay) {
-            if (c.worldX + tileWidth < x || c.worldX > x + largura || c.worldY + tileHeight < y || c.worldY > y + altura) continue;
+            if (c.worldX + folga < x || c.worldX > x + largura || c.worldY + folga < y || c.worldY > y + altura) continue;
             TextureRegion regiao = c.tile.getTextureRegion();
             b.draw(regiao, c.worldX, c.worldY, regiao.getRegionWidth(), regiao.getRegionHeight());
         }
         b.end();
-        renderTelhados(jogadorMundoX, jogadorMundoY);
     }
 
     private void renderTelhados(float jogadorMundoX, float jogadorMundoY) {
