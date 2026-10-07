@@ -51,7 +51,9 @@ public class MiniMapa extends Actor {
     }
     public static final Color COR_MOB = new Color(0.95f, 0.15f, 0.15f, 1f);
     private static final Color COR_BORDA = new Color(83 / 255f, 83 / 255f, 83 / 255f, 1f);
-    private static final Color COR_FUNDO = new Color(0.04f, 0.04f, 0.04f, 1f);
+    /** Cor do void (fora do mapa / fora da dimensao / SQM vazio) - a mesma do jogo. */
+    public static final Color COR_VOID = Color.valueOf("10171a");
+    private static final Color COR_FUNDO = COR_VOID;
 
     private final MapaMundo mapa;
     private final Pintura pintura;

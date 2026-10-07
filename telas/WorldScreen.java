@@ -1080,9 +1080,9 @@ public class WorldScreen extends ScreenAdapter {
         iconeConfig = atlas.findRegion("ui/MenuButton");
         iconeMenu = atlas.findRegion("ui/ConfigButton");
 
-        // Alvo e chat (os mais usados): sempre a mostra, a esquerda do
-        // minimapa, pendurados no topo (sem girar). Menu e config ficam
-        // atras do retrato.
+        // Alvo, chat e bag/livro (os mais usados): sempre a mostra, a
+        // esquerda do minimapa, pendurados no topo (sem girar). Config e o
+        // botao do minimapa ficam atras do retrato.
         botaoTopoAlvo = criarBotaoTopo(null, this::abrirPainelDoAlvo, false);
         botaoTopoAlvo.add(new AtorAlvo()).size(ICONE_BOTAO_TOPO);
         botaoTopoChat = criarBotaoTopo(iconeChat, () -> { recolherBotoesTopo(); alternarChat(); }, false);
@@ -1091,10 +1091,10 @@ public class WorldScreen extends ScreenAdapter {
         // NotificationIcon no lugar.
         iconeChatNovo = atlas.findRegion("ui/ChatNotify");
         if (iconeChatNovo == null) iconeChatNovo = atlas.findRegion("ui/NotificationIcon");
-        botaoTopoMenu = criarBotaoTopo(iconeMenu, () -> { recolherBotoesTopo(); alternarBookMenu(); }, true);
+        botaoTopoMenu = criarBotaoTopo(iconeMenu, () -> { recolherBotoesTopo(); alternarBookMenu(); }, false);
         botaoTopoConfig = criarBotaoTopo(iconeConfig, () -> { recolherBotoesTopo(); alternarSettings(); }, true);
 
-        // Menu e config ficam escondidos atras do retrato do player (canto de
+        // Config e mapa ficam escondidos atras do retrato do player (canto de
         // cima a esquerda, ver criarRetrato): tocar nele abre/fecha a coluna.
         colunaBotoesTopo = new Table();
         colunaBotoesTopo.top();
@@ -1103,7 +1103,7 @@ public class WorldScreen extends ScreenAdapter {
             Controles.definirMinimapaVisivel(!Controles.minimapaVisivel());
             montarBarraMiniMapa();
         }, true);
-        for (Button b : new Button[]{botaoTopoMenu, botaoTopoConfig, botaoTopoMapa}) {
+        for (Button b : new Button[]{botaoTopoConfig, botaoTopoMapa}) {
             colunaBotoesTopo.add(b).size(TAMANHO_BOTAO_TOPO).padTop(8).row();
         }
         colunaBotoesTopo.setVisible(false);
@@ -1116,7 +1116,7 @@ public class WorldScreen extends ScreenAdapter {
 
         // Canto de cima a direita: minimapa (tocar abre o mapa grande) e
         // fps/ms embaixo dele.
-        pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(new Color(0.04f, 0.04f, 0.04f, 1f)));
+        pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
         miniMapa = new MiniMapa(mapa, pinturaMiniMapa, fonteMiniMapa, TILES_MINIMAPA, TILES_MAPA_MIN, TILES_MAPA_MAX, false, 2f);
         miniMapa.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
             @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
@@ -1145,7 +1145,7 @@ public class WorldScreen extends ScreenAdapter {
     private Button botaoTopoMapa;
     private static final Color COR_BOTAO_LIGADO = new Color(0.35f, 1f, 0.35f, 1f);
 
-    /** [alvo][chat][minimapa], fps/ms embaixo. Minimapa desligado (botao do
+    /** [alvo][chat][bag/livro][minimapa], fps/ms embaixo. Minimapa desligado (botao do
      * mapa no retrato): sai da linha e os botoes encostam na direita. Mesma
      * margem de cima pra todos. */
     private void montarBarraMiniMapa() {
@@ -1154,10 +1154,11 @@ public class WorldScreen extends ScreenAdapter {
         boolean comMinimapa = Controles.minimapaVisivel();
         float margemTopo = 10f;
         barra.add(botaoTopoAlvo).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(12);
-        barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(comMinimapa ? 14 : 0);
+        barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(12);
+        barra.add(botaoTopoMenu).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(comMinimapa ? 14 : 0);
         if (comMinimapa) barra.add(miniMapa).size(TAMANHO_MINIMAPA).top().padTop(margemTopo);
         barra.row();
-        barra.add(infoDesempenho).colspan(comMinimapa ? 3 : 2).right().padTop(4);
+        barra.add(infoDesempenho).colspan(comMinimapa ? 4 : 3).right().padTop(4);
         // Ligado: o botao fica verde (borda verde, fundo verde escuro).
         botaoTopoMapa.setColor(comMinimapa ? COR_BOTAO_LIGADO : Color.WHITE);
     }
