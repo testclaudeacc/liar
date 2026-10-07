@@ -86,7 +86,8 @@ BESTIARIO_MARCOS = (1, 20, 100, 500)
 BESTIARIO_BONUS_OURO = 0.05
 
 def bestiario_kills(p, tipo):
-    b = (p.get('skills') or {}).get('bestiary')
+    # Da CONTA (users.bestiary): todos os personagens dela somam no mesmo.
+    b = p.get('bestiary')
     if not isinstance(b, dict): return 0
     try: return int(b.get(tipo, 0))
     except (TypeError, ValueError): return 0
@@ -122,14 +123,10 @@ def montar_bestiario(p):
 def bestiario_registrar_kill(sid, p, tipo):
     # Conta a morte; passou de um marco: avisa o client e manda o bestiary novo.
     if tipo not in MOB_DB: return
-    skills = p.get('skills')
-    if not isinstance(skills, dict):
-        skills = {}
-        p['skills'] = skills
-    b = skills.get('bestiary')
+    b = p.get('bestiary')
     if not isinstance(b, dict):
         b = {}
-        skills['bestiary'] = b
+        p['bestiary'] = b
     antes = bestiario_kills(p, tipo)
     b[tipo] = antes + 1
     nivel_antes, nivel_depois = bestiario_nivel(antes), bestiario_nivel(antes + 1)
@@ -1669,6 +1666,7 @@ def _queue_save(p, position_ack_sid=None):
         'npc_dialogue_state': p.get('npc_dialogue_state', {}).copy() if isinstance(p.get('npc_dialogue_state'), dict) else {},
         'hotbar': normalizar_hotbar(p.get('hotbar')),
         'time_played': tempo_jogado,
+        'bestiary': dict(p['bestiary']) if isinstance(p.get('bestiary'), dict) else None,
         'position_ack_sid': position_ack_sid
     }
     save_queue.put(save_data)
@@ -1705,6 +1703,10 @@ def db_writer_worker():
                 player_data.get('user_id'), player_data.get('name')
             )
             c.execute(query, params)
+            # Bestiary e' da conta (todos os personagens dela).
+            if player_data.get('bestiary') is not None:
+                c.execute("UPDATE users SET bestiary = %s WHERE id = %s",
+                          (json.dumps(player_data['bestiary']), player_data.get('user_id')))
             conn.commit()
             c.close()
             if player_data.get('position_ack_sid'):
@@ -1725,6 +1727,7 @@ def init_db():
                         password TEXT)''')
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code TEXT")
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code_expires DOUBLE PRECISION")
+        c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bestiary TEXT DEFAULT '{}'")
         c.execute('''CREATE TABLE IF NOT EXISTS characters (
                         id SERIAL PRIMARY KEY, 
                         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, 
@@ -2203,6 +2206,19 @@ def handle_join_game(data):
         if not hb_salva: hb_salva = {'slots': [COOKIE]}
         data['hotbar'] = normalizar_hotbar(hb_salva)
         data['session_start'] = time.time()
+        # Bestiary da conta. O que ficou salvo no personagem (versao antiga,
+        # skills['bestiary']) entra na conta (maior valor de cada mob).
+        c.execute("SELECT bestiary FROM users WHERE id = %s", (user_id,))
+        linha_b = c.fetchone()
+        try: bestiario = json.loads(linha_b[0]) if linha_b and linha_b[0] else {}
+        except (TypeError, ValueError): bestiario = {}
+        if not isinstance(bestiario, dict): bestiario = {}
+        antigo = real_skills.pop('bestiary', None)
+        if isinstance(antigo, dict):
+            for tipo_b, k_b in antigo.items():
+                try: bestiario[tipo_b] = max(int(bestiario.get(tipo_b, 0)), int(k_b))
+                except (TypeError, ValueError): pass
+        data['bestiary'] = bestiario
         
         # Uma sessao por conta: quem ja estava logado nela e' derrubado (o
         # client dele mostra "Someone logged in your account." e volta pro
@@ -2222,6 +2238,9 @@ def handle_join_game(data):
                 _sair_de_todos_os_canais_chat(existing_sid)
                 _queue_save(player)
                 players_by_name.pop(player.get('name'), None)
+                # Bestiary em memoria e' o mais novo (o save pode estar na fila),
+                # mesmo vindo de outro personagem da conta.
+                if isinstance(player.get('bestiary'), dict): data['bestiary'] = dict(player['bestiary'])
                 data['current_hp'] = player.get('current_hp')
                 data['current_mp'] = player.get('current_mp')
                 if player.get('pos_x') == -1 and player.get('pos_y') == -1: data['pos_x'], data['pos_y'] = -1, -1

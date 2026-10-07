@@ -1164,7 +1164,7 @@ public class WorldScreen extends ScreenAdapter {
             Controles.definirMinimapaVisivel(!Controles.minimapaVisivel());
             montarBarraMiniMapa();
         }, true);
-        for (Button b : new Button[]{botaoTopoConfig, botaoTopoMapa}) {
+        for (Button b : new Button[]{botaoTopoMapa, botaoTopoConfig}) {
             colunaBotoesTopo.add(b).size(TAMANHO_BOTAO_TOPO).padTop(8).row();
         }
         colunaBotoesTopo.setVisible(false);
@@ -2247,14 +2247,14 @@ public class WorldScreen extends ScreenAdapter {
         aviso.setWrap(true);
         aviso.setAlignment(Align.center);
         conteudo.add(aviso).width(LARGURA_BOTAO_SETTINGS * 1.8f).colspan(2).padBottom(14).row();
-        TextButton sim = new TextButton("Yes", skin, "vermelho-popup");
+        TextButton sim = new TextButton("Yes", skin, "verde-popup");
         sim.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 sim.setDisabled(true);
                 salvarPosicaoESair();
             }
         });
-        TextButton nao = new TextButton("No", skin, "verde-popup");
+        TextButton nao = new TextButton("No", skin, "vermelho-popup");
         nao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 mostrarConteudoSettings(conteudoSettingsNormal);
