@@ -238,6 +238,7 @@ public class WorldScreen extends ScreenAdapter {
         final String texto;
         final boolean critico;
         boolean bloqueio = false;
+        boolean sangra = false; // projetil: deixa sangue quando chega
         Color cor = null; // null = vermelho do dano
         float tempo = 0f;
         NumeroDano(float x, float y, String texto, boolean critico) {
@@ -369,6 +370,46 @@ public class WorldScreen extends ScreenAdapter {
         }
     }
     private final Map<String, BagChao> bags = new LinkedHashMap<>();
+
+    // Sangue no chao: cada hit (nao o miss) num player/mob deixa um Blood1-3
+    // no SQM dele por 10s. Desenhado antes de todo mundo (todos passam por cima).
+    private static final class Sangue {
+        final TextureRegion regiao;
+        final float x, y; // canto de baixo a esquerda do SQM
+        float restante = TEMPO_SANGUE;
+        Sangue(TextureRegion regiao, float x, float y) { this.regiao = regiao; this.x = x; this.y = y; }
+    }
+    private static final float TEMPO_SANGUE = 10f;
+    private static final float SANGUE_SUMINDO = 1f; // ultimo segundo: vai apagando
+    private static final int MAX_SANGUE = 300;
+    private final List<Sangue> sangues = new ArrayList<>();
+    private final List<TextureRegion> regioesSangue = new ArrayList<>();
+
+    /** Mancha de sangue no SQM de quem esta em (x = centro, y = pes). */
+    private void sangrar(float x, float y) {
+        if (regioesSangue.isEmpty()) return;
+        TextureRegion r = regioesSangue.get(com.badlogic.gdx.math.MathUtils.random(regioesSangue.size() - 1));
+        float sqmX = (float) Math.floor(x / Jogador.TILE) * Jogador.TILE;
+        float sqmY = Math.round(y / Jogador.TILE) * Jogador.TILE;
+        if (sangues.size() >= MAX_SANGUE) sangues.remove(0);
+        sangues.add(new Sangue(r, sqmX, sqmY));
+    }
+
+    private void desenharSangue(float delta) {
+        for (int i = sangues.size() - 1; i >= 0; i--) {
+            Sangue sg = sangues.get(i);
+            sg.restante -= delta;
+            if (sg.restante <= 0f) { sangues.remove(i); continue; }
+        }
+        for (Sangue sg : sangues) {
+            float alpha = Math.min(1f, sg.restante / SANGUE_SUMINDO);
+            batch.setColor(1f, 1f, 1f, alpha);
+            // Centralizado no SQM (o png pode nao ter exatamente 16x16).
+            float w = sg.regiao.getRegionWidth(), h = sg.regiao.getRegionHeight();
+            batch.draw(sg.regiao, sg.x + (Jogador.TILE - w) / 2f, sg.y + (Jogador.TILE - h) / 2f, w, h);
+        }
+        batch.setColor(1f, 1f, 1f, 1f);
+    }
     private static final float TEMPO_BAG_VISIVEL = 300f; // 5 min (servidor: LOOT_BAG_VISIVEL_SEG = LOOT_EXPIRA_SEG)
 
     private TextureRegion regiaoAlvo, regiaoTargetHit, regiaoFlag, regiaoBag, regiaoBagDourada;
@@ -759,6 +800,11 @@ public class WorldScreen extends ScreenAdapter {
         regiaoTargetHit = atlas.findRegion("ui/items/HitHitbox");
         regiaoFlag = atlas.findRegion("ui/items/Flag");
         regiaoBag = atlas.findRegion("ui/currency/BasicBag");
+        for (int i = 1; i <= 3; i++) {
+            TextureRegion r = atlas.findRegion("ui/items/Blood" + i);
+            if (r == null) r = atlas.findRegion("Blood" + i);
+            if (r != null) regioesSangue.add(r);
+        }
         regiaoBagDourada = atlas.findRegion("ui/currency/GoldBag");
         criarMobsDoMapa();
 
@@ -956,6 +1002,9 @@ public class WorldScreen extends ScreenAdapter {
         uiStage.addActor(painelOptions);
 
         chat = new ChatUI(uiStage, skin, atlas, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), nomeVisivel(local.nome), local.classe);
+        // Boas-vindas no Local ao entrar no jogo (so' pra ele).
+        chat.adicionarMensagemSistema("Welcome to Mitera Online! We hope you have fun, check out our Discord for updates, report bugs and events!",
+            ChatUI.COR_BOAS_VINDAS);
         chat.setOuvinteCanais(new ChatUI.OuvinteCanais() {
             @Override public void entrou(String canal) { emitirCanalChat("chat_join", canal); }
             @Override public void saiu(String canal) { emitirCanalChat("chat_leave", canal); }
@@ -1091,6 +1140,8 @@ public class WorldScreen extends ScreenAdapter {
         // NotificationIcon no lugar.
         iconeChatNovo = atlas.findRegion("ui/ChatNotify");
         if (iconeChatNovo == null) iconeChatNovo = atlas.findRegion("ui/NotificationIcon");
+        iconeChatPv = primeiraRegiao("ui/ChatPv", "ui/ChatPV", "ui/Chatpv", "ui/ChatPrivate", "ui/ChatNotifyPv");
+        iconeChatParty = primeiraRegiao("ui/ChatParty", "ui/Chatparty", "ui/ChatNotifyParty");
         botaoTopoMenu = criarBotaoTopo(iconeMenu, () -> { recolherBotoesTopo(); alternarBookMenu(); }, false);
         botaoTopoConfig = criarBotaoTopo(iconeConfig, () -> { recolherBotoesTopo(); alternarSettings(); }, true);
 
@@ -1196,7 +1247,8 @@ public class WorldScreen extends ScreenAdapter {
         estilo.down = new TextureRegionDrawable(texBotaoTopoClick);
         Button botao = new Button(estilo);
         fotoRetrato = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
-        fotoRetrato.setClip(true);
+        // Sem corte no quadro de dentro: o personagem so' e' cortado na borda
+        // do botao (igual foto numa moldura), ver botao.setClip abaixo.
         fotoRetrato.top();
         fotoRetrato.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
 
@@ -1223,6 +1275,7 @@ public class WorldScreen extends ScreenAdapter {
         pilha.add(centro);
         pilha.add(cantoAviso);
         botao.add(pilha).grow();
+        botao.setClip(true);
         botao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 colunaBotoesTopo.setVisible(!colunaBotoesTopo.isVisible());
@@ -1462,9 +1515,33 @@ public class WorldScreen extends ScreenAdapter {
     /** Mensagem de outro jogador chegou: com o chat fechado, troca o icone
      * do botao pro de notificacao ate abrir o chat (ver render()). */
     private void avisarMensagemNova(String remetente) {
-        if (remetente.equals(local.nome) || chat.isVisivel() || iconeChatNovo == null) return;
+        avisarMensagemNova(remetente, NOVIDADE_LOCAL);
+    }
+
+    // Prioridade do aviso do chat (o maior fica): local/idioma (vermelho) <
+    // privado (amarelo) < party (azul).
+    private static final int NOVIDADE_LOCAL = 1, NOVIDADE_PV = 2, NOVIDADE_PARTY = 3;
+    private int nivelNovidadeChat = 0;
+    private TextureRegion iconeChatPv, iconeChatParty;
+
+    private void avisarMensagemNova(String remetente, int nivel) {
+        if (remetente.equals(local.nome) || chat.isVisivel()) return;
+        if (nivel <= nivelNovidadeChat) return;
+        TextureRegion icone = nivel == NOVIDADE_PARTY ? iconeChatParty : nivel == NOVIDADE_PV ? iconeChatPv : iconeChatNovo;
+        if (icone == null) icone = iconeChatNovo;
+        if (icone == null) return;
+        nivelNovidadeChat = nivel;
         chatComNovidade = true;
-        imagemIconeChat.setDrawable(new TextureRegionDrawable(iconeChatNovo));
+        imagemIconeChat.setDrawable(new TextureRegionDrawable(icone));
+    }
+
+    /** Primeira regiao que existir no atlas entre esses nomes. */
+    private TextureRegion primeiraRegiao(String... nomes) {
+        for (String n : nomes) {
+            TextureRegion r = atlas.findRegion(n);
+            if (r != null) return r;
+        }
+        return null;
     }
 
     private void alternarChat() {
@@ -2235,7 +2312,7 @@ public class WorldScreen extends ScreenAdapter {
             String iconeOutro = BookMenuUI.iconeClasse(minha ? data.getString("to_class", "Knight") : data.getString("class", "Knight"));
             chat.adicionarMensagemPrivada(outro, nomeVisivel(outro), iconeOutro, nomeVisivel(de),
                 ChatUI.corDaClasse(data.getString("class", "Knight")), data.getString("msg", ""));
-            if (!minha) avisarMensagemNova(de);
+            if (!minha) avisarMensagemNova(de, NOVIDADE_PV);
         });
 
         // ---- Party ----
@@ -2393,7 +2470,7 @@ public class WorldScreen extends ScreenAdapter {
             if (ignorados.contains(nome)) return;
             Color cor = ChatUI.corDaClasse(data.getString("class", "Knight"));
             chat.adicionarMensagemParty(nome, cor, texto);
-            avisarMensagemNova(nome);
+            avisarMensagemNova(nome, NOVIDADE_PARTY);
             // Balao todo amarelo (nome e texto); no log fica igual o Local.
             Fala f = new Fala(nome, texto, ChatUI.COR_MSG_PARTY);
             f.corTexto = ChatUI.COR_MSG_PARTY;
@@ -2475,10 +2552,12 @@ public class WorldScreen extends ScreenAdapter {
             if ("Ranged".equals(data.getString("w_type", "")) && projetil != null && atacante != null) {
                 Projetil pr = new Projetil(projetil, atacante.x, atacante.y + 8f, mob, efeito);
                 pr.numero = numero;
+                numero.sangra = !errou && data.getInt("damage", 0) > 0;
                 projeteis.add(pr);
             } else {
                 tocarEfeitoNoMob(efeito, mob);
                 numerosDano.add(numero);
+                if (!errou && data.getInt("damage", 0) > 0) sangrar(mob.x, mob.y);
             }
         });
         socket.on("player_damaged", (nomeEvt, data) -> {
@@ -2495,6 +2574,7 @@ public class WorldScreen extends ScreenAdapter {
                 NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? "Miss" : String.valueOf(dano), false);
                 if (dano <= 0) nd.cor = new Color(1f, 0.9f, 0.1f, 1f);
                 numerosDano.add(nd);
+                if (dano > 0) sangrar(j.x, j.y);
                 Efeito e = tocarEfeito(data.getString("hit_type", "physical_hit"), j.x, j.y);
                 if (e != null) e.jogadorAlvo = j;
             }
@@ -3269,7 +3349,8 @@ public class WorldScreen extends ScreenAdapter {
 
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
-        // Chao primeiro: cadaveres e bags ficam sempre por baixo de quem passa.
+        // Chao primeiro: sangue, cadaveres e bags ficam sempre por baixo de quem passa.
+        desenharSangue(delta);
         for (MobVisual mob : mobs.values()) if (mob.morto) desenharMob(mob);
         desenharBags();
         desenharCadaveres();
@@ -3363,6 +3444,7 @@ public class WorldScreen extends ScreenAdapter {
         atualizarVisibilidadeBotoesTopo();
         if (chatComNovidade && chat.isVisivel()) {
             chatComNovidade = false;
+            nivelNovidadeChat = 0;
             imagemIconeChat.setDrawable(new TextureRegionDrawable(iconeChat));
         }
 
@@ -4254,6 +4336,7 @@ public class WorldScreen extends ScreenAdapter {
                     NumeroDano n = new NumeroDano(pr.alvo.x, pr.alvo.y, pr.numero.texto, pr.numero.critico);
                     n.cor = pr.numero.cor;
                     numerosDano.add(n);
+                    if (pr.numero.sangra) sangrar(pr.alvo.x, pr.alvo.y);
                 }
             }
         }

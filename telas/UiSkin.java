@@ -129,7 +129,8 @@ public class UiSkin {
         // nessa fonte - nao na do TextField, pra um "[" digitado de verdade
         // pelo usuario nao virar tag de cor por engano) pra colorir
         // timestamp/nome por dentro da MESMA linha (ver ChatUI).
-        BitmapFont fonteChatLog = gerarFonte("fonts/dejavu-sans.condensed.ttf", 20, 0, escala);
+        // Com cirilico (chat Russian) - DejaVu tem os glifos.
+        BitmapFont fonteChatLog = gerarFonte("fonts/dejavu-sans.condensed.ttf", 20, 0, escala, CIRILICO);
         fonteChatLog.getData().markupEnabled = true;
         skin.add("chat-log", new Label.LabelStyle(fonteChatLog, Color.WHITE));
         // "+"/"-" do ChatUI - gerada JA no tamanho final (34px), em vez de
@@ -305,8 +306,20 @@ public class UiSkin {
     // uma instancia PROPRIA (nao compartilhada) da fonte do corpo, com
     // markup/glyph de icone remapeados so' nela (ver comentario la).
     static BitmapFont gerarFonte(String caminho, int tamanho, int borda, float escala) {
+        return gerarFonte(caminho, tamanho, borda, escala, "");
+    }
+
+    private static final String CIRILICO;
+    static {
+        StringBuilder sb = new StringBuilder();
+        for (char c = '\u0400'; c <= '\u045F'; c++) sb.append(c);
+        CIRILICO = sb.toString();
+    }
+
+    static BitmapFont gerarFonte(String caminho, int tamanho, int borda, float escala, String caracteresExtras) {
         FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal(caminho));
         FreeTypeFontParameter parametros = new FreeTypeFontParameter();
+        if (!caracteresExtras.isEmpty()) parametros.characters = FreeTypeFontGenerator.DEFAULT_CHARS + caracteresExtras;
         parametros.size = Math.round(tamanho * escala);
         parametros.minFilter = TextureFilter.Linear;
         parametros.magFilter = TextureFilter.Linear;

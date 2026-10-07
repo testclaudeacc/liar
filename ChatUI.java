@@ -44,6 +44,16 @@ public class ChatUI {
     private static final int MAX_MENSAGENS = 60;
     /** Igual servidor.py::CHAT_MAX_CARACTERES - passou disso o campo para de digitar. */
     public static final int MAX_CARACTERES = 200;
+    /** Amarelo das mensagens de boas-vindas. */
+    public static final Color COR_BOAS_VINDAS = new Color(1f, 0.9f, 0.2f, 1f);
+    private static final java.util.Map<String, String> BOAS_VINDAS = new java.util.HashMap<>();
+    static {
+        BOAS_VINDAS.put("Portuguese", "Seja bem-vindo! Respeite as regras para evitar puni\u00e7\u00f5es e trate os outros com dignidade! Bom jogo :)");
+        BOAS_VINDAS.put("Spanish", "\u00a1Bienvenido! Respeta las reglas para evitar sanciones y trata a los dem\u00e1s con dignidad. \u00a1Buen juego! :)");
+        BOAS_VINDAS.put("English", "Welcome! Follow the rules to avoid punishments and treat others with dignity! Have a good game :)");
+        BOAS_VINDAS.put("Russian", "\u0414\u043e\u0431\u0440\u043e \u043f\u043e\u0436\u0430\u043b\u043e\u0432\u0430\u0442\u044c! \u0421\u043e\u0431\u043b\u044e\u0434\u0430\u0439\u0442\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u0430, \u0447\u0442\u043e\u0431\u044b \u0438\u0437\u0431\u0435\u0436\u0430\u0442\u044c \u043d\u0430\u043a\u0430\u0437\u0430\u043d\u0438\u0439, \u0438 \u043e\u0442\u043d\u043e\u0441\u0438\u0442\u0435\u0441\u044c \u043a \u0434\u0440\u0443\u0433\u0438\u043c \u0441 \u0443\u0432\u0430\u0436\u0435\u043d\u0438\u0435\u043c! \u041f\u0440\u0438\u044f\u0442\u043d\u043e\u0439 \u0438\u0433\u0440\u044b :)");
+        BOAS_VINDAS.put("Help", "Welcome to Help! Ask your questions here and be patient with each other. Treat everyone with dignity :)");
+    }
     private static final Color COR_SISTEMA = new Color(0.68f, 0.68f, 0.68f, 1f); // cinza
     /** Punicoes (mute de spam/toxicidade): vermelho vivo. */
     public static final Color COR_PUNICAO = new Color(1f, 0f, 0f, 1f);
@@ -482,6 +492,9 @@ public class ChatUI {
             soEu.add(nomeJogadorLocal);
             membrosPorAba.put(nome, soEu);
             if (ouvinteCanais != null) ouvinteCanais.entrou(nome);
+            // Boas-vindas no idioma do canal (so' quem entrou ve).
+            String boasVindas = BOAS_VINDAS.get(nome);
+            if (boasVindas != null) adicionarNaAba(nome, hora() + " [#" + COR_BOAS_VINDAS.toString() + "]" + escaparMarkup(boasVindas) + "[]");
         }
         abaAtual = nome;
         reconstruirAbas();
