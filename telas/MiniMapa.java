@@ -89,12 +89,48 @@ public class MiniMapa extends Actor {
         if (arrastavel) {
             addListener(new InputListener() {
                 float ultimoX, ultimoY;
+                // Dedos na tela (celular): com 2, pinca de zoom em vez de arrastar.
+                final float[][] dedos = new float[2][2];
+                final boolean[] tocando = new boolean[2];
+                float distInicial, tilesInicial;
+
                 @Override public boolean touchDown(InputEvent e, float x, float y, int pointer, int botao) {
+                    if (pointer < 2) {
+                        tocando[pointer] = true;
+                        dedos[pointer][0] = x;
+                        dedos[pointer][1] = y;
+                        if (tocando[0] && tocando[1]) {
+                            distInicial = distancia();
+                            tilesInicial = tilesVisiveis;
+                        }
+                    }
                     ultimoX = x;
                     ultimoY = y;
                     return true;
                 }
+                @Override public void touchUp(InputEvent e, float x, float y, int pointer, int botao) {
+                    if (pointer < 2) tocando[pointer] = false;
+                    // Sobrou 1 dedo: continua arrastando dali, sem pulo.
+                    int outro = pointer == 0 ? 1 : 0;
+                    if (pointer < 2 && tocando[outro]) {
+                        ultimoX = dedos[outro][0];
+                        ultimoY = dedos[outro][1];
+                    }
+                }
                 @Override public void touchDragged(InputEvent e, float x, float y, int pointer) {
+                    if (pointer < 2) {
+                        dedos[pointer][0] = x;
+                        dedos[pointer][1] = y;
+                    }
+                    if (tocando[0] && tocando[1]) {
+                        // Pinca: afastar os dedos aproxima, juntar afasta.
+                        float d = distancia();
+                        if (distInicial > 1f && d > 1f) {
+                            tilesVisiveis = MathUtils.clamp(tilesInicial * distInicial / d, tilesMin, tilesMax);
+                            limitarPan();
+                        }
+                        return;
+                    }
                     float s = escalaMundo();
                     panX -= (x - ultimoX) / s;
                     panY -= (y - ultimoY) / s;
@@ -102,7 +138,11 @@ public class MiniMapa extends Actor {
                     ultimoX = x;
                     ultimoY = y;
                 }
+                private float distancia() {
+                    return Vector2.dst(dedos[0][0], dedos[0][1], dedos[1][0], dedos[1][1]);
+                }
                 @Override public boolean scrolled(InputEvent e, float x, float y, float sx, float sy) {
+                    // PC: rodinha do mouse.
                     zoom(sy > 0 ? 1.25f : 0.8f);
                     return true;
                 }

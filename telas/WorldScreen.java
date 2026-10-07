@@ -1666,25 +1666,16 @@ public class WorldScreen extends ScreenAdapter {
         Label titulo = new Label("Map", skin, "secao");
         topo.add(titulo).left().expandX();
         float tb = mobile ? 52f : 40f;
-        TextButton menos = new TextButton("-", skin, "cinza-popup");
-        TextButton mais = new TextButton("+", skin, "cinza-popup");
+        // Zoom: pinca (celular) ou rodinha do mouse (PC), no proprio mapa.
         TextButton centro = new TextButton("Center", skin, "cinza-popup");
         centro.padLeft(16).padRight(16); // texto nao cola nas bordas
         TextButton fechar = new TextButton("X", skin, "vermelho-popup");
-        menos.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.zoom(1.25f); }
-        });
-        mais.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.zoom(0.8f); }
-        });
         centro.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.centralizar(); }
         });
         fechar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { fecharMapaGrande(); }
         });
-        topo.add(menos).size(tb).padRight(8);
-        topo.add(mais).size(tb).padRight(8);
         topo.add(centro).height(tb).padRight(16);
         topo.add(fechar).size(tb);
 
@@ -2691,7 +2682,7 @@ public class WorldScreen extends ScreenAdapter {
             adicionarRemotoSeNovo(data);
             if (data != null) {
                 String nome = data.getString("name", "");
-                if (bookMenu.amigo(nome) != null) hud.notificar(nome + " is online.", COR_NOTIF_ON, null);
+                if (bookMenu.amigo(nome) != null) hud.notificarTipo(HudVitais.NOTIF_AMIGO, nome + " is online.", COR_NOTIF_ON, null);
                 bookMenu.definirOnline(nome, true);
             }
         });
@@ -2738,14 +2729,14 @@ public class WorldScreen extends ScreenAdapter {
             }
             // Vira uma linha (Confirm/Negate) na aba Party; a notificacao leva pra la'.
             bookMenu.adicionarConviteParty(quem, data.getInt("inviter_level", 1));
-            hud.notificar(quem + " invited you to a party.", COR_NOTIF_PARTY, this::abrirAbaParty);
+            hud.notificarTipo(HudVitais.NOTIF_PARTY, quem + " invited you to a party.", COR_NOTIF_PARTY, this::abrirAbaParty);
         });
         socket.on("party_invite_result", (nomeEvt, data) -> {
             if (data == null) return;
             String alvo = data.getString("target_name", "");
             if (data.getBoolean("success", false)) {
                 convitesPartyEnviados.add(alvo);
-                hud.notificar("Party invite sent to " + alvo + ".");
+                hud.notificarTipo(HudVitais.NOTIF_PARTY, "Party invite sent to " + alvo + ".");
                 return;
             }
             String motivo = data.getString("reason", "");
@@ -2755,12 +2746,12 @@ public class WorldScreen extends ScreenAdapter {
                 : "already_in_party".equals(motivo) ? alvo + " is already in a party."
                 : "not_leader".equals(motivo) ? "Only the party leader can invite."
                 : "Could not invite " + alvo + ".";
-            hud.notificar(texto, COR_NOTIF_AVISO, null);
+            hud.notificarTipo(HudVitais.NOTIF_PARTY, texto, COR_NOTIF_AVISO, null);
         });
         socket.on("party_invite_declined", (nomeEvt, data) -> {
             if (data == null) return;
             convitesPartyEnviados.remove(data.getString("target_name", ""));
-            hud.notificar(data.getString("target_name", "") + " declined the party invite.");
+            hud.notificarTipo(HudVitais.NOTIF_PARTY, data.getString("target_name", "") + " declined the party invite.");
         });
         socket.on("party_update", (nomeEvt, data) -> {
             if (data == null) return;
@@ -2773,19 +2764,19 @@ public class WorldScreen extends ScreenAdapter {
             for (BookMenuUI.MembroParty m : bookMenu.membrosParty()) depois.add(m.nome);
             convitesPartyEnviados.removeAll(depois); // aceitou: vira escudo
             if (antigoLider == null) {
-                if (depois.size() > 1) hud.notificar("You joined " + bookMenu.liderParty() + "'s party.", COR_NOTIF_PARTY, this::abrirAbaParty);
-                else hud.notificar("Party created.", COR_NOTIF_PARTY, null);
+                if (depois.size() > 1) hud.notificarTipo(HudVitais.NOTIF_PARTY, "You joined " + bookMenu.liderParty() + "'s party.", COR_NOTIF_PARTY, this::abrirAbaParty);
+                else hud.notificarTipo(HudVitais.NOTIF_PARTY, "Party created.", COR_NOTIF_PARTY, null);
                 return;
             }
             for (String n : depois) {
-                if (!antes.contains(n) && !n.equals(local.nome)) hud.notificar(n + " joined the party.", COR_NOTIF_PARTY, null);
+                if (!antes.contains(n) && !n.equals(local.nome)) hud.notificarTipo(HudVitais.NOTIF_PARTY, n + " joined the party.", COR_NOTIF_PARTY, null);
             }
             for (String n : antes) {
-                if (!depois.contains(n)) hud.notificar(n + " left the party.");
+                if (!depois.contains(n)) hud.notificarTipo(HudVitais.NOTIF_PARTY, n + " left the party.");
             }
             String lider = bookMenu.liderParty();
             if (lider != null && !lider.equals(antigoLider)) {
-                hud.notificar(lider.equals(local.nome) ? "You are now the party leader." : lider + " is now the party leader.",
+                hud.notificarTipo(HudVitais.NOTIF_PARTY, lider.equals(local.nome) ? "You are now the party leader." : lider + " is now the party leader.",
                     COR_NOTIF_PARTY, null);
             }
         });
@@ -2795,9 +2786,9 @@ public class WorldScreen extends ScreenAdapter {
             convitesPartyEnviados.clear(); // convites da party antiga morrem junto
             if (!estava || data == null) return;
             String motivo = data.getString("reason", "");
-            if ("kicked".equals(motivo)) hud.notificar("You were removed from the party.", COR_NOTIF_AVISO, null);
-            else if ("left".equals(motivo)) hud.notificar("You left the party.");
-            else if ("auto_disband".equals(motivo)) hud.notificar("Your party was disbanded.");
+            if ("kicked".equals(motivo)) hud.notificarTipo(HudVitais.NOTIF_PARTY, "You were removed from the party.", COR_NOTIF_AVISO, null);
+            else if ("left".equals(motivo)) hud.notificarTipo(HudVitais.NOTIF_PARTY, "You left the party.");
+            else if ("auto_disband".equals(motivo)) hud.notificarTipo(HudVitais.NOTIF_PARTY, "Your party was disbanded.");
         });
         // ---- Trade (servidor.py, TRADE) ----
         socket.on("trade_invite_received", (nomeEvt, data) -> {
@@ -2805,7 +2796,7 @@ public class WorldScreen extends ScreenAdapter {
             String quem = data.getString("inviter_name", "");
             if (ignorados.contains(quem)) return;
             convitesTrade.add(quem); // balaozinho "Trade" em cima dele (so' pra mim)
-            hud.notificar(quem + " wants to trade.", COR_NOTIF_PARTY, () -> {
+            hud.notificarTipo(HudVitais.NOTIF_TRADE, quem + " wants to trade.", COR_NOTIF_PARTY, () -> {
                 if (socket.isConnected() && convitesTrade.contains(quem)) {
                     socket.emitRaw("accept_trade_invite", GameSocket.obj(w -> w.set("inviter_name", quem)));
                 }
@@ -2819,7 +2810,7 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             String alvo = data.getString("target_name", "");
             if (data.getBoolean("success", false)) {
-                hud.notificar("Trade request sent to " + alvo + ".");
+                hud.notificarTipo(HudVitais.NOTIF_TRADE, "Trade request sent to " + alvo + ".");
                 return;
             }
             String motivo = data.getString("reason", "");
@@ -2829,7 +2820,7 @@ public class WorldScreen extends ScreenAdapter {
                 : "timeout".equals(motivo) ? "Trade request to " + alvo + " expired."
                 : "offline".equals(motivo) ? alvo + " is offline."
                 : "Could not trade with " + alvo + ".";
-            hud.notificar(texto, COR_NOTIF_AVISO, null);
+            hud.notificarTipo(HudVitais.NOTIF_TRADE, texto, COR_NOTIF_AVISO, null);
         });
         socket.on("trade_started", (nomeEvt, data) -> {
             if (data == null) return;
@@ -2850,7 +2841,7 @@ public class WorldScreen extends ScreenAdapter {
             bookMenu.fecharTrade();
             atualizarVisibilidadeJoystick();
             String motivo = data != null ? data.getString("reason", "") : "";
-            hud.notificar("invalid_offer".equals(motivo) ? "Trade failed: the offer is no longer valid."
+            hud.notificarTipo(HudVitais.NOTIF_TRADE, "invalid_offer".equals(motivo) ? "Trade failed: the offer is no longer valid."
                 : "disconnected".equals(motivo) ? "Trade cancelled: the player left."
                 : "Trade cancelled.", COR_NOTIF_AVISO, null);
         });
@@ -2858,7 +2849,7 @@ public class WorldScreen extends ScreenAdapter {
             bookMenu.fecharTrade();
             atualizarVisibilidadeJoystick();
             if (data != null && data.has("new_currency")) bookMenu.atualizarMoedas(data.getLong("new_currency", 0L));
-            hud.notificar("Trade successful!");
+            hud.notificarTipo(HudVitais.NOTIF_TRADE, "Trade successful!");
         });
 
         // Chat Local: [nome, mensagem (ja censurada), classe] de quem esta na
@@ -3127,7 +3118,7 @@ public class WorldScreen extends ScreenAdapter {
             convitesPartyEnviados.remove(data.getString("name", ""));
             bookMenu.removerConviteParty(data.getString("name", ""));
             if (bookMenu.amigo(data.getString("name", "")) != null && !data.getString("name", "").equals(local.nome)) {
-                hud.notificar(data.getString("name", "") + " is offline.", COR_NOTIF_OFF, null);
+                hud.notificarTipo(HudVitais.NOTIF_AMIGO, data.getString("name", "") + " is offline.", COR_NOTIF_OFF, null);
             }
             bookMenu.definirOnline(data.getString("name", ""), false);
             if (data.getString("name", "").equals(painelJogador.nomeAberto())) painelJogador.fechar();

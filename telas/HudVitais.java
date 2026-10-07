@@ -88,6 +88,15 @@ public final class HudVitais {
     private final java.util.ArrayDeque<Notificacao> filaNotificacoes = new java.util.ArrayDeque<>();
     private Notificacao notificacaoAtual;
     private final TextureRegion iconeNotificacaoPadrao;
+    private TextureRegion iconeNotifTrade, iconeNotifAmigo, iconeNotifParty;
+    private Table internoNotif;
+    private com.badlogic.gdx.scenes.scene2d.ui.Cell<?> celulaIconeNotif;
+
+    /** Tipo da notificacao: muda o icone e a cor de fundo da caixinha. */
+    public static final int NOTIF_AVISO = 0, NOTIF_TRADE = 1, NOTIF_AMIGO = 2, NOTIF_PARTY = 3;
+    private static final Color COR_NOTIF_TRADE = new Color(0.42f, 0.33f, 0.05f, 1f); // amarelo escuro
+    private static final Color COR_NOTIF_AMIGO = new Color(0.45f, 0.12f, 0.3f, 1f);  // rosa escuro
+    private static final Color COR_NOTIF_PARTY = new Color(0.16f, 0.32f, 0.45f, 1f); // azul claro escurecido
     private static final float DURACAO_NOTIFICACAO = 5f;
     private static final int MAX_FILA_NOTIFICACOES = 6;
 
@@ -95,6 +104,7 @@ public final class HudVitais {
         final String texto;
         final Color cor;
         final Runnable aoClicar;
+        int tipo = NOTIF_AVISO;
         Notificacao(String texto, Color cor, Runnable aoClicar) {
             this.texto = texto;
             this.cor = cor;
@@ -256,10 +266,13 @@ public final class HudVitais {
         iconeNotificacao.setScaling(Scaling.fit);
         if (regNotif != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(regNotif));
         textoNotificacao = new LabelNitido("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
-        Table internoNotif = new Table();
+        internoNotif = new Table();
         internoNotif.setBackground(cor(COR_MUNICAO));
         internoNotif.left();
-        internoNotif.add(iconeNotificacao).size(px(MOBILE ? 22 : 20)).padLeft(px(4)).padRight(px(6));
+        celulaIconeNotif = internoNotif.add(iconeNotificacao).size(px(MOBILE ? 22 : 20)).padLeft(px(4)).padRight(px(6));
+        iconeNotifTrade = atlas.findRegion("ui/currency/Gold");
+        iconeNotifAmigo = atlas.findRegion("ui/buttons/FriendsBtn");
+        iconeNotifParty = atlas.findRegion("ui/buttons/PartyBtn");
         internoNotif.add(textoNotificacao).left().expandX().padRight(px(8));
         painelNotificacao.setBackground(cor(Color.BLACK));
         painelNotificacao.pad(px(1));
@@ -590,11 +603,35 @@ public final class HudVitais {
 
     public void notificar(String texto) { notificar(texto, null, null); }
 
+    public void notificarTipo(int tipo, String texto) { notificarTipo(tipo, texto, null, null); }
+
+    /** Igual notificar, com icone/cor de fundo do tipo (trade, amigo, party). */
+    public void notificarTipo(int tipo, String texto, Color cor, Runnable aoClicar) {
+        if (texto == null || texto.isEmpty()) return;
+        Notificacao n = new Notificacao(texto, cor != null ? cor : Color.WHITE, aoClicar);
+        n.tipo = tipo;
+        if (notificacaoAtual == null) {
+            mostrarNotificacao(n);
+            return;
+        }
+        if (filaNotificacoes.size() >= MAX_FILA_NOTIFICACOES) filaNotificacoes.pollFirst();
+        filaNotificacoes.addLast(n);
+    }
+
     private void mostrarNotificacao(Notificacao n) {
         notificacaoAtual = n;
         textoNotificacao.setText(n.texto);
         textoNotificacao.setColor(Color.WHITE); // todas brancas
-        if (iconeNotificacaoPadrao != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(iconeNotificacaoPadrao));
+        TextureRegion icone = iconeNotificacaoPadrao;
+        Color fundo = COR_MUNICAO;
+        float tamIcone = px(MOBILE ? 22 : 20);
+        if (n.tipo == NOTIF_TRADE && iconeNotifTrade != null) { icone = iconeNotifTrade; fundo = COR_NOTIF_TRADE; tamIcone *= 0.7f; }
+        else if (n.tipo == NOTIF_AMIGO && iconeNotifAmigo != null) { icone = iconeNotifAmigo; fundo = COR_NOTIF_AMIGO; }
+        else if (n.tipo == NOTIF_PARTY && iconeNotifParty != null) { icone = iconeNotifParty; fundo = COR_NOTIF_PARTY; }
+        if (icone != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(icone));
+        internoNotif.setBackground(cor(fundo));
+        celulaIconeNotif.size(tamIcone);
+        internoNotif.invalidate();
         painelNotificacao.clearActions();
         painelNotificacao.getColor().a = 1f;
         painelNotificacao.setVisible(true);
