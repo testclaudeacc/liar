@@ -1123,14 +1123,18 @@ public class WorldScreen extends ScreenAdapter {
         Table infoDesempenho = new Table();
         infoDesempenho.add(labelFps).right().row();
         infoDesempenho.add(labelMs).right();
+        // Terceiro botao (icone do mapa do livro): mostra/esconde o minimapa.
+        TextureRegion iconeMapa = atlas.findRegion("ui/buttons/MapBtn");
+        botaoTopoMapa = criarBotaoTopo(iconeMapa, () -> {
+            Controles.definirMinimapaVisivel(!Controles.minimapaVisivel());
+            montarBarraMiniMapa();
+        }, false);
+        this.infoDesempenho = infoDesempenho;
         Table barra = new Table();
         barra.setFillParent(true);
         barra.top().right().pad(0, 0, 0, 20);
-        barra.add(botaoTopoAlvo).size(TAMANHO_BOTAO_TOPO).top().padRight(12);
-        barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).top().padRight(14);
-        barra.add(miniMapa).size(TAMANHO_MINIMAPA).top().padTop(10).row();
-        barra.add(infoDesempenho).colspan(3).right().padTop(4);
         barraMiniMapa = barra;
+        montarBarraMiniMapa();
         // Por baixo das janelas (livro/chat/settings), igual o HUD.
         uiStage.getRoot().addActorAt(0, barra);
 
@@ -1138,7 +1142,23 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     // ---- Retrato do player + botoes / minimapa ----
-    private Table colunaRetrato, colunaBotoesTopo, barraMiniMapa;
+    private Table colunaRetrato, colunaBotoesTopo, barraMiniMapa, infoDesempenho;
+    private Button botaoTopoMapa;
+
+    /** [alvo][chat][mapa][minimapa], fps/ms embaixo. Minimapa escondido: sai
+     * da linha e os botoes encostam na direita. Mesma margem de cima pra todos. */
+    private void montarBarraMiniMapa() {
+        Table barra = barraMiniMapa;
+        barra.clearChildren();
+        boolean comMinimapa = Controles.minimapaVisivel();
+        float margemTopo = 10f;
+        barra.add(botaoTopoAlvo).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(12);
+        barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(12);
+        barra.add(botaoTopoMapa).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(comMinimapa ? 14 : 0);
+        if (comMinimapa) barra.add(miniMapa).size(TAMANHO_MINIMAPA).top().padTop(margemTopo);
+        barra.row();
+        barra.add(infoDesempenho).colspan(comMinimapa ? 4 : 3).right().padTop(4);
+    }
     private Button botaoRetrato;
     private com.badlogic.gdx.scenes.scene2d.ui.Container<com.badlogic.gdx.scenes.scene2d.Actor> fotoRetrato;
     private Image avisoRetrato;
@@ -1156,7 +1176,11 @@ public class WorldScreen extends ScreenAdapter {
         @Override public void pontos(MiniMapa.Coletor c) {
             for (NPCVisual n : npcs.values()) c.ponto(n.movimento.x, n.movimento.y, MiniMapa.COR_NPC);
             for (MobVisual m : mobs.values()) if (m.visivel && !m.morto) c.ponto(m.x, m.y, MiniMapa.COR_MOB);
-            for (Jogador j : remotos.values()) c.ponto(j.x, j.y, MiniMapa.COR_PLAYER);
+            // Outros players: so' quem esta na party (e perto, em "remotos"), na cor da classe.
+            for (BookMenuUI.MembroParty m : bookMenu.membrosParty()) {
+                Jogador j = remotos.get(m.nome);
+                if (j != null) c.ponto(j.x, j.y, MiniMapa.corDaClasse(m.classe));
+            }
         }
     };
 
@@ -1253,7 +1277,10 @@ public class WorldScreen extends ScreenAdapter {
 
         Table legenda = new Table();
         adicionarLegenda(legenda, MiniMapa.COR_VOCE, "You");
-        adicionarLegenda(legenda, MiniMapa.COR_PLAYER, "Players");
+        adicionarLegenda(legenda, MiniMapa.COR_KNIGHT, "Knight");
+        adicionarLegenda(legenda, MiniMapa.COR_RANGER, "Ranger");
+        adicionarLegenda(legenda, MiniMapa.COR_MAGE, "Mage");
+        adicionarLegenda(legenda, MiniMapa.COR_BARD, "Bard");
         adicionarLegenda(legenda, MiniMapa.COR_NPC, "NPCs");
         adicionarLegenda(legenda, MiniMapa.COR_MOB, "Monsters");
 

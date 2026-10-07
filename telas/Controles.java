@@ -161,6 +161,15 @@ public final class Controles {
         salvar();
     }
 
+    // ---- Minimapa (botao de mostrar/esconder) ----
+    public static boolean minimapaVisivel() { return prefs().getBoolean("minimapa_visivel", true); }
+
+    public static void definirMinimapaVisivel(boolean visivel) {
+        Preferences p = prefs();
+        p.putBoolean("minimapa_visivel", visivel);
+        p.flush();
+    }
+
     // ---- Joystick ----
     public static float joystickEscala() { carregar(); return joystickEscala; }
     public static float joystickX() { carregar(); return joystickX; }

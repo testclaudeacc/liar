@@ -35,8 +35,20 @@ public class MiniMapa extends Actor {
     }
 
     public static final Color COR_VOCE = Color.WHITE;
-    public static final Color COR_PLAYER = new Color(0.35f, 0.75f, 1f, 1f);
-    public static final Color COR_NPC = new Color(1f, 0.85f, 0.15f, 1f);
+    // Outros players so' aparecem se estiverem na party, na cor da classe.
+    public static final Color COR_KNIGHT = new Color(0.2f, 0.9f, 0.95f, 1f);  // ciano
+    public static final Color COR_RANGER = new Color(0.25f, 0.85f, 0.25f, 1f); // verde
+    public static final Color COR_MAGE = new Color(0.8f, 0.6f, 1f, 1f);        // roxo claro
+    public static final Color COR_BARD = new Color(1f, 0.9f, 0.15f, 1f);       // amarelo
+    // Laranja (amarelo agora e' do bard).
+    public static final Color COR_NPC = new Color(1f, 0.55f, 0.1f, 1f);
+
+    public static Color corDaClasse(String classe) {
+        if ("Mage".equals(classe)) return COR_MAGE;
+        if ("Ranger".equals(classe)) return COR_RANGER;
+        if ("Bard".equals(classe)) return COR_BARD;
+        return COR_KNIGHT;
+    }
     public static final Color COR_MOB = new Color(0.95f, 0.15f, 0.15f, 1f);
     private static final Color COR_BORDA = new Color(83 / 255f, 83 / 255f, 83 / 255f, 1f);
     private static final Color COR_FUNDO = new Color(0.04f, 0.04f, 0.04f, 1f);
