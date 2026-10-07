@@ -989,7 +989,10 @@ public class WorldScreen extends ScreenAdapter {
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
+        // A coluna fica colada no canto da tela (sem a margem do HUD); so' o
+        // retrato mantem o recuo da esquerda.
         hud.definirColunaEsquerda(colunaRetrato, 10f);
+        colunaRetrato.getCell(botaoRetrato).padLeft(hud.margemEsquerda());
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
         hotbar = new HotbarUI(uiStage, skin, bookMenu, indice -> {
             if (localMorto || !socket.isConnected()) return;
@@ -1094,8 +1097,11 @@ public class WorldScreen extends ScreenAdapter {
         colunaBotoesTopo.setVisible(false);
         colunaRetrato = new Table();
         colunaRetrato.top().left();
-        colunaRetrato.add(criarRetrato()).size(TAMANHO_BOTAO_TOPO).row();
-        colunaRetrato.add(colunaBotoesTopo).top();
+        botaoRetrato = criarRetrato();
+        colunaRetrato.add(botaoRetrato).size(TAMANHO_BOTAO_TOPO).left().row();
+        // Botoes colados na borda esquerda da tela; o retrato colado no topo
+        // (o recuo da esquerda dele vem do HUD, ver construirUiSettings).
+        colunaRetrato.add(colunaBotoesTopo).top().left();
 
         // Canto de cima a direita: minimapa (tocar abre o mapa grande) e
         // fps/ms embaixo dele.
@@ -1124,6 +1130,7 @@ public class WorldScreen extends ScreenAdapter {
 
     // ---- Retrato do player + botoes / minimapa ----
     private Table colunaRetrato, colunaBotoesTopo, barraMiniMapa;
+    private Button botaoRetrato;
     private com.badlogic.gdx.scenes.scene2d.ui.Container<com.badlogic.gdx.scenes.scene2d.Actor> fotoRetrato;
     private Image avisoRetrato;
     private Texture texBolinha;
@@ -1175,7 +1182,7 @@ public class WorldScreen extends ScreenAdapter {
         float interno = TAMANHO_BOTAO_TOPO * 0.70f;
         com.badlogic.gdx.scenes.scene2d.ui.Stack pilha = new com.badlogic.gdx.scenes.scene2d.ui.Stack();
         Table centro = new Table();
-        centro.add(fotoRetrato).size(interno);
+        centro.add(fotoRetrato).size(interno).padBottom(TAMANHO_BOTAO_TOPO * 0.12f);
         pilha.add(centro);
         pilha.add(cantoAviso);
         botao.add(pilha).grow();
@@ -1368,9 +1375,11 @@ public class WorldScreen extends ScreenAdapter {
      * mesmo chrome pros 3 botoes do topo, so' o icone muda. */
     private Button criarBotaoTopo(TextureRegion icone, Runnable aoClicar) {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
-        estilo.up = new TextureRegionDrawable(texBotaoTopo);
-        estilo.over = new TextureRegionDrawable(texBotaoTopoHover);
-        estilo.down = new TextureRegionDrawable(texBotaoTopoClick);
+        // Girados 90 graus: a parte que encaixa na borda (era em cima, na
+        // barra do topo) fica pra ESQUERDA, colada na borda da tela.
+        estilo.up = girado90(texBotaoTopo);
+        estilo.over = girado90(texBotaoTopoHover);
+        estilo.down = girado90(texBotaoTopoClick);
         Button botao = new Button(estilo);
         if (icone != null) {
             Image imagemIcone = new Image(new TextureRegionDrawable(icone));
@@ -1381,6 +1390,18 @@ public class WorldScreen extends ScreenAdapter {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
         });
         return botao;
+    }
+
+    /** Desenha a regiao girada 90 graus (anti-horario: o lado de cima vai pra esquerda). */
+    private static com.badlogic.gdx.scenes.scene2d.utils.Drawable girado90(TextureRegion regiao) {
+        com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable d = new com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable() {
+            @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float x, float y, float largura, float altura) {
+                batch.draw(regiao, x, y, largura / 2f, altura / 2f, largura, altura, 1f, 1f, 90f);
+            }
+        };
+        d.setMinWidth(regiao.getRegionHeight());
+        d.setMinHeight(regiao.getRegionWidth());
+        return d;
     }
 
     /** Mensagem de outro jogador chegou: com o chat fechado, troca o icone
