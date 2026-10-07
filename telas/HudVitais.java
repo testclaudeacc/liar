@@ -187,7 +187,7 @@ public final class HudVitais {
         raiz.add(conteudo).top().left();
         conteudo.top().left();
         conteudo.add(linhaTopo).left().row();
-        conteudo.add(painelXp).left().padTop(px(6)).row();
+        // Barra de XP saiu: o XP agora e' o anel em volta do retrato (WorldScreen).
 
         // ---- Municao (so' aparece com flecha equipada) ----
         iconeMunicao.setScaling(Scaling.fit);
@@ -436,6 +436,8 @@ public final class HudVitais {
     }
 
     private float fracaoXp = 0f;
+    /** Tahoma Bold branca com contorno preto (a mesma das barras). */
+    public BitmapFont fonteComContorno() { return fonte; }
     /** 0-1 do caminho ate' o proximo level (anel do retrato). */
     public float fracaoXp() { return fracaoXp; }
 

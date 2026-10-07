@@ -1046,6 +1046,8 @@ public class WorldScreen extends ScreenAdapter {
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
         hud.definirColunaEsquerda(colunaRetrato, 10f);
+        // % do retrato com contorno preto (fonte das barras do HUD).
+        labelXpRetrato.setStyle(new Label.LabelStyle(hud.fonteComContorno(), Color.WHITE));
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
         hotbar = new HotbarUI(uiStage, skin, bookMenu, indice -> {
             if (localMorto || !socket.isConnected()) return;
@@ -1241,9 +1243,10 @@ public class WorldScreen extends ScreenAdapter {
      * do topo. Bolinha vermelha = mensagem nova no chat. */
     private Button criarRetrato() {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
-        estilo.up = new TextureRegionDrawable(texBotaoTopo);
-        estilo.over = new TextureRegionDrawable(texBotaoTopoHover);
-        estilo.down = new TextureRegionDrawable(texBotaoTopoClick);
+        // Fundo menor que a celula: sobra a volta pro anel de XP.
+        estilo.up = encolhido(texBotaoTopo, FATOR_RETRATO);
+        estilo.over = encolhido(texBotaoTopoHover, FATOR_RETRATO);
+        estilo.down = encolhido(texBotaoTopoClick, FATOR_RETRATO);
         Button botao = new Button(estilo);
         // Foto: textura pronta (gerarTexturaRetrato) do tamanho do botao,
         // com o personagem recortado no circulo escuro de dentro dele.
@@ -1279,7 +1282,7 @@ public class WorldScreen extends ScreenAdapter {
         };
         Table cantoXp = new Table();
         cantoXp.bottom().right();
-        cantoXp.add(labelXpRetrato).padRight(-TAMANHO_RETRATO * 0.06f).padBottom(-TAMANHO_RETRATO * 0.04f);
+        cantoXp.add(labelXpRetrato).padRight(-TAMANHO_RETRATO * 0.06f).padBottom(-TAMANHO_RETRATO * 0.14f);
         cantoXp.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
         pilha.add(cantoXp);
         pilha.add(cantoAviso);
@@ -1309,13 +1312,23 @@ public class WorldScreen extends ScreenAdapter {
     private Texture texRetrato;
     private Image imagemRetrato;
     private Label labelXpRetrato;
+    /** Fundo do retrato (Button1) em fracao da celula; o resto e' do anel de XP. */
+    private static final float FATOR_RETRATO = 0.76f;
+
+    /** Desenha a regiao menor (fator) e centralizada na area recebida. */
+    private static com.badlogic.gdx.scenes.scene2d.utils.Drawable encolhido(TextureRegion regiao, float fator) {
+        return new com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable() {
+            @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float x, float y, float w, float h) {
+                batch.draw(regiao, x + w * (1f - fator) / 2f, y + h * (1f - fator) / 2f, w * fator, h * fator);
+            }
+        };
+    }
     private float raioMascara = 0.4f; // raio do circulo escuro, em fracao do lado do botao
 
     // Anel de XP em volta do personagem (em cima do anel claro do botao):
     // trilho escuro + amarelo que vai fechando no sentido horario a partir
     // de cima conforme o XP do level.
     private static final Color COR_ANEL_XP = Color.valueOf("e8b020");
-    private static final Color COR_ANEL_FUNDO = new Color(0.12f, 0.1f, 0.06f, 0.85f);
     private class AnelXp extends com.badlogic.gdx.scenes.scene2d.Actor {
         private static final int SEGMENTOS = 96;
         AnelXp() { setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); }
@@ -1323,25 +1336,37 @@ public class WorldScreen extends ScreenAdapter {
             mascaraDoRetrato();
             float lado = Math.min(getWidth(), getHeight());
             float cx = getX() + getWidth() / 2f, cy = getY() + getHeight() / 2f;
-            float espessura = lado * 0.07f;
-            float raio = lado * raioMascara + espessura / 2f;
+            float espessura = lado * 0.085f;
+            // Logo fora do fundo (Button1 encolhido), dentro da celula.
+            float raio = lado * FATOR_RETRATO / 2f + espessura / 2f + lado * 0.01f;
             float fracao = hud != null ? hud.fracaoXp() : 0f;
             int cheios = Math.round(fracao * SEGMENTOS);
-            // Comprimento de cada pedaco = arco + um pouco (sem frestas).
-            float comp = (float) (2 * Math.PI * raio / SEGMENTOS) * 1.15f;
-            for (int i = 0; i < SEGMENTOS; i++) {
-                Color c = i < cheios ? COR_ANEL_XP : COR_ANEL_FUNDO;
-                b.setColor(c.r, c.g, c.b, c.a * alpha);
-                // Comeca em cima (90 graus) e anda no sentido horario.
-                float ang = 90f - (i + 0.5f) * 360f / SEGMENTOS;
-                float rad = ang * com.badlogic.gdx.math.MathUtils.degreesToRadians;
-                float px = cx + raio * com.badlogic.gdx.math.MathUtils.cos(rad);
-                float py = cy + raio * com.badlogic.gdx.math.MathUtils.sin(rad);
-                // Pedaco tangente ao circulo.
-                b.draw(pixelBrancoRegiao(), px - comp / 2f, py - espessura / 2f, comp / 2f, espessura / 2f,
-                    comp, espessura, 1f, 1f, ang - 90f);
-            }
+            // Borda escura nas duas beiradas (o meio vazio e' transparente).
+            float borda = Math.max(1f, lado * 0.018f);
+            anel(b, cx, cy, raio - espessura / 2f, borda, SEGMENTOS, COR_ANEL_BORDA, alpha);
+            anel(b, cx, cy, raio + espessura / 2f, borda, SEGMENTOS, COR_ANEL_BORDA, alpha);
+            anel(b, cx, cy, raio, espessura - borda, cheios, COR_ANEL_XP, alpha);
             b.setColor(Color.WHITE);
+        }
+    }
+
+    private static final Color COR_ANEL_BORDA = new Color(0.05f, 0.04f, 0.03f, 1f);
+
+    /** Arco de "segmentos" pedacos (de AnelXp.SEGMENTOS na volta toda),
+     * comecando em cima e indo no sentido horario. */
+    private void anel(com.badlogic.gdx.graphics.g2d.Batch b, float cx, float cy, float raio, float espessura,
+                      int segmentos, Color c, float alpha) {
+        int total = AnelXp.SEGMENTOS;
+        // Comprimento de cada pedaco = arco + um pouco (sem frestas).
+        float comp = (float) (2 * Math.PI * raio / total) * 1.15f;
+        b.setColor(c.r, c.g, c.b, c.a * alpha);
+        for (int i = 0; i < segmentos; i++) {
+            float ang = 90f - (i + 0.5f) * 360f / total;
+            float rad = ang * com.badlogic.gdx.math.MathUtils.degreesToRadians;
+            float px = cx + raio * com.badlogic.gdx.math.MathUtils.cos(rad);
+            float py = cy + raio * com.badlogic.gdx.math.MathUtils.sin(rad);
+            b.draw(pixelBrancoRegiao(), px - comp / 2f, py - espessura / 2f, comp / 2f, espessura / 2f,
+                comp, espessura, 1f, 1f, ang - 90f);
         }
     }
 
@@ -1448,7 +1473,7 @@ public class WorldScreen extends ScreenAdapter {
         }
         if (baseUsada < topoUsado) { topoUsado = 0; baseUsada = alturaMax - 1; }
         int alturaUsada = baseUsada - topoUsado + 1;
-        float diametro = 2f * raioMascara * r;
+        float diametro = 2f * raioMascara * r * FATOR_RETRATO;
         int esc = Math.max(1, (int) Math.floor(diametro * 0.72f / Math.max(alturaUsada, SkinsUtil.FRAME_LARGURA)));
         int x0 = (r - SkinsUtil.FRAME_LARGURA * esc) / 2;
         int y0 = (r - alturaUsada * esc) / 2 - topoUsado * esc; // de cima pra baixo
@@ -1485,7 +1510,10 @@ public class WorldScreen extends ScreenAdapter {
                     for (int dx = 0; dx < esc; dx++) {
                         int px = x0 + sx * esc + dx;
                         if (px < 0 || px >= r) continue;
-                        if (!mascara[(py / escMascara) * lado + px / escMascara]) continue;
+                        // Fundo encolhido (FATOR_RETRATO): mascara no meio da textura.
+                        int mx = (int) Math.floor((px - r * (1f - FATOR_RETRATO) / 2f) / (r * FATOR_RETRATO) * lado);
+                        int my = (int) Math.floor((py - r * (1f - FATOR_RETRATO) / 2f) / (r * FATOR_RETRATO) * lado);
+                        if (mx < 0 || my < 0 || mx >= lado || my >= lado || !mascara[my * lado + mx]) continue;
                         saida.drawPixel(px, py, cor);
                     }
                 }
