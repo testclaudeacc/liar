@@ -89,7 +89,8 @@ public final class HudVitais {
     private Notificacao notificacaoAtual;
     private final TextureRegion iconeNotificacaoPadrao;
     private TextureRegion iconeNotifTrade, iconeNotifAmigo, iconeNotifParty;
-    private Table internoNotif;
+    private Table internoNotif, blocoIconeNotif;
+    private float alturaNotif;
     private com.badlogic.gdx.scenes.scene2d.ui.Cell<?> celulaIconeNotif;
 
     /** Tipo da notificacao: muda o icone e a cor de fundo da caixinha. */
@@ -178,7 +179,8 @@ public final class HudVitais {
         pixel = new Texture(pm);
         pm.dispose();
         fonte = gerarFonte(escala, 14, false);
-        fonteNotificacao = gerarFonte(escala, MOBILE ? 16 : 11, true);
+        // Celular: 13 (16 ficava grande demais pra caixinha da notificacao).
+        fonteNotificacao = gerarFonte(escala, MOBILE ? 13 : 11, true);
         // Sem arredondar pra unidade do STAGE (que nao e' pixel de tela): com
         // isso as letras caiam entre pixels e o filtro Linear "derretia" o
         // texto. O LabelNitido prende a origem no pixel de tela.
@@ -266,17 +268,22 @@ public final class HudVitais {
         iconeNotificacao.setScaling(Scaling.fit);
         if (regNotif != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(regNotif));
         textoNotificacao = new LabelNitido("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
+        // Caixinha estilo "toast": bloco do icone (tom mais escuro) colado
+        // na esquerda, texto com folga, borda fina num tom mais claro.
+        alturaNotif = px(MOBILE ? 26 : 30);
         internoNotif = new Table();
         internoNotif.setBackground(cor(COR_MUNICAO));
         internoNotif.left();
-        celulaIconeNotif = internoNotif.add(iconeNotificacao).size(px(MOBILE ? 22 : 20)).padLeft(px(4)).padRight(px(6));
+        blocoIconeNotif = new Table();
+        celulaIconeNotif = blocoIconeNotif.add(iconeNotificacao).size(alturaNotif * 0.68f);
+        internoNotif.add(blocoIconeNotif).size(alturaNotif);
         iconeNotifTrade = atlas.findRegion("ui/currency/Gold");
         iconeNotifAmigo = atlas.findRegion("ui/buttons/FriendsBtn");
         iconeNotifParty = atlas.findRegion("ui/buttons/PartyBtn");
-        internoNotif.add(textoNotificacao).left().expandX().padRight(px(8));
+        internoNotif.add(textoNotificacao).left().expandX().padLeft(px(8)).padRight(px(10));
         painelNotificacao.setBackground(cor(Color.BLACK));
         painelNotificacao.pad(px(1));
-        painelNotificacao.add(internoNotif).minWidth(px(110)).height(px(MOBILE ? 32 : 28));
+        painelNotificacao.add(internoNotif).minWidth(px(120)).height(alturaNotif);
         painelNotificacao.setVisible(false);
         painelNotificacao.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         painelNotificacao.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
@@ -624,12 +631,14 @@ public final class HudVitais {
         textoNotificacao.setColor(Color.WHITE); // todas brancas
         TextureRegion icone = iconeNotificacaoPadrao;
         Color fundo = COR_MUNICAO;
-        float tamIcone = px(MOBILE ? 22 : 20);
-        if (n.tipo == NOTIF_TRADE && iconeNotifTrade != null) { icone = iconeNotifTrade; fundo = COR_NOTIF_TRADE; tamIcone *= 0.7f; }
+        float tamIcone = alturaNotif * 0.68f;
+        if (n.tipo == NOTIF_TRADE && iconeNotifTrade != null) { icone = iconeNotifTrade; fundo = COR_NOTIF_TRADE; tamIcone *= 0.8f; }
         else if (n.tipo == NOTIF_AMIGO && iconeNotifAmigo != null) { icone = iconeNotifAmigo; fundo = COR_NOTIF_AMIGO; }
         else if (n.tipo == NOTIF_PARTY && iconeNotifParty != null) { icone = iconeNotifParty; fundo = COR_NOTIF_PARTY; }
         if (icone != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(icone));
-        internoNotif.setBackground(cor(fundo));
+        internoNotif.setBackground(cor(new Color(fundo.r, fundo.g, fundo.b, 0.93f)));
+        blocoIconeNotif.setBackground(cor(new Color(fundo).mul(0.6f, 0.6f, 0.6f, 1f)));
+        painelNotificacao.setBackground(cor(new Color(fundo).lerp(Color.WHITE, 0.3f)));
         celulaIconeNotif.size(tamIcone);
         internoNotif.invalidate();
         painelNotificacao.clearActions();

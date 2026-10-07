@@ -2003,6 +2003,7 @@ public final class BookMenuUI {
         Label limite = new Label("How many? (max " + max + ")", skin, "hud");
         limite.setFontScale(0.65f * FONTE_STATS);
         limite.setColor(Color.LIGHT_GRAY);
+        final BarraQuantidade[] barraQtd = new BarraQuantidade[1];
         com.badlogic.gdx.scenes.scene2d.ui.TextField campo = new com.badlogic.gdx.scenes.scene2d.ui.TextField(String.valueOf(max), skin);
         campo.setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
         campo.setMaxLength(String.valueOf(max).length());
@@ -2016,12 +2017,23 @@ public final class BookMenuUI {
                 c.setText(String.valueOf(lim));
                 c.setCursorPosition(c.getText().length());
             }
+            if (barraQtd[0] != null) barraQtd[0].definir(lim, false);
             if (ch == '\n' || ch == '\r') confirmarPopup(c, max, aoConfirmar);
         });
+        // Barrinha arrastavel (1..max) + "-"/"+" pra acertar o numero exato.
+        BarraQuantidade barra = new BarraQuantidade(max, v -> {
+            campo.setText(String.valueOf(v));
+            campo.setCursorPosition(campo.getText().length());
+        });
+        barraQtd[0] = barra;
+        barra.definir(max, false);
+        TextButton menos = botaoRepetir("-", () -> barra.definir(barra.valor - 1, true));
+        TextButton mais = botaoRepetir("+", () -> barra.definir(barra.valor + 1, true));
         TextButton botaoMax = new TextButton("Max", estiloBotaoTrade("default"));
         botaoMax.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 campo.setText(String.valueOf(max));
+                barra.definir(max, false);
             }
         });
         TextButton cancelar = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
@@ -2042,7 +2054,18 @@ public final class BookMenuUI {
         linhaBotoes.add(confirmar).width(110).height(44);
         caixa.add(rotulo).padBottom(4).row();
         caixa.add(limite).padBottom(10).row();
-        caixa.add(linhaCampo).padBottom(12).row();
+        caixa.add(linhaCampo).padBottom(10).row();
+        if (max > 1) {
+            Table linhaBarra = new Table();
+            linhaBarra.add(menos).size(40).padRight(8);
+            linhaBarra.add(barra).width(240).height(40);
+            linhaBarra.add(mais).size(40).padLeft(8);
+            caixa.add(linhaBarra).padBottom(4).row();
+            Label dica = new Label("Drag far from the bar for fine steps", skin, "hud");
+            dica.setFontScale(0.55f * FONTE_STATS);
+            dica.setColor(Color.GRAY);
+            caixa.add(dica).padBottom(12).row();
+        }
         caixa.add(linhaBotoes);
 
         popupQuantidade = new Table();
@@ -2054,6 +2077,108 @@ public final class BookMenuUI {
         stage.addActor(popupQuantidade);
         stage.setKeyboardFocus(campo);
         campo.selectAll();
+    }
+
+    /** Botao que repete enquanto segurado (devagar no comeco, depois rapido). */
+    private TextButton botaoRepetir(String texto, Runnable acao) {
+        TextButton b = new TextButton(texto, estiloBotaoTrade("default"));
+        b.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p, int bt) {
+                acao.run();
+                b.clearActions();
+                b.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.sequence(
+                    com.badlogic.gdx.scenes.scene2d.actions.Actions.delay(0.4f),
+                    com.badlogic.gdx.scenes.scene2d.actions.Actions.forever(com.badlogic.gdx.scenes.scene2d.actions.Actions.sequence(
+                        com.badlogic.gdx.scenes.scene2d.actions.Actions.run(acao),
+                        com.badlogic.gdx.scenes.scene2d.actions.Actions.delay(0.05f)))));
+                return true;
+            }
+            @Override public void touchUp(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p, int bt) {
+                b.clearActions();
+            }
+        });
+        return b;
+    }
+
+    /**
+     * Barrinha de quantidade (1..max), arrastavel. Tocar pula pro ponto;
+     * arrastar com o dedo longe da barra (pra cima/baixo) anda mais devagar
+     * (ajuste fino), entao da' pra chegar no numero exato mesmo com milhares.
+     * Desenha so' trilho, parte cheia e o puxador - nao cria nada por valor.
+     */
+    private final class BarraQuantidade extends com.badlogic.gdx.scenes.scene2d.ui.Widget {
+        final int max;
+        int valor = 1;
+        private float valorExato = 1f; // fracionario durante o ajuste fino
+        private final java.util.function.IntConsumer aoMudar;
+        private final com.badlogic.gdx.scenes.scene2d.utils.Drawable trilho =
+            UiSkin.retangulo(new Color(0.06f, 0.06f, 0.06f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1);
+        private final com.badlogic.gdx.scenes.scene2d.utils.Drawable cheio =
+            UiSkin.retangulo(new Color(0.85f, 0.65f, 0.15f, 1f), new Color(0.6f, 0.45f, 0.1f, 1f), 1);
+        private final com.badlogic.gdx.scenes.scene2d.utils.Drawable puxador =
+            UiSkin.retangulo(new Color(0.9f, 0.9f, 0.9f, 1f), new Color(0.2f, 0.2f, 0.2f, 1f), 2);
+
+        BarraQuantidade(int max, java.util.function.IntConsumer aoMudar) {
+            this.max = Math.max(1, max);
+            this.aoMudar = aoMudar;
+            addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+                float ultimoX;
+                @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p, int bt) {
+                    if (p != 0) return false;
+                    pularPara(x);
+                    ultimoX = x;
+                    return true;
+                }
+                @Override public void touchDragged(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p) {
+                    if (p != 0) return;
+                    // Quanto mais longe da barra (vertical), mais fino: ate' 1/20.
+                    float longe = Math.max(0f, Math.abs(y - getHeight() / 2f) - getHeight());
+                    float fino = 1f / (1f + longe / 12f);
+                    fino = Math.max(0.05f, fino);
+                    float porUnidade = (BarraQuantidade.this.max - 1) / Math.max(1f, larguraUtil());
+                    valorExato += (x - ultimoX) * porUnidade * fino;
+                    ultimoX = x;
+                    aplicar(Math.round(valorExato), true, false);
+                }
+            });
+        }
+
+        private float larguraUtil() { return getWidth() - getHeight() * 0.5f; }
+
+        private void pularPara(float x) {
+            float inicio = getHeight() * 0.25f;
+            float t = (x - inicio) / Math.max(1f, larguraUtil());
+            valorExato = 1f + Math.max(0f, Math.min(1f, t)) * (max - 1);
+            aplicar(Math.round(valorExato), true, false);
+        }
+
+        /** avisar: chama aoMudar (vindo da barra/botoes; o campo de texto nao). */
+        void definir(int v, boolean avisar) { aplicar(v, avisar, true); }
+
+        private void aplicar(int v, boolean avisar, boolean sincronizarExato) {
+            v = Math.max(1, Math.min(max, v));
+            if (sincronizarExato) valorExato = v;
+            else valorExato = Math.max(1f, Math.min(max, valorExato));
+            if (v == valor) return;
+            valor = v;
+            if (avisar) aoMudar.accept(v);
+        }
+
+        @Override public float getPrefWidth() { return 240; }
+        @Override public float getPrefHeight() { return 40; }
+
+        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
+            validate();
+            float h = getHeight(), alturaTrilho = h * 0.3f;
+            float x0 = getX() + h * 0.25f, y0 = getY() + (h - alturaTrilho) / 2f;
+            float w = larguraUtil();
+            float t = max > 1 ? (valor - 1f) / (max - 1f) : 1f;
+            batch.setColor(1f, 1f, 1f, parentAlpha);
+            trilho.draw(batch, x0, y0, w, alturaTrilho);
+            if (t > 0f) cheio.draw(batch, x0, y0, Math.max(4f, w * t), alturaTrilho);
+            float lado = h * 0.7f;
+            puxador.draw(batch, x0 + w * t - lado * 0.35f, getY() + (h - lado) / 2f, lado * 0.7f, lado);
+        }
     }
 
     private void confirmarPopup(com.badlogic.gdx.scenes.scene2d.ui.TextField campo, int max, java.util.function.IntConsumer aoConfirmar) {
