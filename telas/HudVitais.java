@@ -177,13 +177,15 @@ public final class HudVitais {
 
         // ---- Painel HP/MP ----
         Table interno = new Table();
-        interno.setBackground(cor(COR_PAINEL));
+        // Fundo semi transparente (igual o trilho das barras em arco): so' a
+        // borda e' solida, da' pra ver o jogo por tras.
+        interno.setBackground(cor(new Color(COR_PAINEL.r, COR_PAINEL.g, COR_PAINEL.b, 0.35f)));
         interno.pad(px(3), 0, px(2), px(3));
         adicionarLinhaVital(interno, atlas, "ui/HPIcon", hp);
         interno.row();
         adicionarLinhaVital(interno, atlas, "ui/MPIcon", mp).padTop(px(5));
         Table painel = new Table();
-        painel.setBackground(cor(COR_BORDA_PAINEL));
+        painel.setBackground(moldura(COR_BORDA_PAINEL, px(2), px(1), px(1), px(1)));
         // Borda: 2px em cima, 1px nos outros lados (medido na print).
         painel.pad(px(2), px(1), px(1), px(1));
         painel.add(interno);
@@ -329,6 +331,23 @@ public final class HudVitais {
         return pixels * FATOR / escala;
     }
 
+    /** So' a borda (cima, esquerda, baixo, direita), sem preencher o meio. */
+    private Drawable moldura(Color c, float cima, float esq, float baixo, float dir) {
+        TextureRegion r = new TextureRegion(pixel);
+        Color cor = new Color(c);
+        return new com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable() {
+            @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch b, float x, float y, float w, float h) {
+                Color antes = new Color(b.getColor());
+                b.setColor(cor.r, cor.g, cor.b, cor.a * antes.a);
+                if (cima > 0f) b.draw(r, x, y + h - cima, w, cima);
+                if (baixo > 0f) b.draw(r, x, y, w, baixo);
+                if (esq > 0f) b.draw(r, x, y + baixo, esq, h - cima - baixo);
+                if (dir > 0f) b.draw(r, x + w - dir, y + baixo, dir, h - cima - baixo);
+                b.setColor(antes);
+            }
+        };
+    }
+
     private Drawable cor(Color c) {
         return new TextureRegionDrawable(new TextureRegion(pixel)).tint(c);
     }
@@ -359,10 +378,11 @@ public final class HudVitais {
         if (img != null) pai.add(img).size(px(39)).padTop(px(-2)).padBottom(px(-2)).padRight(px(5));
         else pai.add().size(px(39)).padTop(px(-2)).padBottom(px(-2)).padRight(px(5));
         Table fundo = new Table();
-        fundo.setBackground(cor(COR_PAINEL));
+        fundo.setBackground(cor(new Color(0f, 0f, 0f, 0.25f))); // trilho vazio, semi transparente
         Stack pilha = new Stack(fundo, barra.alinhador, barra.texto);
         Table comSombra = new Table();
-        comSombra.setBackground(cor(COR_SOMBRA));
+        // Sombra so' na direita/embaixo (antes era um retangulo cheio por tras).
+        comSombra.setBackground(moldura(COR_SOMBRA, 0f, 0f, px(1), px(1)));
         comSombra.pad(0, 0, px(1), px(1));
         comSombra.add(pilha).size(barra.largura, px(34));
         return pai.add(comSombra);
