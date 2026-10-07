@@ -196,8 +196,8 @@ public final class HudVitais {
         linhaTopo.top().left();
         celulaPainel = linhaTopo.add(painel).top().left();
         this.painelVitais = painel;
-        // Alinhado com a barra de HP (borda 2px + pad 3px do painel).
-        linhaTopo.add(iconesStatus).top().left().padLeft(px(9)).padTop(px(10));
+        // Centralizado na altura do painel de HP/MP (ou do retrato, sem ele).
+        linhaTopo.add(iconesStatus).center().left().padLeft(px(10));
         raiz.setFillParent(true);
         raiz.top().left().padLeft(px(17)).padTop(px(13));
         // Coluna da esquerda: retrato do player + botoes (ver WorldScreen::criarRetrato).
@@ -346,15 +346,24 @@ public final class HudVitais {
     /** Quadrado 42x42 (52x52 no celular) com borda preta e o icone no meio. Mouse em cima (PC)
      * ou dedo segurando (celular) mostra a explicacao; saiu/soltou, some. */
     private Table quadradoStatus(TextureAtlas atlas, String regiao, Color fundo, String explicacao) {
+        // Mesmo visual do painel de HP/MP: borda cinza de 2px, filete preto
+        // e o fundo colorido; icone grande no meio.
+        float lado = px(MOBILE ? 58 : 52);
         Table interno = new Table();
         interno.setBackground(cor(fundo));
         Image img = icone(atlas, regiao);
-        // No celular um pouco maior (alem do FATOR que ja' vale pra HUD toda).
-        if (img != null) interno.add(img).size(px(MOBILE ? 40 : 32));
+        if (img != null) {
+            img.setScaling(Scaling.fit);
+            interno.add(img).size(lado * 0.78f);
+        }
+        Table filete = new Table();
+        filete.setBackground(cor(Color.BLACK));
+        filete.pad(px(1));
+        filete.add(interno).grow();
         Table quadrado = new Table();
-        quadrado.setBackground(cor(Color.BLACK));
-        quadrado.pad(px(1));
-        quadrado.add(interno).size(px(MOBILE ? 50 : 40));
+        quadrado.setBackground(cor(COR_BORDA_PAINEL));
+        quadrado.pad(px(2));
+        quadrado.add(filete).size(lado);
         quadrado.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         quadrado.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
             @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer,
@@ -406,8 +415,8 @@ public final class HudVitais {
     private void reorganizarStatus() {
         esconderDica();
         iconesStatus.clearChildren();
-        if (comFome) iconesStatus.add(quadradoFome).padRight(px(4));
-        if (emBatalha) iconesStatus.add(quadradoBatalha).padRight(px(4));
+        if (comFome) iconesStatus.add(quadradoFome).padRight(px(6));
+        if (emBatalha) iconesStatus.add(quadradoBatalha).padRight(px(6));
     }
 
     /** Icone de fome: aparece com a barra de Fullness zerada. */
