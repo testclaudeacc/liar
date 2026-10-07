@@ -266,6 +266,67 @@ public class MapaMundo {
         return p;
     }
 
+    // Dimensoes achadas sozinhas (sem camada "Dimensions"): cada pedaco de
+    // mapa desenhado separado dos outros por SQMs vazios e' uma dimensao.
+    private int[] componenteDaCelula;
+    private final java.util.List<com.badlogic.gdx.math.Rectangle> componentes = new java.util.ArrayList<>();
+    private final com.badlogic.gdx.math.Rectangle mapaInteiro = new com.badlogic.gdx.math.Rectangle();
+
+    /** Retangulo (mundo) da dimensao em que esse ponto esta: o da camada
+     * "Dimensions" do Tiled se existir; senao o pedaco de mapa (SQMs nao
+     * vazios ligados entre si) que contem o ponto; senao o mapa inteiro. */
+    public com.badlogic.gdx.math.Rectangle dimensaoEm(float mundoX, float mundoY) {
+        for (com.badlogic.gdx.math.Rectangle r : propriedades.dimensoes) if (r.contains(mundoX, mundoY)) return r;
+        mapaInteiro.set(0, 0, larguraPx(), alturaPx());
+        if (!propriedades.dimensoes.isEmpty()) return mapaInteiro;
+        if (componenteDaCelula == null) acharComponentes();
+        int cx = (int) Math.floor(mundoX / tileWidth), cy = (int) Math.floor(mundoY / tileHeight);
+        if (cx < 0 || cy < 0 || cx >= mapaLarguraTiles || cy >= mapaAlturaTiles) return mapaInteiro;
+        int id = componenteDaCelula[cy * mapaLarguraTiles + cx];
+        return id > 0 ? componentes.get(id - 1) : mapaInteiro;
+    }
+
+    private void acharComponentes() {
+        int w = mapaLarguraTiles, h = mapaAlturaTiles;
+        boolean[] cheio = new boolean[w * h];
+        for (int indice : indicesCamadas) {
+            if (indice < 0 || !(mapa.getLayers().get(indice) instanceof TiledMapTileLayer)) continue;
+            TiledMapTileLayer camada = (TiledMapTileLayer) mapa.getLayers().get(indice);
+            for (int y = 0; y < Math.min(h, camada.getHeight()); y++)
+                for (int x = 0; x < Math.min(w, camada.getWidth()); x++) {
+                    TiledMapTileLayer.Cell c = camada.getCell(x, y);
+                    if (c != null && c.getTile() != null) cheio[y * w + x] = true;
+                }
+        }
+        for (MapaPropriedades.CelulaOverlay c : propriedades.celulasOverlay)
+            if (c.cx >= 0 && c.cy >= 0 && c.cx < w && c.cy < h) cheio[c.cy * w + c.cx] = true;
+        componenteDaCelula = new int[w * h];
+        int[] fila = new int[w * h];
+        for (int inicio = 0; inicio < w * h; inicio++) {
+            if (!cheio[inicio] || componenteDaCelula[inicio] != 0) continue;
+            int id = componentes.size() + 1;
+            int minX = w, minY = h, maxX = -1, maxY = -1;
+            int ini = 0, fim = 0;
+            fila[fim++] = inicio;
+            componenteDaCelula[inicio] = id;
+            while (ini < fim) {
+                int i = fila[ini++];
+                int x = i % w, y = i / w;
+                minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+                int[] viz = {x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1};
+                for (int v : viz) {
+                    if (v >= 0 && cheio[v] && componenteDaCelula[v] == 0) {
+                        componenteDaCelula[v] = id;
+                        fila[fim++] = v;
+                    }
+                }
+            }
+            componentes.add(new com.badlogic.gdx.math.Rectangle(minX * tileWidth, minY * tileHeight,
+                (maxX - minX + 1) * tileWidth, (maxY - minY + 1) * tileHeight));
+        }
+    }
+
     private void renderTelhados(float jogadorMundoX, float jogadorMundoY) {
         int jcx = (int) Math.floor(jogadorMundoX / tileWidth);
         int jcy = (int) Math.floor(jogadorMundoY / tileHeight);

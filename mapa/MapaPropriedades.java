@@ -149,6 +149,7 @@ public class MapaPropriedades {
     public final List<MobSpawn> mobSpawns = new ArrayList<>();
     public final List<Luz> luzes = new ArrayList<>();
     public final List<AreaNomeada> areasNomeadas = new ArrayList<>();
+    public final List<Rectangle> dimensoes = new ArrayList<>();
 
     private final TiledMap mapa;
     private final int tileWidth, tileHeight;
@@ -233,6 +234,15 @@ public class MapaPropriedades {
             Gdx.app.log("MapaPropriedades", "Camada de objetos 'MobSpawns' nao encontrada no mapa - nenhum mob");
         } else {
             Gdx.app.log("MapaPropriedades", mobSpawns.size() + " mob(s) na camada MobSpawns");
+        }
+
+        // Dimensoes (minimapa so' mostra a do player): retangulos na camada
+        // de objetos "Dimensions". Sem ela, MapaMundo acha sozinho.
+        MapLayer camadaDimensoes = mapa.getLayers().get("Dimensions");
+        if (camadaDimensoes != null) {
+            for (MapObject obj : camadaDimensoes.getObjects()) {
+                if (obj instanceof RectangleMapObject) dimensoes.add(new Rectangle(((RectangleMapObject) obj).getRectangle()));
+            }
         }
 
         MapLayer camadaAreas = mapa.getLayers().get("AreasName");

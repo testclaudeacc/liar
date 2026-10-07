@@ -122,10 +122,11 @@ public class MiniMapa extends Actor {
     }
 
     private void limitarPan() {
-        // Nao deixa o centro sair do mapa.
+        // Nao deixa o centro sair da dimensao em que o player esta.
         float jx = fonte.jogadorX(), jy = fonte.jogadorY();
-        panX = MathUtils.clamp(panX, -jx, mapa.larguraPx() - jx);
-        panY = MathUtils.clamp(panY, -jy, mapa.alturaPx() - jy);
+        Rectangle d = mapa.dimensaoEm(jx, jy + 1f);
+        panX = MathUtils.clamp(panX, d.x - jx, d.x + d.width - jx);
+        panY = MathUtils.clamp(panY, d.y - jy, d.y + d.height - jy);
     }
 
     /** Unidades do stage por pixel do mundo. SQM sempre com um numero
@@ -166,7 +167,13 @@ public class MiniMapa extends Actor {
         float origemX = Math.round((ax + aw / 2f - cx * s) * k) / k;
         float origemY = Math.round((ay + ah / 2f - cy * s) * k) / k;
 
-        area.set(ax, ay, aw, ah);
+        // So' a dimensao do player (mapas "lado a lado" no mesmo .tmx, ligados
+        // por teleporte, nao aparecem um no outro): corta fora o resto.
+        Rectangle d = mapa.dimensaoEm(fonte.jogadorX(), fonte.jogadorY() + 1f);
+        float dx0 = Math.max(ax, origemX + d.x * s), dy0 = Math.max(ay, origemY + d.y * s);
+        float dx1 = Math.min(ax + aw, origemX + (d.x + d.width) * s), dy1 = Math.min(ay + ah, origemY + (d.y + d.height) * s);
+        if (dx1 <= dx0 || dy1 <= dy0) return;
+        area.set(dx0, dy0, dx1 - dx0, dy1 - dy0);
         batch.flush();
         getStage().calculateScissors(area, scissor);
         if (ScissorStack.pushScissors(scissor)) {

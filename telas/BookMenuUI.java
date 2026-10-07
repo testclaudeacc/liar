@@ -168,13 +168,11 @@ public final class BookMenuUI {
         Table leftTab = criarColuna(atlas, xEmCima ? new String[][]{
             {"Party", "ui/buttons/PartyBtn"},
             {"Friends", "ui/buttons/FriendsBtn"},
-            {"Map", "ui/buttons/MapBtn"},
             {"Rank", "ui/buttons/RankBtn"},
             {"Spells", "ui/buttons/SpellsBtn"}
         } : new String[][]{
             {"Party", "ui/buttons/PartyBtn"},
             {"Friends", "ui/buttons/FriendsBtn"},
-            {"Map", "ui/buttons/MapBtn"},
             {"Rank", "ui/buttons/RankBtn"},
             {"Exit", "ui/buttons/CloseBtn"}
         }, true);
@@ -3175,9 +3173,10 @@ public final class BookMenuUI {
 
     // Atalhos do teclado com o menu aberto: seguem a ordem dos botoes na tela
     // (coluna direita de cima pra baixo, depois a esquerda). 1 = Equip,
-    // 2 = Bag, 3 = Skills, ... 9 = Rank, 0 = Exit (Esc tambem fecha, ver WorldScreen).
+    // 2 = Bag, 3 = Skills, ... 8 = Rank, 0 = Exit (o Map saiu do livro: virou
+    // o minimapa, botao do retrato no WorldScreen) (Esc tambem fecha, ver WorldScreen).
     private static final String[] ORDEM_ATALHOS = {
-        "Equip", "Bag", "Skills", "Vanity", "Spells", "Party", "Friends", "Map", "Rank", "Exit"
+        "Equip", "Bag", "Skills", "Vanity", "Spells", "Party", "Friends", "Rank", "Exit"
     };
     private static final int[][] TECLAS_ATALHOS = {
         {com.badlogic.gdx.Input.Keys.NUM_1, com.badlogic.gdx.Input.Keys.NUMPAD_1},
@@ -3188,7 +3187,6 @@ public final class BookMenuUI {
         {com.badlogic.gdx.Input.Keys.NUM_6, com.badlogic.gdx.Input.Keys.NUMPAD_6},
         {com.badlogic.gdx.Input.Keys.NUM_7, com.badlogic.gdx.Input.Keys.NUMPAD_7},
         {com.badlogic.gdx.Input.Keys.NUM_8, com.badlogic.gdx.Input.Keys.NUMPAD_8},
-        {com.badlogic.gdx.Input.Keys.NUM_9, com.badlogic.gdx.Input.Keys.NUMPAD_9},
         {com.badlogic.gdx.Input.Keys.NUM_0, com.badlogic.gdx.Input.Keys.NUMPAD_0},
     };
 
