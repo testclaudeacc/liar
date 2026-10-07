@@ -432,7 +432,12 @@ public final class HudVitais {
         pct = Math.max(0f, Math.min(1f, pct));
         preencher(xp, pct);
         xp.texto.setText(String.format(java.util.Locale.US, "%.2f%%", pct * 100f));
+        fracaoXp = pct;
     }
+
+    private float fracaoXp = 0f;
+    /** 0-1 do caminho ate' o proximo level (anel do retrato). */
+    public float fracaoXp() { return fracaoXp; }
 
     private static long expParaLevel(int level) {
         if (level <= 1) return 0;

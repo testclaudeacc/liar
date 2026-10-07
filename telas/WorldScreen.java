@@ -1268,6 +1268,20 @@ public class WorldScreen extends ScreenAdapter {
 
         com.badlogic.gdx.scenes.scene2d.ui.Stack pilha = new com.badlogic.gdx.scenes.scene2d.ui.Stack();
         pilha.add(imagemRetrato);
+        pilha.add(new AnelXp());
+        // % do XP no canto de baixo a direita.
+        labelXpRetrato = new Label("0%", skin, "hud") {
+            @Override public void act(float delta) {
+                super.act(delta);
+                String t = Math.round(hud != null ? hud.fracaoXp() * 100f : 0f) + "%";
+                if (!t.contentEquals(getText())) setText(t);
+            }
+        };
+        Table cantoXp = new Table();
+        cantoXp.bottom().right();
+        cantoXp.add(labelXpRetrato).padRight(-TAMANHO_RETRATO * 0.06f).padBottom(-TAMANHO_RETRATO * 0.04f);
+        cantoXp.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+        pilha.add(cantoXp);
         pilha.add(cantoAviso);
         botao.add(pilha).grow();
         botao.addListener(new ChangeListener() {
@@ -1294,6 +1308,48 @@ public class WorldScreen extends ScreenAdapter {
 
     private Texture texRetrato;
     private Image imagemRetrato;
+    private Label labelXpRetrato;
+    private float raioMascara = 0.4f; // raio do circulo escuro, em fracao do lado do botao
+
+    // Anel de XP em volta do personagem (em cima do anel claro do botao):
+    // trilho escuro + amarelo que vai fechando no sentido horario a partir
+    // de cima conforme o XP do level.
+    private static final Color COR_ANEL_XP = Color.valueOf("e8b020");
+    private static final Color COR_ANEL_FUNDO = new Color(0.12f, 0.1f, 0.06f, 0.85f);
+    private class AnelXp extends com.badlogic.gdx.scenes.scene2d.Actor {
+        private static final int SEGMENTOS = 96;
+        AnelXp() { setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); }
+        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch b, float alpha) {
+            mascaraDoRetrato();
+            float lado = Math.min(getWidth(), getHeight());
+            float cx = getX() + getWidth() / 2f, cy = getY() + getHeight() / 2f;
+            float espessura = lado * 0.07f;
+            float raio = lado * raioMascara + espessura / 2f;
+            float fracao = hud != null ? hud.fracaoXp() : 0f;
+            int cheios = Math.round(fracao * SEGMENTOS);
+            // Comprimento de cada pedaco = arco + um pouco (sem frestas).
+            float comp = (float) (2 * Math.PI * raio / SEGMENTOS) * 1.15f;
+            for (int i = 0; i < SEGMENTOS; i++) {
+                Color c = i < cheios ? COR_ANEL_XP : COR_ANEL_FUNDO;
+                b.setColor(c.r, c.g, c.b, c.a * alpha);
+                // Comeca em cima (90 graus) e anda no sentido horario.
+                float ang = 90f - (i + 0.5f) * 360f / SEGMENTOS;
+                float rad = ang * com.badlogic.gdx.math.MathUtils.degreesToRadians;
+                float px = cx + raio * com.badlogic.gdx.math.MathUtils.cos(rad);
+                float py = cy + raio * com.badlogic.gdx.math.MathUtils.sin(rad);
+                // Pedaco tangente ao circulo.
+                b.draw(pixelBrancoRegiao(), px - comp / 2f, py - espessura / 2f, comp / 2f, espessura / 2f,
+                    comp, espessura, 1f, 1f, ang - 90f);
+            }
+            b.setColor(Color.WHITE);
+        }
+    }
+
+    private TextureRegion regiaoPixelBranco;
+    private TextureRegion pixelBrancoRegiao() {
+        if (regiaoPixelBranco == null) regiaoPixelBranco = new TextureRegion(pixelBranco);
+        return regiaoPixelBranco;
+    }
     private boolean[] mascaraRetrato; // circulo escuro de dentro do Button1
     private int ladoMascara;
     private final Map<Texture, Pixmap> pixmapsAtlas = new HashMap<>();
@@ -1341,6 +1397,9 @@ public class WorldScreen extends ScreenAdapter {
                 fila.add(v);
             }
         }
+        int area = 0;
+        for (boolean b : m) if (b) area++;
+        raioMascara = (float) Math.sqrt(area / Math.PI) / w;
         return mascaraRetrato = m;
     }
 
@@ -1371,11 +1430,28 @@ public class WorldScreen extends ScreenAdapter {
             alturaMax = Math.max(alturaMax, tira.getRegionHeight());
         }
         if (quadros.isEmpty()) return null;
-        // Personagem com ~87% da largura do botao, topo um pouco abaixo da
-        // borda de cima (mostra cabeca e tronco; o resto fica fora do circulo).
-        int esc = Math.max(1, Math.round(r * 0.875f / SkinsUtil.FRAME_LARGURA));
+        // Corpo inteiro no centro, cabendo no circulo de dentro (inteiro pra
+        // nao borrar). Os pixels transparentes de cima/baixo do quadro nao
+        // contam pra centralizar.
+        int topoUsado = alturaMax, baseUsada = -1;
+        for (int i = 0; i < quadros.size(); i++) {
+            TextureRegion q = quadros.get(i);
+            Pixmap fonte = pixmapDoAtlas(q.getTexture());
+            if (fonte == null) continue;
+            for (int y = 0; y < q.getRegionHeight(); y++)
+                for (int x = 0; x < q.getRegionWidth(); x++)
+                    if ((fonte.getPixel(q.getRegionX() + x, q.getRegionY() + y) & 0xff) > 0) {
+                        int sy = y + alturaMax - q.getRegionHeight();
+                        topoUsado = Math.min(topoUsado, sy);
+                        baseUsada = Math.max(baseUsada, sy);
+                    }
+        }
+        if (baseUsada < topoUsado) { topoUsado = 0; baseUsada = alturaMax - 1; }
+        int alturaUsada = baseUsada - topoUsado + 1;
+        float diametro = 2f * raioMascara * r;
+        int esc = Math.max(1, (int) Math.floor(diametro * 0.72f / Math.max(alturaUsada, SkinsUtil.FRAME_LARGURA)));
         int x0 = (r - SkinsUtil.FRAME_LARGURA * esc) / 2;
-        int y0 = Math.round(r * 0.09f); // de cima pra baixo
+        int y0 = (r - alturaUsada * esc) / 2 - topoUsado * esc; // de cima pra baixo
         Pixmap saida = new Pixmap(r, r, Pixmap.Format.RGBA8888);
         saida.setBlending(Pixmap.Blending.None);
         saida.setColor(0, 0, 0, 0);
