@@ -101,7 +101,7 @@ public class MiniMapa extends Actor {
                         dedos[pointer][1] = y;
                         if (tocando[0] && tocando[1]) {
                             distInicial = distancia();
-                            tilesInicial = tilesVisiveis;
+                            tilesInicial = MiniMapa.this.tilesVisiveis;
                         }
                     }
                     ultimoX = x;
@@ -126,7 +126,7 @@ public class MiniMapa extends Actor {
                         // Pinca: afastar os dedos aproxima, juntar afasta.
                         float d = distancia();
                         if (distInicial > 1f && d > 1f) {
-                            tilesVisiveis = MathUtils.clamp(tilesInicial * distInicial / d, tilesMin, tilesMax);
+                            MiniMapa.this.tilesVisiveis = MathUtils.clamp(tilesInicial * distInicial / d, MiniMapa.this.tilesMin, MiniMapa.this.tilesMax);
                             limitarPan();
                         }
                         return;
