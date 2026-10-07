@@ -1105,8 +1105,7 @@ public class WorldScreen extends ScreenAdapter {
 
         // Canto de cima a direita: minimapa (tocar abre o mapa grande) e
         // fps/ms embaixo dele.
-        cacheMiniMapa = new MiniMapa.Cache(mapa);
-        miniMapa = new MiniMapa(mapa, cacheMiniMapa, fonteMiniMapa, 0, SQMS_MINIMAPA, false, 2f);
+        miniMapa = new MiniMapa(mapa, fonteMiniMapa, TILES_MINIMAPA, TILES_MAPA_MIN, TILES_MAPA_MAX, false, 2f);
         miniMapa.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
             @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
                 abrirMapaGrande();
@@ -1136,11 +1135,9 @@ public class WorldScreen extends ScreenAdapter {
     private Image avisoRetrato;
     private Texture texBolinha;
     private MiniMapa miniMapa, mapaGrande;
-    private MiniMapa.Cache cacheMiniMapa;
     private Table painelMapaGrande;
     private final float TAMANHO_MINIMAPA = mobile ? 165f : 150f;
-    // Minimapa: zoom automatico (inteiro) pra caber ~34 SQMs; mapa grande abre no mesmo tanto de SQMs da largura dele.
-    private static final float SQMS_MINIMAPA = 34f, SQMS_MAPA_GRANDE = 90f;
+    private static final float TILES_MINIMAPA = 34f, TILES_MAPA_GRANDE = 80f, TILES_MAPA_MIN = 20f, TILES_MAPA_MAX = 300f;
 
     /** Pontinhos do minimapa: players azul, NPC amarelo, mob vermelho (voce = branco, no MiniMapa). */
     private final MiniMapa.Fonte fonteMiniMapa = new MiniMapa.Fonte() {
@@ -1213,7 +1210,7 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void criarMapaGrande() {
-        mapaGrande = new MiniMapa(mapa, cacheMiniMapa, fonteMiniMapa, 0, SQMS_MAPA_GRANDE, true, 2f);
+        mapaGrande = new MiniMapa(mapa, fonteMiniMapa, TILES_MAPA_GRANDE, TILES_MAPA_MIN, TILES_MAPA_MAX, true, 2f);
         painelMapaGrande = new Table();
         painelMapaGrande.setFillParent(true);
         painelMapaGrande.setBackground(skin.getDrawable("fundo-opcoes"));
@@ -1228,10 +1225,10 @@ public class WorldScreen extends ScreenAdapter {
         TextButton centro = new TextButton("Center", skin, "cinza-popup");
         TextButton fechar = new TextButton("X", skin, "vermelho-popup");
         menos.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.mudarZoom(-1); }
+            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.zoom(1.25f); }
         });
         mais.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.mudarZoom(1); }
+            @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.zoom(0.8f); }
         });
         centro.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.centralizar(); }
@@ -4708,13 +4705,6 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     @Override
-    public void resume() {
-        // Android pode recriar o contexto GL ao voltar: os blocos do minimapa
-        // (FBO) voltam vazios - gera tudo de novo.
-        if (cacheMiniMapa != null) cacheMiniMapa.limpar();
-    }
-
-    @Override
     public void dispose() {
         mapa.dispose();
         batch.dispose();
@@ -4724,7 +4714,6 @@ public class WorldScreen extends ScreenAdapter {
         pixelBranco.dispose();
         hud.dispose();
         if (miniMapa != null) miniMapa.dispose();
-        if (cacheMiniMapa != null) cacheMiniMapa.dispose();
         if (mapaGrande != null) mapaGrande.dispose();
         if (texBolinha != null) texBolinha.dispose();
         uiStage.dispose();
