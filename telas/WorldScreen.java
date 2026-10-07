@@ -1292,7 +1292,8 @@ public class WorldScreen extends ScreenAdapter {
         painelMapaGrande.add(topo).growX().row();
         painelMapaGrande.add(mapaGrande).grow().padTop(10).row();
         // Embaixo a direita: nome da area onde o player esta (camada AreasName).
-        Label nomeArea = new Label("", skin, "secao") {
+        // Fonte pequena e branca (a mesma da legenda/fps).
+        Label nomeArea = new Label("", skin, "hud") {
             @Override public void act(float delta) {
                 super.act(delta);
                 String area = mapa.propriedades.areaEm(local.x, local.y);
