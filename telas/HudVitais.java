@@ -52,6 +52,7 @@ public final class HudVitais {
     private final BitmapFont fonteNotificacao; // menor e com contorno mais fino
     private final Table raiz = new Table();
     private final Table conteudo = new Table();
+    private Table linhaTopo;
     private final com.badlogic.gdx.scenes.scene2d.ui.Container<com.badlogic.gdx.scenes.scene2d.Actor> colunaEsquerda =
         new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
     private final Barra hp, mp, xp;
@@ -175,7 +176,7 @@ public final class HudVitais {
         quadradoFome = quadradoStatus(atlas, "sheet/r18_c10", COR_FOME,
             "You are hungry! 10% less Dmg and Speed. Regen disabled");
         quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA, null);
-        Table linhaTopo = new Table();
+        linhaTopo = new Table();
         linhaTopo.top().left();
         linhaTopo.add(painel).top().left();
         // Alinhado com a barra de HP (borda 2px + pad 3px do painel).
@@ -533,10 +534,12 @@ public final class HudVitais {
     }
 
     /** Coloca algo a esquerda do painel de HP/MP (retrato + botoes), alinhado em cima. */
-    public void definirColunaEsquerda(com.badlogic.gdx.scenes.scene2d.Actor ator, float espaco) {
+    public void definirColunaEsquerda(com.badlogic.gdx.scenes.scene2d.Actor ator, float espaco, float alturaTopo) {
         colunaEsquerda.setActor(ator);
         colunaEsquerda.top().left();
         raiz.getCell(colunaEsquerda).padRight(espaco);
+        // Painel de HP/MP centralizado na altura do retrato (alturaTopo).
+        raiz.getCell(conteudo).padTop(Math.max(0f, (alturaTopo - linhaTopo.getPrefHeight()) / 2f));
         raiz.invalidate();
     }
 

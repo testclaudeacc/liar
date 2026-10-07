@@ -1045,7 +1045,7 @@ public class WorldScreen extends ScreenAdapter {
         joystick = new Joystick(uiStage, texJoystickBase, texJoystickKnob);
         bookMenu = new BookMenuUI(uiStage, skin, atlas, socket, local.classe);
         hud = new HudVitais(uiStage, atlas, escala);
-        hud.definirColunaEsquerda(colunaRetrato, 10f);
+        hud.definirColunaEsquerda(colunaRetrato, 10f, TAMANHO_RETRATO);
         // % do retrato com contorno preto (fonte das barras do HUD).
         labelXpRetrato.setStyle(new Label.LabelStyle(hud.fonteComContorno(), Color.WHITE));
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
@@ -1282,7 +1282,7 @@ public class WorldScreen extends ScreenAdapter {
         };
         Table cantoXp = new Table();
         cantoXp.bottom().right();
-        cantoXp.add(labelXpRetrato).padRight(-TAMANHO_RETRATO * 0.06f).padBottom(-TAMANHO_RETRATO * 0.14f);
+        cantoXp.add(labelXpRetrato).padRight(-TAMANHO_RETRATO * 0.06f).padBottom(-TAMANHO_RETRATO * 0.06f);
         cantoXp.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
         pilha.add(cantoXp);
         pilha.add(cantoAviso);
