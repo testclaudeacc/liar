@@ -1379,7 +1379,8 @@ public class WorldScreen extends ScreenAdapter {
         if (Math.abs(varredura) < 0.01f) return;
         int n = Math.max(2, Math.round(Math.abs(varredura) / 2.5f));
         float passo = varredura / n;
-        float comp = (float) (2 * Math.PI * raio * Math.abs(passo) / 360f) * 1.2f;
+        // Um pouquinho maior que o arco de cada pedaco (sem frestas entre eles).
+        float comp = (float) (2 * Math.PI * raio * Math.abs(passo) / 360f) * 1.08f;
         b.setColor(c.r, c.g, c.b, c.a * alpha);
         for (int i = 0; i < n; i++) {
             float ang = angInicio + (i + 0.5f) * passo;
@@ -1395,7 +1396,7 @@ public class WorldScreen extends ScreenAdapter {
     // HP no arco da esquerda, MP no da direita, enchendo de baixo pra cima.
     // As barras retas do HUD continuam (servem pra outra coisa).
     private static final float ARCO_VARREDURA = 110f;       // graus de cada arco
-    private static final float ARCO_RAIO_SQM = 1.45f;       // raio em SQMs
+    private static final float ARCO_RAIO_SQM = 2.0f;        // raio em SQMs
     private static final float ARCO_ESPESSURA_SQM = 0.2f;
     private static final Color COR_ARCO_MP = Color.valueOf("6a3ad8");     // roxo da print
     private static final Color COR_ARCO_TRILHO = new Color(0f, 0f, 0f, 0.45f);
@@ -1416,9 +1417,14 @@ public class WorldScreen extends ScreenAdapter {
         @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch b, float alpha) {
             if (localMorto || hud == null) return;
             // Centro do personagem (pes + meio SQM) e o tamanho de 1 SQM no stage.
-            Vector2 c = noStage(local.x, local.y + Jogador.TILE / 2f);
-            float cx = c.x, cy = c.y;
-            float sqm = noStage(local.x + Jogador.TILE, local.y + Jogador.TILE / 2f).x - cx;
+            // Mesma ancora do sprite (desenharJogador: snap pro pixel de tela
+            // pelo zoom) - sem isso o arco tremia em relacao ao boneco ao andar.
+            float ax = Math.round(local.x / camera.zoom) * camera.zoom;
+            float ay = Math.round(local.y / camera.zoom) * camera.zoom;
+            Vector2 c = noStage(ax, ay + Jogador.TILE / 2f);
+            float k = uiStage.getViewport().getScreenWidth() / uiStage.getViewport().getWorldWidth();
+            float cx = Math.round(c.x * k) / k, cy = Math.round(c.y * k) / k;
+            float sqm = noStage(ax + Jogador.TILE, ay + Jogador.TILE / 2f).x - c.x;
             float raio = sqm * ARCO_RAIO_SQM, esp = Math.max(3f, sqm * ARCO_ESPESSURA_SQM);
             float borda = Math.max(1f, esp * 0.22f);
             float hp = hud.hpMax() > 0f ? Math.max(0f, Math.min(1f, hud.hpAtual() / hud.hpMax())) : 0f;
@@ -1432,7 +1438,11 @@ public class WorldScreen extends ScreenAdapter {
 
         private void desenharArco(com.badlogic.gdx.graphics.g2d.Batch b, float cx, float cy, float raio, float esp,
                                   float borda, float inicio, float varredura, float fracao, Color cor, float alpha) {
-            arco(b, cx, cy, raio, esp + borda * 2f, inicio, varredura, COR_ARCO_BORDA, alpha);
+            // Borda passa um pouco das pontas (tampa as duas extremidades);
+            // trilho/cor ficam um pouco pra dentro dela.
+            float sinal = Math.signum(varredura);
+            float folga = (borda * 2.5f / raio) * com.badlogic.gdx.math.MathUtils.radiansToDegrees;
+            arco(b, cx, cy, raio, esp + borda * 2f, inicio - sinal * folga, varredura + sinal * folga * 2f, COR_ARCO_BORDA, alpha);
             arco(b, cx, cy, raio, esp, inicio, varredura, COR_ARCO_TRILHO, alpha);
             arco(b, cx, cy, raio, esp, inicio, varredura * fracao, cor, alpha);
         }
