@@ -1423,10 +1423,13 @@ public class WorldScreen extends ScreenAdapter {
             // pelo zoom) - sem isso o arco tremia em relacao ao boneco ao andar.
             float ax = Math.round(local.x / camera.zoom) * camera.zoom;
             float ay = Math.round(local.y / camera.zoom) * camera.zoom;
+            // noStage devolve sempre o MESMO Vector2: copia antes da 2a chamada
+            // (era isso que dava sqm = 0, sumia com os arcos/travava).
             Vector2 c = noStage(ax, ay + Jogador.TILE / 2f);
+            float centroX = c.x, centroY = c.y;
             float k = uiStage.getViewport().getScreenWidth() / uiStage.getViewport().getWorldWidth();
-            float cx = Math.round(c.x * k) / k, cy = Math.round(c.y * k) / k;
-            float sqm = noStage(ax + Jogador.TILE, ay + Jogador.TILE / 2f).x - c.x;
+            float cx = Math.round(centroX * k) / k, cy = Math.round(centroY * k) / k;
+            float sqm = noStage(ax + Jogador.TILE, ay + Jogador.TILE / 2f).x - centroX;
             if (!(sqm > 1f) || sqm > 1000f) return; // camera ainda nao pronta
             float raio = sqm * ARCO_RAIO_SQM, esp = Math.max(3f, sqm * ARCO_ESPESSURA_SQM);
             float borda = Math.max(1f, esp * 0.22f);
