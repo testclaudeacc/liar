@@ -1400,6 +1400,7 @@ public class WorldScreen extends ScreenAdapter {
     private static final float ARCO_VARREDURA = 110f;       // graus de cada arco
     private static final float ARCO_RAIO_SQM = 2.0f;        // raio em SQMs
     private static final float ARCO_ESPESSURA_SQM = 0.2f;
+    private static final float ARCO_AFASTAR_SQM = 0.4f;     // cada arco pro seu lado
     private static final Color COR_ARCO_MP = Color.valueOf("6a3ad8");     // roxo da print
     private static final Color COR_ARCO_TRILHO = new Color(0f, 0f, 0f, 0.25f);
     private static final Color COR_ARCO_BORDA = new Color(0.03f, 0.03f, 0.03f, 0.75f);
@@ -1436,9 +1437,12 @@ public class WorldScreen extends ScreenAdapter {
             float hp = hud.hpMax() > 0f ? Math.max(0f, Math.min(1f, hud.hpAtual() / hud.hpMax())) : 0f;
             float mp = hud.mpMax() > 0f ? Math.max(0f, Math.min(1f, hud.mpAtual() / hud.mpMax())) : 0f;
             // Esquerda: de baixo (180+v/2) subindo ate' em cima (180-v/2).
-            desenharArco(b, cx, cy, raio, esp, borda, 180f + ARCO_VARREDURA / 2f, -ARCO_VARREDURA, hp, corDaVida(hp), alpha);
+            // Cada arco afastado um pouco pro seu lado (mais longe so' na
+            // horizontal, sem subir/descer).
+            float afastar = sqm * ARCO_AFASTAR_SQM;
+            desenharArco(b, cx - afastar, cy, raio, esp, borda, 180f + ARCO_VARREDURA / 2f, -ARCO_VARREDURA, hp, corDaVida(hp), alpha);
             // Direita: de baixo (-v/2) subindo ate' em cima (+v/2).
-            desenharArco(b, cx, cy, raio, esp, borda, -ARCO_VARREDURA / 2f, ARCO_VARREDURA, mp, COR_ARCO_MP, alpha);
+            desenharArco(b, cx + afastar, cy, raio, esp, borda, -ARCO_VARREDURA / 2f, ARCO_VARREDURA, mp, COR_ARCO_MP, alpha);
             b.setColor(Color.WHITE);
         }
 
