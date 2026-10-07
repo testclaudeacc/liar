@@ -437,13 +437,13 @@ public final class HudVitais {
         esconderDica();
         iconesStatus.clearChildren();
         iconesStatus.top().right();
-        // Em pares: 2 por linha, as linhas vao se empilhando pra baixo (4 = 2x2).
+        // Em trios: 3 por linha, as linhas vao se empilhando pra baixo (6 = 3x2).
         java.util.List<Table> ativos = new java.util.ArrayList<>();
         if (comFome) ativos.add(quadradoFome);
         if (emBatalha) ativos.add(quadradoBatalha);
         for (int i = 0; i < ativos.size(); i++) {
             iconesStatus.add(ativos.get(i)).pad(px(3));
-            if (i % 2 == 1) iconesStatus.row();
+            if (i % 3 == 2) iconesStatus.row();
         }
     }
 

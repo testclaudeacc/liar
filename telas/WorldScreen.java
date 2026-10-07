@@ -1192,7 +1192,8 @@ public class WorldScreen extends ScreenAdapter {
         cantoFps.setFillParent(true);
         cantoFps.bottom().left().pad(0, 12, 8, 0);
         infoDesempenho.clearChildren();
-        infoDesempenho.add(labelFps).left().row();
+        // Lado a lado: "60 fps   16 ms".
+        infoDesempenho.add(labelFps).left().padRight(14);
         infoDesempenho.add(labelMs).left();
         cantoFps.add(infoDesempenho);
         cantoFps.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
@@ -1230,7 +1231,7 @@ public class WorldScreen extends ScreenAdapter {
         barra.add(botaoTopoMenu).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(comMinimapa ? 14 : 0);
         if (comMinimapa) barra.add(miniMapa).size(TAMANHO_MINIMAPA).top().padTop(margemTopo);
         barra.row();
-        // Gaveta de debuffs (fome/battle, em pares) embaixo do minimapa.
+        // Gaveta de debuffs (fome/battle, em trios) embaixo do minimapa.
         barra.add(gavetaDebuffs).colspan(comMinimapa ? 4 : 3).right().top().padTop(10);
         // Ligado: o botao fica verde (borda verde, fundo verde escuro).
         botaoTopoMapa.setColor(comMinimapa ? COR_BOTAO_LIGADO : Color.WHITE);
