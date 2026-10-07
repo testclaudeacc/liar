@@ -1080,22 +1080,25 @@ public class WorldScreen extends ScreenAdapter {
         iconeConfig = atlas.findRegion("ui/MenuButton");
         iconeMenu = atlas.findRegion("ui/ConfigButton");
 
-        botaoTopoAlvo = criarBotaoTopo(null, this::abrirPainelDoAlvo);
+        // Alvo e chat (os mais usados): sempre a mostra, a esquerda do
+        // minimapa, pendurados no topo (sem girar). Menu e config ficam
+        // atras do retrato.
+        botaoTopoAlvo = criarBotaoTopo(null, this::abrirPainelDoAlvo, false);
         botaoTopoAlvo.add(new AtorAlvo()).size(ICONE_BOTAO_TOPO);
-        botaoTopoChat = criarBotaoTopo(iconeChat, () -> { recolherBotoesTopo(); alternarChat(); });
+        botaoTopoChat = criarBotaoTopo(iconeChat, () -> { recolherBotoesTopo(); alternarChat(); }, false);
         imagemIconeChat = (Image) botaoTopoChat.getChildren().first();
         // Icone de "mensagem nova" (chat fechado). Sem ele no atlas, usa o
         // NotificationIcon no lugar.
         iconeChatNovo = atlas.findRegion("ui/ChatNotify");
         if (iconeChatNovo == null) iconeChatNovo = atlas.findRegion("ui/NotificationIcon");
-        botaoTopoMenu = criarBotaoTopo(iconeMenu, () -> { recolherBotoesTopo(); alternarBookMenu(); });
-        botaoTopoConfig = criarBotaoTopo(iconeConfig, () -> { recolherBotoesTopo(); alternarSettings(); });
+        botaoTopoMenu = criarBotaoTopo(iconeMenu, () -> { recolherBotoesTopo(); alternarBookMenu(); }, true);
+        botaoTopoConfig = criarBotaoTopo(iconeConfig, () -> { recolherBotoesTopo(); alternarSettings(); }, true);
 
-        // Os 4 botoes ficam escondidos atras do retrato do player (canto de
+        // Menu e config ficam escondidos atras do retrato do player (canto de
         // cima a esquerda, ver criarRetrato): tocar nele abre/fecha a coluna.
         colunaBotoesTopo = new Table();
         colunaBotoesTopo.top();
-        for (Button b : new Button[]{botaoTopoAlvo, botaoTopoChat, botaoTopoMenu, botaoTopoConfig}) {
+        for (Button b : new Button[]{botaoTopoMenu, botaoTopoConfig}) {
             colunaBotoesTopo.add(b).size(TAMANHO_BOTAO_TOPO).padTop(8).row();
         }
         colunaBotoesTopo.setVisible(false);
@@ -1122,9 +1125,11 @@ public class WorldScreen extends ScreenAdapter {
         infoDesempenho.add(labelMs).right();
         Table barra = new Table();
         barra.setFillParent(true);
-        barra.top().right().pad(10, 0, 0, 20);
-        barra.add(miniMapa).size(TAMANHO_MINIMAPA).row();
-        barra.add(infoDesempenho).right().padTop(4);
+        barra.top().right().pad(0, 0, 0, 20);
+        barra.add(botaoTopoAlvo).size(TAMANHO_BOTAO_TOPO).top().padRight(12);
+        barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).top().padRight(14);
+        barra.add(miniMapa).size(TAMANHO_MINIMAPA).top().padTop(10).row();
+        barra.add(infoDesempenho).colspan(3).right().padTop(4);
         barraMiniMapa = barra;
         // Por baixo das janelas (livro/chat/settings), igual o HUD.
         uiStage.getRoot().addActorAt(0, barra);
@@ -1379,13 +1384,13 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Botao Button1 (up/hover/down) com um icone centralizado por cima -
      * mesmo chrome pros 3 botoes do topo, so' o icone muda. */
-    private Button criarBotaoTopo(TextureRegion icone, Runnable aoClicar) {
+    private Button criarBotaoTopo(TextureRegion icone, Runnable aoClicar, boolean girar) {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
-        // Girados 90 graus: a parte que encaixa na borda (era em cima, na
-        // barra do topo) fica pra ESQUERDA, colada na borda da tela.
-        estilo.up = girado90(texBotaoTopo);
-        estilo.over = girado90(texBotaoTopoHover);
-        estilo.down = girado90(texBotaoTopoClick);
+        // girar: 90 graus, a parte que encaixa na borda (em cima) fica pra
+        // ESQUERDA - os da coluna do retrato.
+        estilo.up = girar ? girado90(texBotaoTopo) : new TextureRegionDrawable(texBotaoTopo);
+        estilo.over = girar ? girado90(texBotaoTopoHover) : new TextureRegionDrawable(texBotaoTopoHover);
+        estilo.down = girar ? girado90(texBotaoTopoClick) : new TextureRegionDrawable(texBotaoTopoClick);
         Button botao = new Button(estilo);
         if (icone != null) {
             Image imagemIcone = new Image(new TextureRegionDrawable(icone));
@@ -1468,7 +1473,6 @@ public class WorldScreen extends ScreenAdapter {
         hotbar.setVisivel(!algumAberto && !localMorto);
         colunaRetrato.setVisible(!algumAberto);
         barraMiniMapa.setVisible(!algumAberto);
-        avisoRetrato.setVisible(chatComNovidade);
         // Fundo do botao de alvo na cor da vida do alvo (cinza normal sem alvo).
         float pct = vidaDoAlvo();
         botaoTopoAlvo.setColor(pct < 0f ? Color.WHITE : corDaVida(pct));
