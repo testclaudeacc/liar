@@ -161,6 +161,25 @@ public final class Controles {
         salvar();
     }
 
+    // ---- Style (Settings) ----
+    /** Barras de HP/MP: em arco em volta do player (padrao) ou as retas do HUD. */
+    public static boolean barrasEmArco() { return prefs().getBoolean("barras_arco", true); }
+
+    public static void definirBarrasEmArco(boolean arco) {
+        Preferences p = prefs();
+        p.putBoolean("barras_arco", arco);
+        p.flush();
+    }
+
+    /** O que o anel do retrato mostra: "xp", "defense" ou "skill" (a da classe). */
+    public static String statRetrato() { return prefs().getString("stat_retrato", "xp"); }
+
+    public static void definirStatRetrato(String stat) {
+        Preferences p = prefs();
+        p.putString("stat_retrato", stat);
+        p.flush();
+    }
+
     // ---- Minimapa (botao de mostrar/esconder) ----
     public static boolean minimapaVisivel() { return prefs().getBoolean("minimapa_visivel", true); }
 

@@ -1048,6 +1048,8 @@ public class WorldScreen extends ScreenAdapter {
         hud.definirColunaEsquerda(colunaRetrato, 10f, TAMANHO_RETRATO);
         // Arcos de HP/MP em volta do player, por baixo de qualquer janela.
         uiStage.getRoot().addActorAt(0, new ArcosVitais());
+        // Em arco (padrao): o painel reto de HP/MP some. Settings > Style troca.
+        hud.definirPainelVitaisVisivel(!Controles.barrasEmArco());
         // % do retrato com contorno preto (fonte das barras do HUD).
         labelXpRetrato.setStyle(new Label.LabelStyle(hud.fonteComContorno(), Color.WHITE));
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
@@ -1278,7 +1280,7 @@ public class WorldScreen extends ScreenAdapter {
         labelXpRetrato = new Label("0%", skin, "hud") {
             @Override public void act(float delta) {
                 super.act(delta);
-                String t = Math.round(hud != null ? hud.fracaoXp() * 100f : 0f) + "%";
+                String t = Math.round(fracaoStatRetrato() * 100f) + "%";
                 if (!t.contentEquals(getText())) setText(t);
             }
         };
@@ -1331,6 +1333,23 @@ public class WorldScreen extends ScreenAdapter {
     // trilho escuro + amarelo que vai fechando no sentido horario a partir
     // de cima conforme o XP do level.
     private static final Color COR_ANEL_XP = Color.valueOf("e8b020");
+
+    /** Progresso (0-1) do que o anel do retrato mostra (Settings > Style >
+     * Portrait ring): XP do level, Defense ou a skill da classe. */
+    private float fracaoStatRetrato() {
+        String stat = Controles.statRetrato();
+        if ("defense".equals(stat)) return bookMenu != null ? bookMenu.fracaoDefesa() : 0f;
+        if ("skill".equals(stat)) return bookMenu != null ? bookMenu.fracaoSkillPrincipal() : 0f;
+        return hud != null ? hud.fracaoXp() : 0f;
+    }
+
+    /** Cor do anel: a mesma da barra daquela skill no livro. */
+    private Color corStatRetrato() {
+        String stat = Controles.statRetrato();
+        if ("defense".equals(stat)) return BookMenuUI.COR_SKILL_DEFESA;
+        if ("skill".equals(stat) && bookMenu != null) return bookMenu.corDaSkillPrincipal();
+        return COR_ANEL_XP;
+    }
     private class AnelXp extends com.badlogic.gdx.scenes.scene2d.Actor {
         private static final int SEGMENTOS = 96;
         AnelXp() { setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); }
@@ -1341,13 +1360,13 @@ public class WorldScreen extends ScreenAdapter {
             float espessura = lado * 0.085f;
             // Logo fora do fundo (Button1 encolhido), dentro da celula.
             float raio = lado * FATOR_RETRATO / 2f + espessura / 2f + lado * 0.01f;
-            float fracao = hud != null ? hud.fracaoXp() : 0f;
+            float fracao = fracaoStatRetrato();
             int cheios = Math.round(fracao * SEGMENTOS);
             // Borda escura nas duas beiradas (o meio vazio e' transparente).
             float borda = Math.max(1f, lado * 0.018f);
             anel(b, cx, cy, raio - espessura / 2f, borda, SEGMENTOS, COR_ANEL_BORDA, alpha);
             anel(b, cx, cy, raio + espessura / 2f, borda, SEGMENTOS, COR_ANEL_BORDA, alpha);
-            anel(b, cx, cy, raio, espessura - borda, cheios, COR_ANEL_XP, alpha);
+            anel(b, cx, cy, raio, espessura - borda, cheios, corStatRetrato(), alpha);
             b.setColor(Color.WHITE);
         }
     }
@@ -1418,7 +1437,7 @@ public class WorldScreen extends ScreenAdapter {
         }
 
         @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch b, float alpha) {
-            if (localMorto || hud == null) return;
+            if (localMorto || hud == null || !Controles.barrasEmArco()) return;
             // Centro do personagem (pes + meio SQM) e o tamanho de 1 SQM no stage.
             // Mesma ancora do sprite (desenharJogador: snap pro pixel de tela
             // pelo zoom) - sem isso o arco tremia em relacao ao boneco ao andar.
@@ -2294,6 +2313,59 @@ public class WorldScreen extends ScreenAdapter {
         return b;
     }
 
+    // ===================== STYLE (Settings) =====================
+    /** Duas escolhas (caixinhas, so' uma marcada por vez): barras de HP/MP
+     * retas ou em arco, e o que o anel do retrato mostra. */
+    private Table criarSecaoEstilo() {
+        Table secao = new Table();
+        secao.left().top();
+        secao.add(new Label("Style", skin, "secao")).left().row();
+
+        String[] nomesBarras = {"Arc", "Square"};
+        secao.add(linhaDeEscolha("HP/MP bars", nomesBarras, Controles.barrasEmArco() ? 0 : 1, i -> {
+            Controles.definirBarrasEmArco(i == 0);
+            hud.definirPainelVitaisVisivel(i != 0);
+        })).left().padTop(10).row();
+
+        String[] chavesStat = {"xp", "defense", "skill"};
+        // Skill da classe logada (o livro ainda nao existe aqui, entao pela classe).
+        String skillClasse = "Mage".equals(local.classe) ? "Magic" : "Ranger".equals(local.classe) ? "Focus"
+            : "Bard".equals(local.classe) ? "Musicality" : "Melee";
+        String[] nomesStat = {"Experience", "Defense", skillClasse};
+        int atual = java.util.Arrays.asList(chavesStat).indexOf(Controles.statRetrato());
+        secao.add(linhaDeEscolha("Portrait ring", nomesStat, Math.max(0, atual),
+            i -> Controles.definirStatRetrato(chavesStat[i]))).left().padTop(6).row();
+        return secao;
+    }
+
+    /** "Nome   [x] Opcao1   [ ] Opcao2 ..." - uma marcada por vez. */
+    private Table linhaDeEscolha(String titulo, String[] opcoes, int marcada, java.util.function.IntConsumer aoMudar) {
+        Table linha = new Table();
+        linha.add(new Label(titulo, skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
+        CheckBox.CheckBoxStyle estilo = new CheckBox.CheckBoxStyle();
+        estilo.checkboxOn = new TextureRegionDrawable(iconeCheckOn);
+        estilo.checkboxOff = new TextureRegionDrawable(iconeCheckOff);
+        estilo.font = skin.getFont("default-font");
+        estilo.fontColor = Color.WHITE;
+        com.badlogic.gdx.scenes.scene2d.ui.ButtonGroup<CheckBox> grupo = new com.badlogic.gdx.scenes.scene2d.ui.ButtonGroup<>();
+        grupo.setMinCheckCount(1);
+        grupo.setMaxCheckCount(1);
+        for (int i = 0; i < opcoes.length; i++) {
+            final int indice = i;
+            CheckBox c = new CheckBox(" " + opcoes[i], estilo);
+            c.getImageCell().size(28);
+            grupo.add(c);
+            c.setChecked(i == marcada);
+            c.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    if (c.isChecked()) aoMudar.accept(indice);
+                }
+            });
+            linha.add(c).left().padRight(24).height(36);
+        }
+        return linha;
+    }
+
     private Table criarSecaoControles() {
         Table secao = new Table();
         secao.left().top();
@@ -2481,6 +2553,7 @@ public class WorldScreen extends ScreenAdapter {
             grid.add(checkFullscreen).size(32).pad(6).row();
         }
         corpo.add(grid).left().row();
+        corpo.add(criarSecaoEstilo()).left().padTop(26).row();
         corpo.add(criarSecaoControles()).left().padTop(26).row();
 
         ScrollPane scroll = new ScrollPane(corpo);

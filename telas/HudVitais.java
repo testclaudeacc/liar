@@ -34,7 +34,7 @@ public final class HudVitais {
     private static final Color COR_PAINEL = new Color(48 / 255f, 48 / 255f, 48 / 255f, 1f);
     private static final Color COR_SOMBRA = new Color(45 / 255f, 45 / 255f, 45 / 255f, 1f);
     private static final Color COR_HP = new Color(198 / 255f, 0f, 0f, 1f);
-    private static final Color COR_MP = new Color(96 / 255f, 153 / 255f, 1f, 1f);
+    private static final Color COR_MP = Color.valueOf("6a3ad8"); // mesmo roxo do arco de MP
     private static final Color COR_XP_FUNDO = new Color(14 / 255f, 14 / 255f, 14 / 255f, 1f);
     private static final Color COR_XP = Color.valueOf("e8b020");
     private static final Color COR_MUNICAO = new Color(0.15f, 0.15f, 0.15f, 1f); // cinza escuro
@@ -53,6 +53,22 @@ public final class HudVitais {
     private final Table raiz = new Table();
     private final Table conteudo = new Table();
     private Table linhaTopo;
+    private Table painelVitais;
+    private com.badlogic.gdx.scenes.scene2d.ui.Cell<?> celulaPainel;
+    private float alturaTopo = 0f;
+
+    /** Painel reto de HP/MP: some (sem ocupar lugar) quando as barras sao em arco. */
+    public void definirPainelVitaisVisivel(boolean visivel) {
+        if ((celulaPainel.getActor() != null) == visivel) return;
+        celulaPainel.setActor(visivel ? painelVitais : null);
+        linhaTopo.invalidateHierarchy();
+        centralizarNoRetrato();
+    }
+
+    private void centralizarNoRetrato() {
+        raiz.getCell(conteudo).padTop(Math.max(0f, (alturaTopo - linhaTopo.getPrefHeight()) / 2f));
+        raiz.invalidate();
+    }
     private final com.badlogic.gdx.scenes.scene2d.ui.Container<com.badlogic.gdx.scenes.scene2d.Actor> colunaEsquerda =
         new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
     private final Barra hp, mp, xp;
@@ -178,7 +194,8 @@ public final class HudVitais {
         quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA, null);
         linhaTopo = new Table();
         linhaTopo.top().left();
-        linhaTopo.add(painel).top().left();
+        celulaPainel = linhaTopo.add(painel).top().left();
+        this.painelVitais = painel;
         // Alinhado com a barra de HP (borda 2px + pad 3px do painel).
         linhaTopo.add(iconesStatus).top().left().padLeft(px(9)).padTop(px(10));
         raiz.setFillParent(true);
@@ -540,7 +557,8 @@ public final class HudVitais {
         colunaEsquerda.top().left();
         raiz.getCell(colunaEsquerda).padRight(espaco);
         // Painel de HP/MP centralizado na altura do retrato (alturaTopo).
-        raiz.getCell(conteudo).padTop(Math.max(0f, (alturaTopo - linhaTopo.getPrefHeight()) / 2f));
+        this.alturaTopo = alturaTopo;
+        centralizarNoRetrato();
         raiz.invalidate();
     }
 

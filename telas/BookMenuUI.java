@@ -824,6 +824,15 @@ public final class BookMenuUI {
 
     // ===================== SKILLS =====================
 
+    // Progresso (0-1) ate' o proximo nivel - anel do retrato (WorldScreen).
+    private float fracaoPrincipal = 0f, fracaoDefesa = 0f;
+    public float fracaoSkillPrincipal() { return fracaoPrincipal; }
+    public float fracaoDefesa() { return fracaoDefesa; }
+    /** Nome da skill da classe (Magic/Musicality/Focus/Melee). */
+    public String nomeSkillPrincipal() { return skillPrincipal()[1]; }
+    public Color corDaSkillPrincipal() { return corSkillPrincipal(skillPrincipal()[0]); }
+    public static final Color COR_SKILL_DEFESA = Color.valueOf("6ab7ff");
+
     private String[] skillPrincipal() {
         switch (classeJogador) {
             case "Ranger": return new String[]{"distance", "Focus"}; // chave do servidor continua "distance"
@@ -1039,12 +1048,14 @@ public final class BookMenuUI {
         int necessarioPrincipal = getHitsToLevel(nivelPrincipal + 1, getSkillMultiplier(classeJogador, false));
         float pctPrincipal = necessarioPrincipal > 0 ? (float) hitsPrincipal / necessarioPrincipal : 0f;
         atualizarBarra(barraPrincipal, nivelPrincipal, pctPrincipal);
+        fracaoPrincipal = Math.max(0f, Math.min(1f, pctPrincipal));
 
         int nivelDefesa = skills != null ? skills.getInt("defense", 10) : 10;
         int hitsDefesa = skills != null ? skills.getInt("defense_hits", 0) : 0;
         int necessarioDefesa = getHitsToLevel(nivelDefesa + 1, getSkillMultiplier(classeJogador, true));
         float pctDefesa = necessarioDefesa > 0 ? (float) hitsDefesa / necessarioDefesa : 0f;
         atualizarBarra(barraDefesa, nivelDefesa, pctDefesa);
+        fracaoDefesa = Math.max(0f, Math.min(1f, pctDefesa));
 
         float fullness = skills != null ? skills.getFloat("fullness", FULLNESS_MAX) : FULLNESS_MAX;
         atualizarBarra(barraFome, 0, fullness / FULLNESS_MAX);
