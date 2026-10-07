@@ -2126,6 +2126,12 @@ public class WorldScreen extends ScreenAdapter {
             float alturaQuadro = 0f;
             for (TextureRegion q : quadros) alturaQuadro = Math.max(alturaQuadro, q.getRegionHeight());
             float escala = Math.min(getWidth() / FRAME_LARGURA, getHeight() / alturaQuadro);
+            // Botao do alvo: quadro alto (sprite com folga em cima) deixava o
+            // boneco minusculo - ali o que manda e' a largura (a folga vazia
+            // pode passar um pouco da area, nao aparece).
+            if (nomeFixo == null && reserva == null) {
+                escala = Math.min(getWidth() * 0.95f / FRAME_LARGURA, getHeight() * 1.35f / alturaQuadro);
+            }
             // Escala inteira (pixel art certinho) quando da' 2x ou mais; entre
             // 1x e 2x, de meio em meio (senao caia pra 1x e ficava minusculo).
             if (escala >= 2f) escala = (float) Math.floor(escala);
