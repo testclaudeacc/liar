@@ -12,7 +12,7 @@ import java.util.Map;
  * no PC, SharedPreferences no Android) - nao vai pro servidor.
  *
  * PC: tecla de cada acao (atalhos 1-9 da hotbar, abrir bag, abrir chat,
- * escrever no chat). Duas acoes nunca ficam com a mesma tecla: escolher uma
+ * abrir o mapa, escrever no chat). Duas acoes nunca ficam com a mesma tecla: escolher uma
  * tecla ja' usada nao deixa (as duas aparecem em vermelho). Movimento (WASD/setas), ESC e C
  * (overlay de colisao) sao fixos e nao podem ser escolhidos.
  *
@@ -38,6 +38,8 @@ public final class Controles {
         PADRAO.put("bag", Input.Keys.B);
         NOMES.put("chat", "Open Chat");
         PADRAO.put("chat", Input.Keys.SPACE);
+        NOMES.put("mapa", "Open Map");
+        PADRAO.put("mapa", Input.Keys.M);
         NOMES.put("write", "Write");
         PADRAO.put("write", Input.Keys.ENTER);
     }

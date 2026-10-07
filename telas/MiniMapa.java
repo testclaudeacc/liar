@@ -163,11 +163,12 @@ public class MiniMapa extends Actor {
                 if (p.textura == null) continue;
                 batch.draw(p.textura, origemX + p.tileX * sqm, origemY + p.tileY * sqm, p.largura * sqm, p.altura * sqm);
             }
-            // Cada um = 1 "pixel" do minimapa (o SQM onde esta), sem contorno.
+            // Cada um = 1 "pixel" do minimapa (tamanho de 1 SQM), sem contorno.
+            // Na posicao continua (nao presa no SQM): anda liso junto com o
+            // mapa e voce fica sempre no centro, sem pular de SQM em SQM.
             Coletor coletor = (mx, my, cor) -> {
-                int tx = (int) Math.floor(mx / mapa.tileWidth);
-                int ty = (int) Math.floor((my + mapa.tileHeight / 2f) / mapa.tileHeight);
-                float px = origemX + tx * sqm, py = origemY + ty * sqm;
+                float px = Math.round((origemX + (mx - mapa.tileWidth / 2f) * s) * k) / k;
+                float py = Math.round((origemY + my * s) * k) / k;
                 if (px + sqm < ax || px > ax + aw || py + sqm < ay || py > ay + ah) return;
                 batch.setColor(cor.r, cor.g, cor.b, cor.a * parentAlpha);
                 batch.draw(pixel, px, py, sqm, sqm);

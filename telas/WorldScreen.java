@@ -885,6 +885,13 @@ public class WorldScreen extends ScreenAdapter {
                     alternarChat();
                     return true;
                 }
+                // Open Map (padrao M): abre/fecha o mapa grande.
+                if (keycode == Controles.tecla("mapa")) {
+                    if (chat.estaDigitando()) return false;
+                    if (mapaGrandeAberto()) fecharMapaGrande();
+                    else abrirMapaGrande();
+                    return true;
+                }
                 // Enter com o chat ja aberto (mas ainda sem foco) comeca a
                 // digitar - ver render()::isKeyJustPressed(ENTER), nao aqui
                 // (com o campo ja focado, quem trata o Enter e' o
