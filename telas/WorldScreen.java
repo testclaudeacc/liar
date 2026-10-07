@@ -1214,7 +1214,6 @@ public class WorldScreen extends ScreenAdapter {
         botaoTopoMapa.setColor(comMinimapa ? COR_BOTAO_LIGADO : Color.WHITE);
     }
     private Button botaoRetrato;
-    private com.badlogic.gdx.scenes.scene2d.ui.Container<com.badlogic.gdx.scenes.scene2d.Actor> fotoRetrato;
     private Image avisoRetrato;
     private Texture texBolinha;
     private MiniMapa miniMapa, mapaGrande;
@@ -1246,11 +1245,10 @@ public class WorldScreen extends ScreenAdapter {
         estilo.over = new TextureRegionDrawable(texBotaoTopoHover);
         estilo.down = new TextureRegionDrawable(texBotaoTopoClick);
         Button botao = new Button(estilo);
-        fotoRetrato = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
-        // Sem corte no quadro de dentro: o personagem so' e' cortado na borda
-        // do botao (igual foto numa moldura), ver botao.setClip abaixo.
-        fotoRetrato.top();
-        fotoRetrato.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+        // Foto: textura pronta (gerarTexturaRetrato) do tamanho do botao,
+        // com o personagem recortado no circulo escuro de dentro dele.
+        imagemRetrato = new Image();
+        imagemRetrato.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
 
         Pixmap pm = new Pixmap(32, 32, Pixmap.Format.RGBA8888);
         pm.setColor(Color.BLACK);
@@ -1268,14 +1266,10 @@ public class WorldScreen extends ScreenAdapter {
         cantoAviso.add(avisoRetrato).size(TAMANHO_RETRATO * 0.26f);
         cantoAviso.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
 
-        float interno = TAMANHO_RETRATO * 0.70f;
         com.badlogic.gdx.scenes.scene2d.ui.Stack pilha = new com.badlogic.gdx.scenes.scene2d.ui.Stack();
-        Table centro = new Table();
-        centro.add(fotoRetrato).size(interno).padBottom(TAMANHO_RETRATO * 0.12f);
-        pilha.add(centro);
+        pilha.add(imagemRetrato);
         pilha.add(cantoAviso);
         botao.add(pilha).grow();
-        botao.setClip(true);
         botao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 colunaBotoesTopo.setVisible(!colunaBotoesTopo.isVisible());
@@ -1288,15 +1282,143 @@ public class WorldScreen extends ScreenAdapter {
         colunaBotoesTopo.setVisible(false);
     }
 
-    /** Troca a foto do retrato pela skin atual (so' a parte de cima: cabeca/ombros). */
+    /** Troca a foto do retrato pela skin atual. */
     private void atualizarRetrato(JsonValue skins) {
-        if (fotoRetrato == null) return;
-        SkinsUtil.Preview p = new SkinsUtil.Preview(atlas, skins, SkinsUtil.FRAME_BAIXO);
-        float interno = TAMANHO_RETRATO * 0.70f;
-        float largura = interno * 1.25f;
-        float altura = largura * p.getPrefHeight() / SkinsUtil.FRAME_LARGURA;
-        fotoRetrato.setActor(p);
-        fotoRetrato.size(largura, altura);
+        if (imagemRetrato == null) return;
+        Texture nova = gerarTexturaRetrato(skins);
+        if (nova == null) return;
+        if (texRetrato != null) texRetrato.dispose();
+        texRetrato = nova;
+        imagemRetrato.setDrawable(new TextureRegionDrawable(new TextureRegion(texRetrato)));
+    }
+
+    private Texture texRetrato;
+    private Image imagemRetrato;
+    private boolean[] mascaraRetrato; // circulo escuro de dentro do Button1
+    private int ladoMascara;
+    private final Map<Texture, Pixmap> pixmapsAtlas = new HashMap<>();
+
+    /** Pixels de uma pagina do atlas (lidos uma vez e guardados). */
+    private Pixmap pixmapDoAtlas(Texture t) {
+        if (pixmapsAtlas.containsKey(t)) return pixmapsAtlas.get(t);
+        Pixmap copia = null;
+        try {
+            com.badlogic.gdx.graphics.TextureData dados = t.getTextureData();
+            if (!dados.isPrepared()) dados.prepare();
+            Pixmap original = dados.consumePixmap();
+            copia = new Pixmap(original.getWidth(), original.getHeight(), Pixmap.Format.RGBA8888);
+            copia.setBlending(Pixmap.Blending.None);
+            copia.drawPixmap(original, 0, 0);
+            if (dados.disposePixmap()) original.dispose();
+        } catch (RuntimeException e) {
+            Gdx.app.error("Retrato", "nao leu os pixels do atlas", e);
+        }
+        pixmapsAtlas.put(t, copia);
+        return copia;
+    }
+
+    /** Area de dentro do botao (cinza escuro): flood fill a partir do centro
+     * do Button1 pelos pixels da mesma cor. */
+    private boolean[] mascaraDoRetrato() {
+        if (mascaraRetrato != null) return mascaraRetrato;
+        Pixmap fonte = pixmapDoAtlas(texBotaoTopo.getTexture());
+        int w = texBotaoTopo.getRegionWidth(), h = texBotaoTopo.getRegionHeight();
+        ladoMascara = w;
+        boolean[] m = new boolean[w * h];
+        if (fonte == null) { java.util.Arrays.fill(m, true); return mascaraRetrato = m; }
+        int ox = texBotaoTopo.getRegionX(), oy = texBotaoTopo.getRegionY();
+        int centro = fonte.getPixel(ox + w / 2, oy + h / 2);
+        java.util.ArrayDeque<int[]> fila = new java.util.ArrayDeque<>();
+        fila.add(new int[]{w / 2, h / 2});
+        m[(h / 2) * w + w / 2] = true;
+        while (!fila.isEmpty()) {
+            int[] c = fila.poll();
+            int[][] viz = {{c[0] + 1, c[1]}, {c[0] - 1, c[1]}, {c[0], c[1] + 1}, {c[0], c[1] - 1}};
+            for (int[] v : viz) {
+                if (v[0] < 0 || v[1] < 0 || v[0] >= w || v[1] >= h || m[v[1] * w + v[0]]) continue;
+                if (!corParecida(fonte.getPixel(ox + v[0], oy + v[1]), centro)) continue;
+                m[v[1] * w + v[0]] = true;
+                fila.add(v);
+            }
+        }
+        return mascaraRetrato = m;
+    }
+
+    private static boolean corParecida(int a, int b) {
+        if ((a & 0xff) < 128) return false;
+        for (int desloc = 8; desloc <= 24; desloc += 8) {
+            if (Math.abs(((a >>> desloc) & 0xff) - ((b >>> desloc) & 0xff)) > 24) return false;
+        }
+        return true;
+    }
+
+    /** Monta a foto: as camadas da skin (quadro de frente, com as cores)
+     * ampliadas sem borrar e so' dentro do circulo escuro do botao. Textura
+     * do tamanho do botao inteiro (4 pixels por pixel do Button1). */
+    private Texture gerarTexturaRetrato(JsonValue skins) {
+        boolean[] mascara = mascaraDoRetrato();
+        int lado = ladoMascara, escMascara = 4, r = lado * escMascara;
+        List<TextureRegion> quadros = new ArrayList<>();
+        List<Color> cores = new ArrayList<>();
+        int alturaMax = 17;
+        for (String cat : SkinsUtil.ORDEM_CAMADAS) {
+            String caminho = SkinsUtil.caminho(skins, cat);
+            if (caminho == null && "base".equals(cat)) caminho = SkinsUtil.BASE_PADRAO;
+            TextureRegion tira = SkinsUtil.regiao(atlas, caminho);
+            if (tira == null) continue;
+            quadros.add(SkinsUtil.quadro(tira, SkinsUtil.FRAME_BAIXO));
+            cores.add("base".equals(cat) ? Color.WHITE : SkinsUtil.cor(SkinsUtil.corHex(skins, cat)));
+            alturaMax = Math.max(alturaMax, tira.getRegionHeight());
+        }
+        if (quadros.isEmpty()) return null;
+        // Personagem com ~87% da largura do botao, topo um pouco abaixo da
+        // borda de cima (mostra cabeca e tronco; o resto fica fora do circulo).
+        int esc = Math.max(1, Math.round(r * 0.875f / SkinsUtil.FRAME_LARGURA));
+        int x0 = (r - SkinsUtil.FRAME_LARGURA * esc) / 2;
+        int y0 = Math.round(r * 0.09f); // de cima pra baixo
+        Pixmap saida = new Pixmap(r, r, Pixmap.Format.RGBA8888);
+        saida.setBlending(Pixmap.Blending.None);
+        saida.setColor(0, 0, 0, 0);
+        saida.fill();
+        for (int sy = 0; sy < alturaMax; sy++) {
+            for (int sx = 0; sx < SkinsUtil.FRAME_LARGURA; sx++) {
+                float cr = 0, cg = 0, cb = 0, ca = 0;
+                for (int i = 0; i < quadros.size(); i++) {
+                    TextureRegion q = quadros.get(i);
+                    int linha = sy - (alturaMax - q.getRegionHeight()); // camadas alinhadas pelos pes
+                    if (linha < 0 || sx >= q.getRegionWidth()) continue;
+                    Pixmap fonte = pixmapDoAtlas(q.getTexture());
+                    if (fonte == null) continue;
+                    int p = fonte.getPixel(q.getRegionX() + sx, q.getRegionY() + linha);
+                    float a = (p & 0xff) / 255f;
+                    if (a <= 0f) continue;
+                    Color t = cores.get(i);
+                    float pr = ((p >>> 24) & 0xff) / 255f * t.r, pg = ((p >>> 16) & 0xff) / 255f * t.g, pb = ((p >>> 8) & 0xff) / 255f * t.b;
+                    // "over": camada de cima por cima da de baixo.
+                    float na = a + ca * (1f - a);
+                    cr = (pr * a + cr * ca * (1f - a)) / na;
+                    cg = (pg * a + cg * ca * (1f - a)) / na;
+                    cb = (pb * a + cb * ca * (1f - a)) / na;
+                    ca = na;
+                }
+                if (ca <= 0f) continue;
+                int cor = Color.rgba8888(cr, cg, cb, ca);
+                for (int dy = 0; dy < esc; dy++) {
+                    int py = y0 + sy * esc + dy;
+                    if (py < 0 || py >= r) continue;
+                    for (int dx = 0; dx < esc; dx++) {
+                        int px = x0 + sx * esc + dx;
+                        if (px < 0 || px >= r) continue;
+                        if (!mascara[(py / escMascara) * lado + px / escMascara]) continue;
+                        saida.drawPixel(px, py, cor);
+                    }
+                }
+            }
+        }
+        Texture t = new Texture(saida);
+        t.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+        saida.dispose();
+        return t;
     }
 
     private void criarMapaGrande() {
@@ -4860,6 +4982,8 @@ public class WorldScreen extends ScreenAdapter {
         if (pinturaMiniMapa != null) pinturaMiniMapa.dispose();
         if (mapaGrande != null) mapaGrande.dispose();
         if (texBolinha != null) texBolinha.dispose();
+        if (texRetrato != null) texRetrato.dispose();
+        for (Pixmap p : pixmapsAtlas.values()) if (p != null) p.dispose();
         uiStage.dispose();
         skin.dispose();
         atlas.dispose();
