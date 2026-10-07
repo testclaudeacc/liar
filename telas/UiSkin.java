@@ -105,7 +105,10 @@ public class UiSkin {
         // la (SectionLabel=48, TitleLabel=70), nao reaproveitadas porque nao
         // existe nenhum texto desse tamanho no resto do jogo ainda portado.
         BitmapFont fonteSecao = gerarFonte(FONTE_GUI, 40, 2, escala);
-        BitmapFont fonteOpcoesTitulo = gerarFonte(FONTE_GUI, 58, 3, escala);
+        // So' letras/numeros: e' a maior fonte do jogo e, no celular (escala
+        // alta), com todos os caracteres a pagina de textura ficava enorme e
+        // alguns glifos sumiam ("Settings" saia "Se  ings").
+        BitmapFont fonteOpcoesTitulo = gerarFonte(FONTE_GUI, 58, 3, escala, null, CARACTERES_TITULO);
         // Variante menor do martel de botao (20, nao 32) - usada onde o texto
         // e' comprido demais pro tamanho padrao (ex: "Return to game" no
         // popup de pause). player.tscn usa font_size=24 pro BackBtn real, mas
@@ -316,10 +319,19 @@ public class UiSkin {
         CIRILICO = sb.toString();
     }
 
+    private static final String CARACTERES_TITULO =
+        "\u0000ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,!?'-:";
+
     static BitmapFont gerarFonte(String caminho, int tamanho, int borda, float escala, String caracteresExtras) {
+        return gerarFonte(caminho, tamanho, borda, escala, caracteresExtras, null);
+    }
+
+    /** caracteresSo != null: gera SO' esses (em vez do conjunto padrao). */
+    static BitmapFont gerarFonte(String caminho, int tamanho, int borda, float escala, String caracteresExtras, String caracteresSo) {
         FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal(caminho));
         FreeTypeFontParameter parametros = new FreeTypeFontParameter();
-        if (!caracteresExtras.isEmpty()) parametros.characters = FreeTypeFontGenerator.DEFAULT_CHARS + caracteresExtras;
+        if (caracteresSo != null) parametros.characters = caracteresSo;
+        else if (caracteresExtras != null && !caracteresExtras.isEmpty()) parametros.characters = FreeTypeFontGenerator.DEFAULT_CHARS + caracteresExtras;
         parametros.size = Math.round(tamanho * escala);
         parametros.minFilter = TextureFilter.Linear;
         parametros.magFilter = TextureFilter.Linear;

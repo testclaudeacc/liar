@@ -1190,7 +1190,8 @@ public class WorldScreen extends ScreenAdapter {
         // fps/ms no canto de baixo a esquerda da tela.
         Table cantoFps = new Table();
         cantoFps.setFillParent(true);
-        cantoFps.bottom().left().pad(0, 12, 8, 0);
+        // No celular mais pra dentro: a borda arredondada/notch cortava o 1o digito.
+        cantoFps.bottom().left().pad(0, mobile ? 48 : 12, 8, 0);
         infoDesempenho.clearChildren();
         // Lado a lado: "60 fps   16 ms".
         infoDesempenho.add(labelFps).left().padRight(14);
@@ -2431,7 +2432,7 @@ public class WorldScreen extends ScreenAdapter {
                 Controles.restaurarPadrao();
                 atualizarBotoesTecla();
                 avisoControles.setText("Controls reset to default.");
-            })).left().width(200).height(38).padTop(8).row();
+            })).left().width(200).height(38).padTop(8).padBottom(30).row();
             // Captura a proxima tecla (no uiStage: vem antes do jogo, entao a
             // tecla escolhida nao dispara a acao dela nesse mesmo aperto).
             uiStage.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
@@ -2459,7 +2460,7 @@ public class WorldScreen extends ScreenAdapter {
             secao.add(botaoPequeno("Edit controls", () -> {
                 fecharSettings();
                 hotbar.entrarEdicao(null);
-            })).left().width(210).height(48).padTop(10).row();
+            })).left().width(210).height(48).padTop(10).padBottom(30).row();
         }
         return secao;
     }

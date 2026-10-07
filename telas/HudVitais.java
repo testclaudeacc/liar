@@ -66,7 +66,10 @@ public final class HudVitais {
     }
 
     private void centralizarNoRetrato() {
-        raiz.getCell(conteudo).padTop(Math.max(0f, (alturaTopo - linhaTopo.getPrefHeight()) / 2f));
+        // Sem o painel reto (barras em arco): nada pra centralizar, a
+        // municao/notificacoes sobem pro topo, do lado do retrato.
+        boolean comPainel = celulaPainel != null && celulaPainel.getActor() != null;
+        raiz.getCell(conteudo).padTop(comPainel ? Math.max(0f, (alturaTopo - linhaTopo.getPrefHeight()) / 2f) : px(6));
         raiz.invalidate();
     }
     private final com.badlogic.gdx.scenes.scene2d.ui.Container<com.badlogic.gdx.scenes.scene2d.Actor> colunaEsquerda =
@@ -489,7 +492,8 @@ public final class HudVitais {
 
     /** Some com o painel reto de HP/MP enquanto uma janela (chat/livro/...) esta aberta. */
     public void definirTopoVisivel(boolean visivel) {
-        if (linhaTopo != null) linhaTopo.setVisible(visivel);
+        // Painel de HP/MP, municao e notificacoes somem juntos.
+        conteudo.setVisible(visivel);
     }
 
     /** Icone de fome: aparece com a barra de Fullness zerada. */
