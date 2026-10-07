@@ -130,6 +130,19 @@ public final class HudVitais {
     private Label textoDica;
     private Label contadorBatalha;
 
+    /** Label desenhado com a origem presa no pixel de tela: a fonte e' gerada
+     * no tamanho real da tela (1 pixel da fonte = 1 pixel de tela), entao com
+     * a origem inteira cada letra cai certinho num pixel - nitido. */
+    private final class LabelNitido extends Label {
+        LabelNitido(CharSequence texto, LabelStyle estilo) { super(texto, estilo); }
+        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
+            float x = getX(), y = getY();
+            setPosition(pixelInteiro(x), pixelInteiro(y));
+            super.draw(batch, parentAlpha);
+            setPosition(x, y);
+        }
+    }
+
     private static final class Barra {
         final Image preenchimento;
         final Table alinhador;
@@ -153,6 +166,10 @@ public final class HudVitais {
         pm.dispose();
         fonte = gerarFonte(escala, 14, false);
         fonteNotificacao = gerarFonte(escala, MOBILE ? 16 : 11, true);
+        // Sem arredondar pra unidade do STAGE (que nao e' pixel de tela): com
+        // isso as letras caiam entre pixels e o filtro Linear "derretia" o
+        // texto. O LabelNitido prende a origem no pixel de tela.
+        fonteNotificacao.setUseIntegerPositions(false);
         Label.LabelStyle estilo = new Label.LabelStyle(fonte, Color.WHITE);
 
         hp = criarBarra(estilo, COR_HP, 314);
@@ -233,7 +250,7 @@ public final class HudVitais {
         iconeNotificacaoPadrao = regNotif;
         iconeNotificacao.setScaling(Scaling.fit);
         if (regNotif != null) iconeNotificacao.setDrawable(new TextureRegionDrawable(regNotif));
-        textoNotificacao = new Label("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
+        textoNotificacao = new LabelNitido("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
         Table internoNotif = new Table();
         internoNotif.setBackground(cor(COR_MUNICAO));
         internoNotif.left();
@@ -256,7 +273,7 @@ public final class HudVitais {
         conteudo.add(colunaInferior).left().padTop(px(6));
         reorganizarInferior();
         // Popup das explicacoes dos icones de status (fome/battle).
-        textoDica = new Label("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
+        textoDica = new LabelNitido("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
         textoDica.setWrap(true);
         Table internoDica = new Table();
         internoDica.setBackground(cor(COR_MUNICAO));
