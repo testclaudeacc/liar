@@ -204,8 +204,8 @@ public final class HudVitais {
         linhaTopo.top().left();
         celulaPainel = linhaTopo.add(painel).top().left();
         this.painelVitais = painel;
-        // Centralizado na altura do painel de HP/MP (ou do retrato, sem ele).
-        linhaTopo.add(iconesStatus).center().left().padLeft(px(10));
+        // Icones de status (fome/battle) nao ficam mais aqui: viraram a
+        // "gaveta de debuffs" embaixo do minimapa (WorldScreen pega iconesStatus()).
         raiz.setFillParent(true);
         raiz.top().left().padLeft(px(17)).padTop(px(13));
         // Coluna da esquerda: retrato do player + botoes (ver WorldScreen::criarRetrato).
@@ -436,8 +436,23 @@ public final class HudVitais {
     private void reorganizarStatus() {
         esconderDica();
         iconesStatus.clearChildren();
-        if (comFome) iconesStatus.add(quadradoFome).padRight(px(6));
-        if (emBatalha) iconesStatus.add(quadradoBatalha).padRight(px(6));
+        iconesStatus.top().right();
+        // Em pares: 2 por linha, as linhas vao se empilhando pra baixo (4 = 2x2).
+        java.util.List<Table> ativos = new java.util.ArrayList<>();
+        if (comFome) ativos.add(quadradoFome);
+        if (emBatalha) ativos.add(quadradoBatalha);
+        for (int i = 0; i < ativos.size(); i++) {
+            iconesStatus.add(ativos.get(i)).pad(px(3));
+            if (i % 2 == 1) iconesStatus.row();
+        }
+    }
+
+    /** Gaveta de debuffs (fome/battle...) - WorldScreen poe embaixo do minimapa. */
+    public Table iconesStatus() { return iconesStatus; }
+
+    /** Some com o painel reto de HP/MP enquanto uma janela (chat/livro/...) esta aberta. */
+    public void definirTopoVisivel(boolean visivel) {
+        if (linhaTopo != null) linhaTopo.setVisible(visivel);
     }
 
     /** Icone de fome: aparece com a barra de Fullness zerada. */

@@ -1050,6 +1050,7 @@ public class WorldScreen extends ScreenAdapter {
         uiStage.getRoot().addActorAt(0, new ArcosVitais());
         // Em arco (padrao): o painel reto de HP/MP some. Settings > Style troca.
         hud.definirPainelVitaisVisivel(!Controles.barrasEmArco());
+        gavetaDebuffs.setActor(hud.iconesStatus());
         // % do retrato com contorno preto (fonte das barras do HUD).
         labelXpRetrato.setStyle(new Label.LabelStyle(hud.fonteComContorno(), Color.WHITE));
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
@@ -1186,6 +1187,18 @@ public class WorldScreen extends ScreenAdapter {
         infoDesempenho.add(labelFps).right().row();
         infoDesempenho.add(labelMs).right();
         this.infoDesempenho = infoDesempenho;
+        // fps/ms no canto de baixo a esquerda da tela.
+        Table cantoFps = new Table();
+        cantoFps.setFillParent(true);
+        cantoFps.bottom().left().pad(0, 12, 8, 0);
+        infoDesempenho.clearChildren();
+        infoDesempenho.add(labelFps).left().row();
+        infoDesempenho.add(labelMs).left();
+        cantoFps.add(infoDesempenho);
+        cantoFps.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+        uiStage.getRoot().addActorAt(0, cantoFps);
+        gavetaDebuffs = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
+        gavetaDebuffs.top().right();
         Table barra = new Table();
         barra.setFillParent(true);
         barra.top().right().pad(0, 0, 0, 20);
@@ -1200,6 +1213,8 @@ public class WorldScreen extends ScreenAdapter {
     // ---- Retrato do player + botoes / minimapa ----
     private Table colunaRetrato, colunaBotoesTopo, barraMiniMapa, infoDesempenho;
     private Button botaoTopoMapa;
+    private com.badlogic.gdx.scenes.scene2d.ui.Container<Table> gavetaDebuffs;
+    private boolean interfaceAberta = false; // chat/livro/settings/mapa: some com HP/MP
     private static final Color COR_BOTAO_LIGADO = new Color(0.35f, 1f, 0.35f, 1f);
 
     /** [alvo][chat][bag/livro][minimapa], fps/ms embaixo. Minimapa desligado (botao do
@@ -1215,7 +1230,8 @@ public class WorldScreen extends ScreenAdapter {
         barra.add(botaoTopoMenu).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(comMinimapa ? 14 : 0);
         if (comMinimapa) barra.add(miniMapa).size(TAMANHO_MINIMAPA).top().padTop(margemTopo);
         barra.row();
-        barra.add(infoDesempenho).colspan(comMinimapa ? 4 : 3).right().padTop(4);
+        // Gaveta de debuffs (fome/battle, em pares) embaixo do minimapa.
+        barra.add(gavetaDebuffs).colspan(comMinimapa ? 4 : 3).right().top().padTop(10);
         // Ligado: o botao fica verde (borda verde, fundo verde escuro).
         botaoTopoMapa.setColor(comMinimapa ? COR_BOTAO_LIGADO : Color.WHITE);
     }
@@ -1437,7 +1453,7 @@ public class WorldScreen extends ScreenAdapter {
         }
 
         @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch b, float alpha) {
-            if (localMorto || hud == null || !Controles.barrasEmArco()) return;
+            if (localMorto || hud == null || interfaceAberta || !Controles.barrasEmArco()) return;
             // Centro do personagem (pes + meio SQM) e o tamanho de 1 SQM no stage.
             // Mesma ancora do sprite (desenharJogador: snap pro pixel de tela
             // pelo zoom) - sem isso o arco tremia em relacao ao boneco ao andar.
@@ -1931,6 +1947,9 @@ public class WorldScreen extends ScreenAdapter {
         algumAberto = algumAberto || mapaGrandeAberto();
         hotbar.setVisivel(!algumAberto && !localMorto);
         colunaRetrato.setVisible(!algumAberto);
+        // HP/MP (reto e arco) somem junto com o resto.
+        interfaceAberta = algumAberto;
+        hud.definirTopoVisivel(!algumAberto);
         barraMiniMapa.setVisible(!algumAberto);
         // Fundo do botao de alvo na cor da vida do alvo (cinza normal sem alvo).
         float pct = vidaDoAlvo();
