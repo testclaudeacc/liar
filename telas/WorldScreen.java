@@ -1260,6 +1260,7 @@ public class WorldScreen extends ScreenAdapter {
         TextButton menos = new TextButton("-", skin, "cinza-popup");
         TextButton mais = new TextButton("+", skin, "cinza-popup");
         TextButton centro = new TextButton("Center", skin, "cinza-popup");
+        centro.padLeft(16).padRight(16); // texto nao cola nas bordas
         TextButton fechar = new TextButton("X", skin, "vermelho-popup");
         menos.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent e, com.badlogic.gdx.scenes.scene2d.Actor a) { mapaGrande.zoom(1.25f); }
@@ -1290,7 +1291,19 @@ public class WorldScreen extends ScreenAdapter {
         painelMapaGrande.pad(14, 24, 14, 24);
         painelMapaGrande.add(topo).growX().row();
         painelMapaGrande.add(mapaGrande).grow().padTop(10).row();
-        painelMapaGrande.add(legenda).left().padTop(8);
+        // Embaixo a direita: nome da area onde o player esta (camada AreasName).
+        Label nomeArea = new Label("", skin, "secao") {
+            @Override public void act(float delta) {
+                super.act(delta);
+                String area = mapa.propriedades.areaEm(local.x, local.y);
+                String texto = area != null ? area : "";
+                if (!texto.contentEquals(getText())) setText(texto);
+            }
+        };
+        Table rodape = new Table();
+        rodape.add(legenda).left().expandX();
+        rodape.add(nomeArea).right().bottom();
+        painelMapaGrande.add(rodape).growX().padTop(8);
         painelMapaGrande.setVisible(false);
         uiStage.addActor(painelMapaGrande);
     }
