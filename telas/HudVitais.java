@@ -181,8 +181,8 @@ public final class HudVitais {
         pixel = new Texture(pm);
         pm.dispose();
         fonte = gerarFonte(escala, 14, false);
-        // Celular: 13 (16 ficava grande demais pra caixinha da notificacao).
-        fonteNotificacao = gerarFonte(escala, MOBILE ? 13 : 11, true);
+        // Notificacoes (e popups dos debuffs): 15 no celular, 13 no PC.
+        fonteNotificacao = gerarFonte(escala, MOBILE ? 15 : 13, true);
         // Sem arredondar pra unidade do STAGE (que nao e' pixel de tela): com
         // isso as letras caiam entre pixels e o filtro Linear "derretia" o
         // texto. O LabelNitido prende a origem no pixel de tela.
@@ -272,7 +272,7 @@ public final class HudVitais {
         textoNotificacao = new LabelNitido("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
         // Caixinha estilo "toast": bloco do icone (tom mais escuro) colado
         // na esquerda, texto com folga, borda fina num tom mais claro.
-        alturaNotif = px(MOBILE ? 26 : 30);
+        alturaNotif = px(MOBILE ? 32 : 38);
         internoNotif = new Table();
         internoNotif.setBackground(cor(COR_MUNICAO));
         internoNotif.left();
@@ -282,10 +282,10 @@ public final class HudVitais {
         iconeNotifTrade = atlas.findRegion("ui/currency/Gold");
         iconeNotifAmigo = atlas.findRegion("ui/buttons/FriendsBtn");
         iconeNotifParty = atlas.findRegion("ui/buttons/PartyBtn");
-        internoNotif.add(textoNotificacao).left().expandX().padLeft(px(8)).padRight(px(10));
+        internoNotif.add(textoNotificacao).left().expandX().padLeft(px(10)).padRight(px(12));
         painelNotificacao.setBackground(cor(Color.BLACK));
         painelNotificacao.pad(px(1));
-        painelNotificacao.add(internoNotif).minWidth(px(120)).height(alturaNotif);
+        painelNotificacao.add(internoNotif).minWidth(px(150)).height(alturaNotif);
         painelNotificacao.setVisible(false);
         painelNotificacao.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         painelNotificacao.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
