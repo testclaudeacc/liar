@@ -3085,7 +3085,6 @@ public final class BookMenuUI {
     // Servidor: servidor.py::handle_get_ranking (top 50, atualiza 1x por hora).
     private final Table rankPage = new Table();
     private final Table listaRank = new Table();
-    private final Map<String, TextButton> abasRank = new LinkedHashMap<>();
     private String categoriaRank = "level";
     private static final String[][] CATEGORIAS_RANK = {
         {"level", "Level"}, {"defense", "Defense"}, {"magic", "Magic"},
@@ -3094,21 +3093,24 @@ public final class BookMenuUI {
 
     private void construirPaginaRank() {
         rankPage.top();
+        // Uma caixa de selecao so' (mesmo estilo do zoom nas opcoes).
+        com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> escolha =
+            new com.badlogic.gdx.scenes.scene2d.ui.SelectBox<>(skin, "zoom-select");
+        String[] nomes = new String[CATEGORIAS_RANK.length];
+        for (int i = 0; i < nomes.length; i++) nomes[i] = CATEGORIAS_RANK[i][1];
+        escolha.setItems(nomes);
+        escolha.setAlignment(Align.center);
+        escolha.getList().setAlignment(Align.center);
+        escolha.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                categoriaRank = CATEGORIAS_RANK[escolha.getSelectedIndex()][0];
+                listaRank.clearChildren();
+                pedirRanking();
+            }
+        });
         Table abas = new Table();
-        for (String[] cat : CATEGORIAS_RANK) {
-            TextButton aba = new TextButton(cat[1], estiloBotaoTrade("default"));
-            aba.getLabel().setFontScale(0.85f);
-            aba.addListener(new ChangeListener() {
-                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                    categoriaRank = cat[0];
-                    pintarAbasRank();
-                    listaRank.clearChildren();
-                    pedirRanking();
-                }
-            });
-            abasRank.put(cat[0], aba);
-            abas.add(aba).height(34).growX().pad(0, 1, 0, 1);
-        }
+        abas.left();
+        abas.add(escolha).width(180).height(36);
         listaRank.top();
         ScrollPane scroll = new ScrollPane(listaRank, skin);
         scroll.setFadeScrollBars(false);
@@ -3121,18 +3123,9 @@ public final class BookMenuUI {
         Label aviso = new Label("Rankings update every hour.", skin, "hud");
         aviso.setFontScale(0.5f * FONTE_STATS);
         aviso.setColor(Color.GRAY);
-        rankPage.add(abas).growX().padBottom(6).row();
+        rankPage.add(abas).left().padBottom(6).row();
         rankPage.add(caixa).grow().row();
         rankPage.add(aviso).right().padTop(3);
-        pintarAbasRank();
-    }
-
-    private void pintarAbasRank() {
-        for (Map.Entry<String, TextButton> e : abasRank.entrySet()) {
-            boolean ativa = e.getKey().equals(categoriaRank);
-            e.getValue().setColor(ativa ? Color.valueOf("f5d328") : Color.WHITE);
-            e.getValue().getLabel().setColor(ativa ? Color.WHITE : Color.LIGHT_GRAY);
-        }
     }
 
     private void pedirRanking() {

@@ -4725,6 +4725,11 @@ RANKING_CACHE_SEG = 3600.0  # atualiza 1x por hora (alivia o servidor/banco)
 RANKING_CATEGORIAS = {"level": None, "defense": "defense", "magic": "magic",
                       "focus": "distance", "musicality": "musicality", "melee": "melee"}
 _ranking_cache = {}  # categoria -> (quando, lista)
+# Personagens de teste (scripts de party etc.) que nao entram no ranking.
+RANKING_IGNORAR_PREFIXOS = ("ptmember", "ptleader", "ptsolo")
+
+def _fora_do_ranking(nome):
+    return str(nome).lower().startswith(RANKING_IGNORAR_PREFIXOS)
 
 def _skill_nivel(skills, chave):
     try: return int((skills or {}).get(chave, 10))
@@ -4754,6 +4759,7 @@ def _montar_ranking(categoria):
                           "exp": p.get('exp', 0), "skills": p.get('skills') or {}}
     lista = []
     for d in por_nome.values():
+        if _fora_do_ranking(d["name"]): continue
         e = {"name": d["name"], "class": d["class"], "level": int(d["level"] or 1), "exp": int(d["exp"] or 0)}
         if chave: e["value"] = _skill_nivel(d["skills"], chave)
         lista.append(e)
