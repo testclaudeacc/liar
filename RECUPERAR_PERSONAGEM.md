@@ -72,4 +72,5 @@ DELETE FROM characters
 WHERE name ILIKE 'fTest%' OR name ILIKE 'Debug%Hero%' OR name ~* '^Sw[AB] ?[0-9]';
 ```
 
-(O ranking ja' ignora esses nomes mesmo sem apagar.)
+(Atencao: o DELETE e' `DELETE FROM`, sem o `name` do SELECT. O ranking ja' ignora
+sozinho PTMember/PTLeader/PTSolo e SwA/SwB+numeros; fTest e Debug Hero nao.)

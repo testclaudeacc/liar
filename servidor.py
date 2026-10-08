@@ -4736,9 +4736,9 @@ RANKING_CATEGORIAS = {"level": None, "defense": "defense", "magic": "magic",
                       "focus": "distance", "musicality": "musicality", "melee": "melee"}
 _ranking_cache = {}  # categoria -> (quando, lista)
 # Personagens de teste (scripts de party/stress etc.) que nao entram no
-# ranking: PTMember..., PTLeader..., PTSolo..., fTest..., Debug Hero...,
-# SwA/SwB seguidos de numeros. Sem diferenciar maiuscula/minuscula.
-RE_RANKING_IGNORAR = re.compile(r"^(ptmember|ptleader|ptsolo|ftest|debug ?hero|sw[ab]\s*\d)", re.IGNORECASE)
+# ranking: PTMember..., PTLeader..., PTSolo..., SwA/SwB seguidos de numeros.
+# Sem diferenciar maiuscula/minuscula.
+RE_RANKING_IGNORAR = re.compile(r"^(ptmember|ptleader|ptsolo|sw[ab]\s*\d)", re.IGNORECASE)
 
 def _fora_do_ranking(nome):
     return bool(RE_RANKING_IGNORAR.match(str(nome)))
