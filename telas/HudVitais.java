@@ -121,6 +121,10 @@ public final class HudVitais {
     private static final Color COR_FOME = new Color(0.36f, 0.22f, 0.12f, 1f);    // marrom
     private static final Color COR_BATALHA = new Color(0.42f, 0.08f, 0.08f, 1f); // vermelho escuro
     private static final Color COR_ZONA_SEGURA = new Color(0.08f, 0.16f, 0.42f, 1f); // azul escuro
+    // Titulo de cada dica no tom claro da cor de fundo do icone.
+    private static final Color TITULO_FOME = Color.valueOf("d8955a");
+    private static final Color TITULO_BATALHA = Color.valueOf("ff6b6b");
+    private static final Color TITULO_ZONA_SEGURA = Color.valueOf("6f9bff");
     private final Table iconesStatus = new Table();
     private Table quadradoFome, quadradoBatalha, quadradoZonaSegura;
     private boolean comFome = false, emBatalha = false, naZonaSegura = false;
@@ -139,12 +143,12 @@ public final class HudVitais {
                 if (!seg.contentEquals(contadorBatalha.getText())) contadorBatalha.setText(seg);
             }
             if (isVisible() && iconeDica == quadradoBatalha) {
-                String texto = textoBatalha();
+                String texto = corpo(textoBatalha());
                 if (!texto.contentEquals(textoDica.getText())) textoDica.setText(texto);
             }
         }
     };
-    private Label textoDica;
+    private Label textoDica, tituloDica;
     private Label contadorBatalha;
 
     /** Label desenhado com a origem presa no pixel de tela: a fonte e' gerada
@@ -233,13 +237,16 @@ public final class HudVitais {
         painelXp.add(pilhaXp).size(px(260), px(32));
 
         quadradoFome = quadradoStatus(atlas, "sheet/r18_c10", COR_FOME,
-            "You are hungry! 10% less Dmg and Speed. Regen disabled");
+            "You are hungry!\n10% less Dmg and Speed. Regen disabled.");
+        quadradoFome.setUserObject(TITULO_FOME);
         // Protection Zone (efeito neutro): sprite no 320,720 do atlas.
         quadradoZonaSegura = quadradoStatus(atlas, nomeRegiao(atlas, "sheet/r78_c4", 320, 720), COR_ZONA_SEGURA,
-            "Safe Zone\nMobs can't target you, neither the players. Collision disabled");
+            "Safe Zone\nMobs can't target you, neither the players. Collision disabled.");
+        quadradoZonaSegura.setUserObject(TITULO_ZONA_SEGURA);
         contadorBatalha = new Label("", estilo);
         contadorBatalha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
         quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA, null, contadorBatalha);
+        quadradoBatalha.setUserObject(TITULO_BATALHA);
         linhaTopo = new Table();
         linhaTopo.top().left();
         celulaPainel = linhaTopo.add(painel).top().left();
@@ -304,11 +311,14 @@ public final class HudVitais {
         conteudo.add(colunaInferior).left().padTop(px(6));
         reorganizarInferior();
         // Popup das explicacoes dos icones de status (fome/battle).
+        // Titulo (1a linha da explicacao, na cor do icone) + descricao.
+        tituloDica = new LabelNitido("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
         textoDica = new LabelNitido("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
         textoDica.setWrap(true);
         Table internoDica = new Table();
         internoDica.setBackground(cor(COR_MUNICAO));
-        internoDica.add(textoDica).width(px(MOBILE ? 260 : 230)).pad(px(6));
+        internoDica.add(tituloDica).left().padLeft(px(6)).padRight(px(6)).padTop(px(6)).row();
+        internoDica.add(textoDica).width(px(MOBILE ? 260 : 230)).pad(px(6)).padTop(px(3));
         dica.setBackground(cor(Color.BLACK));
         // Borda em pixels de tela INTEIROS (px(1) no celular dava 1.7px e a
         // borda sumia de um lado).
@@ -504,7 +514,12 @@ public final class HudVitais {
     /** Popup da explicacao, logo abaixo do icone (por cima de tudo). */
     private void mostrarDica(Table icone, String texto) {
         iconeDica = icone;
-        textoDica.setText(texto != null ? texto : textoBatalha());
+        if (texto == null) texto = textoBatalha();
+        int quebra = texto.indexOf('\n');
+        tituloDica.setText(quebra >= 0 ? texto.substring(0, quebra) : "");
+        tituloDica.setColor(icone.getUserObject() instanceof Color ? (Color) icone.getUserObject() : Color.WHITE);
+        tituloDica.setVisible(quebra >= 0);
+        textoDica.setText(corpo(texto));
         dica.pack();
         com.badlogic.gdx.math.Vector2 p = icone.localToStageCoordinates(new com.badlogic.gdx.math.Vector2(0, 0));
         Stage stage = icone.getStage();
@@ -520,8 +535,14 @@ public final class HudVitais {
 
     private void esconderDica() { dica.setVisible(false); iconeDica = null; }
 
+    /** Explicacao sem o titulo (1a linha). */
+    private static String corpo(String texto) {
+        int quebra = texto.indexOf('\n');
+        return quebra >= 0 ? texto.substring(quebra + 1) : texto;
+    }
+
     private String textoBatalha() {
-        return "In battle\n"
+        return "In Battle\n"
             + "If you log out now, your body stays in the game until the battle ends.";
     }
 

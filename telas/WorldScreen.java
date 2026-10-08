@@ -4965,6 +4965,9 @@ public class WorldScreen extends ScreenAdapter {
             return;
         }
         if (localMorto || esperaAtaque > 0f || !socket.isConnected()) return;
+        // Protection Zone: ninguem ataca de dentro (nem mob que esta' dentro).
+        // Mantem o alvo: saindo da PZ o ataque volta sozinho.
+        if (mapa.propriedades.naZonaProtegida(local.x, local.y) || mapa.propriedades.naZonaProtegida(alvo.x, alvo.y)) return;
         // Arco sem flecha nao ataca (o servidor tambem recusa).
         if ("Ranger".equals(local.classe) && (caminhoMunicao == null || quantidadeMunicao <= 0)) {
             if (!avisouSemMunicao) {

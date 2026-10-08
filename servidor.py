@@ -3057,6 +3057,8 @@ def handle_hit_mob(data):
         if not (proj.startswith('res://') and proj.endswith(('.tres', '.res', '.png')) and '..' not in proj and '::' not in proj): proj = ''
 
         if p.get('is_dead'): return
+        # Protection Zone e' 100% amigavel: dali de dentro ninguem ataca.
+        if na_pz(p): return
         now = time.time()
         # Pequena folga (0.1s) pra latencia: o client manda a cada ~2.4s.
         if now - p.get('last_attack_time', 0) < ATAQUE_COOLDOWN_SEG - 0.1: return
@@ -3071,6 +3073,7 @@ def handle_hit_mob(data):
         # mob novo (de qualquer tipo) do lado do player: XP/loot de graca.
         mob_data = active_mobs.get(mob_id)
         if mob_data is None or mob_data.get('hp', 1) <= 0: return
+        if na_pz(mob_data): return  # mob parado dentro da PZ tambem nao apanha
         # Alcance: corpo a corpo so' do SQM do lado (diagonal vale); a
         # distancia ate ALCANCE_RANGED_SQM em linha reta (igual a deteccao do
         # mob). +1 SQM de folga pro passo em andamento. Mob sem posicao
