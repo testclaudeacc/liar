@@ -469,7 +469,7 @@ public class WorldScreen extends ScreenAdapter {
     private static final Set<String> NPCS_QUE_COBRAM = new HashSet<>(java.util.Arrays.asList("kharon"));
     private boolean questsRecebidas = false;
     // Animacao da ponte: uma linha a cada INTERVALO_LINHA_PONTE segundos.
-    // Antes de cada linha aparecer, a fumaca do spawn sobe em cada SQM
+    // Antes de cada linha aparecer, a fumaca do spawn sobe no SQM do meio
     // dela; os tiles + "TUC" saem quando a fumaca termina.
     private float tempoProximaLinhaPonte = 0f;
     private float tempoRevelarLinhaPonte = -1f;
@@ -504,7 +504,8 @@ public class WorldScreen extends ScreenAdapter {
         tempoProximaLinhaPonte -= delta;
         if (tempoProximaLinhaPonte > 0f || tempoRevelarLinhaPonte >= 0f) return;
         tempoProximaLinhaPonte = INTERVALO_LINHA_PONTE;
-        for (float[] sqm : mapa.sqmsProximaLinha()) efeitos.add(new Efeito(quadrosFumaca(), sqm[0], sqm[1]));
+        float[] centro = mapa.centroProximaLinha();
+        if (centro != null) efeitos.add(new Efeito(quadrosFumaca(), centro[0], centro[1]));
         tempoRevelarLinhaPonte = DURACAO_FUMACA;
     }
 
