@@ -197,11 +197,22 @@ public class MapaMundo {
     public float[] revelarProximaLinha() {
         java.util.List<CelulaGuardada> linha = linhasPendentes.poll();
         if (linha == null || linha.isEmpty()) return null;
+        for (CelulaGuardada g : linha) g.camada.setCell(g.cx, g.cy, g.cell);
+        return centroDaLinha(linha);
+    }
+
+    /** Centro (mundo, base do SQM do meio) da proxima linha, sem mostrar
+     * ela ainda - pra fumaca aparecer antes dos tiles. */
+    public float[] centroProximaLinha() {
+        java.util.List<CelulaGuardada> linha = linhasPendentes.peek();
+        return linha == null || linha.isEmpty() ? null : centroDaLinha(linha);
+    }
+
+    private float[] centroDaLinha(java.util.List<CelulaGuardada> linha) {
         float somaX = 0f, somaY = 0f;
         java.util.Set<Long> vistos = new java.util.HashSet<>();
         int n = 0;
         for (CelulaGuardada g : linha) {
-            g.camada.setCell(g.cx, g.cy, g.cell);
             if (vistos.add(((long) g.cx << 32) | (g.cy & 0xffffffffL))) {
                 somaX += g.cx; somaY += g.cy; n++;
             }

@@ -469,8 +469,12 @@ public class WorldScreen extends ScreenAdapter {
     private static final Set<String> NPCS_QUE_COBRAM = new HashSet<>(java.util.Arrays.asList("kharon"));
     private boolean questsRecebidas = false;
     // Animacao da ponte: uma linha a cada INTERVALO_LINHA_PONTE segundos.
+    // Antes de cada linha aparecer, a fumaca do spawn sobe no SQM do meio
+    // dela; os tiles + "TUC" saem quando a fumaca termina.
     private float tempoProximaLinhaPonte = 0f;
-    private static final float INTERVALO_LINHA_PONTE = 0.4f;
+    private float tempoRevelarLinhaPonte = -1f;
+    private static final float INTERVALO_LINHA_PONTE = 0.35f;
+    private static final float DURACAO_FUMACA = 7 * DURACAO_QUADRO_EFEITO;
     private static final Color COR_TUC = Color.valueOf("ff9a1f"); // mesmo laranja do "Om Noom"
 
     /** Texto de acao parado num ponto do mundo (ex: "TUC" na ponte). */
@@ -480,20 +484,29 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void atualizarAnimacaoPonte(float delta) {
+        if (tempoRevelarLinhaPonte >= 0f) {
+            tempoRevelarLinhaPonte -= delta;
+            if (tempoRevelarLinhaPonte <= 0f) {
+                tempoRevelarLinhaPonte = -1f;
+                float[] centro = mapa.revelarProximaLinha();
+                if (centro != null) textoAcaoNoMundo(centro[0], centro[1], "*TUC*", COR_TUC);
+                // Acabou: minimapa refeito com a ponte inteira.
+                if (!mapa.temLinhaPendente() && pinturaMiniMapa != null) {
+                    MiniMapa.Pintura velha = pinturaMiniMapa;
+                    pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
+                    miniMapa.trocarPintura(pinturaMiniMapa);
+                    mapaGrande.trocarPintura(pinturaMiniMapa);
+                    velha.dispose();
+                }
+            }
+        }
         if (!mapa.temLinhaPendente()) return;
         tempoProximaLinhaPonte -= delta;
-        if (tempoProximaLinhaPonte > 0f) return;
+        if (tempoProximaLinhaPonte > 0f || tempoRevelarLinhaPonte >= 0f) return;
         tempoProximaLinhaPonte = INTERVALO_LINHA_PONTE;
-        float[] centro = mapa.revelarProximaLinha();
-        if (centro != null) textoAcaoNoMundo(centro[0], centro[1], "*TUC*", COR_TUC);
-        // Acabou: minimapa refeito com a ponte inteira.
-        if (!mapa.temLinhaPendente() && pinturaMiniMapa != null) {
-            MiniMapa.Pintura velha = pinturaMiniMapa;
-            pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
-            miniMapa.trocarPintura(pinturaMiniMapa);
-            mapaGrande.trocarPintura(pinturaMiniMapa);
-            velha.dispose();
-        }
+        float[] centro = mapa.centroProximaLinha();
+        if (centro != null) efeitos.add(new Efeito(quadrosFumaca(), centro[0], centro[1]));
+        tempoRevelarLinhaPonte = DURACAO_FUMACA;
     }
 
     // true em Android/iOS - esconde o controle de Fullscreen do Options (nao
