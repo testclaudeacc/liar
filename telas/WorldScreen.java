@@ -1028,6 +1028,13 @@ public class WorldScreen extends ScreenAdapter {
             ChatUI.COR_BOAS_VINDAS);
         // Coordenada no chat ("x300, y400"): abre o mapa grande nela (so' se
         // for na mesma dimensao do player).
+        // Clicar no nome de quem falou: fecha o chat e abre a janela dele.
+        chat.setOuvinteNome(nomeReal -> {
+            if (nomeReal == null || nomeReal.equals(local.nome)) return;
+            chat.setVisivel(false);
+            atualizarVisibilidadeJoystick();
+            abrirPainelDe(nomeReal);
+        });
         chat.setOuvinteCoordenada((cx, cy) -> {
             float wx = mapaGrande.mundoXDe(cx), wy = mapaGrande.mundoYDe(cy);
             com.badlogic.gdx.math.Rectangle dim = mapa.dimensaoEm(local.x, local.y + 1f);
@@ -2765,7 +2772,7 @@ public class WorldScreen extends ScreenAdapter {
             if (!minha && ignorados.contains(de)) return;
             String outro = minha ? para : de;
             String iconeOutro = BookMenuUI.iconeClasse(minha ? data.getString("to_class", "Knight") : data.getString("class", "Knight"));
-            chat.adicionarMensagemPrivada(outro, nomeVisivel(outro), iconeOutro, nomeVisivel(de),
+            chat.adicionarMensagemPrivada(outro, nomeVisivel(outro), iconeOutro, de, nomeVisivel(de),
                 ChatUI.corDaClasse(data.getString("class", "Knight")), data.getString("msg", ""));
             if (!minha) avisarMensagemNova(de, NOVIDADE_PV);
         });
@@ -2912,7 +2919,7 @@ public class WorldScreen extends ScreenAdapter {
             Color cor = ChatUI.corDaClasse(data.size > 2 ? data.get(2).asString() : "Knight");
             if (nome == null || texto == null) return;
             if (ignorados.contains(nome)) return; // ignorado: nem chat nem balao
-            chat.adicionarMensagemLocal(nomeVisivel(nome), cor, texto);
+            chat.adicionarMensagemLocal(nome, nomeVisivel(nome), cor, texto);
             avisarMensagemNova(nome);
             falas.put(nome, new Fala(nome, texto, cor));
         });
@@ -2935,7 +2942,7 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("cc", (nomeEvt, data) -> {
             if (data == null || chat == null) return;
             if (ignorados.contains(data.getString("name", ""))) return;
-            chat.adicionarMensagemCanal(data.getString("channel", ""), nomeVisivel(data.getString("name", "")),
+            chat.adicionarMensagemCanal(data.getString("channel", ""), data.getString("name", ""), nomeVisivel(data.getString("name", "")),
                 ChatUI.corDaClasse(data.getString("class", "Knight")), data.getString("msg", ""));
             avisarMensagemNova(data.getString("name", ""));
         });

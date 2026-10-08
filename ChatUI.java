@@ -264,6 +264,8 @@ public class ChatUI {
                 // Clique num botao (+, -, abas, Close) nao foca o campo - senao
                 // abrir o "+" pra adicionar um chat ja comecava a digitar.
                 if (vemDeBotao(event.getTarget())) return;
+                // Clique nas mensagens (nome/link/texto) tambem nao comeca a digitar.
+                if (event.getTarget() != null && event.getTarget().isDescendantOf(scrollLog)) return;
                 // janela.isVisible(): o clique no botao "Close" tambem borbulha
                 // pra ca (conteudo e' ancestral dele) - o listener do proprio
                 // botao (que fecha a janela E solta o foco, ver setVisivel)
@@ -393,7 +395,7 @@ public class ChatUI {
     /** Mensagem da party (vinda do servidor): igual o Local (nome na cor da
      * classe, texto branco) - so' o balao de fala no mundo e' amarelo. */
     public void adicionarMensagemParty(String nome, Color corNome, String texto) {
-        adicionarNaAba(ABA_PARTY, linhaDeJogador(nome, corNome, texto));
+        adicionarNaAba(ABA_PARTY, linhaDeJogador(nome, nome, corNome, texto));
     }
 
     // ---- Conversa privada (botao de chat da janela do jogador) ----
@@ -429,8 +431,13 @@ public class ChatUI {
      * outro* = o outro lado da conversa (a aba); remetente* = quem escreveu. */
     public void adicionarMensagemPrivada(String outroReal, String outroExibido, String outroIcone,
                                          String remetenteExibido, Color corRemetente, String texto) {
+        adicionarMensagemPrivada(outroReal, outroExibido, outroIcone, null, remetenteExibido, corRemetente, texto);
+    }
+
+    public void adicionarMensagemPrivada(String outroReal, String outroExibido, String outroIcone, String remetenteReal,
+                                         String remetenteExibido, Color corRemetente, String texto) {
         garantirAbaPrivada(outroReal, outroExibido, outroIcone);
-        adicionarNaAba(PREFIXO_PRIVADA + outroReal, linhaDeJogador(remetenteExibido, corRemetente, texto));
+        adicionarNaAba(PREFIXO_PRIVADA + outroReal, linhaDeJogador(remetenteReal, remetenteExibido, corRemetente, texto));
     }
 
     /** Estilo vazio (sem up/over/down) - so' o conteudo do botao aparece. */
@@ -631,10 +638,19 @@ public class ChatUI {
         adicionarNaAba(ABA_LOCAL, linhaDeJogador(nome, corNome, texto));
     }
 
+    /** Idem, com o nome real (clicar no nome abre a janela dele). */
+    public void adicionarMensagemLocal(String nomeReal, String nomeExibido, Color corNome, String texto) {
+        adicionarNaAba(ABA_LOCAL, linhaDeJogador(nomeReal, nomeExibido, corNome, texto));
+    }
+
     /** Mensagem de um jogador num chat de idioma (vinda do servidor). Ignora
      * se o jogador ja fechou essa aba. */
     public void adicionarMensagemCanal(String canal, String nome, Color corNome, String texto) {
         adicionarNaAba(canal, linhaDeJogador(nome, corNome, texto));
+    }
+
+    public void adicionarMensagemCanal(String canal, String nomeReal, String nomeExibido, Color corNome, String texto) {
+        adicionarNaAba(canal, linhaDeJogador(nomeReal, nomeExibido, corNome, texto));
     }
 
     /** Aviso do sistema no chat Local (sem nome): level/skill up, anti-spam... */
@@ -653,7 +669,14 @@ public class ChatUI {
     }
 
     private static String linhaDeJogador(String nome, Color corNome, String texto) {
-        return hora() + " [#" + corNome.toString() + "]" + escaparMarkup(nome) + "[]: " + escaparMarkup(texto);
+        return linhaDeJogador(null, nome, corNome, texto);
+    }
+
+    /** nomeReal (pode ser null): clicar no nome abre a janela desse player.
+     * Formato guardado: [MARCA_JOG nomeReal MARCA_JOG] "[hora] Nome: " MARCA_TEXTO mensagem. */
+    private static String linhaDeJogador(String nomeReal, String nome, Color corNome, String texto) {
+        String prefixo = nomeReal != null ? MARCA_JOG + nomeReal + MARCA_JOG : "";
+        return prefixo + hora() + " [#" + corNome.toString() + "]" + escaparMarkup(nome) + "[]: " + MARCA_TEXTO + escaparMarkup(texto);
     }
 
     /** "[" digitado pelo jogador viraria tag de cor no markup - "[[" e' o escape. */
@@ -680,35 +703,67 @@ public class ChatUI {
         for (int i = 0; i < msgs.size; i++) {
             String linha = msgs.get(i);
             int[] coord = null;
-            // Linha com link: "\u0001x,y\u0001" na frente (ver adicionarNaAba).
+            String nomeReal = null;
+            // Ordem das marcas: [link x,y] [nome real] prefixo MARCA_TEXTO texto.
             if (linha.startsWith(MARCA_LINK)) {
                 int fim = linha.indexOf(MARCA_LINK, 1);
                 String[] xy = linha.substring(1, fim).split(",");
                 coord = new int[]{Integer.parseInt(xy[0]), Integer.parseInt(xy[1])};
                 linha = linha.substring(fim + 1);
             }
-            Label texto = new Label(linha, skinLog, "chat-log");
-            texto.setWrap(true);
-            texto.setAlignment(Align.topLeft);
+            if (linha.startsWith(MARCA_JOG)) {
+                int fim = linha.indexOf(MARCA_JOG, 1);
+                nomeReal = linha.substring(1, fim);
+                linha = linha.substring(fim + 1);
+            }
             Table l = new Table();
             l.left().top();
-            if (coord != null) {
-                TextureRegion icone = atlas != null ? atlas.findRegion("ui/buttons/MapBtn") : null;
-                if (icone != null) {
-                    Image img = new Image(icone);
-                    img.setScaling(com.badlogic.gdx.utils.Scaling.fit);
-                    float tam = texto.getStyle().font.getLineHeight();
-                    l.add(img).size(tam).top().padRight(4);
+            int sep = linha.indexOf(MARCA_TEXTO);
+            if (sep < 0) {
+                // Sistema (sem nome): uma linha so'.
+                Label texto = new Label(linha, skinLog, "chat-log");
+                texto.setWrap(true);
+                texto.setAlignment(Align.topLeft);
+                l.add(texto).growX().top();
+            } else {
+                // "[hora] Nome: " | (icone do mapa) | mensagem
+                Label prefixo = new Label(linha.substring(0, sep), skinLog, "chat-log");
+                prefixo.setAlignment(Align.topLeft);
+                if (nomeReal != null) {
+                    final String quem = nomeReal;
+                    prefixo.addListener(new ClickListener() {
+                        @Override public void clicked(InputEvent event, float x, float y) {
+                            if (ouvinteNome != null) ouvinteNome.abrir(quem);
+                        }
+                    });
                 }
-                final int cx = coord[0], cy = coord[1];
-                l.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
-                l.addListener(new ClickListener() {
-                    @Override public void clicked(InputEvent event, float x, float y) {
-                        if (ouvinteCoordenada != null) ouvinteCoordenada.abrir(cx, cy);
+                l.add(prefixo).top();
+                Table resto = new Table();
+                resto.left().top();
+                if (coord != null) {
+                    TextureRegion icone = atlas != null ? atlas.findRegion("ui/buttons/MapBtn") : null;
+                    if (icone != null) {
+                        Image img = new Image(icone);
+                        img.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+                        float tam = prefixo.getStyle().font.getLineHeight();
+                        resto.add(img).size(tam).top().padRight(4);
                     }
-                });
+                }
+                Label texto = new Label(linha.substring(sep + 1), skinLog, "chat-log");
+                texto.setWrap(true);
+                texto.setAlignment(Align.topLeft);
+                resto.add(texto).growX().top();
+                if (coord != null) {
+                    final int cx = coord[0], cy = coord[1];
+                    resto.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+                    resto.addListener(new ClickListener() {
+                        @Override public void clicked(InputEvent event, float x, float y) {
+                            if (ouvinteCoordenada != null) ouvinteCoordenada.abrir(cx, cy);
+                        }
+                    });
+                }
+                l.add(resto).growX().top();
             }
-            l.add(texto).growX().top();
             logTabela.add(l).growX().left().row();
         }
         scrollLog.layout();
@@ -730,11 +785,22 @@ public class ChatUI {
     /** Se a mensagem tem coordenada: pinta de verde e poe a marca do link
      * na frente (a linha vira clicavel, com o icone do mapa). */
     private static String linkDeCoordenada(String linha) {
-        java.util.regex.Matcher m = RE_COORDENADA.matcher(linha);
+        int inicioTexto = linha.indexOf(MARCA_TEXTO);
+        if (inicioTexto < 0) return linha; // so' mensagem de player tem link
+        String texto = linha.substring(inicioTexto + 1);
+        java.util.regex.Matcher m = RE_COORDENADA.matcher(texto);
         if (!m.find()) return linha;
-        String marcada = linha.substring(0, m.start()) + COR_LINK + m.group() + "[]" + linha.substring(m.end());
-        return MARCA_LINK + m.group(1) + "," + m.group(2) + MARCA_LINK + marcada;
+        String marcada = texto.substring(0, m.start()) + COR_LINK + m.group() + "[]" + texto.substring(m.end());
+        return MARCA_LINK + m.group(1) + "," + m.group(2) + MARCA_LINK + linha.substring(0, inicioTexto + 1) + marcada;
     }
+
+    private static final String MARCA_JOG = "\u0002";
+    private static final String MARCA_TEXTO = "\u0003";
+
+    /** Clicar no nome de quem falou (WorldScreen abre a janela dele). */
+    public interface OuvinteNome { void abrir(String nomeReal); }
+    private OuvinteNome ouvinteNome;
+    public void setOuvinteNome(OuvinteNome o) { this.ouvinteNome = o; }
 
     /** Jogadores por perto (aba Local). Chamado todo frame enquanto o chat
      * esta visivel (ver WorldScreen::render) - lista curta, custo desprezivel;
