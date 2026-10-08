@@ -492,6 +492,9 @@ public class WorldScreen extends ScreenAdapter {
     private float tpRawX, tpRawY;
     private String tpDirecao = "down";
     private static final float TP_ESCURECER = 0.25f, TP_CLAREAR = 0.35f, TP_TIMEOUT = 3f;
+    // Segurando a direcao do TP: quanto tempo o player fica virado pra ele antes de entrar.
+    private static final float TP_ENCARAR = 0.35f;
+    private float tempoEncarandoTp = 0f;
     private final com.badlogic.gdx.math.Matrix4 projecaoTela = new com.badlogic.gdx.math.Matrix4();
 
     private void iniciarTeleporte(float dx, float dy, String direcao) {
@@ -4197,6 +4200,7 @@ public class WorldScreen extends ScreenAdapter {
         else if (h > 0) direcao = "right";
         if (direcao == null) {
             tempoInsistindo = 0f;
+            tempoEncarandoTp = 0f;
             return;
         }
 
@@ -4205,11 +4209,22 @@ public class WorldScreen extends ScreenAdapter {
         boolean diagonal = dx != 0 && dy != 0;
         // Teleport: anda reto PRA DENTRO do TP (que tem colisao) e o servidor
         // leva pro destino (servidor.py::handle_tp).
+        // Antes de entrar, fica uns instantes virado pro TP (TP_ENCARAR).
         if (!diagonal && socket.isConnected() && mapa.propriedades.ehTeleporte(alvoX, alvoY)
                 && !mapa.bloqueadoPorQuest(tileX(alvoX), tileY(alvoY))) {
-            iniciarTeleporte(dx, dy, direcao);
+            if (!direcao.equals(local.direcao)) {
+                enviarVirada(direcao);
+                local.direcao = direcao;
+                tempoEncarandoTp = 0f;
+            }
+            tempoEncarandoTp += Gdx.graphics.getDeltaTime();
+            if (tempoEncarandoTp >= TP_ENCARAR) {
+                tempoEncarandoTp = 0f;
+                iniciarTeleporte(dx, dy, direcao);
+            }
             return;
         }
+        tempoEncarandoTp = 0f;
         boolean livre = !colisao.ehParede(alvoX, alvoY)
             && (diagonal ? !diagonalBloqueada(local.x, local.y, dx, dy)
                          : !colisao.movimentoBloqueado(local.x, local.y, alvoX, alvoY))

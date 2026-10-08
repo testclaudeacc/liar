@@ -198,12 +198,15 @@ public class MapaPropriedades {
             for (MapObject obj : camadaTps.getObjects()) {
                 // Qualquer tipo de objeto (retangulo, objeto de tile, ponto):
                 // x/y (canto de baixo-esquerda, Y pra cima), width, height.
+                // Destino: property dest (id da area na TeleportDests) ou
+                // dest_x/dest_y - quem usa e' o servidor (mapa_tiled.py).
                 MapProperties pt = obj.getProperties();
-                if (pt.get("dest_x") == null || pt.get("dest_y") == null) continue;
+                if (pt.get("dest") == null && (pt.get("dest_x") == null || pt.get("dest_y") == null)) continue;
                 float ox = numeroFloat(pt.get("x"), 0f), oy = numeroFloat(pt.get("y"), 0f);
-                float w = Math.max(1f, numeroFloat(pt.get("width"), 0f)), h = Math.max(1f, numeroFloat(pt.get("height"), 0f));
-                for (int cx = (int) Math.floor(ox / tileWidth); cx <= (int) Math.floor((ox + w - 1f) / tileWidth); cx++)
-                    for (int cy = (int) Math.floor(oy / tileHeight); cy <= (int) Math.floor((oy + h - 1f) / tileHeight); cy++)
+                float w = numeroFloat(pt.get("width"), 0f), h = numeroFloat(pt.get("height"), 0f);
+                int[] fx = faixaSqm(ox, w, tileWidth), fy = faixaSqm(oy, h, tileHeight);
+                for (int cx = fx[0]; cx <= fx[1]; cx++)
+                    for (int cy = fy[0]; cy <= fy[1]; cy++)
                         teleportes.add(chaveCelula(cx, cy));
             }
         }
@@ -513,6 +516,15 @@ public class MapaPropriedades {
         int cy = (int) Math.floor((mundoY + tileHeight / 2f) / tileHeight);
         Float mod = velocidadePorCelula.get(chaveCelula(cx, cy));
         return mod != null ? mod : 1f;
+    }
+
+    /** SQMs que o objeto cobre em pelo menos metade (meio fora do grid nao
+     * pega o SQM do lado); ponto/objeto pequeno = o do meio. Igual
+     * mapa_tiled.py::faixa. */
+    private static int[] faixaSqm(float inicio, float tamanho, int sqm) {
+        int a = Math.round(inicio / sqm), b = Math.round((inicio + tamanho) / sqm) - 1;
+        if (b < a) a = b = (int) Math.floor((inicio + tamanho / 2f) / sqm);
+        return new int[]{a, b};
     }
 
     /** SQM sob (mundoX, mundoY) - pes, igual velocidadeEm - e' um teleport. */

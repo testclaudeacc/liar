@@ -357,24 +357,51 @@ def carregar_mapa(caminho_tmx):
     # Teleports (camada de OBJETOS "Teleports"): retangulo em cima do SQM do
     # TP, com dest_x/dest_y = SQM de destino (coluna/linha do Tiled - o
     # mesmo X/Y do minimapa). {(col, linha): (dest_col, dest_linha)}
+    #
+    # Destino por AREA: na camada de objetos "TeleportDests", um retangulo
+    # com Name (o campo "Name" do objeto no Tiled) = um id qualquer, ex:
+    # "templo". No TP, property dest = "templo": vai pro SQM do meio da area.
+    def faixa(inicio, tamanho):
+        # SQMs que o objeto cobre em pelo menos METADE (objeto meio fora do
+        # grid nao pega o SQM do lado). Ponto/objeto pequeno: o do meio.
+        a = _java_round(inicio / SQM)
+        b = _java_round((inicio + tamanho) / SQM) - 1
+        if b < a: a = b = int((inicio + tamanho / 2.0) // SQM)
+        return range(a, b + 1)
+
+    def caixa(obj):
+        x = float(obj.get('x', 0)); y = float(obj.get('y', 0))
+        w = float(obj.get('width', 0) or 0); h = float(obj.get('height', 0) or 0)
+        if obj.get('gid'): y -= h  # objeto de tile (Insert Tile): o y dele e' a BASE
+        return x, y, w, h
+
+    destinos_tp = {}
+    for obj in objetos('TeleportDests'):
+        nome = (obj.get('name') or '').strip().lower()
+        if not nome: continue
+        x, y, w, h = caixa(obj)
+        destinos_tp[nome] = (int((x + w / 2.0) // SQM), int((y + h / 2.0) // SQM))
+
     teleports = {}
     for obj in objetos('Teleports'):
         props_t = _ler_props(obj)
-        try:
-            dest = (int(float(props_t.get('dest_x'))), int(float(props_t.get('dest_y'))))
-        except (TypeError, ValueError):
-            print(f"[MAPA] Teleport sem dest_x/dest_y (objeto id {obj.get('id')}) ignorado")
-            continue
-        x = float(obj.get('x', 0)); y = float(obj.get('y', 0))
-        w = float(obj.get('width', 0) or 0); h = float(obj.get('height', 0) or 0)
-        # Objeto de tile (Insert Tile): no Tiled o y dele e' a BASE do tile.
-        if obj.get('gid'): y -= h
-        # Ponto (sem tamanho): so' o SQM onde ele esta'.
-        w = max(1.0, w); h = max(1.0, h)
-        for col in range(int(x // SQM), int((x + w - 1) // SQM) + 1):
-            for lin in range(int(y // SQM), int((y + h - 1) // SQM) + 1):
-                teleports[(col, lin)] = dest
-        print(f"[MAPA] Teleport x{int(x // SQM)}, y{int(y // SQM)} -> x{dest[0]}, y{dest[1]}")
+        id_dest = str(props_t.get('dest', '') or '').strip().lower()
+        if id_dest:
+            dest = destinos_tp.get(id_dest)
+            if dest is None:
+                print(f"[MAPA] Teleport (objeto id {obj.get('id')}): dest '{id_dest}' nao existe na camada TeleportDests - ignorado")
+                continue
+        else:
+            try:
+                dest = (int(float(props_t.get('dest_x'))), int(float(props_t.get('dest_y'))))
+            except (TypeError, ValueError):
+                print(f"[MAPA] Teleport sem destino (dest ou dest_x/dest_y) no objeto id {obj.get('id')}: ignorado")
+                continue
+        x, y, w, h = caixa(obj)
+        celulas = [(c, l) for c in faixa(x, w) for l in faixa(y, h)]
+        for cel in celulas: teleports[cel] = dest
+        print(f"[MAPA] Teleport x{celulas[0][0]}, y{celulas[0][1]} ({len(celulas)} SQM) -> "
+              f"{id_dest + ' ' if id_dest else ''}x{dest[0]}, y{dest[1]}")
 
     # Protection Zone (camada de TILES "ProtectionZone"): todo SQM com
     # qualquer tile nela e' area segura - mob nao mira nem entra, e player
