@@ -3255,7 +3255,7 @@ public final class BookMenuUI {
         // cima a direita (apagadas as que ainda nao tem) + mortes no canto
         // de baixo a esquerda.
         Table foto = new Table();
-        foto.setBackground(UiSkin.retangulo(new Color(0.16f, 0.2f, 0.26f, 1f), new Color(0.45f, 0.45f, 0.5f, 1f), 2));
+        foto.setBackground(UiSkin.retangulo(new Color(0.24f, 0.24f, 0.24f, 1f), new Color(0.45f, 0.45f, 0.45f, 1f), 2));
         TextureAtlas.AtlasRegion tira = tiraDoMob(e.getString("type", ""));
         if (tira != null) foto.add(new MobAnimado(tira)).size(lado * 0.62f);
         Table medalhas = new Table();
@@ -3282,7 +3282,7 @@ public final class BookMenuUI {
         kills.setFontScale(0.75f * FONTE_STATS);
         cantoKills.add(kills);
         cantoKills.pad(0, 6, 4, 0);
-        fichaBestiario.add(new Stack(foto, cantoMedalhas, cantoKills)).size(lado).pad(8, 10, 0, 10).left().row();
+        fichaBestiario.add(new Stack(foto, cantoMedalhas, cantoKills)).size(lado).pad(8, 10, 0, 10).center().row();
 
         // Tudo abaixo da foto rola (loot grande nao vaza da janela).
         Table info = new Table();
@@ -3321,7 +3321,7 @@ public final class BookMenuUI {
                 linhaBonus.add(i).size(24).padRight(6);
             }
             Label bonus = new Label("5% Extra DMG/DEF", skin, "hud");
-            bonus.setFontScale(0.75f * FONTE_STATS);
+            bonus.setFontScale(0.65f * FONTE_STATS);
             bonus.setColor(comBonus ? Color.valueOf("f5d328") : Color.GRAY);
             linhaBonus.add(bonus);
             info.add(linhaBonus).left().padLeft(10).padTop(4).row();
