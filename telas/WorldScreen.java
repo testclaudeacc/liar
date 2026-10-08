@@ -4674,6 +4674,13 @@ public class WorldScreen extends ScreenAdapter {
             boolean noSqm = tileX(j.x) == cx && tileY(j.y) == cy;
             boolean noSprite = wx >= j.x - FRAME_LARGURA / 2f && wx <= j.x + FRAME_LARGURA / 2f && wy >= j.y && wy <= j.y + altura;
             if (noSqm || noSprite) {
+                // Ele me mandou trade (balaozinho "Trade" em cima dele): tocar
+                // nele aceita, em vez de so' marcar/abrir a janela dele.
+                if (convitesTrade.contains(j.nome) && socket.isConnected()) {
+                    String quem = j.nome;
+                    socket.emitRaw("accept_trade_invite", GameSocket.obj(w -> w.set("inviter_name", quem)));
+                    return true;
+                }
                 amigoMarcado = j.nome.equals(amigoMarcado) ? null : j.nome;
                 if (amigoMarcado != null) alvoMob = null;
                 return true;
