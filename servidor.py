@@ -4713,6 +4713,69 @@ def handle_add_friend_by_name(data):
     finally:
         if conn: db_pool.putconn(conn)
 
+# ---------------------------------------------------------------------------
+# RANKING (aba Rank do livro). Top RANKING_TOP de cada categoria, montado do
+# banco + o estado em memoria de quem esta online (mais novo que o save). Fica
+# em cache RANKING_CACHE_SEG pra 300 players abrindo a aba nao virarem 300
+# consultas ao banco.
+# ---------------------------------------------------------------------------
+RANKING_TOP = 50
+RANKING_CACHE_SEG = 60.0
+# categoria -> chave em skills (None = level/exp)
+RANKING_CATEGORIAS = {"level": None, "defense": "defense", "magic": "magic",
+                      "focus": "distance", "musicality": "musicality", "melee": "melee"}
+_ranking_cache = {}  # categoria -> (quando, lista)
+
+def _skill_nivel(skills, chave):
+    try: return int((skills or {}).get(chave, 10))
+    except (TypeError, ValueError): return 10
+
+def _montar_ranking(categoria):
+    chave = RANKING_CATEGORIAS[categoria]
+    conn = None
+    por_nome = {}
+    try:
+        conn = db_pool.getconn()
+        c = conn.cursor()
+        c.execute("SELECT name, class_name, level, exp, skills FROM characters")
+        for nome, classe, level, exp, skills_txt in c.fetchall():
+            try: skills = json.loads(skills_txt) if skills_txt else {}
+            except (TypeError, ValueError): skills = {}
+            por_nome[nome] = {"name": nome, "class": classe or "Knight", "level": level or 1,
+                              "exp": exp or 0, "skills": skills if isinstance(skills, dict) else {}}
+        c.close()
+    finally:
+        if conn: db_pool.putconn(conn)
+    # Quem esta online: valores da memoria (o save pode estar na fila).
+    for p in list(online_players.values()):
+        nome = p.get('name')
+        if not nome: continue
+        por_nome[nome] = {"name": nome, "class": p.get('class_name', 'Knight'), "level": p.get('level', 1),
+                          "exp": p.get('exp', 0), "skills": p.get('skills') or {}}
+    lista = []
+    for d in por_nome.values():
+        e = {"name": d["name"], "class": d["class"], "level": int(d["level"] or 1), "exp": int(d["exp"] or 0)}
+        if chave: e["value"] = _skill_nivel(d["skills"], chave)
+        lista.append(e)
+    if chave: lista.sort(key=lambda e: (-e["value"], -e["level"], e["name"].lower()))
+    else: lista.sort(key=lambda e: (-e["level"], -e["exp"], e["name"].lower()))
+    return lista[:RANKING_TOP]
+
+@socketio.on('get_ranking')
+def handle_get_ranking(data):
+    try:
+        sid = request.sid
+        if sid not in online_players: return
+        categoria = str((data or {}).get('category', 'level')).lower() if isinstance(data, dict) else 'level'
+        if categoria not in RANKING_CATEGORIAS: categoria = 'level'
+        agora = time.time()
+        quando, lista = _ranking_cache.get(categoria, (0.0, None))
+        if lista is None or agora - quando > RANKING_CACHE_SEG:
+            lista = _montar_ranking(categoria)
+            _ranking_cache[categoria] = (agora, lista)
+        emit('ranking', {"category": categoria, "entries": lista, "top": RANKING_TOP}, room=sid)
+    except Exception: traceback.print_exc()
+
 @socketio.on('get_friends_list')
 def handle_get_friends_list(data):
     conn = None

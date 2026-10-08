@@ -3078,6 +3078,122 @@ public final class BookMenuUI {
     // Esquerda: os slots da hotbar em grade 3x3 (celular: so' os que tem botao
     // na tela). Clicar seleciona; a direita mostra Inventory/Spells e clicar
     // num item coloca ele no slot.
+    // ===================== RANK =====================
+    // Abas: Level (level + XP total) e as skills (Defense, Magic, Focus,
+    // Musicality, Melee - o level da skill). Linha: posicao, icone da classe,
+    // nome na cor da classe, valores na direita. A minha linha fica destacada.
+    // Servidor: servidor.py::handle_get_ranking (top 50, cache de 60s).
+    private final Table rankPage = new Table();
+    private final Table listaRank = new Table();
+    private final Map<String, TextButton> abasRank = new LinkedHashMap<>();
+    private String categoriaRank = "level";
+    private static final String[][] CATEGORIAS_RANK = {
+        {"level", "Level"}, {"defense", "Defense"}, {"magic", "Magic"},
+        {"focus", "Focus"}, {"musicality", "Musicality"}, {"melee", "Melee"}
+    };
+
+    private void construirPaginaRank() {
+        rankPage.top();
+        Table abas = new Table();
+        for (String[] cat : CATEGORIAS_RANK) {
+            TextButton aba = new TextButton(cat[1], estiloBotaoTrade("default"));
+            aba.getLabel().setFontScale(0.85f);
+            aba.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    categoriaRank = cat[0];
+                    pintarAbasRank();
+                    listaRank.clearChildren();
+                    pedirRanking();
+                }
+            });
+            abasRank.put(cat[0], aba);
+            abas.add(aba).height(34).growX().pad(0, 1, 0, 1);
+        }
+        listaRank.top();
+        ScrollPane scroll = new ScrollPane(listaRank, skin);
+        scroll.setFadeScrollBars(false);
+        scroll.setScrollingDisabled(true, false);
+        scroll.setOverscroll(false, false);
+        Table caixa = new Table();
+        caixa.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.3f, 0.3f, 0.3f, 1f), 1));
+        caixa.top();
+        caixa.add(scroll).grow().pad(4);
+        rankPage.add(abas).growX().padBottom(6).row();
+        rankPage.add(caixa).grow();
+        pintarAbasRank();
+    }
+
+    private void pintarAbasRank() {
+        for (Map.Entry<String, TextButton> e : abasRank.entrySet()) {
+            boolean ativa = e.getKey().equals(categoriaRank);
+            e.getValue().setColor(ativa ? Color.valueOf("f5d328") : Color.WHITE);
+            e.getValue().getLabel().setColor(ativa ? Color.WHITE : Color.LIGHT_GRAY);
+        }
+    }
+
+    private void pedirRanking() {
+        if (!socket.isConnected()) return;
+        String cat = categoriaRank;
+        socket.emitRaw("get_ranking", GameSocket.obj(w -> w.set("category", cat)));
+    }
+
+    /** Resposta do servidor: {category, entries: [{name, class, level, exp, value?}]}. */
+    public void atualizarRanking(JsonValue dados) {
+        if (dados == null || !categoriaRank.equals(dados.getString("category", ""))) return;
+        if (rankPage.getChildren().size == 0) construirPaginaRank();
+        listaRank.clearChildren();
+        boolean porLevel = "level".equals(categoriaRank);
+        JsonValue lista = dados.get("entries");
+        int pos = 0;
+        if (lista != null) {
+            for (JsonValue e = lista.child; e != null; e = e.next) {
+                pos++;
+                String nome = e.getString("name", "?"), classe = e.getString("class", "Knight");
+                boolean eu = nome.equals(nomeLocal);
+                Table linha = new Table();
+                linha.setBackground(UiSkin.retangulo(
+                    eu ? new Color(0.22f, 0.18f, 0.05f, 1f) : pos % 2 == 0 ? new Color(0.12f, 0.12f, 0.12f, 1f) : new Color(0.09f, 0.09f, 0.09f, 1f),
+                    eu ? Color.valueOf("f5d328") : new Color(0.16f, 0.16f, 0.16f, 1f), 1));
+                // Top 3 em ouro/prata/bronze.
+                Label posicao = new Label("#" + pos, skin, "hud");
+                posicao.setFontScale(0.6f * FONTE_STATS);
+                posicao.setColor(pos == 1 ? Color.valueOf("f5d328") : pos == 2 ? Color.valueOf("c8d0d8")
+                    : pos == 3 ? Color.valueOf("d08a4a") : Color.GRAY);
+                linha.add(posicao).width(40).left().padLeft(6);
+                TextureAtlas.AtlasRegion icone = atlas.findRegion(iconeClasse(classe));
+                if (icone != null) {
+                    Image i = new Image(new TextureRegionDrawable(icone));
+                    i.setScaling(Scaling.fit);
+                    linha.add(i).size(24).padRight(8);
+                }
+                Label rotuloNome = new Label(nome, skin, "hud");
+                rotuloNome.setFontScale(0.7f * FONTE_STATS);
+                rotuloNome.setColor(com.teste.game.ChatUI.corDaClasse(classe));
+                linha.add(rotuloNome).left().expandX();
+                if (porLevel) {
+                    Label xp = new Label(formatarNumero(e.getLong("exp", 0)) + " XP", skin, "hud");
+                    xp.setFontScale(0.55f * FONTE_STATS);
+                    xp.setColor(Color.LIGHT_GRAY);
+                    linha.add(xp).right().padRight(12);
+                    Label lv = new Label("Lv " + e.getInt("level", 1), skin, "hud");
+                    lv.setFontScale(0.7f * FONTE_STATS);
+                    linha.add(lv).right().width(70).padRight(6);
+                } else {
+                    Label valor = new Label(String.valueOf(e.getInt("value", 10)), skin, "hud");
+                    valor.setFontScale(0.7f * FONTE_STATS);
+                    linha.add(valor).right().width(70).padRight(6);
+                }
+                listaRank.add(linha).growX().height(34).padBottom(2).row();
+            }
+        }
+        if (pos == 0) {
+            Label vazio = new Label("No players yet.", skin, "hud");
+            vazio.setFontScale(0.6f * FONTE_STATS);
+            vazio.setColor(Color.GRAY);
+            listaRank.add(vazio).padTop(20);
+        }
+    }
+
     // ===================== BESTIARY =====================
     // Grade de mobs (numero + imagem de frente + medalha atual) e, a direita,
     // a ficha do selecionado: foto quadrada maior com as 3 medalhas no canto,
@@ -3608,7 +3724,12 @@ public final class BookMenuUI {
                 : "Spells".equals(secao) ? spellsPage
                 : "Vanity".equals(secao) ? vanityPage : "Friends".equals(secao) ? friendsPage
                 : "Party".equals(secao) ? partyPage
-                : "Bestiary".equals(secao) ? bestiaryPage : bagPage;
+                : "Bestiary".equals(secao) ? bestiaryPage
+                : "Rank".equals(secao) ? rankPage : bagPage;
+            if ("Rank".equals(secao)) {
+                if (rankPage.getChildren().size == 0) construirPaginaRank();
+                pedirRanking();
+            }
             if ("Bestiary".equals(secao)) {
                 reconstruirBestiario();
                 if (socket.isConnected()) socket.emitRaw("get_bestiary", "{}");

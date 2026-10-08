@@ -3277,6 +3277,9 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("bestiary", (nomeEvt, data) -> {
             if (data != null) bookMenu.atualizarBestiario(data);
         });
+        socket.on("ranking", (nomeEvt, data) -> {
+            if (data != null) bookMenu.atualizarRanking(data);
+        });
         socket.on("bestiary_kills", (nomeEvt, data) -> {
             if (data != null) bookMenu.atualizarKillsBestiario(data.getString("type", null), data.getInt("kills", 0));
         });
