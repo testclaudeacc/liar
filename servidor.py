@@ -4735,6 +4735,8 @@ RANKING_CACHE_SEG = 3600.0  # atualiza 1x por hora (alivia o servidor/banco)
 RANKING_CATEGORIAS = {"level": None, "defense": "defense", "magic": "magic",
                       "focus": "distance", "musicality": "musicality", "melee": "melee"}
 _ranking_cache = {}  # categoria -> (quando, lista)
+# Skill de classe: so' entra quem e' dessa classe (Level e Defense: todos).
+RANKING_CLASSE = {"magic": "Mage", "focus": "Ranger", "musicality": "Bard", "melee": "Knight"}
 # Personagens de teste (scripts de party/stress etc.) que nao entram no
 # ranking: PTMember..., PTLeader..., PTSolo..., SwA/SwB seguidos de numeros.
 # Sem diferenciar maiuscula/minuscula.
@@ -4770,8 +4772,10 @@ def _montar_ranking(categoria):
         por_nome[nome] = {"name": nome, "class": p.get('class_name', 'Knight'), "level": p.get('level', 1),
                           "exp": p.get('exp', 0), "skills": p.get('skills') or {}}
     lista = []
+    so_classe = RANKING_CLASSE.get(categoria)
     for d in por_nome.values():
         if _fora_do_ranking(d["name"]): continue
+        if so_classe and d["class"] != so_classe: continue
         e = {"name": d["name"], "class": d["class"], "level": int(d["level"] or 1), "exp": int(d["exp"] or 0)}
         if chave: e["value"] = _skill_nivel(d["skills"], chave)
         lista.append(e)
