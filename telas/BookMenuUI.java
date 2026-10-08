@@ -3094,8 +3094,15 @@ public final class BookMenuUI {
     private void construirPaginaRank() {
         rankPage.top();
         // Uma caixa de selecao so' (mesmo estilo do zoom nas opcoes).
-        com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> escolha =
-            new com.badlogic.gdx.scenes.scene2d.ui.SelectBox<>(skin, "zoom-select");
+        // Icones iguais aos da aba Skills na frente de cada opcao.
+        Map<String, TextureRegion> icones = new HashMap<>();
+        String[] regioes = {"ui/XPIcon", "ui/DefenseIcon", "ui/items/StarterStaff", "ui/FocusIcon", "ui/MusicalityIcon",
+            atlas.findRegion("ui/MeeleIcon") != null ? "ui/MeeleIcon" : "ui/MeleeIcon"};
+        for (int i = 0; i < CATEGORIAS_RANK.length; i++) {
+            TextureAtlas.AtlasRegion r = atlas.findRegion(regioes[i]);
+            if (r != null) icones.put(CATEGORIAS_RANK[i][1], r);
+        }
+        com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> escolha = new SelectComIcone(skin, "zoom-select", icones);
         String[] nomes = new String[CATEGORIAS_RANK.length];
         for (int i = 0; i < nomes.length; i++) nomes[i] = CATEGORIAS_RANK[i][1];
         escolha.setItems(nomes);
@@ -3126,6 +3133,54 @@ public final class BookMenuUI {
         rankPage.add(abas).left().padBottom(6).row();
         rankPage.add(caixa).grow().row();
         rankPage.add(aviso).right().padTop(3);
+    }
+
+    /** SelectBox com um icone antes do texto (na caixa e na lista aberta). */
+    private static final class SelectComIcone extends com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> {
+        private final Map<String, TextureRegion> icones;
+
+        SelectComIcone(Skin skin, String estilo, Map<String, TextureRegion> icones) {
+            super(skin, estilo);
+            this.icones = icones;
+        }
+
+        static com.badlogic.gdx.graphics.g2d.GlyphLayout desenhar(Map<String, TextureRegion> icones,
+                com.badlogic.gdx.graphics.g2d.Batch batch, com.badlogic.gdx.graphics.g2d.BitmapFont fonte,
+                String item, float x, float y, float largura) {
+            TextureRegion icone = icones != null ? icones.get(item) : null;
+            com.badlogic.gdx.graphics.g2d.GlyphLayout texto = new com.badlogic.gdx.graphics.g2d.GlyphLayout(fonte, item);
+            float tam = fonte.getLineHeight() * 0.9f, espaco = icone != null ? tam * 0.3f : 0f;
+            float total = (icone != null ? tam : 0f) + espaco + texto.width;
+            float inicio = x + Math.max(0f, (largura - total) / 2f);
+            if (icone != null) {
+                // y e' o topo do texto: centraliza o icone na altura das letras.
+                float meio = y - fonte.getCapHeight() / 2f;
+                com.badlogic.gdx.graphics.Color antes = new com.badlogic.gdx.graphics.Color(batch.getColor());
+                batch.setColor(1f, 1f, 1f, antes.a);
+                batch.draw(icone, inicio, meio - tam / 2f, tam, tam);
+                batch.setColor(antes);
+            }
+            return fonte.draw(batch, item, inicio + (icone != null ? tam : 0f) + espaco, y);
+        }
+
+        @Override protected com.badlogic.gdx.graphics.g2d.GlyphLayout drawItem(com.badlogic.gdx.graphics.g2d.Batch batch,
+                com.badlogic.gdx.graphics.g2d.BitmapFont fonte, String item, float x, float y, float largura) {
+            return desenhar(icones, batch, fonte, item, x, y, largura);
+        }
+
+        @Override protected SelectBoxScrollPane<String> newScrollPane() {
+            return new SelectBoxScrollPane<String>(this) {
+                @Override protected com.badlogic.gdx.scenes.scene2d.ui.List<String> newList() {
+                    return new com.badlogic.gdx.scenes.scene2d.ui.List<String>(SelectComIcone.this.getStyle().listStyle) {
+                        @Override public String toString(String item) { return item; }
+                        @Override protected com.badlogic.gdx.graphics.g2d.GlyphLayout drawItem(com.badlogic.gdx.graphics.g2d.Batch batch,
+                                com.badlogic.gdx.graphics.g2d.BitmapFont fonte, int indice, String item, float x, float y, float largura) {
+                            return desenhar(icones, batch, fonte, item, x, y, largura);
+                        }
+                    };
+                }
+            };
+        }
     }
 
     private void pedirRanking() {

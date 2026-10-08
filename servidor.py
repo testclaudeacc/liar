@@ -4775,7 +4775,7 @@ def _montar_ranking(categoria):
     so_classe = RANKING_CLASSE.get(categoria)
     for d in por_nome.values():
         if _fora_do_ranking(d["name"]): continue
-        if so_classe and d["class"] != so_classe: continue
+        if so_classe and str(d["class"] or "Knight").strip().lower() != so_classe.lower(): continue
         e = {"name": d["name"], "class": d["class"], "level": int(d["level"] or 1), "exp": int(d["exp"] or 0)}
         if chave: e["value"] = _skill_nivel(d["skills"], chave)
         lista.append(e)
