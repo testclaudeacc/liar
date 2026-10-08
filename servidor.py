@@ -1009,15 +1009,16 @@ def borda_bloqueada(grade, de, para):
     return False
 
 def diagonal_bloqueada(grade, de, para):
-    # Passo na diagonal (player): passa se pelo menos um dos dois caminhos em
-    # "L" (horizontal+vertical ou vertical+horizontal) não cruza cerca fina.
-    # Parede sólida no canto não bloqueia (igual Tibia, dá pra cortar quina).
+    # Passo na diagonal (player): so' passa se pelo menos um dos dois caminhos
+    # em "L" (horizontal+vertical ou vertical+horizontal) estiver LIMPO - SQM
+    # do meio sem parede e sem cerca fina no caminho. Assim nao da' pra se
+    # espremer entre 2 arvores na diagonal; uma quina so' (1 lado livre) passa.
     # Mesma regra do client (WorldScreen.diagonalBloqueada).
     dx, dy = para[0] - de[0], para[1] - de[1]
     if abs(dx) != 1 or abs(dy) != 1: return False
     via_x, via_y = (de[0] + dx, de[1]), (de[0], de[1] + dy)
-    caminho_x = borda_bloqueada(grade, de, via_x) or borda_bloqueada(grade, via_x, para)
-    caminho_y = borda_bloqueada(grade, de, via_y) or borda_bloqueada(grade, via_y, para)
+    caminho_x = eh_parede(grade, via_x) or borda_bloqueada(grade, de, via_x) or borda_bloqueada(grade, via_x, para)
+    caminho_y = eh_parede(grade, via_y) or borda_bloqueada(grade, de, via_y) or borda_bloqueada(grade, via_y, para)
     return caminho_x and caminho_y
 
 def astar(grade, inicio, fim, bloqueados=None, limite=ASTAR_LIMITE_NOS, bounds=None):

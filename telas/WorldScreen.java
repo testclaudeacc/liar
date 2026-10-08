@@ -4290,9 +4290,11 @@ public class WorldScreen extends ScreenAdapter {
      * cerca fina (parede solida na quina nao bloqueia, igual Tibia). Mesma
      * regra do servidor (servidor.py::diagonal_bloqueada). */
     private boolean diagonalBloqueada(float x, float y, float dx, float dy) {
-        boolean caminhoX = colisao.movimentoBloqueado(x, y, x + dx, y)
+        // So' passa se um dos dois caminhos em "L" estiver limpo (SQM do meio
+        // sem parede e sem cerca) - igual servidor.py::diagonal_bloqueada.
+        boolean caminhoX = colisao.ehParede(x + dx, y) || colisao.movimentoBloqueado(x, y, x + dx, y)
             || colisao.movimentoBloqueado(x + dx, y, x + dx, y + dy);
-        boolean caminhoY = colisao.movimentoBloqueado(x, y, x, y + dy)
+        boolean caminhoY = colisao.ehParede(x, y + dy) || colisao.movimentoBloqueado(x, y, x, y + dy)
             || colisao.movimentoBloqueado(x, y + dy, x + dx, y + dy);
         return caminhoX && caminhoY;
     }
