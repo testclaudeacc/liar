@@ -4735,11 +4735,13 @@ RANKING_CACHE_SEG = 3600.0  # atualiza 1x por hora (alivia o servidor/banco)
 RANKING_CATEGORIAS = {"level": None, "defense": "defense", "magic": "magic",
                       "focus": "distance", "musicality": "musicality", "melee": "melee"}
 _ranking_cache = {}  # categoria -> (quando, lista)
-# Personagens de teste (scripts de party etc.) que nao entram no ranking.
-RANKING_IGNORAR_PREFIXOS = ("ptmember", "ptleader", "ptsolo")
+# Personagens de teste (scripts de party/stress etc.) que nao entram no
+# ranking: PTMember..., PTLeader..., PTSolo..., fTest..., Debug Hero...,
+# SwA/SwB seguidos de numeros. Sem diferenciar maiuscula/minuscula.
+RE_RANKING_IGNORAR = re.compile(r"^(ptmember|ptleader|ptsolo|ftest|debug ?hero|sw[ab]\s*\d)", re.IGNORECASE)
 
 def _fora_do_ranking(nome):
-    return str(nome).lower().startswith(RANKING_IGNORAR_PREFIXOS)
+    return bool(RE_RANKING_IGNORAR.match(str(nome)))
 
 def _skill_nivel(skills, chave):
     try: return int((skills or {}).get(chave, 10))

@@ -55,3 +55,21 @@ Se a lista estiver certa:
 ```sql
 DELETE FROM characters WHERE name ILIKE 'PTMember%' OR name ILIKE 'PTLeader%' OR name ILIKE 'PTSolo%';
 ```
+
+## Outros personagens de teste (fTest, Debug Hero, SwA/SwB + numeros)
+
+Conferir primeiro:
+
+```sql
+SELECT name FROM characters
+WHERE name ILIKE 'fTest%' OR name ILIKE 'Debug%Hero%' OR name ~* '^Sw[AB] ?[0-9]';
+```
+
+Se a lista estiver certa:
+
+```sql
+DELETE FROM characters
+WHERE name ILIKE 'fTest%' OR name ILIKE 'Debug%Hero%' OR name ~* '^Sw[AB] ?[0-9]';
+```
+
+(O ranking ja' ignora esses nomes mesmo sem apagar.)

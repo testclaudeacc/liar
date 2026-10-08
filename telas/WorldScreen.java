@@ -1506,9 +1506,10 @@ public class WorldScreen extends ScreenAdapter {
             // Cada arco afastado um pouco pro seu lado (mais longe so' na
             // horizontal, sem subir/descer).
             float afastar = sqm * ARCO_AFASTAR_SQM;
-            desenharArco(b, cx - afastar, cy, raio, esp, borda, 180f + ARCO_VARREDURA / 2f, -ARCO_VARREDURA, hp, corDaVida(hp), alpha);
+            // HP na direita, MP na esquerda (os dois enchem de baixo pra cima).
+            desenharArco(b, cx - afastar, cy, raio, esp, borda, 180f + ARCO_VARREDURA / 2f, -ARCO_VARREDURA, mp, COR_ARCO_MP, alpha);
             // Direita: de baixo (-v/2) subindo ate' em cima (+v/2).
-            desenharArco(b, cx + afastar, cy, raio, esp, borda, -ARCO_VARREDURA / 2f, ARCO_VARREDURA, mp, COR_ARCO_MP, alpha);
+            desenharArco(b, cx + afastar, cy, raio, esp, borda, -ARCO_VARREDURA / 2f, ARCO_VARREDURA, hp, corDaVida(hp), alpha);
             b.setColor(Color.WHITE);
         }
 
