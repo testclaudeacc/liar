@@ -161,6 +161,7 @@ public class MiniMapa extends Actor {
 
     public void centralizar() {
         panX = panY = 0f;
+        temMarcador = false;
     }
 
     private void limitarPan() {
@@ -236,11 +237,71 @@ public class MiniMapa extends Actor {
             };
             fonte.pontos(coletor);
             coletor.ponto(fonte.jogadorX(), fonte.jogadorY(), COR_VOCE);
+            // Marcador (link de coordenada do chat): quadradinho piscando.
+            if (temMarcador && ((int) (System.currentTimeMillis() / 350L)) % 2 == 0) {
+                float mx = origemX + (marcadorX - mapa.tileWidth / 2f) * s;
+                float my = origemY + (marcadorY - mapa.tileHeight / 2f) * s;
+                float b = Math.max(1f, sqm * 0.25f);
+                batch.setColor(COR_MARCADOR.r, COR_MARCADOR.g, COR_MARCADOR.b, parentAlpha);
+                batch.draw(pixel, mx - b, my - b, sqm + b * 2f, b);
+                batch.draw(pixel, mx - b, my + sqm, sqm + b * 2f, b);
+                batch.draw(pixel, mx - b, my, b, sqm);
+                batch.draw(pixel, mx + sqm, my, b, sqm);
+            }
             batch.flush();
             ScissorStack.popScissors();
         }
         batch.setColor(Color.WHITE);
+        // Coordenadas (SQM) do centro no canto de baixo a esquerda.
+        if (fonteCoord != null) {
+            String texto = "X: " + coordX(cx) + "  Y: " + coordY(cy);
+            float escalaAntes = fonteCoord.getData().scaleX;
+            fonteCoord.getData().setScale(escalaAntes * escalaCoord);
+            float tx = ax + 4f, ty = ay + fonteCoord.getCapHeight() + 5f;
+            Color corAntes = new Color(fonteCoord.getColor());
+            fonteCoord.setColor(0f, 0f, 0f, 0.8f * parentAlpha);
+            fonteCoord.draw(batch, texto, tx + 1f, ty - 1f);
+            fonteCoord.setColor(1f, 1f, 1f, parentAlpha);
+            fonteCoord.draw(batch, texto, tx, ty);
+            fonteCoord.setColor(corAntes);
+            fonteCoord.getData().setScale(escalaAntes);
+        }
     }
+
+    // ---- Coordenadas ----
+    private com.badlogic.gdx.graphics.g2d.BitmapFont fonteCoord;
+    private float escalaCoord = 1f;
+    private boolean temMarcador = false;
+    private float marcadorX, marcadorY;
+    private static final Color COR_MARCADOR = new Color(0.3f, 1f, 0.3f, 1f);
+
+    /** Liga o texto de coordenadas (escala relativa a' fonte). */
+    public void definirFonteCoordenadas(com.badlogic.gdx.graphics.g2d.BitmapFont fonte, float escala) {
+        this.fonteCoord = fonte;
+        this.escalaCoord = escala;
+    }
+
+    /** SQM X (da esquerda pra direita, a partir de 0). */
+    public int coordX(float mundoX) { return (int) Math.floor(mundoX / mapa.tileWidth); }
+
+    /** SQM Y (de cima pra baixo, igual o Tiled). */
+    public int coordY(float mundoY) { return mapa.mapaAlturaTiles - 1 - (int) Math.floor(mundoY / mapa.tileHeight); }
+
+    /** Centro (mundo) do SQM da coordenada (x, y). */
+    public float mundoXDe(int x) { return x * mapa.tileWidth + mapa.tileWidth / 2f; }
+    public float mundoYDe(int y) { return (mapa.mapaAlturaTiles - 1 - y) * mapa.tileHeight + mapa.tileHeight / 2f; }
+
+    /** Centraliza (mapa grande) nesse ponto do mundo e marca ele. */
+    public void focarEm(float mundoX, float mundoY) {
+        panX = mundoX - fonte.jogadorX();
+        panY = mundoY - (fonte.jogadorY() + mapa.tileHeight / 2f);
+        limitarPan();
+        temMarcador = true;
+        marcadorX = mundoX;
+        marcadorY = mundoY;
+    }
+
+    public void tirarMarcador() { temMarcador = false; }
 
     public void dispose() {
         pixel.dispose();

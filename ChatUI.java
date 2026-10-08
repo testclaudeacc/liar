@@ -84,7 +84,9 @@ public class ChatUI {
     private final TextureAtlas atlas; // pode ser null (TesteGame) - ai os botoes viram texto
     private final Table janela;
     private final TextField campoTexto;
-    private final Label logLabel;
+    // Log: uma linha (Label) por mensagem - as que tem coordenada ganham o
+    // icone do mapa na frente e abrem o mapa ao clicar (ver linkDeCoordenada).
+    private final Table logTabela = new Table();
     private final ScrollPane scrollLog;
     private final Table listaJogadoresBox;
     private final Label cabecalhoJogadores;
@@ -186,15 +188,12 @@ public class ChatUI {
         topo.add(botaoMais).size(44).padRight(6);
         topo.add(botaoMenos).size(44);
 
-        logLabel = new Label("", skin, "chat-log");
-        logLabel.setWrap(true);
-        // topLeft (nao bottomLeft) - com poucas mensagens (ScrollPane maior
-        // que o conteudo), bottomLeft deixava o log "flutuando" colado no
-        // fundo da caixa em vez de comecar do topo (a pedido do usuario,
-        // mesma causa ja corrigida na lista de jogadores ao lado).
-        logLabel.setAlignment(Align.topLeft);
-        scrollLog = new ScrollPane(logLabel, skin);
+        this.skinLog = skin;
+        // top (nao bottom) - com poucas mensagens o log comeca do topo da caixa.
+        logTabela.top().left();
+        scrollLog = new ScrollPane(logTabela, skin);
         scrollLog.setFadeScrollBars(false);
+        scrollLog.setScrollingDisabled(true, false);
         Table logBox = new Table();
         logBox.setBackground(criarFundo(new Color(0f, 0f, 0f, 0.35f)));
         logBox.add(scrollLog).grow().pad(8);
@@ -665,7 +664,7 @@ public class ChatUI {
     private void adicionarNaAba(String aba, String linha) {
         Array<String> msgs = mensagensPorAba.get(aba);
         if (msgs == null) return;
-        msgs.add(linha);
+        msgs.add(linkDeCoordenada(linha));
         if (msgs.size > MAX_MENSAGENS) msgs.removeIndex(0);
         if (aba.equals(abaAtual)) reconstruirLog();
         // Nao lida: aba que nao esta aberta, ou o chat inteiro fechado.
@@ -677,14 +676,64 @@ public class ChatUI {
 
     private void reconstruirLog() {
         Array<String> msgs = mensagensPorAba.getOrDefault(abaAtual, new Array<>());
-        StringBuilder sb = new StringBuilder();
+        logTabela.clearChildren();
         for (int i = 0; i < msgs.size; i++) {
-            if (i > 0) sb.append("\n");
-            sb.append(msgs.get(i));
+            String linha = msgs.get(i);
+            int[] coord = null;
+            // Linha com link: "\u0001x,y\u0001" na frente (ver adicionarNaAba).
+            if (linha.startsWith(MARCA_LINK)) {
+                int fim = linha.indexOf(MARCA_LINK, 1);
+                String[] xy = linha.substring(1, fim).split(",");
+                coord = new int[]{Integer.parseInt(xy[0]), Integer.parseInt(xy[1])};
+                linha = linha.substring(fim + 1);
+            }
+            Label texto = new Label(linha, skinLog, "chat-log");
+            texto.setWrap(true);
+            texto.setAlignment(Align.topLeft);
+            Table l = new Table();
+            l.left().top();
+            if (coord != null) {
+                TextureRegion icone = atlas != null ? atlas.findRegion("ui/buttons/MapBtn") : null;
+                if (icone != null) {
+                    Image img = new Image(icone);
+                    img.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+                    float tam = texto.getStyle().font.getLineHeight();
+                    l.add(img).size(tam).top().padRight(4);
+                }
+                final int cx = coord[0], cy = coord[1];
+                l.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+                l.addListener(new ClickListener() {
+                    @Override public void clicked(InputEvent event, float x, float y) {
+                        if (ouvinteCoordenada != null) ouvinteCoordenada.abrir(cx, cy);
+                    }
+                });
+            }
+            l.add(texto).growX().top();
+            logTabela.add(l).growX().left().row();
         }
-        logLabel.setText(sb.toString());
         scrollLog.layout();
         scrollLog.setScrollPercentY(100f);
+    }
+
+    // ---- Link de coordenada no chat ("x300, y400") ----
+    private Skin skinLog;
+    private static final String MARCA_LINK = "\u0001";
+    private static final java.util.regex.Pattern RE_COORDENADA = java.util.regex.Pattern.compile(
+        "(?i)\\bx\\s*[:=]?\\s*(\\d{1,5})\\s*[,;]?\\s*y\\s*[:=]?\\s*(\\d{1,5})\\b");
+    private static final String COR_LINK = "[#55ff55]";
+
+    /** Clicar numa coordenada do chat (WorldScreen abre o mapa la'). */
+    public interface OuvinteCoordenada { void abrir(int x, int y); }
+    private OuvinteCoordenada ouvinteCoordenada;
+    public void setOuvinteCoordenada(OuvinteCoordenada o) { this.ouvinteCoordenada = o; }
+
+    /** Se a mensagem tem coordenada: pinta de verde e poe a marca do link
+     * na frente (a linha vira clicavel, com o icone do mapa). */
+    private static String linkDeCoordenada(String linha) {
+        java.util.regex.Matcher m = RE_COORDENADA.matcher(linha);
+        if (!m.find()) return linha;
+        String marcada = linha.substring(0, m.start()) + COR_LINK + m.group() + "[]" + linha.substring(m.end());
+        return MARCA_LINK + m.group(1) + "," + m.group(2) + MARCA_LINK + marcada;
     }
 
     /** Jogadores por perto (aba Local). Chamado todo frame enquanto o chat

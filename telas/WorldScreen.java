@@ -1026,6 +1026,18 @@ public class WorldScreen extends ScreenAdapter {
         // Boas-vindas no Local ao entrar no jogo (so' pra ele).
         chat.adicionarMensagemSistema("Welcome to Mitera Online! We hope you have fun, check out our Discord for updates, report bugs and events!",
             ChatUI.COR_BOAS_VINDAS);
+        // Coordenada no chat ("x300, y400"): abre o mapa grande nela (so' se
+        // for na mesma dimensao do player).
+        chat.setOuvinteCoordenada((cx, cy) -> {
+            float wx = mapaGrande.mundoXDe(cx), wy = mapaGrande.mundoYDe(cy);
+            com.badlogic.gdx.math.Rectangle dim = mapa.dimensaoEm(local.x, local.y + 1f);
+            if (wx < 0 || wy < 0 || wx > mapa.larguraPx() || wy > mapa.alturaPx() || !dim.contains(wx, wy)) {
+                hud.notificar("That location is not in this area.", COR_NOTIF_AVISO, null);
+                return;
+            }
+            abrirMapaGrande();
+            mapaGrande.focarEm(wx, wy);
+        });
         chat.setOuvinteCanais(new ChatUI.OuvinteCanais() {
             @Override public void entrou(String canal) { emitirCanalChat("chat_join", canal); }
             @Override public void saiu(String canal) { emitirCanalChat("chat_leave", canal); }
@@ -1200,6 +1212,8 @@ public class WorldScreen extends ScreenAdapter {
         // fps/ms embaixo dele.
         pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
         miniMapa = new MiniMapa(mapa, pinturaMiniMapa, fonteMiniMapa, TILES_MINIMAPA, TILES_MAPA_MIN, TILES_MAPA_MAX, false, 2f);
+        // Coordenadas (SQM) no canto de baixo a esquerda.
+        miniMapa.definirFonteCoordenadas(skin.getFont("hud-font"), 0.8f);
         miniMapa.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
             @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
                 abrirMapaGrande();
@@ -1687,6 +1701,7 @@ public class WorldScreen extends ScreenAdapter {
 
     private void criarMapaGrande() {
         mapaGrande = new MiniMapa(mapa, pinturaMiniMapa, fonteMiniMapa, TILES_MAPA_GRANDE, TILES_MAPA_MIN, TILES_MAPA_MAX, true, 2f);
+        mapaGrande.definirFonteCoordenadas(skin.getFont("hud-font"), 1.2f); // um pouco maior no mapa grande
         painelMapaGrande = new Table();
         painelMapaGrande.setFillParent(true);
         painelMapaGrande.setBackground(skin.getDrawable("fundo-opcoes"));
