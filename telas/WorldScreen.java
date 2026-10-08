@@ -1089,7 +1089,9 @@ public class WorldScreen extends ScreenAdapter {
         hud = new HudVitais(uiStage, atlas, escala);
         hud.definirColunaEsquerda(colunaRetrato, 10f, TAMANHO_RETRATO);
         // Arcos de HP/MP em volta do player, por baixo de qualquer janela.
-        uiStage.getRoot().addActorAt(0, new ArcosVitais());
+        // Desenhados a mao no render() (antes dos baloes de fala/texto de
+        // acao, que precisam ficar por cima), nao pelo uiStage.
+        arcosVitais = new ArcosVitais();
         // Em arco (padrao): o painel reto de HP/MP some. Settings > Style troca.
         hud.definirPainelVitaisVisivel(!Controles.barrasEmArco());
         // Debuffs: no PC na gaveta embaixo do minimapa; no celular do lado
@@ -1495,6 +1497,8 @@ public class WorldScreen extends ScreenAdapter {
     private static final Color COR_ARCO_BORDA = new Color(0.03f, 0.03f, 0.03f, 0.75f);
     private final com.badlogic.gdx.math.Vector3 tmpArco = new com.badlogic.gdx.math.Vector3();
     private final Vector2 tmpArco2 = new Vector2();
+
+    private ArcosVitais arcosVitais;
 
     private class ArcosVitais extends com.badlogic.gdx.scenes.scene2d.Actor {
         ArcosVitais() { setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); }
@@ -3874,12 +3878,10 @@ public class WorldScreen extends ScreenAdapter {
         batch.begin();
         desenharNome(local);
         for (Jogador j : remotos.values()) desenharNome(j);
-        desenharFalas();
         for (NPCVisual npc : npcs.values()) desenharNomeNPC(npc);
         for (MobVisual mob : mobs.values()) desenharNomeMob(mob);
         desenharNumerosDano();
         desenharTextosFlutuantes();
-        desenharTextosAcao();
         desenharLootsFlutuantes();
         desenharBalaoInteracaoNPC(npcMaisProximoParaConversar());
         TextureRegion notifAtual = notificacaoAtual();
@@ -3904,6 +3906,22 @@ public class WorldScreen extends ScreenAdapter {
         // 2. Aplica a iluminação multiplicativa SOBRE a cena renderizada
         // A iluminação vai escurecer os roofs, pillars, tiles do mapa e os jogadores
         iluminacao.compositar(batch, camera);
+
+        // Arcos de HP/MP (coordenadas do uiStage) e, POR CIMA deles, os baloes
+        // de fala e o texto de acao ("Om Noom") - senao o arco cobria o texto.
+        // Fora da iluminacao: ficam sempre legiveis.
+        if (arcosVitais != null) {
+            uiStage.getViewport().apply();
+            batch.setProjectionMatrix(uiStage.getCamera().combined);
+            batch.begin();
+            arcosVitais.draw(batch, 1f);
+            batch.end();
+        }
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+        desenharFalas();
+        desenharTextosAcao();
+        batch.end();
 
         labelFps.setText(Gdx.graphics.getFramesPerSecond() + " fps");
         acumuladorMs += delta;
