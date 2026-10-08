@@ -4716,11 +4716,11 @@ def handle_add_friend_by_name(data):
 # ---------------------------------------------------------------------------
 # RANKING (aba Rank do livro). Top RANKING_TOP de cada categoria, montado do
 # banco + o estado em memoria de quem esta online (mais novo que o save). Fica
-# em cache RANKING_CACHE_SEG pra 300 players abrindo a aba nao virarem 300
-# consultas ao banco.
+# em cache RANKING_CACHE_SEG (1 hora) pra 300 players abrindo a aba nao
+# virarem 300 consultas ao banco.
 # ---------------------------------------------------------------------------
 RANKING_TOP = 50
-RANKING_CACHE_SEG = 60.0
+RANKING_CACHE_SEG = 3600.0  # atualiza 1x por hora (alivia o servidor/banco)
 # categoria -> chave em skills (None = level/exp)
 RANKING_CATEGORIAS = {"level": None, "defense": "defense", "magic": "magic",
                       "focus": "distance", "musicality": "musicality", "melee": "melee"}

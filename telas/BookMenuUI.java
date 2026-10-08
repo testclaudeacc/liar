@@ -3082,7 +3082,7 @@ public final class BookMenuUI {
     // Abas: Level (level + XP total) e as skills (Defense, Magic, Focus,
     // Musicality, Melee - o level da skill). Linha: posicao, icone da classe,
     // nome na cor da classe, valores na direita. A minha linha fica destacada.
-    // Servidor: servidor.py::handle_get_ranking (top 50, cache de 60s).
+    // Servidor: servidor.py::handle_get_ranking (top 50, atualiza 1x por hora).
     private final Table rankPage = new Table();
     private final Table listaRank = new Table();
     private final Map<String, TextButton> abasRank = new LinkedHashMap<>();
@@ -3118,8 +3118,12 @@ public final class BookMenuUI {
         caixa.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.3f, 0.3f, 0.3f, 1f), 1));
         caixa.top();
         caixa.add(scroll).grow().pad(4);
+        Label aviso = new Label("Rankings update every hour.", skin, "hud");
+        aviso.setFontScale(0.5f * FONTE_STATS);
+        aviso.setColor(Color.GRAY);
         rankPage.add(abas).growX().padBottom(6).row();
-        rankPage.add(caixa).grow();
+        rankPage.add(caixa).grow().row();
+        rankPage.add(aviso).right().padTop(3);
         pintarAbasRank();
     }
 
