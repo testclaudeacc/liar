@@ -467,6 +467,34 @@ public class WorldScreen extends ScreenAdapter {
     // Quests feitas (servidor manda em "quest_state"): libera a ponte etc.
     private final Set<String> questsFeitas = new HashSet<>();
     private static final Set<String> NPCS_QUE_COBRAM = new HashSet<>(java.util.Arrays.asList("kharon"));
+    private boolean questsRecebidas = false;
+    // Animacao da ponte: uma linha a cada INTERVALO_LINHA_PONTE segundos.
+    private float tempoProximaLinhaPonte = 0f;
+    private static final float INTERVALO_LINHA_PONTE = 0.18f;
+    private static final Color COR_TUC = Color.valueOf("ff9a1f"); // mesmo laranja do "Om Noom"
+
+    /** Texto de acao parado num ponto do mundo (ex: "TUC" na ponte). */
+    private void textoAcaoNoMundo(float x, float y, String texto, Color cor) {
+        Jogador ponto = new Jogador("", "Knight", x, y);
+        textosAcao.add(new TextoAcao(ponto, texto, cor));
+    }
+
+    private void atualizarAnimacaoPonte(float delta) {
+        if (!mapa.temLinhaPendente()) return;
+        tempoProximaLinhaPonte -= delta;
+        if (tempoProximaLinhaPonte > 0f) return;
+        tempoProximaLinhaPonte = INTERVALO_LINHA_PONTE;
+        float[] centro = mapa.revelarProximaLinha();
+        if (centro != null) textoAcaoNoMundo(centro[0], centro[1], "TUC", COR_TUC);
+        // Acabou: minimapa refeito com a ponte inteira.
+        if (!mapa.temLinhaPendente() && pinturaMiniMapa != null) {
+            MiniMapa.Pintura velha = pinturaMiniMapa;
+            pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
+            miniMapa.trocarPintura(pinturaMiniMapa);
+            mapaGrande.trocarPintura(pinturaMiniMapa);
+            velha.dispose();
+        }
+    }
 
     // true em Android/iOS - esconde o controle de Fullscreen do Options (nao
     // faz sentido no celular) e some com o joystick quando chat/settings
@@ -3312,10 +3340,17 @@ public class WorldScreen extends ScreenAdapter {
         // ---- Quests (Pay do Kharon -> ponte) ----
         socket.on("quest_state", (nomeEvt, data) -> {
             if (data == null) return;
+            Set<String> antes = new HashSet<>(questsFeitas);
             questsFeitas.clear();
             JsonValue feitas = data.get("done");
             if (feitas != null) for (JsonValue q = feitas.child; q != null; q = q.next) questsFeitas.add(q.asString().toLowerCase());
-            mapa.aplicarQuests(questsFeitas);
+            // Quest que acabou de ser feita (nao a lista do login): a ponte
+            // aparece de 3 em 3 SQMs, com "TUC" em cada linha.
+            Set<String> novas = new HashSet<>();
+            if (questsRecebidas) for (String q : questsFeitas) if (!antes.contains(q)) novas.add(q);
+            questsRecebidas = true;
+            mapa.aplicarQuests(questsFeitas, novas, local.x, local.y);
+            tempoProximaLinhaPonte = 0f;
             // Minimapa refeito (a ponte aparece/some nele tambem).
             if (pinturaMiniMapa != null) {
                 MiniMapa.Pintura velha = pinturaMiniMapa;
@@ -3708,6 +3743,7 @@ public class WorldScreen extends ScreenAdapter {
         for (NPCVisual npc : npcs.values()) npc.movimento.atualizar(delta);
         for (MobVisual mob : mobs.values()) mob.atualizar(delta);
         atualizarCombate(delta);
+        atualizarAnimacaoPonte(delta);
         for (int i = lootsFlutuantes.size() - 1; i >= 0; i--) {
             LootFlutuante l = lootsFlutuantes.get(i);
             l.tempo += delta;

@@ -2885,6 +2885,9 @@ def handle_swap_req(data):
         tt = tile_de(t_p.get('pos_x', 0), t_p.get('pos_y', 0))
         # Do lado ou na diagonal (diagonal: sem cerca fina fechando os 2 caminhos).
         if max(abs(tp[0] - tt[0]), abs(tp[1] - tt[1])) != 1: return
+        # Area de quest (ponte): ninguem entra nela trocando de lugar com quem
+        # ja' fez a quest - cada um so' vai pro SQM do outro se puder pisar la'.
+        if bloqueado_por_quest(p, tt) or bloqueado_por_quest(t_p, tp): return
         grade_s = mapas_colisao.get(p.get('mapa'))
         if grade_s is not None and int(p.get('floor', 1) or 1) == 1:
             if abs(tp[0] - tt[0]) + abs(tp[1] - tt[1]) == 1 and borda_bloqueada(grade_s, tp, tt): return

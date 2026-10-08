@@ -122,8 +122,19 @@ public class MapaMundo {
                          (int) Math.floor(r.y / tileHeight), (int) Math.floor((r.y + r.height - 1f) / tileHeight)};
     }
 
+    // Linhas da ponte esperando pra aparecer (animacao do Pay): cada item =
+    // as celulas de uma linha (3 SQMs numa ponte de 3 de largura).
+    private final java.util.ArrayDeque<java.util.List<CelulaGuardada>> linhasPendentes = new java.util.ArrayDeque<>();
+
     /** Mostra/esconde os tiles de cada area conforme as quests feitas. */
     public void aplicarQuests(java.util.Collection<String> feitas) {
+        aplicarQuests(feitas, java.util.Collections.emptySet(), 0f, 0f);
+    }
+
+    /** animar: quests que acabaram de ser feitas - a area delas aparece linha
+     * por linha (revelarProximaLinha), comecando pela ponta mais perto de
+     * (pertoX, pertoY), em vez de tudo de uma vez. */
+    public void aplicarQuests(java.util.Collection<String> feitas, java.util.Set<String> animar, float pertoX, float pertoY) {
         questsFeitas.clear();
         for (String q : feitas) questsFeitas.add(q.toLowerCase());
         for (MapaPropriedades.AreaQuest a : propriedades.areasQuest) {
@@ -131,8 +142,12 @@ public class MapaMundo {
             java.util.List<CelulaGuardada> guardadas = escondidas.get(a);
             if (liberada) {
                 if (guardadas == null) continue;
-                for (CelulaGuardada g : guardadas) g.camada.setCell(g.cx, g.cy, g.cell);
                 escondidas.remove(a);
+                if (animar.contains(a.quest)) {
+                    enfileirarLinhas(a, guardadas, pertoX, pertoY);
+                    continue;
+                }
+                for (CelulaGuardada g : guardadas) g.camada.setCell(g.cx, g.cy, g.cell);
             } else if (guardadas == null) {
                 guardadas = new java.util.ArrayList<>();
                 int[] c = celulasDe(a.area);
@@ -158,6 +173,40 @@ public class MapaMundo {
             }
         }
     }
+
+    private void enfileirarLinhas(MapaPropriedades.AreaQuest a, java.util.List<CelulaGuardada> guardadas, float px, float py) {
+        // Ponte em pe (mais alta que larga): uma linha = mesma altura (cy);
+        // deitada: mesma coluna (cx).
+        boolean emPe = a.area.height >= a.area.width;
+        java.util.TreeMap<Integer, java.util.List<CelulaGuardada>> porLinha = new java.util.TreeMap<>();
+        for (CelulaGuardada g : guardadas) porLinha.computeIfAbsent(emPe ? g.cy : g.cx, k -> new java.util.ArrayList<>()).add(g);
+        java.util.List<java.util.List<CelulaGuardada>> linhas = new java.util.ArrayList<>(porLinha.values());
+        // Comeca pela ponta mais perto de quem pagou.
+        float inicio = emPe ? porLinha.firstKey() * tileHeight : porLinha.firstKey() * tileWidth;
+        float fim = emPe ? porLinha.lastKey() * tileHeight : porLinha.lastKey() * tileWidth;
+        float ref = emPe ? py : px;
+        if (Math.abs(ref - fim) < Math.abs(ref - inicio)) java.util.Collections.reverse(linhas);
+        linhasPendentes.addAll(linhas);
+    }
+
+    /** Mostra a proxima linha da animacao. Devolve o centro (mundo) dela, ou
+     * null se nao tem mais nada pra mostrar. */
+    public float[] revelarProximaLinha() {
+        java.util.List<CelulaGuardada> linha = linhasPendentes.poll();
+        if (linha == null || linha.isEmpty()) return null;
+        float somaX = 0f, somaY = 0f;
+        java.util.Set<Long> vistos = new java.util.HashSet<>();
+        int n = 0;
+        for (CelulaGuardada g : linha) {
+            g.camada.setCell(g.cx, g.cy, g.cell);
+            if (vistos.add(((long) g.cx << 32) | (g.cy & 0xffffffffL))) {
+                somaX += g.cx; somaY += g.cy; n++;
+            }
+        }
+        return new float[]{(somaX / n + 0.5f) * tileWidth, (somaY / n) * tileHeight};
+    }
+
+    public boolean temLinhaPendente() { return !linhasPendentes.isEmpty(); }
 
     /** SQM (cx, cy com Y pra cima) dentro de uma area cuja quest nao foi feita. */
     public boolean bloqueadoPorQuest(int cx, int cy) {
