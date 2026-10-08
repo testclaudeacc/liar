@@ -47,6 +47,10 @@ public final class DialogoNPCUI {
     private final Label nomeLabel;
     private final Label falaLabel;
     private final TextButton fecharButton;
+    private final TextButton botaoAcao;
+    private final com.badlogic.gdx.scenes.scene2d.ui.Image iconeAcao;
+    private Runnable acao;
+    private float escalaRodape = 1f;
     private final TextButton.TextButtonStyle estiloProximo;
     private final TextButton.TextButtonStyle estiloFechar;
     private Runnable aoFechar = () -> {};
@@ -171,6 +175,25 @@ public final class DialogoNPCUI {
             }
         });
 
+        // Botao de acao (ex: "Pay" com o SellerIcon), so' na ultima pagina,
+        // na direita - ver definirAcao().
+        TextButton.TextButtonStyle estiloAcao = new TextButton.TextButtonStyle(skin.get("verde-popup", TextButton.TextButtonStyle.class));
+        estiloAcao.font = fonteBotao;
+        estiloAcao.fontColor = Color.WHITE;
+        botaoAcao = new TextButton("", estiloAcao);
+        iconeAcao = new com.badlogic.gdx.scenes.scene2d.ui.Image();
+        iconeAcao.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+        botaoAcao.clearChildren();
+        botaoAcao.add(iconeAcao).size(22f * escala).padRight(5f * escala);
+        botaoAcao.add(botaoAcao.getLabel());
+        botaoAcao.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                if (acao != null) acao.run();
+            }
+        });
+        this.escalaRodape = escala;
+
         Table retratoMoldura = new Table();
         retratoMoldura.setBackground(skin.getDrawable("dialogo-npc-retrato"));
         retratoMoldura.add(retrato).size(58f * escala, 70f * escala).pad(4f * escala);
@@ -232,6 +255,7 @@ public final class DialogoNPCUI {
         this.paginas = (paginas == null || paginas.length == 0) ? new String[] {""} : paginas;
         this.paginaAtual = 0;
         this.aoFechar = aoFechar == null ? () -> {} : aoFechar;
+        this.acao = null; // quem quiser o botao chama definirAcao depois de abrir
         iniciarPagina();
         root.setVisible(true);
     }
@@ -254,8 +278,34 @@ public final class DialogoNPCUI {
         boolean ultimaPagina = paginaAtual >= paginas.length - 1;
         fecharButton.setText(ultimaPagina ? "Close" : "Next");
         fecharButton.setStyle(ultimaPagina ? estiloFechar : estiloProximo);
-        if (ultimaPagina) rodape.left(); else rodape.right();
+        rodape.clearChildren();
+        if (ultimaPagina) {
+            // Close na esquerda; acao (Pay...) na direita, se tiver.
+            rodape.add(fecharButton).width(86f * escalaRodape).height(42f * escalaRodape).left();
+            rodape.add().expandX();
+            if (acao != null) rodape.add(botaoAcao).height(42f * escalaRodape).minWidth(86f * escalaRodape).right();
+        } else {
+            rodape.add().expandX();
+            rodape.add(fecharButton).width(86f * escalaRodape).height(42f * escalaRodape).right();
+        }
         rodape.invalidateHierarchy();
+    }
+
+    /** Botao extra na ultima pagina (direita), ex: "Pay" com o icone do vendedor. */
+    public void definirAcao(String texto, TextureRegion icone, Runnable acao) {
+        this.acao = acao;
+        botaoAcao.setText(texto);
+        iconeAcao.setDrawable(icone != null ? new TextureRegionDrawable(icone) : null);
+        atualizarBotaoRodape();
+    }
+
+    /** Resposta do NPC (ex: depois do Pay): troca a fala por essa, sem botao de acao. */
+    public void mostrarResposta(String fala) {
+        if (!root.isVisible()) return;
+        this.paginas = new String[]{fala};
+        this.paginaAtual = 0;
+        this.acao = null;
+        iniciarPagina();
     }
 
     public void atualizar() {

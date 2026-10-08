@@ -56,7 +56,10 @@ public class MiniMapa extends Actor {
     private static final Color COR_FUNDO = COR_VOID;
 
     private final MapaMundo mapa;
-    private final Pintura pintura;
+    private Pintura pintura;
+
+    /** Mapa repintado (ex: ponte liberada por quest). */
+    public void trocarPintura(Pintura nova) { this.pintura = nova; }
     private final Fonte fonte;
     private final Texture pixel;
     private final float borda;

@@ -334,7 +334,23 @@ def carregar_mapa(caminho_tmx):
         mobs.append({'id': f"{mob_id}_{_java_round(cru_x)}_{_java_round(cru_y)}", 'type': mob_id,
                      'spawn_range': alcance, 'respawn_time': respawn})
 
-    return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru, 'velocidades': velocidades}
+    # Areas de quest (camada "QuestAreas", property quest=...): SQMs (coluna,
+    # linha do Tiled - o mesmo tile_de do servidor) que so' quem fez a quest pisa.
+    quest_areas = []
+    for obj in objetos('QuestAreas'):
+        quest = (_ler_props(obj).get('quest') or '').strip().lower()
+        if not quest: continue
+        x = float(obj.get('x', 0)); y = float(obj.get('y', 0))
+        w = float(obj.get('width', 0) or 0); h = float(obj.get('height', 0) or 0)
+        if w <= 0 or h <= 0: continue
+        cells = set()
+        for col in range(int(x // SQM), int((x + w - 1) // SQM) + 1):
+            for lin in range(int(y // SQM), int((y + h - 1) // SQM) + 1):
+                cells.add((col, lin))
+        quest_areas.append({'quest': quest, 'cells': cells})
+
+    return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru, 'velocidades': velocidades,
+            'quest_areas': quest_areas}
 
 
 def _rasterizar(hitboxes, bordas, altura_px):

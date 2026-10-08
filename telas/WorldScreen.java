@@ -464,6 +464,9 @@ public class WorldScreen extends ScreenAdapter {
     // ver registrarEventosDeRede) pra nao repetir a fala/"quest" dele numa
     // proxima conversa, nem depois de relogar (a pedido do usuario).
     private final Set<String> npcDialogoVisto = new HashSet<>();
+    // Quests feitas (servidor manda em "quest_state"): libera a ponte etc.
+    private final Set<String> questsFeitas = new HashSet<>();
+    private static final Set<String> NPCS_QUE_COBRAM = new HashSet<>(java.util.Arrays.asList("kharon"));
 
     // true em Android/iOS - esconde o controle de Fullscreen do Options (nao
     // faz sentido no celular) e some com o joystick quando chat/settings
@@ -3306,6 +3309,27 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("bestiary", (nomeEvt, data) -> {
             if (data != null) bookMenu.atualizarBestiario(data);
         });
+        // ---- Quests (Pay do Kharon -> ponte) ----
+        socket.on("quest_state", (nomeEvt, data) -> {
+            if (data == null) return;
+            questsFeitas.clear();
+            JsonValue feitas = data.get("done");
+            if (feitas != null) for (JsonValue q = feitas.child; q != null; q = q.next) questsFeitas.add(q.asString().toLowerCase());
+            mapa.aplicarQuests(questsFeitas);
+            // Minimapa refeito (a ponte aparece/some nele tambem).
+            if (pinturaMiniMapa != null) {
+                MiniMapa.Pintura velha = pinturaMiniMapa;
+                pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
+                miniMapa.trocarPintura(pinturaMiniMapa);
+                mapaGrande.trocarPintura(pinturaMiniMapa);
+                velha.dispose();
+            }
+        });
+        socket.on("npc_pay_result", (nomeEvt, data) -> {
+            if (data == null) return;
+            if (data.has("currency")) bookMenu.atualizarMoedas(data.getLong("currency", 0L));
+            dialogoNPC.mostrarResposta(data.getString("text", ""));
+        });
         socket.on("ranking", (nomeEvt, data) -> {
             if (data != null) bookMenu.atualizarRanking(data);
         });
@@ -3546,7 +3570,10 @@ public class WorldScreen extends ScreenAdapter {
             npc.animacao.idleBaixo.getRegionY(),
             FRAME_LARGURA,
             npc.animacao.idleBaixo.getRegionHeight());
-        String[] paginas = npcDialogoVisto.contains(npc.tipo)
+        // Quest dele ja feita (pagou): so' "You shall pass.", sem botao.
+        boolean questFeita = questsFeitas.contains(npc.tipo.toLowerCase());
+        String[] paginas = questFeita ? new String[]{"You shall pass."}
+            : npcDialogoVisto.contains(npc.tipo)
             ? DIALOGO_NPC_LEMBRETE
             : DIALOGO_NPC_INTRO;
         dialogoNPC.abrir(npc.nome, retrato, paginas,
@@ -3559,6 +3586,13 @@ public class WorldScreen extends ScreenAdapter {
                 npcEmDialogo = null;
                 atualizarVisibilidadeJoystick();
             });
+        // NPC que cobra (servidor.py::NPC_DB "price"): botao Pay na ultima pagina.
+        if (!questFeita && NPCS_QUE_COBRAM.contains(npc.tipo.toLowerCase())) {
+            String tipo = npc.tipo.toLowerCase();
+            dialogoNPC.definirAcao("Pay", atlas.findRegion("ui/SellerIcon"), () -> {
+                if (socket.isConnected()) socket.emitRaw("npc_pay", GameSocket.obj(w -> w.set("npc_id", tipo)));
+            });
+        }
         atualizarVisibilidadeJoystick();
     }
 
@@ -4042,7 +4076,8 @@ public class WorldScreen extends ScreenAdapter {
             && (diagonal ? !diagonalBloqueada(local.x, local.y, dx, dy)
                          : !colisao.movimentoBloqueado(local.x, local.y, alvoX, alvoY))
             && !npcOcupaTile(alvoX, alvoY)
-            && !mobOcupaTile(alvoX, alvoY);
+            && !mobOcupaTile(alvoX, alvoY)
+            && !mapa.bloqueadoPorQuest(tileX(alvoX), tileY(alvoY)); // ponte sem a quest
         Jogador noCaminho = livre ? jogadorOcupaTile(alvoX, alvoY) : null;
         if (livre && noCaminho == null) {
             tempoInsistindo = 0f;

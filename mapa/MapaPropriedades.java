@@ -150,6 +150,16 @@ public class MapaPropriedades {
     public final List<Luz> luzes = new ArrayList<>();
     public final List<AreaNomeada> areasNomeadas = new ArrayList<>();
     public final List<Rectangle> dimensoes = new ArrayList<>();
+    public final List<AreaQuest> areasQuest = new ArrayList<>();
+
+    public static class AreaQuest {
+        public final String quest;
+        public final Rectangle area;      // mundo (Y pra cima)
+        public final String camadas;      // "Buildings1,Buildings2" ou null (todas menos Ground)
+        AreaQuest(String quest, Rectangle area, String camadas) {
+            this.quest = quest; this.area = area; this.camadas = camadas;
+        }
+    }
 
     private final TiledMap mapa;
     private final int tileWidth, tileHeight;
@@ -242,6 +252,21 @@ public class MapaPropriedades {
         if (camadaDimensoes != null) {
             for (MapObject obj : camadaDimensoes.getObjects()) {
                 if (obj instanceof RectangleMapObject) dimensoes.add(new Rectangle(((RectangleMapObject) obj).getRectangle()));
+            }
+        }
+
+        // Areas de quest (camada de objetos "QuestAreas", property quest=...;
+        // opcional layers="Buildings1,Buildings2" - sem ela, todas menos Ground):
+        // os tiles dessas camadas ali dentro (ex: uma ponte) so' aparecem e so'
+        // da' pra pisar depois da quest (MapaMundo.aplicarQuests / servidor.py).
+        MapLayer camadaQuests = mapa.getLayers().get("QuestAreas");
+        if (camadaQuests != null) {
+            for (MapObject obj : camadaQuests.getObjects()) {
+                Object q = obj.getProperties().get("quest");
+                if (q == null || q.toString().trim().isEmpty() || !(obj instanceof RectangleMapObject)) continue;
+                Object camadasQuest = obj.getProperties().get("layers");
+                areasQuest.add(new AreaQuest(q.toString().trim().toLowerCase(),
+                    new Rectangle(((RectangleMapObject) obj).getRectangle()), camadasQuest != null ? camadasQuest.toString() : null));
             }
         }
 

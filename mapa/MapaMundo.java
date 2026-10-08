@@ -99,6 +99,74 @@ public class MapaMundo {
         // sem ela atrapalhar, isso nao e' estado de jogo).
         if (camadaRoofs != null) camadaRoofs.setVisible(true);
         if (camadaPillars != null) camadaPillars.setVisible(true);
+        // Comeca com toda area de quest travada (o servidor manda as feitas no join).
+        aplicarQuests(java.util.Collections.emptyList());
+    }
+
+    // ---- Areas de quest (ex: ponte do Kharon) ----
+    // Tiles escondidos de cada area enquanto a quest nao foi feita: removidos
+    // da camada (setCell null) DEPOIS do scan de colisao (MapaPropriedades) -
+    // a colisao continua sendo a "com ponte"; quem trava sem a quest e' o
+    // bloqueadoPorQuest (client) e o servidor.
+    private static final class CelulaGuardada {
+        final TiledMapTileLayer camada; final int cx, cy; final TiledMapTileLayer.Cell cell;
+        CelulaGuardada(TiledMapTileLayer camada, int cx, int cy, TiledMapTileLayer.Cell cell) {
+            this.camada = camada; this.cx = cx; this.cy = cy; this.cell = cell;
+        }
+    }
+    private final Map<MapaPropriedades.AreaQuest, java.util.List<CelulaGuardada>> escondidas = new HashMap<>();
+    private final java.util.Set<String> questsFeitas = new java.util.HashSet<>();
+
+    private int[] celulasDe(com.badlogic.gdx.math.Rectangle r) {
+        return new int[]{(int) Math.floor(r.x / tileWidth), (int) Math.floor((r.x + r.width - 1f) / tileWidth),
+                         (int) Math.floor(r.y / tileHeight), (int) Math.floor((r.y + r.height - 1f) / tileHeight)};
+    }
+
+    /** Mostra/esconde os tiles de cada area conforme as quests feitas. */
+    public void aplicarQuests(java.util.Collection<String> feitas) {
+        questsFeitas.clear();
+        for (String q : feitas) questsFeitas.add(q.toLowerCase());
+        for (MapaPropriedades.AreaQuest a : propriedades.areasQuest) {
+            boolean liberada = questsFeitas.contains(a.quest);
+            java.util.List<CelulaGuardada> guardadas = escondidas.get(a);
+            if (liberada) {
+                if (guardadas == null) continue;
+                for (CelulaGuardada g : guardadas) g.camada.setCell(g.cx, g.cy, g.cell);
+                escondidas.remove(a);
+            } else if (guardadas == null) {
+                guardadas = new java.util.ArrayList<>();
+                int[] c = celulasDe(a.area);
+                java.util.Set<String> nomes = null;
+                if (a.camadas != null) {
+                    nomes = new java.util.HashSet<>();
+                    for (String n : a.camadas.split(",")) nomes.add(n.trim());
+                }
+                for (com.badlogic.gdx.maps.MapLayer ml : mapa.getLayers()) {
+                    if (!(ml instanceof TiledMapTileLayer)) continue;
+                    if (nomes != null ? !nomes.contains(ml.getName()) : "Ground".equals(ml.getName())) continue;
+                    TiledMapTileLayer camada = (TiledMapTileLayer) ml;
+                    for (int x = c[0]; x <= c[1]; x++) {
+                        for (int y = c[2]; y <= c[3]; y++) {
+                            TiledMapTileLayer.Cell cell = camada.getCell(x, y);
+                            if (cell == null) continue;
+                            guardadas.add(new CelulaGuardada(camada, x, y, cell));
+                            camada.setCell(x, y, null);
+                        }
+                    }
+                }
+                escondidas.put(a, guardadas);
+            }
+        }
+    }
+
+    /** SQM (cx, cy com Y pra cima) dentro de uma area cuja quest nao foi feita. */
+    public boolean bloqueadoPorQuest(int cx, int cy) {
+        for (MapaPropriedades.AreaQuest a : propriedades.areasQuest) {
+            if (questsFeitas.contains(a.quest)) continue;
+            int[] c = celulasDe(a.area);
+            if (cx >= c[0] && cx <= c[1] && cy >= c[2] && cy <= c[3]) return true;
+        }
+        return false;
     }
 
     public void atualizar(float delta) {

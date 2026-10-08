@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.16"
+SERVER_VERSION = "v0.17"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -70,7 +70,7 @@ except Exception as e:
     print(f"Erro fatal ao conectar ao PostgreSQL: {e}")
 
 MOB_DB = {
-    "rotworm": {"hp": 50, "xp": 20, "attack": 3.0, "drops": [], "currency": {"min": 5, "max": 10}},
+    "rotworm": {"hp": 50, "xp": 15, "attack": 3.0, "drops": [], "currency": {"min": 5, "max": 10}},
 }
 
 # ---------------------------------------------------------------------------
@@ -145,8 +145,31 @@ def bestiario_ouro(p, tipo):
     return bestiario_kills(p, tipo) >= BESTIARIO_MARCOS[-1]
 
 NPC_DB = {
-    "kharon": {"name": "Kharon"},
+    # price (em cobre) + quest: botao "Pay" no dialogo (handle_npc_pay). Pagar
+    # libera a quest pro personagem (ex: a ponte da area "kharon" no Tiled).
+    "kharon": {"name": "Kharon", "price": 200, "quest": "kharon"},
 }
+NPC_PAY_DISTANCIA_SQM = 4
+NPC_TEXTO_SEM_DINHEIRO = "Do not try to deceive me, mortal."
+NPC_TEXTO_PAGO = "You shall pass."
+
+# Areas de quest (camada de objetos "QuestAreas" do Tiled, property quest=...):
+# so' quem fez a quest anda nesses SQMs (o client tambem so' desenha a ponte
+# pra quem fez). mapa -> [{"quest": id, "cells": set((col, linha))}]
+areas_de_quest = {}
+
+def quests_feitas(p):
+    estado = p.get('npc_dialogue_state')
+    if not isinstance(estado, dict): return []
+    return [k[6:] for k, v in estado.items() if str(k).startswith('quest:') and v]
+
+def bloqueado_por_quest(p, tile):
+    feitas = None
+    for area in areas_de_quest.get(p.get('mapa'), ()):
+        if tile in area['cells']:
+            if feitas is None: feitas = set(quests_feitas(p))
+            if area['quest'] not in feitas: return True
+    return False
 NPC_WANDER_RADIUS_SQM = 5
 # Mob parado (sem alvo) passeia perto de casa, numa area menor que a do NPC.
 MOB_WANDER_RADIUS_SQM = 3
@@ -2305,6 +2328,7 @@ def handle_join_game(data):
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
         emit('bestiary', montar_bestiario(data), room=sid)
+        emit('quest_state', {'done': quests_feitas(data)}, room=sid)
 
         rooms_area = set(salas_vizinhas(room))
         dead_mobs = [m_id for m_id, m_data in active_mobs.items() if m_data.get('hp', 1) <= 0 and m_data.get('room') in rooms_area]
@@ -2770,6 +2794,42 @@ def handle_update_skins(data):
     except Exception: 
         import traceback
         traceback.print_exc()   
+
+@socketio.on('npc_pay')
+def handle_npc_pay(data):
+    # Botao "Pay" do dialogo: cobra o preco do NPC e libera a quest dele.
+    try:
+        sid = request.sid
+        p = online_players.get(sid)
+        if not p or not isinstance(data, dict): return
+        npc_id = str(data.get('npc_id', '')).strip().lower()[:64]
+        info = NPC_DB.get(npc_id)
+        if not info or 'price' not in info: return
+        # Tem que estar perto de um NPC desse tipo.
+        tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+        perto = any(n.get('npc_id', '').lower() == npc_id and
+                    max(abs(tile_de(n.get('pos_x', 0), n.get('pos_y', 0))[0] - tp[0]),
+                        abs(tile_de(n.get('pos_x', 0), n.get('pos_y', 0))[1] - tp[1])) <= NPC_PAY_DISTANCIA_SQM
+                    for n in active_npcs.values())
+        if not perto: return
+        quest = info.get('quest', npc_id)
+        if quest in quests_feitas(p):
+            emit('npc_pay_result', {'npc_id': npc_id, 'ok': True, 'text': NPC_TEXTO_PAGO,
+                                    'currency': int(p.get('currency', 0))}, room=sid)
+            return
+        preco = int(info['price'])
+        if int(p.get('currency', 0)) < preco:
+            emit('npc_pay_result', {'npc_id': npc_id, 'ok': False, 'text': NPC_TEXTO_SEM_DINHEIRO}, room=sid)
+            return
+        p['currency'] = int(p.get('currency', 0)) - preco
+        if not isinstance(p.get('npc_dialogue_state'), dict): p['npc_dialogue_state'] = {}
+        p['npc_dialogue_state']['quest:' + quest] = True
+        _queue_save(p)
+        emit('npc_pay_result', {'npc_id': npc_id, 'ok': True, 'text': NPC_TEXTO_PAGO,
+                                'currency': int(p['currency'])}, room=sid)
+        emit('quest_state', {'done': quests_feitas(p)}, room=sid)
+    except Exception:
+        traceback.print_exc()
 
 @socketio.on('npc_dialogue_seen')
 def handle_npc_dialogue_seen(data):
@@ -3698,6 +3758,10 @@ def handle_m(data):
             if max(abs(destino_tile[0] - origem_p[0]), abs(destino_tile[1] - origem_p[1])) > 2:
                 _corrigir_posicao(sid, p)
                 return
+        # Area de quest (ponte do Kharon...) sem a quest feita: nao passa.
+        if bloqueado_por_quest(p, destino_tile):
+            _corrigir_posicao(sid, p)
+            return
         grade_p = mapas_colisao.get(p.get('mapa'))
         if grade_p is not None and int(p.get('floor', 1) or 1) == 1:
             if eh_parede(grade_p, destino_tile):
@@ -5182,6 +5246,7 @@ def carregar_mapa_do_servidor():
     conteudo_mapas[MAPA_ID_SERVIDOR] = {'fp': grade['fp'], 'mobs': dados['mobs'],
                                         'npcs': dados['npcs'], 'spawn': dados['spawn']}
     velocidade_tiles[MAPA_ID_SERVIDOR] = dados.get('velocidades', {})
+    areas_de_quest[MAPA_ID_SERVIDOR] = dados.get('quest_areas', [])
     MAPAS_DO_SERVIDOR.add(MAPA_ID_SERVIDOR)
     for m in active_mobs.values():
         m['path'] = None
@@ -5194,7 +5259,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-08 bestiary"
+VERSAO_SERVIDOR = "2026-10-08 kharon pay + ponte"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)
