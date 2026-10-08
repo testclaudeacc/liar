@@ -44,8 +44,8 @@ public class ChatUI {
     private static final int MAX_MENSAGENS = 60;
     /** Igual servidor.py::CHAT_MAX_CARACTERES - passou disso o campo para de digitar. */
     public static final int MAX_CARACTERES = 200;
-    /** Amarelo das mensagens de boas-vindas. */
-    public static final Color COR_BOAS_VINDAS = new Color(1f, 0.9f, 0.2f, 1f);
+    /** Cor das mensagens de boas-vindas (Local e canais).*/
+    public static final Color COR_BOAS_VINDAS = new Color(0.35f, 1f, 0.35f, 1f); // verde
     private static final java.util.Map<String, String> BOAS_VINDAS = new java.util.HashMap<>();
     static {
         BOAS_VINDAS.put("Portuguese", "Seja bem-vindo! Respeite as regras para evitar puni\u00e7\u00f5es e trate os outros com dignidade! Bom jogo :)");

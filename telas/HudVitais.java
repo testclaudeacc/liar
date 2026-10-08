@@ -356,6 +356,30 @@ public final class HudVitais {
         return pixels * FATOR / escala;
     }
 
+    /** Fundo dos icones de status: borda (2px de tela), filete preto (1px)
+     * e o fundo colorido, tudo alinhado em pixel inteiro de tela. */
+    private Drawable quadroStatus(Color borda, Color fundo) {
+        TextureRegion r = new TextureRegion(pixel);
+        Color cBorda = new Color(borda), cFundo = new Color(fundo);
+        return new com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable() {
+            @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch b, float x, float y, float w, float h) {
+                float x0 = pixelInteiro(x), y0 = pixelInteiro(y);
+                float x1 = pixelInteiro(x + w), y1 = pixelInteiro(y + h);
+                float px1 = 1f / escala;
+                float grossura = Math.max(1, Math.round(FATOR * 2f)) * px1;
+                Color antes = new Color(b.getColor());
+                b.setColor(cBorda.r, cBorda.g, cBorda.b, antes.a);
+                b.draw(r, x0, y0, x1 - x0, y1 - y0);
+                b.setColor(0f, 0f, 0f, antes.a);
+                b.draw(r, x0 + grossura, y0 + grossura, x1 - x0 - grossura * 2f, y1 - y0 - grossura * 2f);
+                float d = grossura + Math.max(1, Math.round(FATOR)) * px1;
+                b.setColor(cFundo.r, cFundo.g, cFundo.b, antes.a);
+                b.draw(r, x0 + d, y0 + d, x1 - x0 - d * 2f, y1 - y0 - d * 2f);
+                b.setColor(antes);
+            }
+        };
+    }
+
     /** So' a borda (cima, esquerda, baixo, direita), sem preencher o meio. */
     private Drawable moldura(Color c, float cima, float esq, float baixo, float dir) {
         TextureRegion r = new TextureRegion(pixel);
@@ -424,29 +448,26 @@ public final class HudVitais {
         // Mesmo visual do painel de HP/MP: borda cinza de 2px, filete preto
         // e o fundo colorido; icone grande no meio.
         float lado = px(MOBILE ? 58 : 52);
+        // Borda, filete preto e fundo num desenho so', com cada camada presa
+        // no pixel de tela: em tabelas separadas a borda caia entre pixels e
+        // sumia na esquerda/embaixo.
         Table interno = new Table();
-        interno.setBackground(cor(fundo));
         Image img = icone(atlas, regiao);
         if (img != null) {
             img.setScaling(Scaling.fit);
             interno.add(img).size(lado * 0.78f);
         }
-        Table filete = new Table();
-        filete.setBackground(cor(Color.BLACK));
-        filete.pad(px(1));
+        Table quadrado = new Table();
+        quadrado.setBackground(quadroStatus(new Color(fundo).mul(0.55f, 0.55f, 0.55f, 1f), fundo));
+        quadrado.pad(px(3));
         if (contador != null) {
             Table canto = new Table();
             canto.bottom().right();
             canto.add(contador).padRight(px(3)).padBottom(px(1));
-            filete.add(new Stack(interno, canto)).grow();
+            quadrado.add(new Stack(interno, canto)).size(lado);
         } else {
-            filete.add(interno).grow();
+            quadrado.add(interno).size(lado);
         }
-        Table quadrado = new Table();
-        // Borda na cor do proprio botao, mais escura (antes era cinza).
-        quadrado.setBackground(cor(new Color(fundo).mul(0.55f, 0.55f, 0.55f, 1f)));
-        quadrado.pad(px(2));
-        quadrado.add(filete).size(lado);
         quadrado.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         quadrado.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
             @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer,
