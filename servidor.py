@@ -1758,6 +1758,8 @@ def init_db():
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS npc_dialogue_state TEXT DEFAULT '{}'")
         # Barra de atalhos: {"slots": [8]} (ver normalizar_hotbar).
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS hotbar TEXT DEFAULT '{}'")
+        # Personagem "apagado" (soft delete, ver delete_character): NULL = ativo.
+        c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS deleted_at DOUBLE PRECISION")
         c.execute('''CREATE TABLE IF NOT EXISTS friendships (
                         id SERIAL PRIMARY KEY,
                         owner_name TEXT NOT NULL,
@@ -1927,7 +1929,7 @@ def create_character():
         conn = db_pool.getconn()
         c = conn.cursor()
         if not token_valido(c, user_id, dados.get('token')): return jsonify({"erro": "Session expired."}), 401
-        c.execute("SELECT COUNT(*) FROM characters WHERE user_id = %s", (user_id,))
+        c.execute("SELECT COUNT(*) FROM characters WHERE user_id = %s AND deleted_at IS NULL", (user_id,))
         if c.fetchone()[0] >= 4: return jsonify({"erro": "No character slots."}), 403
         inventory_inicial, equipped_inicial = montar_kit_inicial(class_name)
 
@@ -1954,7 +1956,7 @@ def get_characters():
         c = conn.cursor()
         # Sem token valido, qualquer um via os personagens de qualquer conta.
         if not token_valido(c, user_id, dados.get('token')): return jsonify({"erro": "Session expired."}), 401
-        c.execute("SELECT name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, time_played FROM characters WHERE user_id = %s ORDER BY id ASC", (user_id,))
+        c.execute("SELECT name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, time_played FROM characters WHERE user_id = %s AND deleted_at IS NULL ORDER BY id ASC", (user_id,))
         char_list = []
         for row in c.fetchall():
             char_list.append({
@@ -1993,8 +1995,16 @@ def delete_character():
         if not user or not _conferir_senha(user[0], str(dados['password'])): return jsonify({"erro": "Wrong pass."}), 401
         # Personagem online nao pode ser apagado (ficava "fantasma" no mundo).
         if str(dados['name']) in players_by_name: return jsonify({"erro": "Character is online."}), 409
-        c.execute("DELETE FROM characters WHERE user_id = %s AND name = %s", (dados['user_id'], str(dados['name'])))
+        # Nao apaga de verdade: renomeia pra "<nome>#del#<aleatorio>" e marca
+        # deleted_at. Some da selecao de personagens, do ranking e libera o
+        # nome; da' pra recuperar no banco (ver RECUPERAR_PERSONAGEM.md).
+        nome_antigo = str(dados['name'])
+        nome_apagado = f"{nome_antigo}#del#{secrets.token_hex(6)}"
+        c.execute("""UPDATE characters SET name = %s, deleted_at = %s
+                     WHERE user_id = %s AND name = %s AND deleted_at IS NULL""",
+                  (nome_apagado, time.time(), dados['user_id'], nome_antigo))
         conn.commit()
+        if c.rowcount: _ranking_cache.clear()  # sai do ranking na proxima abertura
         return jsonify({"mensagem": "Deleted!"}), 200
     except Exception as e: return _erro_interno(e)
     finally:
@@ -2179,7 +2189,7 @@ def handle_join_game(data):
         # So' guarda o que o servidor mesmo vai usar (o resto do payload do
         # client nao entra no estado do player).
         data = {'user_id': user_id, 'name': p_name, 'skins': data.get('skins')}
-        c.execute("SELECT class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, kills, current_hp, current_mp, currency, time_played, npc_dialogue_state, hotbar FROM characters WHERE user_id = %s AND name = %s", (user_id, p_name))
+        c.execute("SELECT class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, kills, current_hp, current_mp, currency, time_played, npc_dialogue_state, hotbar FROM characters WHERE user_id = %s AND name = %s AND deleted_at IS NULL", (user_id, p_name))
         row = c.fetchone()
 
         if not row: return
@@ -4742,7 +4752,7 @@ def _montar_ranking(categoria):
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
-        c.execute("SELECT name, class_name, level, exp, skills FROM characters")
+        c.execute("SELECT name, class_name, level, exp, skills FROM characters WHERE deleted_at IS NULL")
         for nome, classe, level, exp, skills_txt in c.fetchall():
             try: skills = json.loads(skills_txt) if skills_txt else {}
             except (TypeError, ValueError): skills = {}
