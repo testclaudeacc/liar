@@ -3471,10 +3471,10 @@ public final class BookMenuUI {
             if (iconeHp != null) {
                 Image i = new Image(new TextureRegionDrawable(iconeHp));
                 i.setScaling(Scaling.fit);
-                linhaHp.add(i).size(24).padRight(6);
+                linhaHp.add(i).size(ICONE_FICHA).padRight(6);
             }
             Label hp = new Label(String.valueOf(e.getInt("hp", 0)), skin, "hud");
-            hp.setFontScale(0.9f * FONTE_STATS);
+            hp.setFontScale(0.75f * FONTE_STATS);
             hp.setColor(1f, 0.55f, 0.55f, 1f); // vermelho claro
             linhaHp.add(hp);
             info.add(linhaHp).left().padLeft(10).padTop(6).row();
@@ -3486,7 +3486,7 @@ public final class BookMenuUI {
                 Image i = new Image(new TextureRegionDrawable(estrela));
                 i.setScaling(Scaling.fit);
                 if (!comBonus) i.setColor(0.4f, 0.4f, 0.4f, 0.7f);
-                linhaBonus.add(i).size(24).padRight(6);
+                linhaBonus.add(i).size(ICONE_FICHA).padRight(6);
             }
             Label bonus = new Label("5% Extra DMG/DEF", skin, "hud");
             bonus.setFontScale(0.65f * FONTE_STATS);
@@ -3503,10 +3503,10 @@ public final class BookMenuUI {
             if (iconeBag != null) {
                 Image i = new Image(new TextureRegionDrawable(iconeBag));
                 i.setScaling(Scaling.fit);
-                linhaTitulo.add(i).size(24).padRight(6);
+                linhaTitulo.add(i).size(ICONE_FICHA).padRight(6);
             }
             Label titulo = new Label("Loot", skin, "hud");
-            titulo.setFontScale(0.8f * FONTE_STATS);
+            titulo.setFontScale(0.75f * FONTE_STATS);
             titulo.setColor(Color.LIGHT_GRAY);
             linhaTitulo.add(titulo);
             info.add(linhaTitulo).left().padLeft(10).padTop(8).row();
@@ -3567,13 +3567,16 @@ public final class BookMenuUI {
         if (r != null) {
             Image i = new Image(new TextureRegionDrawable(r));
             i.setScaling(Scaling.fit);
-            linha.add(i).size(20).padRight(3);
+            linha.add(i).size(ICONE_FICHA).padRight(4);
         }
         Label v = new Label(moeda[1], skin, "hud");
         v.setFontScale(0.75f * FONTE_STATS);
         v.setColor(corMoeda(moeda[0]));
         linha.add(v);
     }
+
+    /** Mesmo tamanho de icone em todas as linhas da ficha (HP, bonus, loot, moedas). */
+    private static final float ICONE_FICHA = 22f;
 
     private static String formatarChance(float chance) {
         float pct = chance * 100f;
