@@ -2634,6 +2634,21 @@ def comando_admin(sid, p, texto):
     if cmd in ('help', 'admin'):
         chat_sistema(sid, "Admin: /bestiary <mob> <0-3|clear>  (0 discovered, 1 copper, 2 silver, 3 gold)")
         chat_sistema(sid, "Admin: /quest <name> complete|reset   /quests   /mobs")
+        chat_sistema(sid, "Admin: /tp x<X> y<Y>  (minimap coordinates, ex: /tp x56 y200)")
+        return
+    if cmd == 'tp':
+        # /tp x56 y200 (ou /tp 56 200): mesmo X/Y do minimapa.
+        try:
+            nums = [int(re.sub(r'^[xXyY]', '', v).strip(',')) for v in partes[1:3]]
+            if len(nums) != 2: raise ValueError
+        except ValueError:
+            chat_sistema(sid, "Usage: /tp x<X> y<Y>  (ex: /tp x56 y200)", 'red')
+            return
+        if p.get('is_dead'):
+            chat_sistema(sid, "You are dead.", 'red')
+            return
+        dest = _teleportar(sid, p, (nums[0], nums[1]), p.get('direction', 'down'))
+        chat_sistema(sid, f"Teleported to x{dest[0]}, y{dest[1]}.")
         return
     if cmd == 'mobs':
         chat_sistema(sid, "Mobs: " + (", ".join(f"{t} ({i.get('name', t.capitalize())})" for t, i in MOB_DB.items()) or "none"))
@@ -3974,24 +3989,30 @@ def handle_tp(data):
             _avisar_admin_bloqueio(sid, p, "teleport invalido (nao tem TP na direcao)", sqm_tp)
             return recusar()
         p['_ultimo_tp'] = now
-        dest = _destino_livre(p, dest)
-        x, y = centro_tile(dest)
-        new_room = get_chunk(x, y, 1)
-        old_room = p.get('room')
-        if old_room != new_room:
-            if old_room: leave_room(old_room)
-            join_room(new_room)
-        p['room'], p['pos_x'], p['pos_y'], p['direction'] = new_room, x, y, direcao
-        p['_move_balde'] = MOVE_BALDE_MAX
-        p['last_move_time'] = now
-        p.pop('_fator_passo', None)
-        # Sem "passo": quem ve o player recebe ele reposicionado direto (foto),
-        # em vez de ve-lo andando ate' o destino.
-        marcar_movimento(sid)
-        emit('tp_result', {'ok': True, 'pos_x': x, 'pos_y': y, 'direction': direcao}, room=sid)
-        emit('sync_area_data', montar_sync_area(sid, new_room), room=sid)
+        _teleportar(sid, p, dest, direcao)
     except Exception:
         traceback.print_exc()
+
+def _teleportar(sid, p, dest, direcao):
+    # Leva o player pro SQM dest (ou o livre mais perto). Usado pelo TP do
+    # mapa e pelo /tp do admin.
+    dest = _destino_livre(p, dest)
+    x, y = centro_tile(dest)
+    new_room = get_chunk(x, y, 1)
+    old_room = p.get('room')
+    if old_room != new_room:
+        if old_room: leave_room(old_room)
+        join_room(new_room)
+    p['room'], p['pos_x'], p['pos_y'], p['direction'], p['floor'] = new_room, x, y, direcao, 1
+    p['_move_balde'] = MOVE_BALDE_MAX
+    p['last_move_time'] = time.time()
+    p.pop('_fator_passo', None)
+    # Sem "passo": quem ve o player recebe ele reposicionado direto (foto),
+    # em vez de ve-lo andando ate' o destino.
+    marcar_movimento(sid)
+    emit('tp_result', {'ok': True, 'pos_x': x, 'pos_y': y, 'direction': direcao}, room=sid)
+    emit('sync_area_data', montar_sync_area(sid, new_room), room=sid)
+    return dest
 
 @socketio.on('l')
 def handle_l(data):

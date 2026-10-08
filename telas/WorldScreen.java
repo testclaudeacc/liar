@@ -2783,11 +2783,17 @@ public class WorldScreen extends ScreenAdapter {
             tpRawY = data.getFloat("pos_y", -1f);
             tpDirecao = data.getString("direction", local.direcao);
             tpRespondido = tpRawX != -1f && tpRawY != -1f;
-            // Respondeu depois do timeout (ja' clareou): aplica direto.
+            // Sem TP em andamento (/tp do admin, ou resposta depois do
+            // timeout): aplica direto.
             if (tpFase == 0 && tpRespondido) {
                 local.x = conversor.rawParaMundoX(Jogador.snapCentroXCru(tpRawX));
                 local.y = conversor.rawParaMundoY(Jogador.snapBaseYCru(tpRawY));
                 local.movendo = false;
+                if (tpOk) {
+                    spawnSmokeX = local.x;
+                    spawnSmokeY = local.y;
+                    spawnSmokeTempo = 0f;
+                }
             }
         });
         socket.on("sync_local_player", (nomeEvt, data) -> {
