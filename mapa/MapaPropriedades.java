@@ -155,7 +155,7 @@ public class MapaPropriedades {
     public static class AreaQuest {
         public final String quest;
         public final Rectangle area;      // mundo (Y pra cima)
-        public final String camadas;      // "Buildings1,Buildings2" ou null (todas menos Ground)
+        public final String camadas;      // "Buildings1,Buildings2" ou null (Buildings2)
         AreaQuest(String quest, Rectangle area, String camadas) {
             this.quest = quest; this.area = area; this.camadas = camadas;
         }
@@ -256,7 +256,7 @@ public class MapaPropriedades {
         }
 
         // Areas de quest (camada de objetos "QuestAreas", property quest=...;
-        // opcional layers="Buildings1,Buildings2" - sem ela, todas menos Ground):
+        // opcional layers="Buildings1,Buildings2" - sem ela, so' Buildings2):
         // os tiles dessas camadas ali dentro (ex: uma ponte) so' aparecem e so'
         // da' pra pisar depois da quest (MapaMundo.aplicarQuests / servidor.py).
         MapLayer camadaQuests = mapa.getLayers().get("QuestAreas");

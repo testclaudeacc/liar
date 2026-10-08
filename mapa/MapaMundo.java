@@ -116,6 +116,7 @@ public class MapaMundo {
     }
     private final Map<MapaPropriedades.AreaQuest, java.util.List<CelulaGuardada>> escondidas = new HashMap<>();
     private final java.util.Set<String> questsFeitas = new java.util.HashSet<>();
+    private static final String CAMADA_PONTE_PADRAO = "Buildings2";
 
     private int[] celulasDe(com.badlogic.gdx.math.Rectangle r) {
         return new int[]{(int) Math.floor(r.x / tileWidth), (int) Math.floor((r.x + r.width - 1f) / tileWidth),
@@ -151,14 +152,12 @@ public class MapaMundo {
             } else if (guardadas == null) {
                 guardadas = new java.util.ArrayList<>();
                 int[] c = celulasDe(a.area);
-                java.util.Set<String> nomes = null;
-                if (a.camadas != null) {
-                    nomes = new java.util.HashSet<>();
-                    for (String n : a.camadas.split(",")) nomes.add(n.trim());
-                }
+                // Camada da ponte: a da property "layers" ou, sem ela, Buildings2.
+                java.util.Set<String> nomes = new java.util.HashSet<>();
+                for (String n : (a.camadas != null ? a.camadas : CAMADA_PONTE_PADRAO).split(",")) nomes.add(n.trim());
                 for (com.badlogic.gdx.maps.MapLayer ml : mapa.getLayers()) {
                     if (!(ml instanceof TiledMapTileLayer)) continue;
-                    if (nomes != null ? !nomes.contains(ml.getName()) : "Ground".equals(ml.getName())) continue;
+                    if (!nomes.contains(ml.getName())) continue;
                     TiledMapTileLayer camada = (TiledMapTileLayer) ml;
                     for (int x = c[0]; x <= c[1]; x++) {
                         for (int y = c[2]; y <= c[3]; y++) {
