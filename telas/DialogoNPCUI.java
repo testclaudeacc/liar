@@ -258,6 +258,8 @@ public final class DialogoNPCUI {
         this.acao = null; // quem quiser o botao chama definirAcao depois de abrir
         iniciarPagina();
         root.setVisible(true);
+        // Por cima dos botoes e da hotbar (antes ficava atras e eles cobriam a fala).
+        root.toFront();
     }
 
     private void iniciarPagina() {

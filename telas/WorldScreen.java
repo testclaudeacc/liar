@@ -470,7 +470,7 @@ public class WorldScreen extends ScreenAdapter {
     private boolean questsRecebidas = false;
     // Animacao da ponte: uma linha a cada INTERVALO_LINHA_PONTE segundos.
     private float tempoProximaLinhaPonte = 0f;
-    private static final float INTERVALO_LINHA_PONTE = 0.18f;
+    private static final float INTERVALO_LINHA_PONTE = 0.4f;
     private static final Color COR_TUC = Color.valueOf("ff9a1f"); // mesmo laranja do "Om Noom"
 
     /** Texto de acao parado num ponto do mundo (ex: "TUC" na ponte). */
@@ -485,7 +485,7 @@ public class WorldScreen extends ScreenAdapter {
         if (tempoProximaLinhaPonte > 0f) return;
         tempoProximaLinhaPonte = INTERVALO_LINHA_PONTE;
         float[] centro = mapa.revelarProximaLinha();
-        if (centro != null) textoAcaoNoMundo(centro[0], centro[1], "TUC", COR_TUC);
+        if (centro != null) textoAcaoNoMundo(centro[0], centro[1], "*TUC*", COR_TUC);
         // Acabou: minimapa refeito com a ponte inteira.
         if (!mapa.temLinhaPendente() && pinturaMiniMapa != null) {
             MiniMapa.Pintura velha = pinturaMiniMapa;

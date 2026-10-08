@@ -2546,6 +2546,13 @@ def eh_admin(p):
 # /bestiary <mob> <0-3>: 0 = so' descoberto, 1 = cobre, 2 = prata, 3 = ouro.
 ADMIN_BESTIARIO_KILLS = {0: 1, 1: 20, 2: 100, 3: 500}
 
+def _todas_as_quests():
+    # Quests dos NPCs (NPC_DB "quest") + as das areas do mapa (QuestAreas).
+    nomes = {str(i['quest']).lower() for i in NPC_DB.values() if i.get('quest')}
+    for areas in areas_de_quest.values():
+        for a in areas: nomes.add(a['quest'])
+    return sorted(nomes)
+
 def _tipo_do_mob_pelo_nome(nome):
     nome = nome.lower().strip()
     for tipo, info in MOB_DB.items():
@@ -2559,6 +2566,30 @@ def comando_admin(sid, p, texto):
     cmd = partes[0].lower()
     if cmd in ('help', 'admin'):
         chat_sistema(sid, "Admin: /bestiary <mob> <0-3|clear>  (0 discovered, 1 copper, 2 silver, 3 gold)")
+        chat_sistema(sid, "Admin: /quest <name> complete|reset   /quests   /mobs")
+        return
+    if cmd == 'mobs':
+        chat_sistema(sid, "Mobs: " + (", ".join(f"{t} ({i.get('name', t.capitalize())})" for t, i in MOB_DB.items()) or "none"))
+        return
+    if cmd == 'quests':
+        feitas = set(quests_feitas(p))
+        nomes = _todas_as_quests()
+        chat_sistema(sid, "Quests: " + (", ".join(f"{q} [{'done' if q in feitas else 'not done'}]" for q in nomes) or "none"))
+        return
+    if cmd == 'quest':
+        if len(partes) < 3 or partes[-1].lower() not in ('complete', 'reset'):
+            chat_sistema(sid, "Usage: /quest <name> complete|reset", 'red')
+            return
+        quest = ' '.join(partes[1:-1]).lower()
+        if quest not in _todas_as_quests():
+            chat_sistema(sid, "Unknown quest. Quests: " + ", ".join(_todas_as_quests()), 'red')
+            return
+        if not isinstance(p.get('npc_dialogue_state'), dict): p['npc_dialogue_state'] = {}
+        if partes[-1].lower() == 'complete': p['npc_dialogue_state']['quest:' + quest] = True
+        else: p['npc_dialogue_state'].pop('quest:' + quest, None)
+        _queue_save(p)
+        socketio.emit('quest_state', {'done': quests_feitas(p)}, room=sid)
+        chat_sistema(sid, f"Quest {quest}: {partes[-1].lower()}.")
         return
     if cmd == 'bestiary':
         if len(partes) < 3:
@@ -4972,7 +5003,7 @@ def _comer(sid, p, inst):
     p['_fullness_acc'] = 0.0  # acabou de comer: o proximo "tique" de fome recomeça
     _queue_save(p)
     emit('food_result', {'ok': True, 'fullness': obter_fullness(p)}, room=sid)
-    texto_de_acao(p, "Om Noom")
+    texto_de_acao(p, "*Om Noom*")  # barulhos entre asteriscos
     emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(inventario), 'equipped_items': p.get('equipped_items', {})}, room=sid)
     emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
 
