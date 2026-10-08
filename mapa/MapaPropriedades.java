@@ -136,6 +136,9 @@ public class MapaPropriedades {
     // Protection Zone: SQMs com qualquer tile na camada de tiles
     // "ProtectionZone" (nao e' desenhada). Mesma regra do servidor.py::na_pz.
     private final java.util.Set<Long> zonaProtegida = new java.util.HashSet<>();
+    // Teleports: SQMs cobertos pelos retangulos da camada de objetos
+    // "Teleports" (o destino so' o servidor usa - servidor.py::handle_tp).
+    private final java.util.Set<Long> teleportes = new java.util.HashSet<>();
 
     // Forma e' "fina" se um lado for <= 30% do tile (~4.8px de 16) e o lado
     // oposto cobrir pelo menos 60% do tile (~9.6px) - bate com os valores
@@ -190,6 +193,19 @@ public class MapaPropriedades {
                 }
         }
         Gdx.app.log("MapaPropriedades", zonaProtegida.size() + " SQM(s) de Protection Zone");
+        MapLayer camadaTps = mapa.getLayers().get("Teleports");
+        if (camadaTps != null) {
+            for (MapObject obj : camadaTps.getObjects()) {
+                if (!(obj instanceof RectangleMapObject)) continue;
+                if (obj.getProperties().get("dest_x") == null || obj.getProperties().get("dest_y") == null) continue;
+                Rectangle r = ((RectangleMapObject) obj).getRectangle();
+                float w = r.width > 0 ? r.width : tileWidth, h = r.height > 0 ? r.height : tileHeight;
+                for (int cx = (int) Math.floor(r.x / tileWidth); cx <= (int) Math.floor((r.x + w - 1f) / tileWidth); cx++)
+                    for (int cy = (int) Math.floor(r.y / tileHeight); cy <= (int) Math.floor((r.y + h - 1f) / tileHeight); cy++)
+                        teleportes.add(chaveCelula(cx, cy));
+            }
+        }
+        Gdx.app.log("MapaPropriedades", teleportes.size() + " SQM(s) de teleport na camada Teleports");
         int[][] anulaAPartirDe = calcularAnulacaoPorCelula(camadas);
         for (int i = 0; i < camadas.length; i++) {
             if (camadas[i] != null) escanearColisaoELuz(camadas[i], i, anulaAPartirDe);
@@ -495,6 +511,14 @@ public class MapaPropriedades {
         int cy = (int) Math.floor((mundoY + tileHeight / 2f) / tileHeight);
         Float mod = velocidadePorCelula.get(chaveCelula(cx, cy));
         return mod != null ? mod : 1f;
+    }
+
+    /** SQM sob (mundoX, mundoY) - pes, igual velocidadeEm - e' um teleport. */
+    public boolean ehTeleporte(float mundoX, float mundoY) {
+        if (teleportes.isEmpty()) return false;
+        int cx = (int) Math.floor(mundoX / tileWidth);
+        int cy = (int) Math.floor((mundoY + tileHeight / 2f) / tileHeight);
+        return teleportes.contains(chaveCelula(cx, cy));
     }
 
     /** SQM sob (mundoX, mundoY) - pes, igual velocidadeEm - e' Protection Zone. */

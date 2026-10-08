@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.18"
+SERVER_VERSION = "v0.19"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -172,6 +172,11 @@ def na_pz(obj, tile=None):
     if not pz or int(obj.get('floor', 1) or 1) != 1: return False
     if tile is None: tile = tile_de(obj.get('pos_x', 0), obj.get('pos_y', 0))
     return tile in pz
+
+# Teleports (camada Teleports do World.tmx): {map_id: {SQM do TP: SQM destino}}.
+teleportes = {}
+TP_COOLDOWN_SEG = 1.0
+_DELTA_DIRECAO = {'up': (0, -1), 'down': (0, 1), 'left': (-1, 0), 'right': (1, 0)}
 
 class _Bloqueados:
     """Dois conjuntos de SQMs bloqueados juntos, sem copiar (a PZ pode ser grande)."""
@@ -3927,6 +3932,67 @@ def handle_m(data):
         marcar_movimento(sid, (x, y, d_int))
     except Exception: pass
 
+def _destino_livre(p, dest):
+    # Destino do TP ocupado (player/mob) ou parede: o SQM livre mais perto
+    # (ate' 2 SQMs). Nada livre: vai pro proprio destino mesmo.
+    grade = mapas_colisao.get(p.get('mapa'))
+    ocupados = _tiles_ocupados(excluir_sid=request.sid, sala=get_chunk(*centro_tile(dest), 1))
+    for raio in range(0, 3):
+        for dx in range(-raio, raio + 1):
+            for dy in range(-raio, raio + 1):
+                if max(abs(dx), abs(dy)) != raio: continue
+                t = (dest[0] + dx, dest[1] + dy)
+                if t in ocupados or (grade is not None and eh_parede(grade, t)): continue
+                if t in teleportes.get(p.get('mapa'), {}) or bloqueado_por_quest(p, t): continue
+                return t
+    return dest
+
+@socketio.on('tp')
+def handle_tp(data):
+    # Teleport (igual Tibia): o SQM do TP tem colisao; o client "anda" pra
+    # dentro dele e pede o teleporte. So' vale andando NA DIRECAO do TP, do
+    # SQM do lado (reto) - nada de ser empurrado/trocado pra dentro dele.
+    try:
+        sid = request.sid
+        p = online_players.get(sid)
+        if not p or not isinstance(data, dict): return
+        direcao = str(data.get('direction', ''))
+        delta = _DELTA_DIRECAO.get(direcao)
+        now = time.time()
+
+        def recusar():
+            emit('tp_result', {'ok': False, 'pos_x': p.get('pos_x', -1), 'pos_y': p.get('pos_y', -1),
+                               'direction': p.get('direction', 'down')}, room=sid)
+
+        if delta is None or p.get('is_dead') or int(p.get('floor', 1) or 1) != 1 \
+                or now - p.get('_ultimo_tp', 0) < TP_COOLDOWN_SEG:
+            return recusar()
+        origem = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+        sqm_tp = (origem[0] + delta[0], origem[1] + delta[1])
+        dest = teleportes.get(p.get('mapa'), {}).get(sqm_tp)
+        if dest is None or bloqueado_por_quest(p, sqm_tp):
+            _avisar_admin_bloqueio(sid, p, "teleport invalido (nao tem TP na direcao)", sqm_tp)
+            return recusar()
+        p['_ultimo_tp'] = now
+        dest = _destino_livre(p, dest)
+        x, y = centro_tile(dest)
+        new_room = get_chunk(x, y, 1)
+        old_room = p.get('room')
+        if old_room != new_room:
+            if old_room: leave_room(old_room)
+            join_room(new_room)
+        p['room'], p['pos_x'], p['pos_y'], p['direction'] = new_room, x, y, direcao
+        p['_move_balde'] = MOVE_BALDE_MAX
+        p['last_move_time'] = now
+        p.pop('_fator_passo', None)
+        # Sem "passo": quem ve o player recebe ele reposicionado direto (foto),
+        # em vez de ve-lo andando ate' o destino.
+        marcar_movimento(sid)
+        emit('tp_result', {'ok': True, 'pos_x': x, 'pos_y': y, 'direction': direcao}, room=sid)
+        emit('sync_area_data', montar_sync_area(sid, new_room), room=sid)
+    except Exception:
+        traceback.print_exc()
+
 @socketio.on('l')
 def handle_l(data):
     # Virou pro lado sem andar (ex: encostou numa parede/player). So' muda a
@@ -5360,6 +5426,7 @@ def carregar_mapa_do_servidor():
     velocidade_tiles[MAPA_ID_SERVIDOR] = dados.get('velocidades', {})
     areas_de_quest[MAPA_ID_SERVIDOR] = dados.get('quest_areas', [])
     zonas_protegidas[MAPA_ID_SERVIDOR] = dados.get('protection_zone', set())
+    teleportes[MAPA_ID_SERVIDOR] = dados.get('teleports', {})
     MAPAS_DO_SERVIDOR.add(MAPA_ID_SERVIDOR)
     for m in active_mobs.values():
         m['path'] = None
@@ -5367,13 +5434,14 @@ def carregar_mapa_do_servidor():
     print(f"[MAPA] {os.path.basename(MAPA_TMX)} lido pelo servidor: grade {grade['w']}x{grade['h']} "
           f"(fp {grade['fp'][:8]}), {len(dados['mobs'])} mob(s), {len(dados['npcs'])} NPC(s), spawn {dados['spawn']}, "
           f"{len(velocidade_tiles[MAPA_ID_SERVIDOR])} SQM(s) com speed_modifier, "
-          f"{len(zonas_protegidas[MAPA_ID_SERVIDOR])} SQM(s) de Protection Zone")
+          f"{len(zonas_protegidas[MAPA_ID_SERVIDOR])} SQM(s) de Protection Zone, "
+          f"{len(teleportes[MAPA_ID_SERVIDOR])} SQM(s) de teleport")
 
 carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-08 protection zone"
+VERSAO_SERVIDOR = "2026-10-08 teleports"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)

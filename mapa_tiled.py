@@ -354,6 +354,23 @@ def carregar_mapa(caminho_tmx):
                 cells.add((col, lin))
         quest_areas.append({'quest': quest, 'cells': cells})
 
+    # Teleports (camada de OBJETOS "Teleports"): retangulo em cima do SQM do
+    # TP, com dest_x/dest_y = SQM de destino (coluna/linha do Tiled - o
+    # mesmo X/Y do minimapa). {(col, linha): (dest_col, dest_linha)}
+    teleports = {}
+    for obj in objetos('Teleports'):
+        props_t = _ler_props(obj)
+        try:
+            dest = (int(float(props_t.get('dest_x'))), int(float(props_t.get('dest_y'))))
+        except (TypeError, ValueError):
+            print(f"[MAPA] Teleport sem dest_x/dest_y (objeto id {obj.get('id')}) ignorado")
+            continue
+        x = float(obj.get('x', 0)); y = float(obj.get('y', 0))
+        w = float(obj.get('width', 0) or SQM); h = float(obj.get('height', 0) or SQM)
+        for col in range(int(x // SQM), int((x + w - 1) // SQM) + 1):
+            for lin in range(int(y // SQM), int((y + h - 1) // SQM) + 1):
+                teleports[(col, lin)] = dest
+
     # Protection Zone (camada de TILES "ProtectionZone"): todo SQM com
     # qualquer tile nela e' area segura - mob nao mira nem entra, e player
     # atravessa player. (coluna, linha do Tiled) = tile_de do servidor.
@@ -363,7 +380,7 @@ def carregar_mapa(caminho_tmx):
             protection_zone.update(_gids_da_camada(c, largura, altura).keys())
 
     return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru, 'velocidades': velocidades,
-            'quest_areas': quest_areas, 'protection_zone': protection_zone}
+            'quest_areas': quest_areas, 'protection_zone': protection_zone, 'teleports': teleports}
 
 
 def _rasterizar(hitboxes, bordas, altura_px):

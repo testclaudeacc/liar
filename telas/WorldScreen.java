@@ -483,6 +483,65 @@ public class WorldScreen extends ScreenAdapter {
         textosAcao.add(new TextoAcao(ponto, texto, cor));
     }
 
+    // ---- Teleport (camada Teleports) ----
+    // 1 = escurecendo (o player anda pra dentro do TP), 2 = tela preta
+    // esperando o servidor, 3 = clareando ja' no destino.
+    private int tpFase = 0;
+    private float tpEscuro = 0f, tpEspera = 0f;
+    private boolean tpRespondido = false, tpOk = false;
+    private float tpRawX, tpRawY;
+    private String tpDirecao = "down";
+    private static final float TP_ESCURECER = 0.25f, TP_CLAREAR = 0.35f, TP_TIMEOUT = 3f;
+    private final com.badlogic.gdx.math.Matrix4 projecaoTela = new com.badlogic.gdx.math.Matrix4();
+
+    private void iniciarTeleporte(float dx, float dy, String direcao) {
+        local.multVelocidade = multFome * mapa.propriedades.velocidadeEm(local.x, local.y);
+        local.multVelocidadeDestino = local.multVelocidade;
+        local.iniciarPasso(dx, dy, direcao);
+        ultimoPassoDx = Math.signum(dx);
+        ultimoPassoDy = Math.signum(dy);
+        tpFase = 1;
+        tpEspera = 0f;
+        tpRespondido = false;
+        socket.emitRaw("tp", GameSocket.obj(jw -> jw.set("direction", direcao)));
+    }
+
+    private void atualizarTeleporte(float delta) {
+        if (tpFase == 1) {
+            tpEscuro = Math.min(1f, tpEscuro + delta / TP_ESCURECER);
+            if (tpEscuro >= 1f) tpFase = 2;
+        } else if (tpFase == 2) {
+            tpEspera += delta;
+            if (!tpRespondido && tpEspera < TP_TIMEOUT) return;
+            if (tpRespondido) {
+                local.x = conversor.rawParaMundoX(Jogador.snapCentroXCru(tpRawX));
+                local.y = conversor.rawParaMundoY(Jogador.snapBaseYCru(tpRawY));
+                local.movendo = false;
+                local.direcao = tpDirecao;
+                if (tpOk) {
+                    spawnSmokeX = local.x;
+                    spawnSmokeY = local.y;
+                    spawnSmokeTempo = 0f;
+                }
+            }
+            tpFase = 3;
+        } else if (tpFase == 3) {
+            tpEscuro = Math.max(0f, tpEscuro - delta / TP_CLAREAR);
+            if (tpEscuro <= 0f) tpFase = 0;
+        }
+    }
+
+    private void desenharEscuroTeleporte() {
+        if (tpEscuro <= 0f) return;
+        projecaoTela.setToOrtho2D(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        batch.setProjectionMatrix(projecaoTela);
+        batch.begin();
+        batch.setColor(0f, 0f, 0f, tpEscuro);
+        batch.draw(pixelColisao, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        batch.setColor(1f, 1f, 1f, 1f);
+        batch.end();
+    }
+
     private void atualizarAnimacaoPonte(float delta) {
         if (tempoRevelarLinhaPonte >= 0f) {
             tempoRevelarLinhaPonte -= delta;
@@ -2717,6 +2776,20 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void registrarEventosDeRede() {
+        socket.on("tp_result", (nomeEvt, data) -> {
+            if (data == null) return;
+            tpOk = data.getBoolean("ok", false);
+            tpRawX = data.getFloat("pos_x", -1f);
+            tpRawY = data.getFloat("pos_y", -1f);
+            tpDirecao = data.getString("direction", local.direcao);
+            tpRespondido = tpRawX != -1f && tpRawY != -1f;
+            // Respondeu depois do timeout (ja' clareou): aplica direto.
+            if (tpFase == 0 && tpRespondido) {
+                local.x = conversor.rawParaMundoX(Jogador.snapCentroXCru(tpRawX));
+                local.y = conversor.rawParaMundoY(Jogador.snapBaseYCru(tpRawY));
+                local.movendo = false;
+            }
+        });
         socket.on("sync_local_player", (nomeEvt, data) -> {
             if (data == null) return;
             float rawX = data.getFloat("pos_x", -1f);
@@ -3757,6 +3830,7 @@ public class WorldScreen extends ScreenAdapter {
         for (MobVisual mob : mobs.values()) mob.atualizar(delta);
         atualizarCombate(delta);
         atualizarAnimacaoPonte(delta);
+        atualizarTeleporte(delta);
         hud.definirZonaSegura(mapa.propriedades.naZonaProtegida(local.x, local.y));
         for (int i = lootsFlutuantes.size() - 1; i >= 0; i--) {
             LootFlutuante l = lootsFlutuantes.get(i);
@@ -3822,7 +3896,7 @@ public class WorldScreen extends ScreenAdapter {
         // pra andar e mexer em outras GUIs com ele aberto) - em vez disso,
         // fecharDialogoNPCSeForaDeAlcance() encerra a conversa sozinha se o
         // jogador sair dos SQMs de alcance do NPC (ver abaixo).
-        if (!local.movendo && !localMorto && !settingsAberta() && !chat.isVisivel() && !bookMenu.isVisible()) {
+        if (!local.movendo && tpFase == 0 && !localMorto && !settingsAberta() && !chat.isVisivel() && !bookMenu.isVisible()) {
             processarEntrada();
             if (local.movendo && sobraLocal > 0f) {
                 local.atualizar(sobraLocal);
@@ -4037,6 +4111,7 @@ public class WorldScreen extends ScreenAdapter {
             imagemIconeChat.setDrawable(new TextureRegionDrawable(iconeChat));
         }
 
+        desenharEscuroTeleporte();
         uiStage.act(delta);
         uiStage.draw();
     }
@@ -4122,6 +4197,13 @@ public class WorldScreen extends ScreenAdapter {
         float alvoX = local.x + dx;
         float alvoY = local.y + dy;
         boolean diagonal = dx != 0 && dy != 0;
+        // Teleport: anda reto PRA DENTRO do TP (que tem colisao) e o servidor
+        // leva pro destino (servidor.py::handle_tp).
+        if (!diagonal && socket.isConnected() && mapa.propriedades.ehTeleporte(alvoX, alvoY)
+                && !mapa.bloqueadoPorQuest(tileX(alvoX), tileY(alvoY))) {
+            iniciarTeleporte(dx, dy, direcao);
+            return;
+        }
         boolean livre = !colisao.ehParede(alvoX, alvoY)
             && (diagonal ? !diagonalBloqueada(local.x, local.y, dx, dy)
                          : !colisao.movimentoBloqueado(local.x, local.y, alvoX, alvoY))
