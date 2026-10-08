@@ -3497,10 +3497,19 @@ public final class BookMenuUI {
         JsonValue loot = e.get("loot");
         if (loot != null) {
             boolean comChance = nivel >= 4;
+            // "Loot" em cinza com o icone da bag comum (a do chao).
+            Table linhaTitulo = new Table();
+            TextureAtlas.AtlasRegion iconeBag = atlas.findRegion("ui/currency/BasicBag");
+            if (iconeBag != null) {
+                Image i = new Image(new TextureRegionDrawable(iconeBag));
+                i.setScaling(Scaling.fit);
+                linhaTitulo.add(i).size(24).padRight(6);
+            }
             Label titulo = new Label("Loot", skin, "hud");
             titulo.setFontScale(0.8f * FONTE_STATS);
-            titulo.setColor(Color.valueOf("f0a028"));
-            info.add(titulo).left().padLeft(10).padTop(8).row();
+            titulo.setColor(Color.LIGHT_GRAY);
+            linhaTitulo.add(titulo);
+            info.add(linhaTitulo).left().padLeft(10).padTop(8).row();
             // Moedas (sempre caem): icone da moeda + minimo - maximo,
             // convertido pra maior moeda (200 cobre = 2 prata).
             JsonValue moeda = e.get("currency");
