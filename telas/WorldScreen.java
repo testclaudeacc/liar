@@ -1035,6 +1035,8 @@ public class WorldScreen extends ScreenAdapter {
             atualizarVisibilidadeJoystick();
             abrirPainelDe(nomeReal);
         });
+        // Botao de coordenada do chat: a posicao atual (SQM) do player.
+        chat.setFornecedorCoordenadas(() -> "x" + mapaGrande.coordX(local.x) + ", y" + mapaGrande.coordY(local.y + Jogador.TILE / 2f));
         chat.setOuvinteCoordenada((cx, cy) -> {
             float wx = mapaGrande.mundoXDe(cx), wy = mapaGrande.mundoYDe(cy);
             com.badlogic.gdx.math.Rectangle dim = mapa.dimensaoEm(local.x, local.y + 1f);

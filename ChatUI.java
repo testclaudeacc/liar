@@ -183,8 +183,30 @@ public class ChatUI {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { fecharAbaAtual(); }
         });
 
+        // Botao de coordenada: cola "x.., y.." da posicao do player no campo.
+        Button botaoCoord = new Button(skin.get("cinza-popup", TextButton.TextButtonStyle.class));
+        TextureRegion iconeMapa = atlas != null ? atlas.findRegion("ui/buttons/MapBtn") : null;
+        if (iconeMapa != null) {
+            Image img = new Image(iconeMapa);
+            img.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+            botaoCoord.add(img).size(30);
+        }
+        botaoCoord.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                if (fornecedorCoordenadas == null || campoTexto.isDisabled()) return;
+                String coord = fornecedorCoordenadas.get();
+                if (coord == null) return;
+                String atual = campoTexto.getText();
+                String novo = atual.isEmpty() || atual.endsWith(" ") ? atual + coord : atual + " " + coord;
+                campoTexto.setText(novo);
+                campoTexto.setCursorPosition(novo.length());
+                stage.setKeyboardFocus(campoTexto);
+            }
+        });
+
         Table topo = new Table();
         topo.add(campoTexto).height(44).growX().padRight(8);
+        topo.add(botaoCoord).size(44).padRight(6);
         topo.add(botaoMais).size(44).padRight(6);
         topo.add(botaoMenos).size(44);
 
@@ -777,6 +799,14 @@ public class ChatUI {
         "(?i)\\bx\\s*[:=]?\\s*(\\d{1,5})\\s*[,;]?\\s*y\\s*[:=]?\\s*(\\d{1,5})\\b");
     private static final String COR_LINK = "[#55ff55]";
 
+    /** Texto "x.., y.." da posicao atual do player (WorldScreen). */
+    private java.util.function.Supplier<String> fornecedorCoordenadas;
+    public void setFornecedorCoordenadas(java.util.function.Supplier<String> f) { this.fornecedorCoordenadas = f; }
+
+    // Tambem aceita invertido: "y400, x300".
+    private static final java.util.regex.Pattern RE_COORDENADA_YX = java.util.regex.Pattern.compile(
+        "(?i)\\by\\s*[:=]?\\s*(\\d{1,5})\\s*[,;]?\\s*x\\s*[:=]?\\s*(\\d{1,5})\\b");
+
     /** Clicar numa coordenada do chat (WorldScreen abre o mapa la'). */
     public interface OuvinteCoordenada { void abrir(int x, int y); }
     private OuvinteCoordenada ouvinteCoordenada;
@@ -789,9 +819,16 @@ public class ChatUI {
         if (inicioTexto < 0) return linha; // so' mensagem de player tem link
         String texto = linha.substring(inicioTexto + 1);
         java.util.regex.Matcher m = RE_COORDENADA.matcher(texto);
-        if (!m.find()) return linha;
+        String x, y;
+        if (m.find()) {
+            x = m.group(1); y = m.group(2);
+        } else {
+            m = RE_COORDENADA_YX.matcher(texto);
+            if (!m.find()) return linha;
+            y = m.group(1); x = m.group(2); // y veio primeiro
+        }
         String marcada = texto.substring(0, m.start()) + COR_LINK + m.group() + "[]" + texto.substring(m.end());
-        return MARCA_LINK + m.group(1) + "," + m.group(2) + MARCA_LINK + linha.substring(0, inicioTexto + 1) + marcada;
+        return MARCA_LINK + x + "," + y + MARCA_LINK + linha.substring(0, inicioTexto + 1) + marcada;
     }
 
     private static final String MARCA_JOG = "\u0002";
