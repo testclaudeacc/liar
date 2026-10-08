@@ -201,11 +201,18 @@ public class MapaMundo {
         return centroDaLinha(linha);
     }
 
-    /** Centro (mundo, base do SQM do meio) da proxima linha, sem mostrar
+    /** Base (mundo, centro em X) de cada SQM da proxima linha, sem mostrar
      * ela ainda - pra fumaca aparecer antes dos tiles. */
-    public float[] centroProximaLinha() {
+    public java.util.List<float[]> sqmsProximaLinha() {
+        java.util.List<float[]> sqms = new java.util.ArrayList<>();
         java.util.List<CelulaGuardada> linha = linhasPendentes.peek();
-        return linha == null || linha.isEmpty() ? null : centroDaLinha(linha);
+        if (linha == null) return sqms;
+        java.util.Set<Long> vistos = new java.util.HashSet<>();
+        for (CelulaGuardada g : linha) {
+            if (vistos.add(((long) g.cx << 32) | (g.cy & 0xffffffffL)))
+                sqms.add(new float[]{(g.cx + 0.5f) * tileWidth, g.cy * tileHeight});
+        }
+        return sqms;
     }
 
     private float[] centroDaLinha(java.util.List<CelulaGuardada> linha) {
