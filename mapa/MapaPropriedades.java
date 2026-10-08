@@ -196,12 +196,14 @@ public class MapaPropriedades {
         MapLayer camadaTps = mapa.getLayers().get("Teleports");
         if (camadaTps != null) {
             for (MapObject obj : camadaTps.getObjects()) {
-                if (!(obj instanceof RectangleMapObject)) continue;
-                if (obj.getProperties().get("dest_x") == null || obj.getProperties().get("dest_y") == null) continue;
-                Rectangle r = ((RectangleMapObject) obj).getRectangle();
-                float w = r.width > 0 ? r.width : tileWidth, h = r.height > 0 ? r.height : tileHeight;
-                for (int cx = (int) Math.floor(r.x / tileWidth); cx <= (int) Math.floor((r.x + w - 1f) / tileWidth); cx++)
-                    for (int cy = (int) Math.floor(r.y / tileHeight); cy <= (int) Math.floor((r.y + h - 1f) / tileHeight); cy++)
+                // Qualquer tipo de objeto (retangulo, objeto de tile, ponto):
+                // x/y (canto de baixo-esquerda, Y pra cima), width, height.
+                MapProperties pt = obj.getProperties();
+                if (pt.get("dest_x") == null || pt.get("dest_y") == null) continue;
+                float ox = numeroFloat(pt.get("x"), 0f), oy = numeroFloat(pt.get("y"), 0f);
+                float w = Math.max(1f, numeroFloat(pt.get("width"), 0f)), h = Math.max(1f, numeroFloat(pt.get("height"), 0f));
+                for (int cx = (int) Math.floor(ox / tileWidth); cx <= (int) Math.floor((ox + w - 1f) / tileWidth); cx++)
+                    for (int cy = (int) Math.floor(oy / tileHeight); cy <= (int) Math.floor((oy + h - 1f) / tileHeight); cy++)
                         teleportes.add(chaveCelula(cx, cy));
             }
         }

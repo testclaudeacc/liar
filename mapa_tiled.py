@@ -366,10 +366,15 @@ def carregar_mapa(caminho_tmx):
             print(f"[MAPA] Teleport sem dest_x/dest_y (objeto id {obj.get('id')}) ignorado")
             continue
         x = float(obj.get('x', 0)); y = float(obj.get('y', 0))
-        w = float(obj.get('width', 0) or SQM); h = float(obj.get('height', 0) or SQM)
+        w = float(obj.get('width', 0) or 0); h = float(obj.get('height', 0) or 0)
+        # Objeto de tile (Insert Tile): no Tiled o y dele e' a BASE do tile.
+        if obj.get('gid'): y -= h
+        # Ponto (sem tamanho): so' o SQM onde ele esta'.
+        w = max(1.0, w); h = max(1.0, h)
         for col in range(int(x // SQM), int((x + w - 1) // SQM) + 1):
             for lin in range(int(y // SQM), int((y + h - 1) // SQM) + 1):
                 teleports[(col, lin)] = dest
+        print(f"[MAPA] Teleport x{int(x // SQM)}, y{int(y // SQM)} -> x{dest[0]}, y{dest[1]}")
 
     # Protection Zone (camada de TILES "ProtectionZone"): todo SQM com
     # qualquer tile nela e' area segura - mob nao mira nem entra, e player
