@@ -357,24 +357,14 @@ def carregar_mapa(caminho_tmx):
     # Teleports (camada de OBJETOS "Teleports"): retangulo em cima do SQM do
     # TP, com dest_x/dest_y = SQM de destino (coluna/linha do Tiled - o
     # mesmo X/Y do minimapa). {(col, linha): (dest_col, dest_linha)}
-    # Ou "dest" (property do tipo object do Tiled): aponta pra outro objeto
-    # (ponto ou retangulo, de qualquer camada) que marca o destino.
     teleports = {}
-    objetos_por_id = {o.get('id'): o for g in raiz.iter('objectgroup') for o in g.findall('object')}
     for obj in objetos('Teleports'):
         props_t = _ler_props(obj)
-        dest = None
-        alvo = objetos_por_id.get(str(props_t.get('dest', '')).strip())
-        if alvo is not None:
-            ax = float(alvo.get('x', 0)) + float(alvo.get('width', 0) or 0) / 2.0
-            ay = float(alvo.get('y', 0)) + float(alvo.get('height', 0) or 0) / 2.0
-            dest = (int(ax // SQM), int(ay // SQM))
-        else:
-            try:
-                dest = (int(float(props_t.get('dest_x'))), int(float(props_t.get('dest_y'))))
-            except (TypeError, ValueError):
-                print(f"[MAPA] Teleport sem destino (dest ou dest_x/dest_y) no objeto id {obj.get('id')}: ignorado")
-                continue
+        try:
+            dest = (int(float(props_t.get('dest_x'))), int(float(props_t.get('dest_y'))))
+        except (TypeError, ValueError):
+            print(f"[MAPA] Teleport sem dest_x/dest_y (objeto id {obj.get('id')}) ignorado")
+            continue
         x = float(obj.get('x', 0)); y = float(obj.get('y', 0))
         w = float(obj.get('width', 0) or SQM); h = float(obj.get('height', 0) or SQM)
         for col in range(int(x // SQM), int((x + w - 1) // SQM) + 1):

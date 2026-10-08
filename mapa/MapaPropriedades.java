@@ -197,8 +197,7 @@ public class MapaPropriedades {
         if (camadaTps != null) {
             for (MapObject obj : camadaTps.getObjects()) {
                 if (!(obj instanceof RectangleMapObject)) continue;
-                MapProperties pt = obj.getProperties();
-                if (pt.get("dest") == null && (pt.get("dest_x") == null || pt.get("dest_y") == null)) continue;
+                if (obj.getProperties().get("dest_x") == null || obj.getProperties().get("dest_y") == null) continue;
                 Rectangle r = ((RectangleMapObject) obj).getRectangle();
                 float w = r.width > 0 ? r.width : tileWidth, h = r.height > 0 ? r.height : tileHeight;
                 for (int cx = (int) Math.floor(r.x / tileWidth); cx <= (int) Math.floor((r.x + w - 1f) / tileWidth); cx++)
