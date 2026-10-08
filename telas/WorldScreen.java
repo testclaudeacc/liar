@@ -4039,6 +4039,7 @@ public class WorldScreen extends ScreenAdapter {
         // frente do player - usa o renderer/batch interno do
         // OrthogonalTiledMapRenderer (igual desenharMapa), por isso fora do
         // batch.begin()/end() do WorldScreen.
+        mapa.desenharAcimaDoPlayer(camera);
         mapa.desenharTelhados(camera, local.x, local.y);
 
         // Nomes e baloes dos jogadores e NPCs recebem a mesma iluminacao.

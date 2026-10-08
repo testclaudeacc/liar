@@ -131,7 +131,7 @@ public class MapaPropriedades {
         }
     }
 
-    private static final String[] CAMADAS_COLISAO_E_LUZ = {"Ground", "Buildings1", "Buildings2", "Roofs", "Pillars"};
+    private static final String[] CAMADAS_COLISAO_E_LUZ = {"Ground", "Buildings1", "Buildings2", "Buildings3", "Roofs", "Pillars"};
     private final Map<Long, Float> velocidadePorCelula = new HashMap<>();
     // Protection Zone: SQMs com qualquer tile na camada de tiles
     // "ProtectionZone" (nao e' desenhada). Mesma regra do servidor.py::na_pz.
@@ -390,6 +390,9 @@ public class MapaPropriedades {
                 // ver calcularAnulacaoPorCelula. Luz/overlay/velocidade
                 // continuam por camada, sem anulacao (nao foi pedido).
                 boolean anulado = anulaAPartirDe[cx][cy] != -1 && idxCamada < anulaAPartirDe[cx][cy];
+                // Protection Zone: nada naquele SQM tem colisao (passagem
+                // secreta) - igual mapa_tiled.py.
+                if (zonaProtegida.contains(chaveCelula(cx, cy))) anulado = true;
 
                 if (!anulado && Boolean.TRUE.equals(props.get("solid", Boolean.class))) {
                     hitboxesMundo.add(new Rectangle(worldCellX, worldCellY, tileWidth, tileHeight));

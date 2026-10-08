@@ -49,6 +49,10 @@ public class MapaMundo {
     private final TiledMap mapa;
     private final OrthogonalTiledMapRenderer renderer;
     private final int[] indicesCamadas;
+    // Desenho: o player fica por cima so' de Ground e Buildings1; Buildings2 e
+    // Buildings3 saem DEPOIS dele (desenharAcimaDoPlayer).
+    private final int[] indicesChao;
+    private final int[] indicesAcima;
     private final int[] indicesTelhados;
     private final TiledMapTileLayer camadaRoofs;
     private final TiledMapTileLayer camadaPillars;
@@ -85,8 +89,11 @@ public class MapaMundo {
         indicesCamadas = new int[]{
                 mapa.getLayers().getIndex("Ground"),
                 mapa.getLayers().getIndex("Buildings1"),
-                mapa.getLayers().getIndex("Buildings2")
+                mapa.getLayers().getIndex("Buildings2"),
+                mapa.getLayers().getIndex("Buildings3")
         };
+        indicesChao = existentes("Ground", "Buildings1");
+        indicesAcima = existentes("Buildings2", "Buildings3");
         indicesTelhados = new int[]{
                 mapa.getLayers().getIndex("Roofs"),
                 mapa.getLayers().getIndex("Pillars")
@@ -262,7 +269,27 @@ public class MapaMundo {
      * Pillars NAO entram aqui - ver desenharTelhados. */
     public void desenharMapa(OrthographicCamera camera) {
         prepararView(camera);
-        renderer.render(indicesCamadas);
+        renderer.render(indicesChao);
+    }
+
+    /** Buildings2 + Buildings3, por cima do player (chamado fora do
+     * batch.begin()/end() do WorldScreen, antes dos telhados). */
+    public void desenharAcimaDoPlayer(OrthographicCamera camera) {
+        if (indicesAcima.length == 0) return;
+        prepararView(camera);
+        renderer.render(indicesAcima);
+    }
+
+    /** Indices das camadas que existem no mapa (sem as que faltam). */
+    private int[] existentes(String... nomes) {
+        java.util.List<Integer> lista = new java.util.ArrayList<>();
+        for (String nome : nomes) {
+            int i = mapa.getLayers().getIndex(nome);
+            if (i >= 0) lista.add(i);
+        }
+        int[] r = new int[lista.size()];
+        for (int k = 0; k < r.length; k++) r[k] = lista.get(k);
+        return r;
     }
 
     /** Celulas overlap_transparency=true, uma a uma, por cima do player -

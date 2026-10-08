@@ -32,7 +32,7 @@ SQM = 16
 PADDING_SQM = 2
 LIMIAR_FINO = 0.3
 LIMIAR_COBERTURA = 0.6
-CAMADAS_COLISAO = ("Ground", "Buildings1", "Buildings2", "Roofs", "Pillars")
+CAMADAS_COLISAO = ("Ground", "Buildings1", "Buildings2", "Buildings3", "Roofs", "Pillars")
 # speed_modifier: todas as camadas de colisao; a mais de CIMA com a property
 # na celula decide (igual MapaPropriedades.carregarVelocidades).
 CAMADAS_VELOCIDADE = CAMADAS_COLISAO
@@ -246,6 +246,15 @@ def carregar_mapa(caminho_tmx):
             if tile is not None and _bool_prop(tile.props, 'anula_colisao_abaixo'):
                 anula[pos] = idx
 
+    # Protection Zone (camada de TILES "ProtectionZone"): todo SQM com
+    # qualquer tile nela e' area segura - mob nao mira nem entra, player
+    # atravessa player, e NENHUM tile daquele SQM tem colisao (passagem
+    # secreta). (coluna, linha do Tiled) = tile_de do servidor.
+    protection_zone = set()
+    for c in raiz.iter('layer'):
+        if c.get('name') == 'ProtectionZone':
+            protection_zone.update(_gids_da_camada(c, largura, altura).keys())
+
     hitboxes = []   # (x, y, w, h) mundo Y pra cima
     bordas = []     # (worldCellX, worldCellY, lado)
     for idx, gids in enumerate(camadas):
@@ -254,6 +263,7 @@ def carregar_mapa(caminho_tmx):
             tile = tile_do_gid(bruto & MASCARA_GID)
             if tile is None: continue
             if (col, linha) in anula and idx < anula[(col, linha)]: continue
+            if (col, linha) in protection_zone: continue
             cx, cy = celula_mundo(col, linha)
             wcx, wcy = float(cx * tw), float(cy * th)
             if _bool_prop(tile.props, 'solid'):
@@ -402,14 +412,6 @@ def carregar_mapa(caminho_tmx):
         for cel in celulas: teleports[cel] = dest
         print(f"[MAPA] Teleport x{celulas[0][0]}, y{celulas[0][1]} ({len(celulas)} SQM) -> "
               f"{id_dest + ' ' if id_dest else ''}x{dest[0]}, y{dest[1]}")
-
-    # Protection Zone (camada de TILES "ProtectionZone"): todo SQM com
-    # qualquer tile nela e' area segura - mob nao mira nem entra, e player
-    # atravessa player. (coluna, linha do Tiled) = tile_de do servidor.
-    protection_zone = set()
-    for c in raiz.iter('layer'):
-        if c.get('name') == 'ProtectionZone':
-            protection_zone.update(_gids_da_camada(c, largura, altura).keys())
 
     return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru, 'velocidades': velocidades,
             'quest_areas': quest_areas, 'protection_zone': protection_zone, 'teleports': teleports}
