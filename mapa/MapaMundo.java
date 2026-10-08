@@ -169,6 +169,10 @@ public class MapaMundo {
                     }
                 }
                 escondidas.put(a, guardadas);
+                // Diagnostico (console do jogo): quantas celulas da ponte sumiram.
+                com.badlogic.gdx.Gdx.app.log("MapaMundo", "QuestArea '" + a.quest + "': SQMs x " + c[0] + ".." + c[1]
+                    + ", y " + c[2] + ".." + c[3] + " - escondeu " + guardadas.size() + " tile(s) em " + nomes
+                    + (guardadas.isEmpty() ? "  <<< NADA escondido: confira a camada da ponte (property layers)" : ""));
             }
         }
     }

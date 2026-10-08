@@ -270,6 +270,10 @@ public class MapaPropriedades {
             }
         }
 
+        Gdx.app.log("MapaPropriedades", camadaQuests == null
+            ? "Sem camada de objetos 'QuestAreas' no mapa (nenhuma ponte/area de quest)."
+            : areasQuest.size() + " area(s) de quest na camada QuestAreas");
+
         MapLayer camadaAreas = mapa.getLayers().get("AreasName");
         if (camadaAreas != null) {
             for (MapObject obj : camadaAreas.getObjects()) {
