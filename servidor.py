@@ -117,6 +117,9 @@ def montar_bestiario(p):
                 if nivel >= 4: linha["chance"] = float(d.get("chance", 0.0))
                 loot.append(linha)
             e["loot"] = loot
+            faixa = info.get("currency") or {}
+            if int(faixa.get("max", 0) or 0) > 0:
+                e["currency"] = {"min": int(faixa.get("min", 0) or 0), "max": int(faixa.get("max", 0) or 0)}
         entradas.append(e)
     return {"entries": entradas, "milestones": list(BESTIARIO_MARCOS)}
 

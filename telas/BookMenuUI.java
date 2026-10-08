@@ -3115,13 +3115,53 @@ public final class BookMenuUI {
         if ("Bestiary".equals(secaoAtual) && root.isVisible()) reconstruirFichaBestiario();
     }
 
-    private TextureRegion frenteDoMob(String tipo) {
+    private TextureAtlas.AtlasRegion tiraDoMob(String tipo) {
         if (tipo == null || tipo.isEmpty()) return null;
         TextureAtlas.AtlasRegion tira = atlas.findRegion("sprites/mobs/" + tipo);
         if (tira == null) tira = atlas.findRegion("sprites/mobs/" + Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1));
-        if (tira == null) return null;
-        return tira.getRegionWidth() >= SkinsUtil.FRAME_LARGURA * (SkinsUtil.FRAME_BAIXO + 1)
-            ? SkinsUtil.quadro(tira, SkinsUtil.FRAME_BAIXO) : tira;
+        return tira;
+    }
+
+    /** Mob andando pra baixo (quadros 4 e 5 da tira, igual o mundo), em
+     * escala que cabe no espaco; tira curta demais: so' o quadro que tiver. */
+    private final class MobAnimado extends com.badlogic.gdx.scenes.scene2d.ui.Widget {
+        private final TextureRegion[] quadros;
+        private float tempo = 0f;
+        MobAnimado(TextureAtlas.AtlasRegion tira) {
+            int n = tira.getRegionWidth() / SkinsUtil.FRAME_LARGURA;
+            if (n >= 6) quadros = new TextureRegion[]{SkinsUtil.quadro(tira, 4), SkinsUtil.quadro(tira, 5)};
+            else if (n >= 4) quadros = new TextureRegion[]{SkinsUtil.quadro(tira, SkinsUtil.FRAME_BAIXO)};
+            else quadros = new TextureRegion[]{tira};
+        }
+        @Override public void act(float delta) {
+            super.act(delta);
+            tempo += delta;
+        }
+        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
+            TextureRegion q = quadros[(int) (tempo / 0.3f) % quadros.length];
+            float escala = Math.min(getWidth() / q.getRegionWidth(), getHeight() / q.getRegionHeight());
+            if (escala >= 2f) escala = (float) Math.floor(escala); // pixel art sem distorcer
+            float w = q.getRegionWidth() * escala, h = q.getRegionHeight() * escala;
+            Color c = getColor();
+            batch.setColor(c.r, c.g, c.b, c.a * parentAlpha);
+            batch.draw(q, getX() + (getWidth() - w) / 2f, getY() + (getHeight() - h) / 2f, w, h);
+            batch.setColor(Color.WHITE);
+        }
+    }
+
+    /** Moeda em cobre -> maior moeda que cabe (100 cobre = 1 prata...). */
+    private String[] moedaFormatada(long cobre) {
+        String[] tipos = {"Platinum", "Gold", "Silver", "Copper"};
+        long[] valores = {1_000_000L, 10_000L, 100L, 1L};
+        for (int i = 0; i < tipos.length; i++) {
+            if (cobre >= valores[i] || i == tipos.length - 1) {
+                float v = cobre / (float) valores[i];
+                String texto = v == Math.round(v) ? String.valueOf(Math.round(v))
+                    : String.format(java.util.Locale.US, "%.2f", v).replaceAll("0+$", "").replaceAll("\\.$", "");
+                return new String[]{tipos[i], texto};
+            }
+        }
+        return new String[]{"Copper", String.valueOf(cobre)};
     }
 
     private void construirPaginaBestiario() {
@@ -3163,16 +3203,12 @@ public final class BookMenuUI {
             selecionado ? Color.valueOf("f0a028") : new Color(0.32f, 0.32f, 0.36f, 1f), selecionado ? 2 : 1));
         if (!descoberto) return fundo; // ainda nao matou: slot vazio
         Table camadaImagem = new Table();
-        TextureRegion frente = frenteDoMob(e.getString("type", ""));
-        if (frente != null) {
-            Image img = new Image(new TextureRegionDrawable(frente));
-            img.setScaling(Scaling.fit);
-            camadaImagem.add(img).size(SLOT_BESTIARIO * 0.62f).padTop(6);
-        }
+        TextureAtlas.AtlasRegion tira = tiraDoMob(e.getString("type", ""));
+        if (tira != null) camadaImagem.add(new MobAnimado(tira)).size(SLOT_BESTIARIO * 0.62f).padTop(6);
         Table camadaNumero = new Table();
         camadaNumero.top().left();
         Label numero = new Label(String.valueOf(id), skin, "hud");
-        numero.setFontScale(0.55f);
+        numero.setFontScale(0.65f);
         camadaNumero.add(numero).pad(2, 4, 0, 0);
         Table camadaMedalha = new Table();
         camadaMedalha.bottom().right();
@@ -3214,18 +3250,15 @@ public final class BookMenuUI {
         }
         int nivel = e.getInt("tier", 0);
         float lado = 150f;
-        // Foto quadrada do mob + as 3 medalhas no canto de cima a direita
-        // (as que ainda nao tem ficam apagadas).
+        fichaBestiario.left().top();
+        // Foto quadrada (mob andando pra baixo) + as 3 medalhas no canto de
+        // cima a direita (apagadas as que ainda nao tem) + mortes no canto
+        // de baixo a esquerda.
         Table foto = new Table();
         foto.setBackground(UiSkin.retangulo(new Color(0.16f, 0.2f, 0.26f, 1f), new Color(0.45f, 0.45f, 0.5f, 1f), 2));
-        TextureRegion frente = frenteDoMob(e.getString("type", ""));
-        if (frente != null) {
-            Image img = new Image(new TextureRegionDrawable(frente));
-            img.setScaling(Scaling.fit);
-            foto.add(img).size(lado * 0.62f).padTop(lado * 0.1f);
-        }
+        TextureAtlas.AtlasRegion tira = tiraDoMob(e.getString("type", ""));
+        if (tira != null) foto.add(new MobAnimado(tira)).size(lado * 0.62f);
         Table medalhas = new Table();
-        medalhas.top().right();
         for (int i = 0; i < 3; i++) {
             TextureAtlas.AtlasRegion r = atlas.findRegion(MEDALHAS[i]);
             if (r == null) continue;
@@ -3237,28 +3270,23 @@ public final class BookMenuUI {
         Table cantoMedalhas = new Table();
         cantoMedalhas.top().right();
         cantoMedalhas.add(medalhas).pad(5, 0, 0, 5);
-        fichaBestiario.add(new Stack(foto, cantoMedalhas)).size(lado).padTop(8).row();
-
-        Label nome = new Label(e.getString("name", "?"), skin, "hud");
-        nome.setFontScale(0.85f * FONTE_STATS);
-        fichaBestiario.add(nome).padTop(6).row();
-        // Mortes e quanto falta pra proxima medalha.
-        int kills = e.getInt("kills", 0);
-        int[] marcos = {1, 20, 100, 500};
-        String progresso = "Kills: " + kills;
-        for (int m : marcos) if (kills < m) { progresso += " / " + m; break; }
-        Label rotuloKills = new Label(progresso, skin, "hud");
-        rotuloKills.setFontScale(0.55f * FONTE_STATS);
-        rotuloKills.setColor(Color.LIGHT_GRAY);
-        Table linhaKills = new Table();
+        Table cantoKills = new Table();
+        cantoKills.bottom().left();
         TextureAtlas.AtlasRegion iconeKills = atlas.findRegion("ui/CritIcon");
         if (iconeKills != null) {
             Image i = new Image(new TextureRegionDrawable(iconeKills));
             i.setScaling(Scaling.fit);
-            linhaKills.add(i).size(16).padRight(4);
+            cantoKills.add(i).size(20).padRight(4);
         }
-        linhaKills.add(rotuloKills);
-        fichaBestiario.add(linhaKills).padTop(2).row();
+        Label kills = new Label(String.valueOf(e.getInt("kills", 0)), skin, "hud");
+        kills.setFontScale(0.75f * FONTE_STATS);
+        cantoKills.add(kills);
+        cantoKills.pad(0, 6, 4, 0);
+        fichaBestiario.add(new Stack(foto, cantoMedalhas, cantoKills)).size(lado).pad(8, 10, 0, 10).left().row();
+
+        Label nome = new Label(e.getString("name", "?"), skin, "hud");
+        nome.setFontScale(1.0f * FONTE_STATS);
+        fichaBestiario.add(nome).left().padLeft(10).padTop(6).row();
 
         if (e.has("hp")) {
             Table linhaHp = new Table();
@@ -3266,20 +3294,42 @@ public final class BookMenuUI {
             if (iconeHp != null) {
                 Image i = new Image(new TextureRegionDrawable(iconeHp));
                 i.setScaling(Scaling.fit);
-                linhaHp.add(i).size(20).padRight(6);
+                linhaHp.add(i).size(24).padRight(6);
             }
             Label hp = new Label(String.valueOf(e.getInt("hp", 0)), skin, "hud");
-            hp.setFontScale(0.7f * FONTE_STATS);
+            hp.setFontScale(0.9f * FONTE_STATS);
+            hp.setColor(1f, 0.55f, 0.55f, 1f); // vermelho claro
             linhaHp.add(hp);
-            fichaBestiario.add(linhaHp).padTop(8).row();
+            fichaBestiario.add(linhaHp).left().padLeft(10).padTop(6).row();
         }
         JsonValue loot = e.get("loot");
         if (loot != null) {
+            boolean comChance = nivel >= 4;
             Label titulo = new Label("Loot", skin, "hud");
-            titulo.setFontScale(0.6f * FONTE_STATS);
+            titulo.setFontScale(0.8f * FONTE_STATS);
             titulo.setColor(Color.valueOf("f0a028"));
-            fichaBestiario.add(titulo).padTop(8).row();
+            fichaBestiario.add(titulo).left().padLeft(10).padTop(8).row();
+            // Moedas (sempre caem): icone da moeda + minimo - maximo,
+            // convertido pra maior moeda (200 cobre = 2 prata).
+            JsonValue moeda = e.get("currency");
+            if (moeda != null) {
+                Table linhaMoeda = new Table();
+                String[] min = moedaFormatada(moeda.getLong("min", 0)), max = moedaFormatada(moeda.getLong("max", 0));
+                adicionarMoedaLoot(linhaMoeda, min);
+                Label traco = new Label(" - ", skin, "hud");
+                traco.setFontScale(0.7f * FONTE_STATS);
+                linhaMoeda.add(traco);
+                adicionarMoedaLoot(linhaMoeda, max);
+                if (comChance) {
+                    Label cem = new Label("  100%", skin, "hud");
+                    cem.setFontScale(0.65f * FONTE_STATS);
+                    cem.setColor(Color.LIGHT_GRAY);
+                    linhaMoeda.add(cem);
+                }
+                fichaBestiario.add(linhaMoeda).left().padLeft(10).padTop(4).row();
+            }
             Table itens = new Table();
+            itens.left();
             int n = 0;
             for (JsonValue d = loot.child; d != null; d = d.next) {
                 Table celula = new Table();
@@ -3292,23 +3342,36 @@ public final class BookMenuUI {
                     quadro.add(i).size(30);
                 }
                 celula.add(quadro).size(38).row();
-                if (d.has("chance")) {
+                if (comChance && d.has("chance")) {
                     Label chance = new Label(formatarChance(d.getFloat("chance", 0f)), skin, "hud");
-                    chance.setFontScale(0.5f * FONTE_STATS);
+                    chance.setFontScale(0.6f * FONTE_STATS);
                     celula.add(chance).padTop(1);
                 }
                 itens.add(celula).pad(2);
                 if (++n % 4 == 0) itens.row();
             }
-            if (n == 0) {
+            if (n > 0) fichaBestiario.add(itens).left().padLeft(8).padTop(4).row();
+            else if (moeda == null) {
                 Label nada = new Label("Nothing", skin, "hud");
-                nada.setFontScale(0.55f * FONTE_STATS);
+                nada.setFontScale(0.7f * FONTE_STATS);
                 nada.setColor(Color.GRAY);
-                itens.add(nada);
+                fichaBestiario.add(nada).left().padLeft(10).row();
             }
-            fichaBestiario.add(itens).padTop(2).row();
         }
         fichaBestiario.add().expandY();
+    }
+
+    private void adicionarMoedaLoot(Table linha, String[] moeda) {
+        TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + moeda[0]);
+        if (r != null) {
+            Image i = new Image(new TextureRegionDrawable(r));
+            i.setScaling(Scaling.fit);
+            linha.add(i).size(20).padRight(3);
+        }
+        Label v = new Label(moeda[1], skin, "hud");
+        v.setFontScale(0.75f * FONTE_STATS);
+        v.setColor(corMoeda(moeda[0]));
+        linha.add(v);
     }
 
     private static String formatarChance(float chance) {
