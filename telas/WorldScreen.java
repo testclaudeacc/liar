@@ -977,6 +977,27 @@ public class WorldScreen extends ScreenAdapter {
         float escala = Math.min(Gdx.graphics.getBackBufferWidth() / MUNDO_UI_LARGURA, Gdx.graphics.getBackBufferHeight() / MUNDO_UI_ALTURA);
         skin = UiSkin.criar(escala);
         uiStage = new Stage(new ExtendViewport(MUNDO_UI_LARGURA, MUNDO_UI_ALTURA));
+        // Rodinha do mouse rola a lista que estiver EMBAIXO do cursor, sem
+        // precisar clicar nela antes (o scene2d so' rola quem tem o "foco
+        // de scroll", que antes so' vinha clicando).
+        uiStage.addCaptureListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override public boolean scrolled(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y,
+                                              float amountX, float amountY) {
+                com.badlogic.gdx.scenes.scene2d.Actor embaixo = uiStage.hit(event.getStageX(), event.getStageY(), true);
+                ScrollPane sp = null;
+                for (com.badlogic.gdx.scenes.scene2d.Actor a = embaixo; a != null; a = a.getParent()) {
+                    if (a instanceof ScrollPane) { sp = (ScrollPane) a; break; }
+                }
+                if (sp == null || sp == uiStage.getScrollFocus()) return false; // segue o normal
+                uiStage.setScrollFocus(sp);
+                // Rola ja' esse giro (mesmo passo que o ScrollPane usa).
+                float area = sp.getScrollHeight();
+                float passo = Math.min(area, Math.max(area * 0.9f, sp.getMaxY() * 0.1f) / 4f);
+                sp.setScrollY(sp.getScrollY() + passo * amountY);
+                event.cancel();
+                return true;
+            }
+        });
 
         criarBarraTopo();
 
