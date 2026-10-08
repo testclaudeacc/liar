@@ -5,10 +5,14 @@
 No terminal da maquina do servidor:
 
 ```bash
-psql -U postgres -h localhost -d postgres
+psql -U postgres -h localhost -d inverted_realms
 ```
 
-(usuario/host/banco sao os do `.env`: `DB_USER`, `DB_HOST`, `DB_NAME`; a senha e' a `DB_PASS`.)
+O banco do jogo e' o **`inverted_realms`** (os outros da lista do `\l` -
+`postgres`, `template0`, `template1` - sao do proprio PostgreSQL, NAO apague).
+Se ja' estiver dentro do `psql` em outro banco: `\c inverted_realms`.
+Pra conferir: `\dt` tem que mostrar `characters`, `users`, `friendships`.
+
 Dentro do `psql`, cada comando termina com `;`. Pra sair: `\q`.
 
 ## Personagens apagados (soft delete)
@@ -16,6 +20,11 @@ Dentro do `psql`, cada comando termina com `;`. Pra sair: `\q`.
 Apagar um personagem no jogo NAO tira ele do banco: o nome vira
 `<nome antigo>#del#<letras aleatorias>` e a coluna `deleted_at` recebe a hora.
 Ele some da tela de personagens e do ranking, e o nome fica livre.
+
+A coluna `deleted_at` e' criada pelo servidor novo quando ele inicia. Se der
+"column deleted_at does not exist", reinicie o servidor (ou rode
+`ALTER TABLE characters ADD COLUMN IF NOT EXISTS deleted_at DOUBLE PRECISION;`).
+So' quem foi apagado DEPOIS dessa atualizacao aparece aqui (antes apagava de verdade).
 
 Ver os apagados (mais recentes primeiro):
 
