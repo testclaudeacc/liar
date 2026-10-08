@@ -3291,6 +3291,7 @@ public final class BookMenuUI {
         rolagem.setFadeScrollBars(false);
         rolagem.setScrollingDisabled(true, false);
         rolagem.setOverscroll(false, false);
+        rolagem.setForceScroll(false, true); // barra sempre ali, mesmo sem passar do espaco
 
         Label nome = new Label(e.getString("name", "?"), skin, "hud");
         nome.setFontScale(1.0f * FONTE_STATS);
@@ -3317,10 +3318,10 @@ public final class BookMenuUI {
                 Image i = new Image(new TextureRegionDrawable(estrela));
                 i.setScaling(Scaling.fit);
                 if (!comBonus) i.setColor(0.4f, 0.4f, 0.4f, 0.7f);
-                linhaBonus.add(i).size(20).padRight(6);
+                linhaBonus.add(i).size(24).padRight(6);
             }
-            Label bonus = new Label("5% Extra Dmg/Def Against", skin, "hud");
-            bonus.setFontScale(0.6f * FONTE_STATS);
+            Label bonus = new Label("5% Extra DMG/DEF", skin, "hud");
+            bonus.setFontScale(0.75f * FONTE_STATS);
             bonus.setColor(comBonus ? Color.valueOf("f5d328") : Color.GRAY);
             linhaBonus.add(bonus);
             info.add(linhaBonus).left().padLeft(10).padTop(4).row();
