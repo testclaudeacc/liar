@@ -3138,7 +3138,7 @@ public final class BookMenuUI {
             tempo += delta;
         }
         @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
-            TextureRegion q = quadros[(int) (tempo / 0.3f) % quadros.length];
+            TextureRegion q = quadros[(int) (tempo / 0.55f) % quadros.length]; // passo lento, so' pra dar vida
             float escala = Math.min(getWidth() / q.getRegionWidth(), getHeight() / q.getRegionHeight());
             if (escala >= 2f) escala = (float) Math.floor(escala); // pixel art sem distorcer
             float w = q.getRegionWidth() * escala, h = q.getRegionHeight() * escala;
@@ -3284,9 +3284,17 @@ public final class BookMenuUI {
         cantoKills.pad(0, 6, 4, 0);
         fichaBestiario.add(new Stack(foto, cantoMedalhas, cantoKills)).size(lado).pad(8, 10, 0, 10).left().row();
 
+        // Tudo abaixo da foto rola (loot grande nao vaza da janela).
+        Table info = new Table();
+        info.top().left();
+        ScrollPane rolagem = new ScrollPane(info, skin);
+        rolagem.setFadeScrollBars(false);
+        rolagem.setScrollingDisabled(true, false);
+        rolagem.setOverscroll(false, false);
+
         Label nome = new Label(e.getString("name", "?"), skin, "hud");
         nome.setFontScale(1.0f * FONTE_STATS);
-        fichaBestiario.add(nome).left().padLeft(10).padTop(6).row();
+        info.add(nome).left().padLeft(10).padTop(6).row();
 
         if (e.has("hp")) {
             Table linhaHp = new Table();
@@ -3300,7 +3308,22 @@ public final class BookMenuUI {
             hp.setFontScale(0.9f * FONTE_STATS);
             hp.setColor(1f, 0.55f, 0.55f, 1f); // vermelho claro
             linhaHp.add(hp);
-            fichaBestiario.add(linhaHp).left().padLeft(10).padTop(6).row();
+            info.add(linhaHp).left().padLeft(10).padTop(6).row();
+            // Bonus da medalha de ouro (apagado ate' ganhar).
+            boolean comBonus = nivel >= 4;
+            Table linhaBonus = new Table();
+            TextureAtlas.AtlasRegion estrela = atlas.findRegion("ui/ClassIcon");
+            if (estrela != null) {
+                Image i = new Image(new TextureRegionDrawable(estrela));
+                i.setScaling(Scaling.fit);
+                if (!comBonus) i.setColor(0.4f, 0.4f, 0.4f, 0.7f);
+                linhaBonus.add(i).size(20).padRight(6);
+            }
+            Label bonus = new Label("5% Extra Dmg/Def Against", skin, "hud");
+            bonus.setFontScale(0.6f * FONTE_STATS);
+            bonus.setColor(comBonus ? Color.valueOf("f5d328") : Color.GRAY);
+            linhaBonus.add(bonus);
+            info.add(linhaBonus).left().padLeft(10).padTop(4).row();
         }
         JsonValue loot = e.get("loot");
         if (loot != null) {
@@ -3308,7 +3331,7 @@ public final class BookMenuUI {
             Label titulo = new Label("Loot", skin, "hud");
             titulo.setFontScale(0.8f * FONTE_STATS);
             titulo.setColor(Color.valueOf("f0a028"));
-            fichaBestiario.add(titulo).left().padLeft(10).padTop(8).row();
+            info.add(titulo).left().padLeft(10).padTop(8).row();
             // Moedas (sempre caem): icone da moeda + minimo - maximo,
             // convertido pra maior moeda (200 cobre = 2 prata).
             JsonValue moeda = e.get("currency");
@@ -3326,7 +3349,7 @@ public final class BookMenuUI {
                     cem.setColor(Color.LIGHT_GRAY);
                     linhaMoeda.add(cem);
                 }
-                fichaBestiario.add(linhaMoeda).left().padLeft(10).padTop(4).row();
+                info.add(linhaMoeda).left().padLeft(10).padTop(4).row();
             }
             Table itens = new Table();
             itens.left();
@@ -3350,15 +3373,15 @@ public final class BookMenuUI {
                 itens.add(celula).pad(2);
                 if (++n % 4 == 0) itens.row();
             }
-            if (n > 0) fichaBestiario.add(itens).left().padLeft(8).padTop(4).row();
+            if (n > 0) info.add(itens).left().padLeft(8).padTop(4).row();
             else if (moeda == null) {
                 Label nada = new Label("Nothing", skin, "hud");
                 nada.setFontScale(0.7f * FONTE_STATS);
                 nada.setColor(Color.GRAY);
-                fichaBestiario.add(nada).left().padLeft(10).row();
+                info.add(nada).left().padLeft(10).row();
             }
         }
-        fichaBestiario.add().expandY();
+        fichaBestiario.add(rolagem).grow().padBottom(6);
     }
 
     private void adicionarMoedaLoot(Table linha, String[] moeda) {
