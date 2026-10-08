@@ -2543,6 +2543,16 @@ ADMIN_NOMES = {"labubus"}
 def eh_admin(p):
     return str(p.get('name', '')).lower() in ADMIN_NOMES
 
+def _avisar_admin_bloqueio(sid, p, motivo, tile):
+    # So' pro admin: por que o SERVIDOR recusou o passo (o SQM no formato do
+    # minimapa: X igual, Y de cima pra baixo = linha do Tiled).
+    if not eh_admin(p): return
+    agora = time.time()
+    if agora - p.get('_ultimo_aviso_bloqueio', 0) < 1.0: return
+    p['_ultimo_aviso_bloqueio'] = agora
+    fonte = "World.tmx do servidor" if MAPA_ID_SERVIDOR in MAPAS_DO_SERVIDOR else "mapa enviado por um client (mapas_colisao.json)"
+    chat_sistema(sid, f"[debug] servidor bloqueou: {motivo} x{tile[0]}, y{tile[1]} ({fonte})", 'red')
+
 # /bestiary <mob> <0-3>: 0 = so' descoberto, 1 = cobre, 2 = prata, 3 = ouro.
 ADMIN_BESTIARIO_KILLS = {0: 1, 1: 20, 2: 100, 3: 500}
 
@@ -3794,11 +3804,13 @@ def handle_m(data):
                 return
         # Area de quest (ponte do Kharon...) sem a quest feita: nao passa.
         if bloqueado_por_quest(p, destino_tile):
+            _avisar_admin_bloqueio(sid, p, "area de quest", destino_tile)
             _corrigir_posicao(sid, p)
             return
         grade_p = mapas_colisao.get(p.get('mapa'))
         if grade_p is not None and int(p.get('floor', 1) or 1) == 1:
             if eh_parede(grade_p, destino_tile):
+                _avisar_admin_bloqueio(sid, p, "parede (SQM inteiro)", destino_tile)
                 _corrigir_posicao(sid, p)
                 return
             # Cerca/corrimao (borda fina entre 2 SQMs): so' da' pra checar num
@@ -3806,9 +3818,11 @@ def handle_m(data):
             if not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
                 o = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
                 if abs(destino_tile[0] - o[0]) + abs(destino_tile[1] - o[1]) == 1 and borda_bloqueada(grade_p, o, destino_tile):
+                    _avisar_admin_bloqueio(sid, p, f"borda fina entre {o} e", destino_tile)
                     _corrigir_posicao(sid, p)
                     return
                 if diagonal_bloqueada(grade_p, o, destino_tile):
+                    _avisar_admin_bloqueio(sid, p, "diagonal fechada", destino_tile)
                     _corrigir_posicao(sid, p)
                     return
         x, y = centro_tile(destino_tile)
