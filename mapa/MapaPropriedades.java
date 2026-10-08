@@ -133,6 +133,9 @@ public class MapaPropriedades {
 
     private static final String[] CAMADAS_COLISAO_E_LUZ = {"Ground", "Buildings1", "Buildings2", "Roofs", "Pillars"};
     private final Map<Long, Float> velocidadePorCelula = new HashMap<>();
+    // Protection Zone: SQMs com qualquer tile na camada de tiles
+    // "ProtectionZone" (nao e' desenhada). Mesma regra do servidor.py::na_pz.
+    private final java.util.Set<Long> zonaProtegida = new java.util.HashSet<>();
 
     // Forma e' "fina" se um lado for <= 30% do tile (~4.8px de 16) e o lado
     // oposto cobrir pelo menos 60% do tile (~9.6px) - bate com os valores
@@ -177,6 +180,16 @@ public class MapaPropriedades {
             if (camada instanceof TiledMapTileLayer) camadas[i] = (TiledMapTileLayer) camada;
         }
         carregarVelocidades(camadas);
+        Object camadaPz = mapa.getLayers().get("ProtectionZone");
+        if (camadaPz instanceof TiledMapTileLayer) {
+            TiledMapTileLayer pz = (TiledMapTileLayer) camadaPz;
+            for (int cx = 0; cx < pz.getWidth(); cx++)
+                for (int cy = 0; cy < pz.getHeight(); cy++) {
+                    TiledMapTileLayer.Cell cell = pz.getCell(cx, cy);
+                    if (cell != null && cell.getTile() != null) zonaProtegida.add(chaveCelula(cx, cy));
+                }
+        }
+        Gdx.app.log("MapaPropriedades", zonaProtegida.size() + " SQM(s) de Protection Zone");
         int[][] anulaAPartirDe = calcularAnulacaoPorCelula(camadas);
         for (int i = 0; i < camadas.length; i++) {
             if (camadas[i] != null) escanearColisaoELuz(camadas[i], i, anulaAPartirDe);
@@ -482,6 +495,14 @@ public class MapaPropriedades {
         int cy = (int) Math.floor((mundoY + tileHeight / 2f) / tileHeight);
         Float mod = velocidadePorCelula.get(chaveCelula(cx, cy));
         return mod != null ? mod : 1f;
+    }
+
+    /** SQM sob (mundoX, mundoY) - pes, igual velocidadeEm - e' Protection Zone. */
+    public boolean naZonaProtegida(float mundoX, float mundoY) {
+        if (zonaProtegida.isEmpty()) return false;
+        int cx = (int) Math.floor(mundoX / tileWidth);
+        int cy = (int) Math.floor((mundoY + tileHeight / 2f) / tileHeight);
+        return zonaProtegida.contains(chaveCelula(cx, cy));
     }
 
     private static long chaveCelula(int cx, int cy) { return ((long) cx << 32) ^ (cy & 0xffffffffL); }

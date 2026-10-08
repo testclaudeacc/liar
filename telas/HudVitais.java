@@ -120,9 +120,10 @@ public final class HudVitais {
     // Ficam lado a lado nessa ordem; sem a fome, o de battle ocupa o lugar dela.
     private static final Color COR_FOME = new Color(0.36f, 0.22f, 0.12f, 1f);    // marrom
     private static final Color COR_BATALHA = new Color(0.42f, 0.08f, 0.08f, 1f); // vermelho escuro
+    private static final Color COR_ZONA_SEGURA = new Color(0.08f, 0.16f, 0.42f, 1f); // azul escuro
     private final Table iconesStatus = new Table();
-    private Table quadradoFome, quadradoBatalha;
-    private boolean comFome = false, emBatalha = false;
+    private Table quadradoFome, quadradoBatalha, quadradoZonaSegura;
+    private boolean comFome = false, emBatalha = false, naZonaSegura = false;
     // Tempo ate' sair do battle: travado em 30 enquanto luta; o servidor avisa
     // quando o player parou (counting) e daí desce sozinho aqui.
     private float batalhaRestante = 0f;
@@ -233,6 +234,9 @@ public final class HudVitais {
 
         quadradoFome = quadradoStatus(atlas, "sheet/r18_c10", COR_FOME,
             "You are hungry! 10% less Dmg and Speed. Regen disabled");
+        // Protection Zone (efeito neutro): sprite no 320,720 do atlas.
+        quadradoZonaSegura = quadradoStatus(atlas, nomeRegiao(atlas, "sheet/r78_c4", 320, 720), COR_ZONA_SEGURA,
+            "Safe Zone\nMobs can't target you, neither the players. Collision disabled");
         contadorBatalha = new Label("", estilo);
         contadorBatalha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
         quadradoBatalha = quadradoStatus(atlas, "sheet/r107_c2", COR_BATALHA, null, contadorBatalha);
@@ -401,6 +405,14 @@ public final class HudVitais {
         return new TextureRegionDrawable(new TextureRegion(pixel)).tint(c);
     }
 
+    /** nome, se existir no atlas; senao o nome da regiao que esta' em (x, y) da pagina. */
+    private static String nomeRegiao(TextureAtlas atlas, String nome, int x, int y) {
+        if (atlas.findRegion(nome) != null) return nome;
+        for (TextureAtlas.AtlasRegion r : atlas.getRegions())
+            if (r.getRegionX() == x && r.getRegionY() == y) return r.name;
+        return nome;
+    }
+
     private Image icone(TextureAtlas atlas, String nome) {
         TextureAtlas.AtlasRegion regiao = atlas.findRegion(nome);
         if (regiao == null) return null;
@@ -523,6 +535,7 @@ public final class HudVitais {
         else iconesStatus.top().right();
         // Em trios: 3 por linha, as linhas vao se empilhando pra baixo (6 = 3x2).
         java.util.List<Table> ativos = new java.util.ArrayList<>();
+        if (naZonaSegura) ativos.add(quadradoZonaSegura);
         if (comFome) ativos.add(quadradoFome);
         if (emBatalha) ativos.add(quadradoBatalha);
         for (int i = 0; i < ativos.size(); i++) {
@@ -548,6 +561,13 @@ public final class HudVitais {
     public void definirTopoVisivel(boolean visivel) {
         // Painel de HP/MP, municao e notificacoes somem juntos.
         conteudo.setVisible(visivel);
+    }
+
+    /** Icone da Protection Zone: aparece enquanto o player pisa nela. */
+    public void definirZonaSegura(boolean naZonaSegura) {
+        if (this.naZonaSegura == naZonaSegura) return;
+        this.naZonaSegura = naZonaSegura;
+        reorganizarStatus();
     }
 
     /** Icone de fome: aparece com a barra de Fullness zerada. */

@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.17"
+SERVER_VERSION = "v0.18"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -162,6 +162,22 @@ def quests_feitas(p):
     estado = p.get('npc_dialogue_state')
     if not isinstance(estado, dict): return []
     return [k[6:] for k, v in estado.items() if str(k).startswith('quest:') and v]
+
+# Protection Zone (camada ProtectionZone do World.tmx): {map_id: set de SQMs}.
+# So' vale no andar 1 (o do mapa do servidor).
+zonas_protegidas = {}
+
+def na_pz(obj, tile=None):
+    pz = zonas_protegidas.get(obj.get('mapa'))
+    if not pz or int(obj.get('floor', 1) or 1) != 1: return False
+    if tile is None: tile = tile_de(obj.get('pos_x', 0), obj.get('pos_y', 0))
+    return tile in pz
+
+class _Bloqueados:
+    """Dois conjuntos de SQMs bloqueados juntos, sem copiar (a PZ pode ser grande)."""
+    __slots__ = ('a', 'b')
+    def __init__(self, a, b): self.a, self.b = a, b
+    def __contains__(self, t): return t in self.a or t in self.b
 
 def bloqueado_por_quest(p, tile):
     feitas = None
@@ -1128,6 +1144,7 @@ def _player_alvo_valido(sid, m):
     except (TypeError, ValueError): pass
     if int(p.get('floor', 1) or 1) != MOB_FLOOR: return None
     if m.get('room') and p.get('room') not in salas_vizinhas(m['room']): return None
+    if na_pz(p): return None  # Protection Zone: mob nao mira
     return p
 
 # Igual _player_alvo_valido, mas SEM checar andar: usado pra manter a
@@ -1388,6 +1405,14 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
     if grade is None: return False
     origem = tile_do_mob(m)
     ocupados = _tiles_ocupados(excluir_mob=mob_id, sala=m.get('room'))
+    # Mob nao entra na Protection Zone (se ja' esta dentro, deixa sair).
+    pz = zonas_protegidas.get(m.get('mapa'))
+    if pz and origem not in pz:
+        livres = ocupados - {destino}
+        ocupados = _Bloqueados(ocupados, pz)
+        livres = _Bloqueados(livres, pz)
+    else:
+        livres = ocupados - {destino}
     cache = m.get('path')
     caminho = None
     if cache and cache['fim'] == destino and cache.get('adj') == ate_adjacente and cache['caminho'] and cache['caminho'][0] == origem and now - cache['t'] < PATH_RECALC_SEG:
@@ -1396,7 +1421,7 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
         if ate_adjacente:
             caminho = astar_ate_adjacente(grade, origem, destino, ocupados)
         else:
-            caminho = astar(grade, origem, destino, ocupados - {destino})
+            caminho = astar(grade, origem, destino, livres)
         m['path'] = {'fim': destino, 'adj': ate_adjacente, 'caminho': caminho, 't': now}
     if not caminho or len(caminho) < 2: return False
     proximo = caminho[1]
@@ -1491,7 +1516,7 @@ def _mob_tick(mob_id, m, now):
         # o ataque em si, lá em cima). Escolher um NOVO alvo continua exigindo
         # o mesmo andar (mais abaixo).
         alvo = _player_pursuit_valido(alvo_sid)
-        if alvo is None:  # morreu, saiu, desconectou
+        if alvo is None or na_pz(alvo):  # morreu, saiu, desconectou, entrou na PZ
             _mob_voltar_pra_casa(mob_id, m)
             return
         if _dist_px(m, alvo) > (DETECCAO_SQM + PERSISTE_SQM) * TILE:
@@ -1565,6 +1590,7 @@ def _mob_passear(mob_id, m, origem, now):
     for destino in destinos:
         if max(abs(destino[0] - casa[0]), abs(destino[1] - casa[1])) > MOB_WANDER_RADIUS_SQM: continue
         if destino in ocupados or eh_parede(grade, destino) or borda_bloqueada(grade, origem, destino): continue
+        if na_pz(m, destino): continue
         _virar_para(m, origem, destino)
         m['pos_x'], m['pos_y'] = centro_tile(destino)
         passo = _duracao_passo_mob(m, origem, destino)
@@ -3836,7 +3862,8 @@ def handle_m(data):
             for _, o in (_mobs_perto(p['room']) if p.get('room') else active_mobs.items()))
         # Outro player vivo no mesmo andar tambem bloqueia (pra passar por quem
         # esta parado no caminho, o client pede troca de lugar: swap_req).
-        player_no_caminho = any(
+        # Na Protection Zone players se atravessam.
+        player_no_caminho = not na_pz(p, destino_tile) and any(
             o_sid != sid and not online_players[o_sid].get('is_dead')
             and int(online_players[o_sid].get('floor', 1) or 1) == andar_p
             and tile_de(online_players[o_sid].get('pos_x', 0), online_players[o_sid].get('pos_y', 0)) == destino_tile
@@ -5295,19 +5322,21 @@ def carregar_mapa_do_servidor():
                                         'npcs': dados['npcs'], 'spawn': dados['spawn']}
     velocidade_tiles[MAPA_ID_SERVIDOR] = dados.get('velocidades', {})
     areas_de_quest[MAPA_ID_SERVIDOR] = dados.get('quest_areas', [])
+    zonas_protegidas[MAPA_ID_SERVIDOR] = dados.get('protection_zone', set())
     MAPAS_DO_SERVIDOR.add(MAPA_ID_SERVIDOR)
     for m in active_mobs.values():
         m['path'] = None
         m['alcance'] = {}
     print(f"[MAPA] {os.path.basename(MAPA_TMX)} lido pelo servidor: grade {grade['w']}x{grade['h']} "
           f"(fp {grade['fp'][:8]}), {len(dados['mobs'])} mob(s), {len(dados['npcs'])} NPC(s), spawn {dados['spawn']}, "
-          f"{len(velocidade_tiles[MAPA_ID_SERVIDOR])} SQM(s) com speed_modifier")
+          f"{len(velocidade_tiles[MAPA_ID_SERVIDOR])} SQM(s) com speed_modifier, "
+          f"{len(zonas_protegidas[MAPA_ID_SERVIDOR])} SQM(s) de Protection Zone")
 
 carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-08 kharon pay + ponte"
+VERSAO_SERVIDOR = "2026-10-08 protection zone"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)

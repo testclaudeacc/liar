@@ -354,8 +354,16 @@ def carregar_mapa(caminho_tmx):
                 cells.add((col, lin))
         quest_areas.append({'quest': quest, 'cells': cells})
 
+    # Protection Zone (camada de TILES "ProtectionZone"): todo SQM com
+    # qualquer tile nela e' area segura - mob nao mira nem entra, e player
+    # atravessa player. (coluna, linha do Tiled) = tile_de do servidor.
+    protection_zone = set()
+    for c in raiz.iter('layer'):
+        if c.get('name') == 'ProtectionZone':
+            protection_zone.update(_gids_da_camada(c, largura, altura).keys())
+
     return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru, 'velocidades': velocidades,
-            'quest_areas': quest_areas}
+            'quest_areas': quest_areas, 'protection_zone': protection_zone}
 
 
 def _rasterizar(hitboxes, bordas, altura_px):

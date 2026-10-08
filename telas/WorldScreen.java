@@ -3757,6 +3757,7 @@ public class WorldScreen extends ScreenAdapter {
         for (MobVisual mob : mobs.values()) mob.atualizar(delta);
         atualizarCombate(delta);
         atualizarAnimacaoPonte(delta);
+        hud.definirZonaSegura(mapa.propriedades.naZonaProtegida(local.x, local.y));
         for (int i = lootsFlutuantes.size() - 1; i >= 0; i--) {
             LootFlutuante l = lootsFlutuantes.get(i);
             l.tempo += delta;
@@ -4127,7 +4128,8 @@ public class WorldScreen extends ScreenAdapter {
             && !npcOcupaTile(alvoX, alvoY)
             && !mobOcupaTile(alvoX, alvoY)
             && !mapa.bloqueadoPorQuest(tileX(alvoX), tileY(alvoY)); // ponte sem a quest
-        Jogador noCaminho = livre ? jogadorOcupaTile(alvoX, alvoY) : null;
+        // Na Protection Zone players se atravessam (servidor.py::handle_m).
+        Jogador noCaminho = livre && !mapa.propriedades.naZonaProtegida(alvoX, alvoY) ? jogadorOcupaTile(alvoX, alvoY) : null;
         if (livre && noCaminho == null) {
             tempoInsistindo = 0f;
             // Speed_modifier muda no MEIO do passo: 1a metade na velocidade do
