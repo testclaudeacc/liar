@@ -4030,6 +4030,10 @@ def handle_equip_item(data):
         if alvo is None: return  
         # Item so' entra no slot dele (ex: arma nao vai no Helm).
         if slot_do_item(alvo.get('item')) != slot: return
+        # Item de outra classe: recusa (o client ja' trava o botao; a punicao
+        # de _slots_com_classe_invalida fica pra quem ja' tinha equipado).
+        req_class = obter_req_class_item(alvo.get('item'))
+        if req_class != "All" and req_class != p.get('class_name', 'Knight'): return
         # Level minimo do item (antes nao era checado no servidor).
         try:
             if int(obter_dados_item(alvo.get('item')).get('req_level', 0) or 0) > int(p.get('level', 1) or 1): return

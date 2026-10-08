@@ -103,6 +103,7 @@ public final class BookMenuUI {
     private Table equipColunaDireita;
     private Table equipPainelGrade;
     private TextButton equipButton;
+    private TextButton.TextButtonStyle estiloEquipar, estiloEquiparBloqueado;
     private TextButton unequipButton;
     private String selectedSlot = "";
     private int selectedEquipCandidate = -1;
@@ -504,6 +505,13 @@ public final class BookMenuUI {
         TextButton.TextButtonStyle estiloDesequipar = new TextButton.TextButtonStyle(
             skin.get("default", TextButton.TextButtonStyle.class));
         estiloDesequipar.font = skin.getFont("botao-pequeno-font");
+        this.estiloEquipar = estiloEquipar;
+        // Item de outra classe (ou level baixo): botao cinza e travado.
+        estiloEquiparBloqueado = new TextButton.TextButtonStyle(
+            skin.get("default", TextButton.TextButtonStyle.class));
+        estiloEquiparBloqueado.font = skin.getFont("botao-pequeno-font");
+        estiloEquiparBloqueado.fontColor = new Color(0.55f, 0.55f, 0.55f, 1f);
+        estiloEquiparBloqueado.disabledFontColor = estiloEquiparBloqueado.fontColor;
         equipButton = new TextButton("Equip", estiloEquipar);
         equipButton.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
@@ -634,7 +642,9 @@ public final class BookMenuUI {
             equipColunaDireita.add(separadorEquip()).growX().height(1).row();
             preencherBlocoStats(equipDetalhesDireita, candidatoPath, atual == null ? "" : atual);
             equipColunaDireita.add(equipDetalhesDireita).grow().top().left().pad(10, 12, 10, 12);
-            equipButton.setDisabled(slotAlvo == null && selectedSlot.isEmpty());
+            boolean bloqueado = !podeEquipar(candidatoPath);
+            equipButton.setStyle(bloqueado ? estiloEquiparBloqueado : estiloEquipar);
+            equipButton.setDisabled(bloqueado || (slotAlvo == null && selectedSlot.isEmpty()));
         } else {
             equipColunaDireita.add(equipPainelGrade).grow().row();
             if (equipadoPath != null) {
@@ -731,10 +741,18 @@ public final class BookMenuUI {
         return label;
     }
 
+    /** Classe certa e level suficiente (o servidor recusa igual). */
+    private boolean podeEquipar(String caminho) {
+        EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        if (dados == null) return true;
+        return ("All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass)) && dados.reqLevel <= nivelAtual;
+    }
+
     private void equiparSelecionado() {
         if (selectedEquipCandidate < 0 || selectedEquipCandidate >= inventoryItems.size()
             || !socket.isConnected()) return;
         InventoryItem item = inventoryItems.get(selectedEquipCandidate);
+        if (!podeEquipar(item.itemPath)) return;
         String slotItem = slotDoItem(item.itemPath);
         String slot = slotItem != null ? slotItem : selectedSlot;
         if (item.instanceId.isEmpty() || slot.isEmpty()) return;
