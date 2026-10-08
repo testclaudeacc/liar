@@ -963,6 +963,32 @@ def _bit_ligado(bits, w, h, x, y):
 # sem tornar nenhum dos dois solido (ao contrario de eh_parede). 'de' e
 # 'para' precisam ser ortogonalmente adjacentes (dx/dy = +-1 em um so eixo -
 # e' a unica forma de movimento que astar/astar_ate_adjacente geram).
+def linha_de_visao(grade, de, para):
+    # Ataque a distancia: a reta (centro a centro) entre os 2 SQMs nao pode
+    # passar por SQM solido. Anda 1 SQM por vez no eixo maior; quando a reta
+    # passa exatamente entre 2 SQMs, so' bloqueia se os DOIS forem solidos.
+    # Cercas/bordas finas nao bloqueiam (da' pra atirar por cima).
+    # Mesma conta de WorldScreen.temLinhaDeVisao (client).
+    if grade is None: return True
+    dx, dy = para[0] - de[0], para[1] - de[1]
+    passos = max(abs(dx), abs(dy))
+    for k in range(1, passos):
+        if abs(dx) >= abs(dy):
+            x = de[0] + (k if dx > 0 else -k)
+            v = de[1] + dy * k / passos
+            base = math.floor(v)
+            if abs(v - base - 0.5) < 1e-9:
+                if eh_parede(grade, (x, base)) and eh_parede(grade, (x, base + 1)): return False
+            elif eh_parede(grade, (x, math.floor(v + 0.5))): return False
+        else:
+            y = de[1] + (k if dy > 0 else -k)
+            v = de[0] + dx * k / passos
+            base = math.floor(v)
+            if abs(v - base - 0.5) < 1e-9:
+                if eh_parede(grade, (base, y)) and eh_parede(grade, (base + 1, y)): return False
+            elif eh_parede(grade, (math.floor(v + 0.5), y)): return False
+    return True
+
 def borda_bloqueada(grade, de, para):
     if grade is None: return False
     dx, dy = para[0] - de[0], para[1] - de[1]
@@ -3082,6 +3108,10 @@ def handle_hit_mob(data):
         if 'pos_x' not in mob_data: return
         if p.get('class_name') in CLASSES_RANGED:
             if _dist_px(mob_data, p) > (ALCANCE_RANGED_SQM + 1) * TILE: return
+            # Parede no meio: a flecha/magia nao passa.
+            if int(p.get('floor', 1) or 1) == 1 and not linha_de_visao(
+                    mapas_colisao.get(p.get('mapa')), tile_de(p.get('pos_x', 0), p.get('pos_y', 0)), tile_do_mob(mob_data)):
+                return
         else:
             tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
             tm = tile_do_mob(mob_data)

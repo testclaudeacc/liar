@@ -4756,6 +4756,34 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private static int tileX(float mundoX) { return (int) Math.floor(mundoX / Jogador.TILE); }
+
+    private boolean paredeNoSqm(int tx, int ty) {
+        return colisao.ehParede(tx * Jogador.TILE + Jogador.TILE / 2f, ty * Jogador.TILE);
+    }
+
+    /** Ataque a distancia: a reta (centro a centro) nao pode passar por SQM
+     * solido; passando exatamente entre 2 SQMs, so' bloqueia se os DOIS forem.
+     * Bordas finas (cercas) nao bloqueiam. Igual servidor.py::linha_de_visao. */
+    private boolean temLinhaDeVisao(float x0, float y0, float x1, float y1) {
+        int ax = tileX(x0), ay = tileY(y0), bx = tileX(x1), by = tileY(y1);
+        int dx = bx - ax, dy = by - ay;
+        int passos = Math.max(Math.abs(dx), Math.abs(dy));
+        for (int k = 1; k < passos; k++) {
+            boolean horizontal = Math.abs(dx) >= Math.abs(dy);
+            int fixo = horizontal ? ax + (dx > 0 ? k : -k) : ay + (dy > 0 ? k : -k);
+            double v = horizontal ? ay + (double) dy * k / passos : ax + (double) dx * k / passos;
+            int base = (int) Math.floor(v);
+            if (Math.abs(v - base - 0.5) < 1e-9) {
+                boolean a = horizontal ? paredeNoSqm(fixo, base) : paredeNoSqm(base, fixo);
+                boolean b = horizontal ? paredeNoSqm(fixo, base + 1) : paredeNoSqm(base + 1, fixo);
+                if (a && b) return false;
+            } else {
+                int r = (int) Math.floor(v + 0.5);
+                if (horizontal ? paredeNoSqm(fixo, r) : paredeNoSqm(r, fixo)) return false;
+            }
+        }
+        return true;
+    }
     private static int tileY(float mundoY) { return Math.round(mundoY / Jogador.TILE); }
 
     /** Distancia em SQMs (diagonal conta 1, igual o servidor). */
@@ -4987,6 +5015,8 @@ public class WorldScreen extends ScreenAdapter {
         if (classeRanged()) {
             float dx = local.x - alvo.x, dy = local.y - alvo.y;
             if (dx * dx + dy * dy > (float) (ALCANCE_RANGED_SQM * Jogador.TILE) * (ALCANCE_RANGED_SQM * Jogador.TILE)) return;
+            // Parede no meio: espera (o alvo continua marcado) - o servidor recusa igual.
+            if (!temLinhaDeVisao(local.x, local.y, alvo.x, alvo.y)) return;
         } else if (distanciaSqm(local.x, local.y, alvo.x, alvo.y) > 1) return;
         String id = alvo.id;
         // "<tipo>_<x>_<y>": tipo e' tudo antes dos 2 ultimos "_" (pode ter "_", ex cave_spider).
