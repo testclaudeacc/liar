@@ -3868,6 +3868,8 @@ def handle_m(data):
             # Andando rapido demais (speed hack): o passo nao vale e o client
             # e' puxado de volta pra posicao do servidor.
             p['_move_balde'] = balde
+            _avisar_admin_bloqueio(sid, p, f"rapido demais (balde {balde:.2f}/{custo:.2f}, fator do passo anterior {fator:.2f}, "
+                                           f"speed do SQM {mult_tile(p, destino_tile):.2f})", destino_tile)
             _corrigir_posicao(sid, p)
             return
         p['_move_balde'] = balde - custo
