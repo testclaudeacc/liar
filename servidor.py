@@ -2496,6 +2496,61 @@ carregar_mutes_chat()
 def chat_sistema(sid, texto, cor='yellow'):
     socketio.emit('chat_system', {'text': texto, 'color': cor}, room=sid)
 
+# ---------------------------------------------------------------------------
+# ADMIN. Decidido SO' no servidor pelo nome do personagem logado (que vem do
+# banco, depois do token conferido) - o client nao manda "sou admin", entao
+# nao da' pra burlar. Comandos vao pelo chat Local comecando com "/".
+# ---------------------------------------------------------------------------
+ADMIN_NOMES = {"labubus"}
+
+def eh_admin(p):
+    return str(p.get('name', '')).lower() in ADMIN_NOMES
+
+# /bestiary <mob> <0-3>: 0 = so' descoberto, 1 = cobre, 2 = prata, 3 = ouro.
+ADMIN_BESTIARIO_KILLS = {0: 1, 1: 20, 2: 100, 3: 500}
+
+def _tipo_do_mob_pelo_nome(nome):
+    nome = nome.lower().strip()
+    for tipo, info in MOB_DB.items():
+        if nome == tipo.lower() or nome == str(info.get('name', '')).lower():
+            return tipo
+    return None
+
+def comando_admin(sid, p, texto):
+    partes = texto[1:].split()
+    if not partes: return
+    cmd = partes[0].lower()
+    if cmd in ('help', 'admin'):
+        chat_sistema(sid, "Admin: /bestiary <mob> <0-3|clear>  (0 discovered, 1 copper, 2 silver, 3 gold)")
+        return
+    if cmd == 'bestiary':
+        if len(partes) < 3:
+            chat_sistema(sid, "Usage: /bestiary <mob> <0-3|clear>")
+            return
+        tipo = _tipo_do_mob_pelo_nome(' '.join(partes[1:-1]))
+        if tipo is None:
+            chat_sistema(sid, "Unknown mob. Mobs: " + ", ".join(MOB_DB.keys()), 'red')
+            return
+        b = p.get('bestiary')
+        if not isinstance(b, dict):
+            b = {}
+            p['bestiary'] = b
+        valor = partes[-1].lower()
+        if valor == 'clear':
+            b.pop(tipo, None)
+        else:
+            try: nivel = int(valor)
+            except ValueError: nivel = -1
+            if nivel not in ADMIN_BESTIARIO_KILLS:
+                chat_sistema(sid, "Level must be 0, 1, 2, 3 or clear.", 'red')
+                return
+            b[tipo] = ADMIN_BESTIARIO_KILLS[nivel]
+        _queue_save(p)
+        socketio.emit('bestiary', montar_bestiario(p), room=sid)
+        chat_sistema(sid, f"Bestiary: {tipo} set to {valor}.")
+        return
+    chat_sistema(sid, f"Unknown command /{cmd}. Try /help.", 'red')
+
 def _formatar_tempo(seg):
     seg = int(math.ceil(seg))
     if seg >= 3600: return "1 hour" if seg <= 3600 else f"{math.ceil(seg / 3600)} hours"
@@ -2564,6 +2619,11 @@ def handle_c(data):
         if sid not in online_players: return
         p = online_players[sid]
         if not isinstance(data, list) or len(data) == 0: return
+        # Comando de admin ("/..."): so' de personagem admin, nunca vai pro chat.
+        # Pra quem nao e' admin, "/algo" e' so' uma mensagem normal.
+        if eh_admin(p) and str(data[0]).strip().startswith('/'):
+            comando_admin(sid, p, str(data[0]).strip()[:200])
+            return
         msg = _filtrar_mensagem_chat(sid, p, data[0])
         if msg is None: return
 
