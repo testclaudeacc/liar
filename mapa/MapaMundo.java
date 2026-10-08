@@ -49,10 +49,7 @@ public class MapaMundo {
     private final TiledMap mapa;
     private final OrthogonalTiledMapRenderer renderer;
     private final int[] indicesCamadas;
-    // Desenho: o player fica por cima so' de Ground e Buildings1; Buildings2 e
-    // Buildings3 saem DEPOIS dele (desenharAcimaDoPlayer).
     private final int[] indicesChao;
-    private final int[] indicesAcima;
     private final int[] indicesTelhados;
     private final TiledMapTileLayer camadaRoofs;
     private final TiledMapTileLayer camadaPillars;
@@ -92,8 +89,7 @@ public class MapaMundo {
                 mapa.getLayers().getIndex("Buildings2"),
                 mapa.getLayers().getIndex("Buildings3")
         };
-        indicesChao = existentes("Ground", "Buildings1");
-        indicesAcima = existentes("Buildings2", "Buildings3");
+        indicesChao = existentes("Ground", "Buildings1", "Buildings2", "Buildings3");
         indicesTelhados = new int[]{
                 mapa.getLayers().getIndex("Roofs"),
                 mapa.getLayers().getIndex("Pillars")
@@ -272,12 +268,24 @@ public class MapaMundo {
         renderer.render(indicesChao);
     }
 
-    /** Buildings2 + Buildings3, por cima do player (chamado fora do
-     * batch.begin()/end() do WorldScreen, antes dos telhados). */
-    public void desenharAcimaDoPlayer(OrthographicCamera camera) {
-        if (indicesAcima.length == 0) return;
-        prepararView(camera);
-        renderer.render(indicesAcima);
+    /** Tiles com a property Above_Player=true: desenhados de novo por cima
+     * do player (a camada normal ja' desenhou por baixo). Dentro do
+     * batch.begin()/end() do WorldScreen, logo depois dos overlays. So' os
+     * que estao na tela e que continuam na camada (ponte escondida pela
+     * quest nao aparece). */
+    public void desenharAcimaDoPlayer(Batch batch, OrthographicCamera camera) {
+        if (propriedades.celulasAcimaDoPlayer.isEmpty()) return;
+        float meiaL = camera.viewportWidth * camera.zoom / 2f + tileWidth * 4f;
+        float meiaA = camera.viewportHeight * camera.zoom / 2f + tileHeight * 6f;
+        for (MapaPropriedades.CelulaAcima c : propriedades.celulasAcimaDoPlayer) {
+            if (Math.abs(c.worldX - camera.position.x) > meiaL || Math.abs(c.worldY - camera.position.y) > meiaA) continue;
+            TiledMapTileLayer.Cell cell = c.camada.getCell(c.cx, c.cy);
+            if (cell == null || cell.getTile() != c.tile) continue;
+            TextureRegion regiao = c.tile.getTextureRegion();
+            float w = regiao.getRegionWidth(), h = regiao.getRegionHeight();
+            batch.draw(regiao, c.worldX + (cell.getFlipHorizontally() ? w : 0f), c.worldY + (cell.getFlipVertically() ? h : 0f),
+                cell.getFlipHorizontally() ? -w : w, cell.getFlipVertically() ? -h : h);
+        }
     }
 
     /** Indices das camadas que existem no mapa (sem as que faltam). */

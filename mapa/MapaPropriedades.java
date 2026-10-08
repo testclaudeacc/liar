@@ -150,6 +150,24 @@ public class MapaPropriedades {
     public final List<Rectangle> hitboxesMundo = new ArrayList<>();
     public final List<BordaFina> bordasFinas = new ArrayList<>();
     public final List<CelulaOverlay> celulasOverlay = new ArrayList<>();
+    /** Tiles com a property Above_Player=true (MapaMundo.desenharAcimaDoPlayer). */
+    public final List<CelulaAcima> celulasAcimaDoPlayer = new ArrayList<>();
+
+    public static class CelulaAcima {
+        public final TiledMapTileLayer camada;
+        public final int cx, cy;
+        public final float worldX, worldY;
+        public final TiledMapTile tile;
+        CelulaAcima(TiledMapTileLayer camada, int cx, int cy, float worldX, float worldY, TiledMapTile tile) {
+            this.camada = camada; this.cx = cx; this.cy = cy; this.worldX = worldX; this.worldY = worldY; this.tile = tile;
+        }
+    }
+
+    private static boolean propriedadeTrue(MapProperties props, String nome) {
+        Object v = props.get(nome);
+        if (v == null) v = props.get(nome.toLowerCase());
+        return Boolean.TRUE.equals(v) || (v != null && "true".equalsIgnoreCase(v.toString().trim()));
+    }
     public final Map<String, Vector2> spawns = new HashMap<>();
     public final List<NPCSpawn> npcSpawns = new ArrayList<>();
     public final List<MobSpawn> mobSpawns = new ArrayList<>();
@@ -413,6 +431,10 @@ public class MapaPropriedades {
                     Color cor = props.get("light_color", Color.WHITE, Color.class);
                     float raio = props.get("light_radius", 32f, Float.class);
                     luzes.add(new Luz(worldCellX + offsetX, worldCellY + offsetY, cor, raio));
+                }
+
+                if (propriedadeTrue(props, "Above_Player")) {
+                    celulasAcimaDoPlayer.add(new CelulaAcima(camada, cx, cy, worldCellX, worldCellY, tile));
                 }
 
                 if (Boolean.TRUE.equals(props.get("overlap_transparency", Boolean.class))) {

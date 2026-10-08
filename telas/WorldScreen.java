@@ -4033,13 +4033,14 @@ public class WorldScreen extends ScreenAdapter {
         // precisar do renderer/batch interno do OrthogonalTiledMapRenderer,
         // ja que essas celulas foram removidas das layers normais).
         mapa.desenharOverlays(batch, local.x, local.y);
+        // Tiles com Above_Player=true: por cima do player.
+        mapa.desenharAcimaDoPlayer(batch, camera);
         batch.end();
 
         // Roofs/Pillars (camadas INTEIRAS, nao celula por celula) tambem na
         // frente do player - usa o renderer/batch interno do
         // OrthogonalTiledMapRenderer (igual desenharMapa), por isso fora do
         // batch.begin()/end() do WorldScreen.
-        mapa.desenharAcimaDoPlayer(camera);
         mapa.desenharTelhados(camera, local.x, local.y);
 
         // Nomes e baloes dos jogadores e NPCs recebem a mesma iluminacao.
