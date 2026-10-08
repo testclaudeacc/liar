@@ -156,8 +156,10 @@ public class MapaPropriedades {
         public final String quest;
         public final Rectangle area;      // mundo (Y pra cima)
         public final String camadas;      // "Buildings1,Buildings2" ou null (Buildings2)
-        AreaQuest(String quest, Rectangle area, String camadas) {
-            this.quest = quest; this.area = area; this.camadas = camadas;
+        /** Linhas de cima que nao travam (property free_top_rows). */
+        public final int linhasLivresTopo;
+        AreaQuest(String quest, Rectangle area, String camadas, int linhasLivresTopo) {
+            this.quest = quest; this.area = area; this.camadas = camadas; this.linhasLivresTopo = linhasLivresTopo;
         }
     }
 
@@ -265,8 +267,13 @@ public class MapaPropriedades {
                 Object q = obj.getProperties().get("quest");
                 if (q == null || q.toString().trim().isEmpty() || !(obj instanceof RectangleMapObject)) continue;
                 Object camadasQuest = obj.getProperties().get("layers");
+                int livres = 0;
+                Object fl = obj.getProperties().get("free_top_rows");
+                if (fl != null) {
+                    try { livres = Math.max(0, Math.round(Float.parseFloat(fl.toString()))); } catch (NumberFormatException ignorada) { }
+                }
                 areasQuest.add(new AreaQuest(q.toString().trim().toLowerCase(),
-                    new Rectangle(((RectangleMapObject) obj).getRectangle()), camadasQuest != null ? camadasQuest.toString() : null));
+                    new Rectangle(((RectangleMapObject) obj).getRectangle()), camadasQuest != null ? camadasQuest.toString() : null, livres));
             }
         }
 

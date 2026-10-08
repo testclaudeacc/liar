@@ -338,14 +338,19 @@ def carregar_mapa(caminho_tmx):
     # linha do Tiled - o mesmo tile_de do servidor) que so' quem fez a quest pisa.
     quest_areas = []
     for obj in objetos('QuestAreas'):
-        quest = (_ler_props(obj).get('quest') or '').strip().lower()
+        props_q = _ler_props(obj)
+        quest = (props_q.get('quest') or '').strip().lower()
         if not quest: continue
+        # free_top_rows: linhas de cima da area que NAO travam (ex: o comeco
+        # da ponte em cima da grama, que da' pra pisar mesmo sem a ponte).
+        try: livres = max(0, int(float(props_q.get('free_top_rows', 0) or 0)))
+        except ValueError: livres = 0
         x = float(obj.get('x', 0)); y = float(obj.get('y', 0))
         w = float(obj.get('width', 0) or 0); h = float(obj.get('height', 0) or 0)
         if w <= 0 or h <= 0: continue
         cells = set()
         for col in range(int(x // SQM), int((x + w - 1) // SQM) + 1):
-            for lin in range(int(y // SQM), int((y + h - 1) // SQM) + 1):
+            for lin in range(int(y // SQM) + livres, int((y + h - 1) // SQM) + 1):
                 cells.add((col, lin))
         quest_areas.append({'quest': quest, 'cells': cells})
 

@@ -216,7 +216,8 @@ public class MapaMundo {
         for (MapaPropriedades.AreaQuest a : propriedades.areasQuest) {
             if (questsFeitas.contains(a.quest)) continue;
             int[] c = celulasDe(a.area);
-            if (cx >= c[0] && cx <= c[1] && cy >= c[2] && cy <= c[3]) return true;
+            // Y pra cima: as linhas de cima (livres) sao as de cy maior.
+            if (cx >= c[0] && cx <= c[1] && cy >= c[2] && cy <= c[3] - a.linhasLivresTopo) return true;
         }
         return false;
     }
