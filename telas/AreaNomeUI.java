@@ -112,7 +112,9 @@ public final class AreaNomeUI {
         root.setTouchable(Touchable.disabled);
         root.getColor().a = 0f;
         root.setVisible(false);
-        stage.addActor(root);
+        // Por baixo de todas as GUIs (livro, chat, settings, HUD...): o nome
+        // da area nunca cobre uma janela aberta.
+        stage.getRoot().addActorAt(0, root);
     }
 
     /** Dispara a animacao pro nome dado - chamado so' quando o jogador ENTRA
