@@ -52,8 +52,10 @@ public class MapaIluminacao implements Disposable {
     public static final float CICLO_SEG = 1200f;
     private static final Color DIA = new Color(1f, 1f, 1f, 1f);
     private static final Color AMANHECER = new Color(0.62f, 0.55f, 0.68f, 1f);
-    private static final Color TARDE = new Color(1f, 0.84f, 0.62f, 1f);
-    private static final Color CREPUSCULO = new Color(0.72f, 0.42f, 0.42f, 1f);
+    // Tarde: sol se pondo (laranja-dourado forte); crepusculo: alaranjado
+    // avermelhado ja' escurecendo.
+    private static final Color TARDE = new Color(1f, 0.70f, 0.40f, 1f);
+    private static final Color CREPUSCULO = new Color(0.80f, 0.40f, 0.30f, 1f);
     private static final Color NOITE = new Color(0.13f, 0.14f, 0.24f, 1f);
     private static final float[] MARCAS = {0f, 360f, 420f, 690f, 735f, 780f, 1110f, 1155f, 1200f};
     private static final Color[] CORES = {DIA, DIA, TARDE, TARDE, CREPUSCULO, NOITE, NOITE, AMANHECER, DIA};

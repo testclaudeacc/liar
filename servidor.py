@@ -2651,7 +2651,7 @@ def comando_admin(sid, p, texto):
         chat_sistema(sid, "Admin: /bestiary <mob> <0-3|clear>  (0 discovered, 1 copper, 2 silver, 3 gold)")
         chat_sistema(sid, "Admin: /quest <name> complete|reset   /quests   /mobs")
         chat_sistema(sid, "Admin: /tp x<X> y<Y>  (minimap coordinates, ex: /tp x56 y200)")
-        chat_sistema(sid, "Admin: /time day|afternoon|night|<seconds 0-1199>  (20 min cycle)")
+        chat_sistema(sid, "Admin: /time day|afternoon|night|<seconds>s|<minutes>m  (20 min cycle, ex: /time 450s)")
         return
     if cmd == 'time':
         global _inicio_ciclo
@@ -2660,13 +2660,18 @@ def comando_admin(sid, p, texto):
             return
         alvo = FASES_DO_DIA.get(partes[1].lower())
         if alvo is None:
-            try: alvo = float(partes[1]) % CICLO_DIA_SEG
+            # /time 700, /time 700s ou /time 7m (minutos).
+            v = partes[1].lower()
+            try:
+                if v.endswith('m'): alvo = float(v[:-1]) * 60.0
+                else: alvo = float(v[:-1] if v.endswith('s') else v)
+                alvo %= CICLO_DIA_SEG
             except ValueError:
-                chat_sistema(sid, "Usage: /time day|afternoon|night|<seconds 0-1199>", 'red')
+                chat_sistema(sid, "Usage: /time day|afternoon|night|<seconds>s|<minutes>m  (ex: /time 450s, /time 12m)", 'red')
                 return
         _inicio_ciclo = time.time() - alvo
         socketio.emit('world_time', payload_hora_do_mundo())
-        chat_sistema(sid, f"World time set to {alvo:.0f}s.")
+        chat_sistema(sid, f"World time set to {alvo:.0f}s ({alvo / 60:.1f} min).")
         return
     if cmd == 'tp':
         # /tp x56 y200 (ou /tp 56 200): mesmo X/Y do minimapa.
