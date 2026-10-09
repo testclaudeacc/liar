@@ -46,15 +46,17 @@ public class MapaIluminacao implements Disposable {
     public static final Color AMBIENTE_CAVERNA = AMBIENTE_PADRAO;
 
     // ---- Ciclo (segundos dentro dos 20 min) ----
-    // 0-420 dia, 420-780 tarde, 780-1200 noite; as trocas sao graduais.
+    // 0-420 dia, 420-780 tarde, 780-1200 noite. As trocas acontecem no FIM
+    // da fase anterior, entao cada fase ja' comeca com a cor dela (/time
+    // afternoon = tarde dourada na hora, /time night = noite na hora).
     public static final float CICLO_SEG = 1200f;
     private static final Color DIA = new Color(1f, 1f, 1f, 1f);
     private static final Color AMANHECER = new Color(0.62f, 0.55f, 0.68f, 1f);
     private static final Color TARDE = new Color(1f, 0.84f, 0.62f, 1f);
     private static final Color CREPUSCULO = new Color(0.72f, 0.42f, 0.42f, 1f);
     private static final Color NOITE = new Color(0.13f, 0.14f, 0.24f, 1f);
-    private static final float[] MARCAS = {0f, 60f, 400f, 480f, 720f, 780f, 840f, 1140f, 1200f};
-    private static final Color[] CORES = {AMANHECER, DIA, DIA, TARDE, TARDE, CREPUSCULO, NOITE, NOITE, AMANHECER};
+    private static final float[] MARCAS = {0f, 360f, 420f, 690f, 735f, 780f, 1110f, 1155f, 1200f};
+    private static final Color[] CORES = {DIA, DIA, TARDE, TARDE, CREPUSCULO, NOITE, NOITE, AMANHECER, DIA};
     private static final float TRANSICAO_CAVERNA_SEG = 1.5f;
 
     private float tempoCiclo = 100f; // ate' o servidor mandar a hora: dia
