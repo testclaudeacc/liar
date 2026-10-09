@@ -198,14 +198,41 @@ public final class HudVitais {
         mp = criarBarra(estilo, COR_MP, 314);
 
         // ---- Painel HP/MP ----
-        Table interno = new Table();
-        // Fundo semi transparente (igual o trilho das barras em arco): so' a
-        // borda e' solida, da' pra ver o jogo por tras.
-        interno.setBackground(cor(new Color(COR_PAINEL.r, COR_PAINEL.g, COR_PAINEL.b, 0.35f)));
+        // Fundo do painel cinza escuro SOLIDO; so' o trilho das barras (atras
+        // do vermelho/roxo) e' semi transparente - ali da' pra ver o jogo.
+        // Por isso o painel pinta tudo MENOS o retangulo de cada barra.
+        final java.util.List<com.badlogic.gdx.scenes.scene2d.Actor> barrasPainel = new java.util.ArrayList<>();
+        final TextureRegion regiaoPixel = new TextureRegion(pixel);
+        Table interno = new Table() {
+            @Override protected void drawBackground(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha, float x, float y) {
+                Color antes = new Color(batch.getColor());
+                batch.setColor(COR_PAINEL.r, COR_PAINEL.g, COR_PAINEL.b, parentAlpha * getColor().a);
+                // Barras em coordenadas do painel, de baixo pra cima.
+                java.util.List<float[]> furos = new java.util.ArrayList<>();
+                for (com.badlogic.gdx.scenes.scene2d.Actor a : barrasPainel) {
+                    com.badlogic.gdx.math.Vector2 v = a.localToAscendantCoordinates(this, new com.badlogic.gdx.math.Vector2(0, 0));
+                    furos.add(new float[]{v.x, v.y, a.getWidth(), a.getHeight()});
+                }
+                furos.sort((a, b) -> Float.compare(a[1], b[1]));
+                float w = getWidth(), h = getHeight();
+                if (furos.isEmpty()) { batch.draw(regiaoPixel, x, y, w, h); batch.setColor(antes); return; }
+                float fx0 = furos.get(0)[0], fx1 = fx0 + furos.get(0)[2];
+                batch.draw(regiaoPixel, x, y, fx0, h);                 // esquerda (icones)
+                batch.draw(regiaoPixel, x + fx1, y, w - fx1, h);       // direita
+                float baixo = 0f;
+                for (float[] f : furos) {                              // vaos entre as barras
+                    if (f[1] > baixo) batch.draw(regiaoPixel, x + fx0, y + baixo, fx1 - fx0, f[1] - baixo);
+                    baixo = f[1] + f[3];
+                }
+                if (h > baixo) batch.draw(regiaoPixel, x + fx0, y + baixo, fx1 - fx0, h - baixo);
+                batch.setColor(antes);
+            }
+        };
+        interno.setBackground(cor(COR_PAINEL)); // so' pra Table desenhar o fundo (drawBackground acima)
         interno.pad(px(3), 0, px(2), px(3));
-        adicionarLinhaVital(interno, atlas, "ui/HPIcon", hp);
+        barrasPainel.add(adicionarLinhaVital(interno, atlas, "ui/HPIcon", hp).getActor());
         interno.row();
-        adicionarLinhaVital(interno, atlas, "ui/MPIcon", mp).padTop(px(5));
+        barrasPainel.add(adicionarLinhaVital(interno, atlas, "ui/MPIcon", mp).padTop(px(5)).getActor());
         Table painel = new Table();
         painel.setBackground(moldura(COR_BORDA_PAINEL, px(2), px(1), px(1), px(1)));
         // Borda: 2px em cima, 1px nos outros lados (medido na print).
@@ -450,7 +477,7 @@ public final class HudVitais {
         else pai.add().size(px(39)).padTop(px(-2)).padBottom(px(-2)).padRight(px(5));
         Table fundo = new Table();
         // Trilho vazio (atras do vermelho/roxo): cinza escuro semi transparente.
-        fundo.setBackground(cor(new Color(0.16f, 0.16f, 0.16f, 0.6f)));
+        fundo.setBackground(cor(new Color(0.12f, 0.12f, 0.12f, 0.45f)));
         Stack pilha = new Stack(fundo, barra.alinhador, barra.texto);
         Table comSombra = new Table();
         // Sombra so' na direita/embaixo (antes era um retangulo cheio por tras).
