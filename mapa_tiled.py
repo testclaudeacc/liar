@@ -36,6 +36,9 @@ CAMADAS_COLISAO = ("Ground", "Buildings1", "Buildings2", "Buildings3", "Roofs", 
 # speed_modifier: todas as camadas de colisao; a mais de CIMA com a property
 # na celula decide (igual MapaPropriedades.carregarVelocidades).
 CAMADAS_VELOCIDADE = CAMADAS_COLISAO
+# Camadas que entram na lista acima (velocidade/anulacao) mas cujos tiles
+# NUNCA tem colisao. Mesma lista de MapaPropriedades.CAMADAS_SEM_COLISAO.
+CAMADAS_SEM_COLISAO = ("Roofs",)
 
 FLIP_H = 0x80000000
 FLIP_V = 0x40000000
@@ -259,6 +262,8 @@ def carregar_mapa(caminho_tmx):
     bordas = []     # (worldCellX, worldCellY, lado)
     for idx, gids in enumerate(camadas):
         if gids is None: continue
+        # Roofs (telhado/teto de caverna) nunca tem colisao - so' visual.
+        if CAMADAS_COLISAO[idx] in CAMADAS_SEM_COLISAO: continue
         for (col, linha), bruto in gids.items():
             tile = tile_do_gid(bruto & MASCARA_GID)
             if tile is None: continue

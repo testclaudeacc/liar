@@ -132,6 +132,9 @@ public class MapaPropriedades {
     }
 
     private static final String[] CAMADAS_COLISAO_E_LUZ = {"Ground", "Buildings1", "Buildings2", "Buildings3", "Roofs", "Pillars"};
+    /** Dessas acima, as que NUNCA tem colisao (luz/velocidade continuam).
+     * Igual mapa_tiled.py::CAMADAS_SEM_COLISAO. */
+    private static final String[] CAMADAS_SEM_COLISAO = {"Roofs"};
     private final Map<Long, Float> velocidadePorCelula = new HashMap<>();
     // Protection Zone: SQMs com qualquer tile na camada de tiles
     // "ProtectionZone" (nao e' desenhada). Mesma regra do servidor.py::na_pz.
@@ -244,7 +247,8 @@ public class MapaPropriedades {
         Gdx.app.log("MapaPropriedades", teleportes.size() + " SQM(s) de teleport na camada Teleports");
         int[][] anulaAPartirDe = calcularAnulacaoPorCelula(camadas);
         for (int i = 0; i < camadas.length; i++) {
-            if (camadas[i] != null) escanearColisaoELuz(camadas[i], i, anulaAPartirDe);
+            if (camadas[i] != null) escanearColisaoELuz(camadas[i], i, anulaAPartirDe,
+                java.util.Arrays.asList(CAMADAS_SEM_COLISAO).contains(CAMADAS_COLISAO_E_LUZ[i]));
         }
 
         MapLayer spawnLayer = mapa.getLayers().get("SpawnPoints");
@@ -406,7 +410,7 @@ public class MapaPropriedades {
         return anulaAPartirDe;
     }
 
-    private void escanearColisaoELuz(TiledMapTileLayer camada, int idxCamada, int[][] anulaAPartirDe) {
+    private void escanearColisaoELuz(TiledMapTileLayer camada, int idxCamada, int[][] anulaAPartirDe, boolean semColisao) {
         for (int cy = 0; cy < camada.getHeight(); cy++) {
             for (int cx = 0; cx < camada.getWidth(); cx++) {
                 TiledMapTileLayer.Cell cell = camada.getCell(cx, cy);
@@ -424,6 +428,8 @@ public class MapaPropriedades {
                 // Protection Zone: nada naquele SQM tem colisao (passagem
                 // secreta) - igual mapa_tiled.py.
                 if (zonaProtegida.contains(chaveCelula(cx, cy))) anulado = true;
+                // Roofs (telhado/teto de caverna): so' visual, nunca colide.
+                if (semColisao) anulado = true;
 
                 if (!anulado && Boolean.TRUE.equals(props.get("solid", Boolean.class))) {
                     hitboxesMundo.add(new Rectangle(worldCellX, worldCellY, tileWidth, tileHeight));
