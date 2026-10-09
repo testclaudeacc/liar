@@ -3409,10 +3409,30 @@ public class WorldScreen extends ScreenAdapter {
             hud.definirBatalha(data.getBoolean("in_battle", false), data.getBoolean("counting", false),
                 data.getFloat("seconds", 30f));
         });
+        // Alguem (eu ou outro perto) bebeu pocao: efeito de cura em cima do
+        // sprite dele (acompanha se andar) e o quanto curou subindo.
+        socket.on("potion_used", (nomeEvt, data) -> {
+            if (data == null) return;
+            Jogador j = jogadorPorNome(data.getString("name", ""));
+            if (j == null) return;
+            boolean mana = "mp".equals(data.getString("kind", "hp"));
+            TextureRegion[] quadros = quadrosCura(mana ? "manaheal" : "heal");
+            if (quadros != null) {
+                Efeito e = new Efeito(quadros, j.x, j.y);
+                e.jogadorAlvo = j;
+                e.duracaoQuadro = DURACAO_QUADRO_HIT;
+                efeitos.add(e);
+            }
+            NumeroDano n = new NumeroDano(j.x, j.y + 4f, "+" + data.getInt("amount", 0), false);
+            n.cor = mana ? COR_CURA_MP : COR_CURA_HP;
+            numerosDano.add(n);
+        });
         socket.on("food_result", (nomeEvt, data) -> {
             if (data == null || data.getBoolean("ok", false)) return;
             String motivo = data.getString("reason", "");
-            if ("full".equals(motivo)) hud.notificar("You are full.", COR_NOTIF_AVISO, null);
+            if ("full_hp".equals(motivo)) hud.notificar("Your health is already full.", COR_NOTIF_AVISO, null);
+            else if ("full_mp".equals(motivo)) hud.notificar("Your mana is already full.", COR_NOTIF_AVISO, null);
+            else if ("full".equals(motivo)) hud.notificar("You are full.", COR_NOTIF_AVISO, null);
             else if ("none".equals(motivo)) hud.notificar("You don't have this item.", COR_NOTIF_AVISO, null);
         });
         socket.on("hotbar_synced", (nomeEvt, data) -> {
@@ -4818,6 +4838,32 @@ public class WorldScreen extends ScreenAdapter {
         efeitos.add(e);
         return e;
     }
+
+    /** Efeito de cura das pocoes: heal.png (vida) / manaheal.png (mana), em
+     * qualquer pasta do atlas. Quadros quadrados (altura x altura). */
+    private TextureRegion[] quadrosCura(String nomeArquivo) {
+        String chave = "__cura_" + nomeArquivo;
+        if (cacheEfeitos.containsKey(chave)) return cacheEfeitos.get(chave);
+        TextureRegion tira = null;
+        for (TextureAtlas.AtlasRegion r : atlas.getRegions()) {
+            String n = r.name.substring(r.name.lastIndexOf('/') + 1);
+            if (n.equalsIgnoreCase(nomeArquivo)) { tira = r; break; }
+        }
+        TextureRegion[] quadros = null;
+        if (tira != null) {
+            int lado = Math.max(1, tira.getRegionHeight());
+            int n = Math.max(1, tira.getRegionWidth() / lado);
+            quadros = new TextureRegion[n];
+            for (int i = 0; i < n; i++) quadros[i] = new TextureRegion(tira, i * lado, 0, lado, lado);
+        } else {
+            Gdx.app.error("WorldScreen", "Efeito de cura nao encontrado no atlas: " + nomeArquivo);
+        }
+        cacheEfeitos.put(chave, quadros);
+        return quadros;
+    }
+
+    private static final Color COR_CURA_HP = Color.valueOf("5cff6a");
+    private static final Color COR_CURA_MP = Color.valueOf("8f8bff");
 
     /** Hit que acompanha o sprite do mob enquanto ele anda. */
     private void tocarEfeitoNoMob(String nome, MobVisual mob) {

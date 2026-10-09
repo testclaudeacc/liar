@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.22"
+SERVER_VERSION = "v0.23"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -297,7 +297,16 @@ ITEM_DB = {
     "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "max_stack": 9999, "cap": 0.1},
     # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
     "res://sprites/items/Food/Cookie.tres": {"name": "Cookie", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "stackable": True, "max_stack": 100, "cap": 0.1},
+    # Pocoes: "heal_hp"/"heal_mp" = o que aparece pro player ("Heals 50");
+    # a cura de verdade e' um dos valores de CURA_POCAO (perto disso).
+    # "icon" = regiao do atlas.
+    "res://sprites/items/Potions/SmallHealthPotion.tres": {"name": "Small Health Potion", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_hp": 50, "icon": "sheet/r44_c2", "stackable": True, "max_stack": 100, "cap": 0.2},
+    "res://sprites/items/Potions/SmallManaPotion.tres": {"name": "Small Mana Potion", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 50, "icon": "sheet/r44_c9", "stackable": True, "max_stack": 100, "cap": 0.2},
 }
+# Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
+# que aparece na descricao.
+CURA_POCAO = {50: (42, 44, 46, 48, 50)}
+POCAO_COOLDOWN_SEG = 1.0
 
 SLOT_MUNICAO = "Hand"
 # Classes que atacam a distancia (o resto e' corpo a corpo) e o alcance delas.
@@ -312,7 +321,7 @@ ALCANCE_RANGED_SQM = 5
 # de uma copia propria e o que aparece na tela e' sempre o valor real.
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
-                       "fullness", "stackable")
+                       "fullness", "stackable", "heal_hp", "heal_mp", "icon")
 
 def montar_item_db_cliente():
     db = {}
@@ -354,7 +363,10 @@ STARTING_EQUIPMENT = {
 }
 # Item da bag inicial: caminho, ou (caminho, quantidade) pra empilhavel.
 COOKIE = "res://sprites/items/Food/Cookie.tres"
-STARTING_INVENTORY = {c: [(COOKIE, 10)] for c in ("Knight", "Ranger", "Mage", "Bard")}
+POCAO_HP_PEQUENA = "res://sprites/items/Potions/SmallHealthPotion.tres"
+POCAO_MP_PEQUENA = "res://sprites/items/Potions/SmallManaPotion.tres"
+STARTING_INVENTORY = {c: [(COOKIE, 10), (POCAO_HP_PEQUENA, 5), (POCAO_MP_PEQUENA, 5)]
+                      for c in ("Knight", "Ranger", "Mage", "Bard")}
 
 def montar_kit_inicial(class_name):
     equipped = {}
@@ -5178,8 +5190,44 @@ def handle_eat_food(data):
         p = online_players.get(sid)
         if p is None or p.get('is_dead') or not isinstance(data, dict): return
         inst = encontrar_instancia(p.get('inventory', []), str(data.get('instance_id', '')))
-        if inst is not None: _comer(sid, p, inst)
+        if inst is not None: _usar_item(sid, p, inst)
     except Exception: traceback.print_exc()
+
+def _usar_item(sid, p, inst):
+    # Botao Eat/Use da bag ou atalho da hotbar: comida ou pocao.
+    dados = ITEM_DB.get(inst.get('item'), {})
+    if dados.get('heal_hp') or dados.get('heal_mp'): _beber_pocao(sid, p, inst, dados)
+    else: _comer(sid, p, inst)
+
+def _beber_pocao(sid, p, inst, dados):
+    now = time.time()
+    if now - p.get('_ultima_pocao', 0) < POCAO_COOLDOWN_SEG: return
+    max_hp, max_mp = calcular_max_vitais(p)
+    tipo = 'hp' if dados.get('heal_hp') else 'mp'
+    chave, maximo = ('current_hp', max_hp) if tipo == 'hp' else ('current_mp', max_mp)
+    try: atual = float(p.get(chave, -1))
+    except (TypeError, ValueError): atual = maximo
+    if atual < 0: atual = maximo  # -1 no banco = cheio
+    if atual >= maximo:
+        emit('food_result', {'ok': False, 'reason': 'full_hp' if tipo == 'hp' else 'full_mp'}, room=sid)
+        return
+    nominal = int(dados.get('heal_hp') or dados.get('heal_mp'))
+    cura = random.choice(CURA_POCAO.get(nominal, (nominal,)))
+    p[chave] = min(maximo, atual + cura)
+    p['_ultima_pocao'] = now
+    inventario = p.get('inventory', [])
+    qty = int(inst.get('qty', 1))
+    if qty > 1: inst['qty'] = qty - 1
+    else: inventario.remove(inst)
+    _queue_save(p)
+    emit('sync_vitals', {chave: p[chave], 'max_hp': max_hp, 'max_mp': max_mp}, room=sid)
+    texto_de_acao(p, "*Gulp*")
+    # Todo mundo perto ve o efeito de cura e o numero em cima do player.
+    emit_area('potion_used', {'name': p.get('name', ''), 'kind': tipo, 'amount': int(cura)}, p.get('room'))
+    if tipo == 'hp':
+        emit_area('player_status_updated', {'name': p.get('name', ''), 'current_hp': p[chave], 'max_hp': max_hp},
+                  p.get('room'), skip_sid=sid)
+    emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(inventario), 'equipped_items': p.get('equipped_items', {})}, room=sid)
 
 # Textinho de acao em cima da cabeca do player (igual OT de Tibia), pra todo
 # mundo que esta perto: comer ("Om Noom"), e depois magias, pocoes, quests...
@@ -5219,9 +5267,9 @@ def _comer(sid, p, inst):
 HOTBAR_SLOTS = 9
 
 def item_usavel_no_atalho(item_path):
-    # Por enquanto só comida; poção (e magia) entram aqui quando existirem.
+    # Comida e pocao (magia entra aqui quando existir).
     dados = ITEM_DB.get(item_path, {})
-    try: return int(dados.get('fullness', 0)) > 0
+    try: return int(dados.get('fullness', 0)) > 0 or bool(dados.get('heal_hp') or dados.get('heal_mp'))
     except (TypeError, ValueError): return False
 
 def normalizar_hotbar(hb):
@@ -5270,7 +5318,7 @@ def handle_use_hotbar(data):
         if inst is None:
             emit('food_result', {'ok': False, 'reason': 'none'}, room=sid)
             return
-        _comer(sid, p, inst)
+        _usar_item(sid, p, inst)
     except Exception: traceback.print_exc()
 
 # Battle: entra quando um mob mira o player (ou o player bate num mob) e sai
@@ -5501,7 +5549,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-09 roofs sem colisao"
+VERSAO_SERVIDOR = "2026-10-09 pocoes pequenas"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)

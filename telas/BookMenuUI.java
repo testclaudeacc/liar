@@ -382,7 +382,8 @@ public final class BookMenuUI {
         final int reqLevel;
         final String reqClass;
         final int bonusDamage, defense, stamina, mana, fourthStatValue, manaCost, fullness;
-        final String fourthStatType;
+        final int healHp, healMp; // pocao: quanto cura (o que aparece)
+        final String fourthStatType, icone;
 
         EquipStats(JsonValue d) {
             this.nome = d.getString("name", "");
@@ -398,7 +399,12 @@ public final class BookMenuUI {
             this.fourthStatValue = d.getInt("fourth_stat_value", 0);
             this.manaCost = d.getInt("mana_cost", 0);
             this.fullness = d.getInt("fullness", 0);
+            this.healHp = d.getInt("heal_hp", 0);
+            this.healMp = d.getInt("heal_mp", 0);
+            this.icone = d.getString("icon", null);
         }
+
+        boolean ehPocao() { return healHp > 0 || healMp > 0; }
     }
 
     private final Map<String, EquipStats> ITEM_STATS = new LinkedHashMap<>();
@@ -706,6 +712,13 @@ public final class BookMenuUI {
             bloco.add(linhaStat("Fullness " + dados.fullness, COR_FOME)).left().row();
             return;
         }
+        if (dados.ehPocao()) {
+            // Pocao: "Potion" e quanto cura (valor maximo; o servidor varia um pouco).
+            bloco.add(linhaStat("Potion", Color.LIGHT_GRAY)).left().row();
+            if (dados.healHp > 0) bloco.add(linhaStat("Heals " + dados.healHp + " HP", COR_POCAO_HP)).left().row();
+            if (dados.healMp > 0) bloco.add(linhaStat("Restores " + dados.healMp + " Mana", COR_POCAO_MP)).left().row();
+            return;
+        }
         bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
         // Vermelho = classe errada (o servidor pune quem equipa item de outra classe).
         boolean classeCerta = "All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass);
@@ -936,6 +949,8 @@ public final class BookMenuUI {
     private static final Color COR_BARRA_XP = Color.valueOf("f5b82e");
     private static final Color COR_DEFESA = Color.valueOf("6ab7ff");
     private static final Color COR_FOME = Color.valueOf("f0a35a");
+    private static final Color COR_POCAO_HP = Color.valueOf("ff6b6b");
+    private static final Color COR_POCAO_MP = Color.valueOf("8f6bff");
     /** Mesmo valor de servidor.py::FULLNESS_MAX. */
     public static final float FULLNESS_MAX = 50f;
     private static final Color COR_BARRA_FOME = Color.valueOf("8a4b2a");
@@ -1580,6 +1595,12 @@ public final class BookMenuUI {
     }
 
     public TextureAtlas.AtlasRegion iconeDoItem(String caminhoItem) {
+        // Item com "icon" no ITEM_DB (ex: pocoes) usa essa regiao do atlas.
+        EquipStats comIcone = caminhoItem == null ? null : ITEM_STATS.get(caminhoItem);
+        if (comIcone != null && comIcone.icone != null) {
+            TextureAtlas.AtlasRegion r = atlas.findRegion(comIcone.icone);
+            if (r != null) return r;
+        }
         String nome = caminhoItem == null ? "" : caminhoItem.substring(caminhoItem.lastIndexOf('/') + 1);
         int extensao = nome.lastIndexOf('.');
         if (extensao >= 0) nome = nome.substring(0, extensao);
@@ -1619,15 +1640,17 @@ public final class BookMenuUI {
         preencherBlocoStats(bagDetalhes, item.itemPath,
             ITEM_STATS.containsKey(item.itemPath) ? (equipado == null ? "" : equipado) : null);
         EquipStats comida = ITEM_STATS.get(item.itemPath);
-        // Comida nao mostra "Quantity" (a quantidade ja' aparece no icone).
-        boolean ehComida = comida != null && comida.fullness > 0;
+        // Comida/pocao nao mostram "Quantity" (a quantidade ja' aparece no icone).
+        boolean ehPocao = comida != null && comida.ehPocao();
+        boolean ehComida = comida != null && (comida.fullness > 0 || ehPocao);
         if (item.quantity > 1 && !ehComida) bagDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
         if (item.favorite) bagDetalhes.add(linhaStat("Favorite", new Color(1f, 0.82f, 0.24f, 1f))).left().row();
         if (ehComida && !item.instanceId.isEmpty()) {
             TextButton.TextButtonStyle estiloComer = new TextButton.TextButtonStyle(
                 skin.get("verde", TextButton.TextButtonStyle.class));
             estiloComer.font = skin.getFont("botao-pequeno-font");
-            TextButton comer = new TextButton("Eat", estiloComer);
+            // Pocao: "Use" (o servidor decide: eat_food usa comida ou pocao).
+            TextButton comer = new TextButton(ehPocao ? "Use" : "Eat", estiloComer);
             String id = item.instanceId;
             comer.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
@@ -3055,10 +3078,10 @@ public final class BookMenuUI {
         return usavelNoAtalho(caminho);
     }
 
-    /** Item que pode ir num slot da barra (por enquanto: comida). */
+    /** Item que pode ir num slot da barra: comida e pocao. */
     private boolean usavelNoAtalho(String caminho) {
         EquipStats dados = ITEM_STATS.get(caminho);
-        return dados != null && dados.fullness > 0;
+        return dados != null && (dados.fullness > 0 || dados.ehPocao());
     }
 
     /** Aba da direita na pagina Spells: itens da bag ou magias. */
