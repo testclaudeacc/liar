@@ -129,7 +129,7 @@ public class UiSkin {
         skin.add("hud", new Label.LabelStyle(fonteHud, Color.WHITE));
         // Quantidade nos slots (bag, hotbar, botoes) e cooldown das pocoes:
         // mesma fonte com contorno preto, pra ler em cima de qualquer icone.
-        BitmapFont fonteQuantidade = gerarFonte("fonts/dejavu-sans.condensed.ttf", 12, 2, escala);
+        BitmapFont fonteQuantidade = gerarFonte("fonts/dejavu-sans.condensed.ttf", 14, 2, escala);
         fonteQuantidade.setUseIntegerPositions(false);
         skin.add("quantidade-font", fonteQuantidade);
         skin.add("quantidade", new Label.LabelStyle(fonteQuantidade, Color.WHITE));
