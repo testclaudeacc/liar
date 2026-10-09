@@ -360,8 +360,8 @@ public final class HotbarUI {
                 }
                 pilha.add(centro);
                 if (qtd > 0) {
-                    Label numero = new Label(String.valueOf(qtd), skin, "hud");
-                    numero.setFontScale(MOBILE ? 0.75f : 0.65f);
+                    Label numero = new Label(String.valueOf(qtd), skin, "quantidade");
+                    numero.setFontScale(MOBILE ? 1.15f : 1.05f);
                     Table canto = new Table();
                     // Quantidade no canto de baixo a direita (no redondo, um pouco
                     // pra dentro pra nao sair do circulo).
@@ -370,6 +370,8 @@ public final class HotbarUI {
                     canto.add(numero).pad(0, 0, 2 + dentro, 4 + dentro);
                     pilha.add(canto);
                 }
+                // Pocao em cooldown: cinza escuro + segundos por cima.
+                if (livro.ehPocao(caminho)) pilha.add(livro.sobreposicaoCooldown());
             }
             // PC: tecla do slot no canto; celular, no editor: numero do slot.
             if (!MOBILE || editando) {

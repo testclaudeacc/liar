@@ -3415,6 +3415,8 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             Jogador j = jogadorPorNome(data.getString("name", ""));
             if (j == null) return;
+            // Fui eu: todas as pocoes travam (cinza + segundos em todo slot de pocao).
+            if (j == local) CooldownPocao.iniciar(data.getFloat("cooldown", CooldownPocao.DURACAO));
             boolean mana = "mp".equals(data.getString("kind", "hp"));
             TextureRegion[] quadros = quadrosCura(mana ? "manaheal" : "heal");
             if (quadros != null) {

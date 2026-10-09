@@ -715,8 +715,9 @@ public final class BookMenuUI {
         if (dados.ehPocao()) {
             // Pocao: "Potion" e quanto cura (valor maximo; o servidor varia um pouco).
             bloco.add(linhaStat("Potion", Color.LIGHT_GRAY)).left().row();
-            if (dados.healHp > 0) bloco.add(linhaStat("Heals " + dados.healHp + " HP", COR_POCAO_HP)).left().row();
-            if (dados.healMp > 0) bloco.add(linhaStat("Restores " + dados.healMp + " Mana", COR_POCAO_MP)).left().row();
+            // "+(icone de HP/MP da HUD) 50".
+            if (dados.healHp > 0) bloco.add(linhaCura("ui/HPIcon", dados.healHp, COR_POCAO_HP)).left().row();
+            if (dados.healMp > 0) bloco.add(linhaCura("ui/MPIcon", dados.healMp, COR_POCAO_MP)).left().row();
             return;
         }
         bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
@@ -745,6 +746,19 @@ public final class BookMenuUI {
             texto += " (" + (diferenca >= 0 ? "+" : "") + diferenca + ")";
         }
         bloco.add(linhaStat(texto, cor)).left().row();
+    }
+
+    private Table linhaCura(String icone, int valor, Color cor) {
+        Table linha = new Table();
+        linha.add(linhaStat("+", cor)).padRight(3);
+        TextureAtlas.AtlasRegion regiao = atlas.findRegion(icone);
+        if (regiao != null) {
+            Image img = new Image(new TextureRegionDrawable(regiao));
+            img.setScaling(Scaling.fit);
+            linha.add(img).size(18f).padRight(4);
+        }
+        linha.add(linhaStat(String.valueOf(valor), cor));
+        return linha;
     }
 
     private Label linhaStat(String texto, Color cor) {
@@ -788,8 +802,8 @@ public final class BookMenuUI {
      * numero nao tem pe, entao sobrava um vao; o padBottom negativo desconta
      * isso e o numero encosta na borda sem sair do slot. */
     private void adicionarQuantidade(Table marcadores, int quantidade) {
-        final float escalaFonte = 0.6f;
-        Label rotulo = new Label(String.valueOf(quantidade), skin, "hud");
+        final float escalaFonte = 1f;
+        Label rotulo = new Label(String.valueOf(quantidade), skin, "quantidade");
         rotulo.setFontScale(escalaFonte);
         rotulo.setColor(Color.WHITE);
         rotulo.setAlignment(Align.bottomLeft);
@@ -1565,6 +1579,7 @@ public final class BookMenuUI {
                     }
                     conteudo.add(marcadores);
                 }
+                if (ehPocao(item.itemPath)) conteudo.add(sobreposicaoCooldown());
                 slot.add(conteudo).grow().pad(2);
             }
             slot.addListener(new ChangeListener() {
@@ -1987,10 +2002,11 @@ public final class BookMenuUI {
             adicionarQuantidade(marcadores, escolhida > 0 ? escolhida : quantidade);
             Label numero = (Label) marcadores.getChildren().peek();
             if (escolhida > 0) numero.setColor(COR_TRADE_SELECIONADO);
-            if (MOBILE_LIVRO) numero.setFontScale(0.6f * 0.8f);
+            if (MOBILE_LIVRO) numero.setFontScale(0.8f);
             marcadores.add().expandX();
             conteudo.add(marcadores);
         }
+        if (ehPocao(caminho)) conteudo.add(sobreposicaoCooldown());
         return conteudo;
     }
 
@@ -3078,6 +3094,17 @@ public final class BookMenuUI {
         return usavelNoAtalho(caminho);
     }
 
+    /** Pocao (cura HP/MP): tem o cooldown compartilhado (CooldownPocao). */
+    public boolean ehPocao(String caminho) {
+        EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        return dados != null && dados.ehPocao();
+    }
+
+    /** Cinza escuro + segundos por cima do slot de uma pocao em cooldown. */
+    public CooldownPocao.Sobreposicao sobreposicaoCooldown() {
+        return new CooldownPocao.Sobreposicao(skin.getFont("quantidade-font"), 1.4f);
+    }
+
     /** Item que pode ir num slot da barra: comida e pocao. */
     private boolean usavelNoAtalho(String caminho) {
         EquipStats dados = ITEM_STATS.get(caminho);
@@ -3729,13 +3756,13 @@ public final class BookMenuUI {
             }
             pilha.add(centro);
             if (qtd > 0) {
-                Label numero = new Label(String.valueOf(qtd), skin, "hud");
-                numero.setFontScale(0.6f);
+                Label numero = new Label(String.valueOf(qtd), skin, "quantidade");
                 Table canto = new Table();
                 canto.bottom().right();
                 canto.add(numero).pad(0, 0, 1, 4);
                 pilha.add(canto);
             }
+            if (ehPocao(caminho)) pilha.add(sobreposicaoCooldown());
         }
         if (tecla != null) {
             Label numeroTecla = new Label(tecla, skin, "hud");

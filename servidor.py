@@ -306,7 +306,7 @@ ITEM_DB = {
 # Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
 # que aparece na descricao.
 CURA_POCAO = {50: (42, 44, 46, 48, 50)}
-POCAO_COOLDOWN_SEG = 1.0
+POCAO_COOLDOWN_SEG = 5.0  # usou uma: TODAS travam (igual CooldownPocao.DURACAO no client)
 
 SLOT_MUNICAO = "Hand"
 # Classes que atacam a distancia (o resto e' corpo a corpo) e o alcance delas.
@@ -2323,7 +2323,7 @@ def handle_join_game(data):
         try: hb_salva = json.loads(row[17]) if row[17] else {}
         except (TypeError, ValueError): hb_salva = {}
         # Nunca configurou a barra: começa com o cookie no 1o slot de item.
-        if not hb_salva: hb_salva = {'slots': [COOKIE]}
+        if not hb_salva: hb_salva = {'slots': [COOKIE, POCAO_HP_PEQUENA, POCAO_MP_PEQUENA]}
         data['hotbar'] = normalizar_hotbar(hb_salva)
         data['session_start'] = time.time()
         # Bestiary da conta. O que ficou salvo no personagem (versao antiga,
@@ -5223,7 +5223,8 @@ def _beber_pocao(sid, p, inst, dados):
     emit('sync_vitals', {chave: p[chave], 'max_hp': max_hp, 'max_mp': max_mp}, room=sid)
     texto_de_acao(p, "*Gulp*")
     # Todo mundo perto ve o efeito de cura e o numero em cima do player.
-    emit_area('potion_used', {'name': p.get('name', ''), 'kind': tipo, 'amount': int(cura)}, p.get('room'))
+    emit_area('potion_used', {'name': p.get('name', ''), 'kind': tipo, 'amount': int(cura),
+                              'cooldown': POCAO_COOLDOWN_SEG}, p.get('room'))
     if tipo == 'hp':
         emit_area('player_status_updated', {'name': p.get('name', ''), 'current_hp': p[chave], 'max_hp': max_hp},
                   p.get('room'), skip_sid=sid)

@@ -127,6 +127,12 @@ public class UiSkin {
         fonteHud.setUseIntegerPositions(false);
         skin.add("hud-font", fonteHud);
         skin.add("hud", new Label.LabelStyle(fonteHud, Color.WHITE));
+        // Quantidade nos slots (bag, hotbar, botoes) e cooldown das pocoes:
+        // mesma fonte com contorno preto, pra ler em cima de qualquer icone.
+        BitmapFont fonteQuantidade = gerarFonte("fonts/dejavu-sans.condensed.ttf", 12, 2, escala);
+        fonteQuantidade.setUseIntegerPositions(false);
+        skin.add("quantidade-font", fonteQuantidade);
+        skin.add("quantidade", new Label.LabelStyle(fonteQuantidade, Color.WHITE));
         // Log do chat - sem contorno (fundo escuro + texto branco ja tem
         // contraste, igual o campo de texto) e com MARKUP ligado (so'
         // nessa fonte - nao na do TextField, pra um "[" digitado de verdade
