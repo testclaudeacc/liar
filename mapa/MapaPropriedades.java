@@ -139,6 +139,9 @@ public class MapaPropriedades {
     // Teleports: SQMs cobertos pelos retangulos da camada de objetos
     // "Teleports" (o destino so' o servidor usa - servidor.py::handle_tp).
     private final java.util.Set<Long> teleportes = new java.util.HashSet<>();
+    // Cavernas: SQMs com qualquer tile na camada de tiles "Caves" (nao e'
+    // desenhada) - la' dentro o dia/noite nao muda nada (MapaIluminacao).
+    private final java.util.Set<Long> cavernas = new java.util.HashSet<>();
 
     // Forma e' "fina" se um lado for <= 30% do tile (~4.8px de 16) e o lado
     // oposto cobrir pelo menos 60% do tile (~9.6px) - bate com os valores
@@ -211,6 +214,16 @@ public class MapaPropriedades {
                 }
         }
         Gdx.app.log("MapaPropriedades", zonaProtegida.size() + " SQM(s) de Protection Zone");
+        Object camadaCaves = mapa.getLayers().get("Caves");
+        if (camadaCaves instanceof TiledMapTileLayer) {
+            TiledMapTileLayer cv = (TiledMapTileLayer) camadaCaves;
+            for (int cx = 0; cx < cv.getWidth(); cx++)
+                for (int cy = 0; cy < cv.getHeight(); cy++) {
+                    TiledMapTileLayer.Cell cell = cv.getCell(cx, cy);
+                    if (cell != null && cell.getTile() != null) cavernas.add(chaveCelula(cx, cy));
+                }
+        }
+        Gdx.app.log("MapaPropriedades", cavernas.size() + " SQM(s) de caverna (camada Caves)");
         MapLayer camadaTps = mapa.getLayers().get("Teleports");
         if (camadaTps != null) {
             for (MapObject obj : camadaTps.getObjects()) {
@@ -558,6 +571,14 @@ public class MapaPropriedades {
         int cx = (int) Math.floor(mundoX / tileWidth);
         int cy = (int) Math.floor((mundoY + tileHeight / 2f) / tileHeight);
         return teleportes.contains(chaveCelula(cx, cy));
+    }
+
+    /** SQM sob (mundoX, mundoY) - pes, igual velocidadeEm - e' caverna. */
+    public boolean naCaverna(float mundoX, float mundoY) {
+        if (cavernas.isEmpty()) return false;
+        int cx = (int) Math.floor(mundoX / tileWidth);
+        int cy = (int) Math.floor((mundoY + tileHeight / 2f) / tileHeight);
+        return cavernas.contains(chaveCelula(cx, cy));
     }
 
     /** SQM sob (mundoX, mundoY) - pes, igual velocidadeEm - e' Protection Zone. */

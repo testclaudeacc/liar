@@ -31,16 +31,34 @@ import java.util.List;
  * World.tmx::is_light) - redesenhar todas elas num FrameBuffer so' todo
  * frame e' barato o bastante pra nao precisar desse cache (se o mapa crescer
  * muito e isso virar gargalo de verdade, ai' sim vale separar em
- * estatico/dinamico). Tambem nao tem ciclo dia/noite (Mirage calcula a cor
- * ambiente a partir da hora do "realm time" do servidor) - cor ambiente fixa
- * por enquanto, ver corAmbiente.
+ * estatico/dinamico).
+ *
+ * Dia e noite: o servidor manda a hora do ciclo (world_time, 20 min) e
+ * corDoCiclo() da' a cor ambiente de cada momento (dia sem escurecer, tarde
+ * dourada, noite azul escura). Caverna (camada "Caves") ignora o ciclo: fica
+ * sempre em AMBIENTE_CAVERNA, com uma transicao suave ao entrar/sair.
  */
 public class MapaIluminacao implements Disposable {
 
-    /** Escurao fixo (sem ciclo dia/noite ainda) - baixo o bastante pra
-     * tocha/luz fazerem diferenca visivel, alto o bastante pra nao ficar
-     * tudo preto fora do alcance de alguma luz. */
-    public static final Color AMBIENTE_PADRAO = new Color(0.22f, 0.22f, 0.3f, 1f);
+    /** Escurao das cavernas (sempre igual, sem dia/noite) - era a noite
+     * eterna de antes, um pouco mais escura. */
+    public static final Color AMBIENTE_PADRAO = new Color(0.16f, 0.16f, 0.23f, 1f);
+    public static final Color AMBIENTE_CAVERNA = AMBIENTE_PADRAO;
+
+    // ---- Ciclo (segundos dentro dos 20 min) ----
+    // 0-420 dia, 420-780 tarde, 780-1200 noite; as trocas sao graduais.
+    public static final float CICLO_SEG = 1200f;
+    private static final Color DIA = new Color(1f, 1f, 1f, 1f);
+    private static final Color AMANHECER = new Color(0.62f, 0.55f, 0.68f, 1f);
+    private static final Color TARDE = new Color(1f, 0.84f, 0.62f, 1f);
+    private static final Color CREPUSCULO = new Color(0.72f, 0.42f, 0.42f, 1f);
+    private static final Color NOITE = new Color(0.13f, 0.14f, 0.24f, 1f);
+    private static final float[] MARCAS = {0f, 60f, 400f, 480f, 720f, 780f, 840f, 1140f, 1200f};
+    private static final Color[] CORES = {AMANHECER, DIA, DIA, TARDE, TARDE, CREPUSCULO, NOITE, NOITE, AMANHECER};
+    private static final float TRANSICAO_CAVERNA_SEG = 1.5f;
+
+    private float tempoCiclo = 100f; // ate' o servidor mandar a hora: dia
+    private float fatorCaverna = -1f; // 0 = campo, 1 = caverna; -1 = ainda nao sabe
 
     private final Texture texturaLuz;
     private final TextureRegion regiaoLuz;
@@ -49,6 +67,37 @@ public class MapaIluminacao implements Disposable {
     private int fboLargura = -1, fboAltura = -1;
 
     public Color corAmbiente = new Color(AMBIENTE_PADRAO);
+
+    /** Hora do ciclo vinda do servidor (world_time). */
+    public void definirTempoCiclo(float segundos) {
+        tempoCiclo = ((segundos % CICLO_SEG) + CICLO_SEG) % CICLO_SEG;
+    }
+
+    public float tempoCiclo() { return tempoCiclo; }
+
+    /** Cor ambiente do campo naquele momento do ciclo. */
+    public static Color corDoCiclo(float t, Color saida) {
+        for (int i = 0; i < MARCAS.length - 1; i++) {
+            if (t <= MARCAS[i + 1]) {
+                float f = (t - MARCAS[i]) / (MARCAS[i + 1] - MARCAS[i]);
+                // Suave nas pontas (sem "quina" na troca de fase).
+                f = f * f * (3f - 2f * f);
+                return saida.set(CORES[i]).lerp(CORES[i + 1], f);
+            }
+        }
+        return saida.set(CORES[0]);
+    }
+
+    /** 1x por frame: anda o relogio e mistura com a caverna (transicao suave
+     * na entrada/saida). */
+    public void atualizar(float delta, boolean naCaverna) {
+        tempoCiclo = (tempoCiclo + delta) % CICLO_SEG;
+        float alvo = naCaverna ? 1f : 0f;
+        if (fatorCaverna < 0f) fatorCaverna = alvo;
+        float passo = delta / TRANSICAO_CAVERNA_SEG;
+        fatorCaverna = fatorCaverna < alvo ? Math.min(alvo, fatorCaverna + passo) : Math.max(alvo, fatorCaverna - passo);
+        corDoCiclo(tempoCiclo, corAmbiente).lerp(AMBIENTE_CAVERNA, fatorCaverna);
+    }
 
     public MapaIluminacao() {
         texturaLuz = new Texture(Gdx.files.internal("lights/light.png"));

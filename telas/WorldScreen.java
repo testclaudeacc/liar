@@ -2779,6 +2779,10 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void registrarEventosDeRede() {
+        // Dia e noite: hora do ciclo de 20 min (servidor.py::hora_do_mundo).
+        socket.on("world_time", (nomeEvt, data) -> {
+            if (data != null) iluminacao.definirTempoCiclo(data.getFloat("t", 100f));
+        });
         socket.on("tp_result", (nomeEvt, data) -> {
             if (data == null) return;
             tpOk = data.getBoolean("ok", false);
@@ -3997,6 +4001,7 @@ public class WorldScreen extends ScreenAdapter {
         }
         luzesRemotos.keySet().retainAll(remotos.keySet());
         for (AvisoSpawn a : avisosSpawn) luzesDoFrame.add(a.luz);
+        iluminacao.atualizar(delta, mapa.propriedades.naCaverna(local.x, local.y));
         iluminacao.renderizar(batch, camera, luzesDoFrame);
 
         // Mundo inteiro desenhado DIRETO na tela real, num passo so' - igual

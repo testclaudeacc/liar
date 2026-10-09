@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.20"
+SERVER_VERSION = "v0.21"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -172,6 +172,20 @@ def na_pz(obj, tile=None):
     if not pz or int(obj.get('floor', 1) or 1) != 1: return False
     if tile is None: tile = tile_de(obj.get('pos_x', 0), obj.get('pos_y', 0))
     return tile in pz
+
+# ---- Dia e noite ----
+# Ciclo de 20 min (igual pra todo mundo): 7 de dia, 6 de tarde, 7 de noite.
+# O servidor so' dita o relogio; a cor de cada hora e' do client
+# (MapaIluminacao.corDoCiclo). /time do admin adianta pra uma fase.
+CICLO_DIA_SEG = 1200.0
+FASES_DO_DIA = {'day': 0.0, 'afternoon': 420.0, 'night': 780.0}
+_inicio_ciclo = time.time()
+
+def hora_do_mundo():
+    return (time.time() - _inicio_ciclo) % CICLO_DIA_SEG
+
+def payload_hora_do_mundo():
+    return {'t': round(hora_do_mundo(), 2), 'cycle': CICLO_DIA_SEG}
 
 # Teleports (camada Teleports do World.tmx): {map_id: {SQM do TP: SQM destino}}.
 teleportes = {}
@@ -2387,6 +2401,7 @@ def handle_join_game(data):
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
         emit('bestiary', montar_bestiario(data), room=sid)
         emit('quest_state', {'done': quests_feitas(data)}, room=sid)
+        emit('world_time', payload_hora_do_mundo(), room=sid)
 
         rooms_area = set(salas_vizinhas(room))
         dead_mobs = [m_id for m_id, m_data in active_mobs.items() if m_data.get('hp', 1) <= 0 and m_data.get('room') in rooms_area]
@@ -2636,6 +2651,22 @@ def comando_admin(sid, p, texto):
         chat_sistema(sid, "Admin: /bestiary <mob> <0-3|clear>  (0 discovered, 1 copper, 2 silver, 3 gold)")
         chat_sistema(sid, "Admin: /quest <name> complete|reset   /quests   /mobs")
         chat_sistema(sid, "Admin: /tp x<X> y<Y>  (minimap coordinates, ex: /tp x56 y200)")
+        chat_sistema(sid, "Admin: /time day|afternoon|night|<seconds 0-1199>  (20 min cycle)")
+        return
+    if cmd == 'time':
+        global _inicio_ciclo
+        if len(partes) < 2:
+            chat_sistema(sid, f"World time: {hora_do_mundo():.0f}s of {CICLO_DIA_SEG:.0f}s. Usage: /time day|afternoon|night|<seconds>")
+            return
+        alvo = FASES_DO_DIA.get(partes[1].lower())
+        if alvo is None:
+            try: alvo = float(partes[1]) % CICLO_DIA_SEG
+            except ValueError:
+                chat_sistema(sid, "Usage: /time day|afternoon|night|<seconds 0-1199>", 'red')
+                return
+        _inicio_ciclo = time.time() - alvo
+        socketio.emit('world_time', payload_hora_do_mundo())
+        chat_sistema(sid, f"World time set to {alvo:.0f}s.")
         return
     if cmd == 'tp':
         # /tp x56 y200 (ou /tp 56 200): mesmo X/Y do minimapa.
@@ -5465,7 +5496,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-08 pz sem colisao + buildings2 por cima"
+VERSAO_SERVIDOR = "2026-10-09 dia e noite"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)
