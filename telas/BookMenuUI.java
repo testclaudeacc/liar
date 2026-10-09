@@ -801,14 +801,18 @@ public final class BookMenuUI {
      * Equip). O Label reserva espaco pro "pe" das letras (descent) embaixo -
      * numero nao tem pe, entao sobrava um vao; o padBottom negativo desconta
      * isso e o numero encosta na borda sem sair do slot. */
+    /** Numero de quantidade padrao (fonte com contorno, sem escala, nitido). */
+    public Label rotuloQuantidade(int quantidade) {
+        Label rotulo = new LabelPixel(String.valueOf(quantidade), skin.get("quantidade", Label.LabelStyle.class));
+        rotulo.setAlignment(Align.bottomRight);
+        return rotulo;
+    }
+
     private void adicionarQuantidade(Table marcadores, int quantidade) {
-        final float escalaFonte = 1f;
-        Label rotulo = new Label(String.valueOf(quantidade), skin, "quantidade");
-        rotulo.setFontScale(escalaFonte);
-        rotulo.setColor(Color.WHITE);
-        rotulo.setAlignment(Align.bottomLeft);
-        float descent = rotulo.getStyle().font.getDescent() * escalaFonte; // negativo
-        marcadores.add(rotulo).left().bottom().padLeft(1f).padBottom(descent);
+        // Canto inferior DIREITO, colado (sem margem) - igual em toda GUI.
+        Label rotulo = rotuloQuantidade(quantidade);
+        marcadores.add().expandX();
+        marcadores.add(rotulo).right().bottom().padBottom(rotulo.getStyle().font.getDescent());
     }
 
     /** Mana gasta por ataque basico pela arma da mao principal (0 = nao gasta). */
@@ -845,9 +849,8 @@ public final class BookMenuUI {
             Table moldura = new Table();
             moldura.add(icone).grow().pad(4); // +2 do pad da pilha = 6, igual os outros slots
             Table marcadores = new Table();
-            marcadores.bottom().left();
+            marcadores.bottom();
             adicionarQuantidade(marcadores, qtd);
-            marcadores.add().expandX();
             botao.add(new Stack(moldura, marcadores)).grow().pad(2);
         }
     }
@@ -1570,13 +1573,13 @@ public final class BookMenuUI {
                     // favorito (mesmo icone do botao) no inferior direito.
                     Table marcadores = new Table();
                     marcadores.bottom();
-                    if (item.quantity > 1) adicionarQuantidade(marcadores, item.quantity);
-                    marcadores.add().expandX();
                     if (item.favorite) {
                         Image estrela = new Image(new TextureRegionDrawable(atlas.findRegion("ui/Star")));
                         estrela.setScaling(Scaling.fit);
-                        marcadores.add(estrela).size(16f).right().bottom();
+                        marcadores.add(estrela).size(16f).left().bottom();
                     }
+                    if (item.quantity > 1) adicionarQuantidade(marcadores, item.quantity);
+                    else marcadores.add().expandX();
                     conteudo.add(marcadores);
                 }
                 if (ehPocao(item.itemPath)) conteudo.add(sobreposicaoCooldown());
@@ -1762,8 +1765,6 @@ public final class BookMenuUI {
             adicionarQuantidade(marcadores, (int) Math.min(Integer.MAX_VALUE, quantidade));
             Label numero = (Label) marcadores.getChildren().peek();
             numero.setColor(corQtd);
-            if (MOBILE_LIVRO) numero.setFontScale(0.6f * 0.8f);
-            marcadores.add().expandX();
             conteudo.add(marcadores);
         }
         slot.add(conteudo).grow().pad(2);
@@ -2002,8 +2003,6 @@ public final class BookMenuUI {
             adicionarQuantidade(marcadores, escolhida > 0 ? escolhida : quantidade);
             Label numero = (Label) marcadores.getChildren().peek();
             if (escolhida > 0) numero.setColor(COR_TRADE_SELECIONADO);
-            if (MOBILE_LIVRO) numero.setFontScale(0.8f);
-            marcadores.add().expandX();
             conteudo.add(marcadores);
         }
         if (ehPocao(caminho)) conteudo.add(sobreposicaoCooldown());
@@ -3102,7 +3101,7 @@ public final class BookMenuUI {
 
     /** Cinza escuro + segundos por cima do slot de uma pocao em cooldown. */
     public CooldownPocao.Sobreposicao sobreposicaoCooldown() {
-        return new CooldownPocao.Sobreposicao(skin.getFont("quantidade-font"), 1.4f);
+        return new CooldownPocao.Sobreposicao(skin.getFont("cooldown-font"));
     }
 
     /** Item que pode ir num slot da barra: comida e pocao. */
@@ -3756,10 +3755,10 @@ public final class BookMenuUI {
             }
             pilha.add(centro);
             if (qtd > 0) {
-                Label numero = new Label(String.valueOf(qtd), skin, "quantidade");
+                Label numero = rotuloQuantidade(qtd);
                 Table canto = new Table();
                 canto.bottom().right();
-                canto.add(numero).pad(0, 0, 1, 4);
+                canto.add(numero).padBottom(numero.getStyle().font.getDescent());
                 pilha.add(canto);
             }
             if (ehPocao(caminho)) pilha.add(sobreposicaoCooldown());

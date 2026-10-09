@@ -44,14 +44,13 @@ public final class CooldownPocao {
 
     /** Camada por cima do icone de uma pocao (ocupa o slot inteiro). */
     public static final class Sobreposicao extends Widget {
-        private static final Color FUNDO = new Color(0.08f, 0.08f, 0.08f, 0.72f);
+        // Bem escuro, mas ainda deixa ver a pocao por baixo.
+        private static final Color FUNDO = new Color(0.02f, 0.02f, 0.02f, 0.82f);
         private final BitmapFont fonte;
-        private final float escalaFonte;
         private final GlyphLayout layout = new GlyphLayout();
 
-        public Sobreposicao(BitmapFont fonte, float escalaFonte) {
+        public Sobreposicao(BitmapFont fonte) {
             this.fonte = fonte;
-            this.escalaFonte = escalaFonte;
             setTouchable(Touchable.disabled);
         }
 
@@ -62,12 +61,14 @@ public final class CooldownPocao {
             batch.setColor(FUNDO.r, FUNDO.g, FUNDO.b, FUNDO.a * parentAlpha);
             batch.draw(pixel(), getX(), getY(), getWidth(), getHeight());
             batch.setColor(antes);
-            float escalaX = fonte.getData().scaleX, escalaY = fonte.getData().scaleY;
-            fonte.getData().setScale(escalaX * escalaFonte, escalaY * escalaFonte);
             fonte.setColor(1f, 1f, 1f, parentAlpha);
             layout.setText(fonte, String.valueOf((int) Math.ceil(falta)));
-            fonte.draw(batch, layout, getX() + (getWidth() - layout.width) / 2f, getY() + (getHeight() + layout.height) / 2f);
-            fonte.getData().setScale(escalaX, escalaY);
+            // Numero no pixel exato da tela (nitido), centralizado no slot.
+            float tx = getX() + (getWidth() - layout.width) / 2f, ty = getY() + (getHeight() + layout.height) / 2f;
+            com.badlogic.gdx.math.Vector2 p = localToStageCoordinates(new com.badlogic.gdx.math.Vector2(tx - getX(), ty - getY()));
+            tx += LabelPixel.ajuste(getStage(), p.x, true);
+            ty += LabelPixel.ajuste(getStage(), p.y, false);
+            fonte.draw(batch, layout, tx, ty);
             fonte.setColor(Color.WHITE);
         }
     }

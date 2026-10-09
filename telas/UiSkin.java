@@ -133,6 +133,9 @@ public class UiSkin {
         fonteQuantidade.setUseIntegerPositions(false);
         skin.add("quantidade-font", fonteQuantidade);
         skin.add("quantidade", new Label.LabelStyle(fonteQuantidade, Color.WHITE));
+        BitmapFont fonteCooldown = gerarFonte("fonts/dejavu-sans.condensed.ttf", 17, 2, escala);
+        fonteCooldown.setUseIntegerPositions(false);
+        skin.add("cooldown-font", fonteCooldown);
         // Log do chat - sem contorno (fundo escuro + texto branco ja tem
         // contraste, igual o campo de texto) e com MARKUP ligado (so'
         // nessa fonte - nao na do TextField, pra um "[" digitado de verdade

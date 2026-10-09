@@ -360,14 +360,14 @@ public final class HotbarUI {
                 }
                 pilha.add(centro);
                 if (qtd > 0) {
-                    Label numero = new Label(String.valueOf(qtd), skin, "quantidade");
-                    numero.setFontScale(MOBILE ? 1.15f : 1.05f);
+                    Label numero = livro.rotuloQuantidade(qtd);
                     Table canto = new Table();
                     // Quantidade no canto de baixo a direita (no redondo, um pouco
                     // pra dentro pra nao sair do circulo).
                     canto.bottom().right();
                     float dentro = MOBILE ? tamanhoSlot(i) * 0.12f : 0f;
-                    canto.add(numero).pad(0, 0, 2 + dentro, 4 + dentro);
+                    // Colado no canto (no celular, so' o bastante pra nao sair do circulo).
+                    canto.add(numero).pad(0, 0, dentro + numero.getStyle().font.getDescent(), dentro);
                     pilha.add(canto);
                 }
                 // Pocao em cooldown: cinza escuro + segundos por cima.
