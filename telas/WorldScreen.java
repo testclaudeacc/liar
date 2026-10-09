@@ -2055,7 +2055,26 @@ public class WorldScreen extends ScreenAdapter {
         return null;
     }
 
+    // ---- Alma (personagem novo, antes do portal do Kharon) ----
+    // Sem chat, sem nome e sem trocar skin (servidor.py::eh_alma). Quem esta'
+    // com a pele BaseSoul tambem fica sem nome pros outros.
+    private boolean almaLocal = false;
+    private final Set<String> almas = new HashSet<>();
+
+    private void definirAlmaLocal(boolean alma) {
+        almaLocal = alma;
+        if (alma && chat.isVisivel()) chat.setVisivel(false);
+        botaoTopoChat.setVisible(!alma);
+        bookMenu.definirAlma(alma);
+    }
+
+    private static boolean skinDeAlma(JsonValue skins) {
+        String base = SkinsUtil.caminho(skins, "base");
+        return base != null && base.contains("BaseSoul");
+    }
+
     private void alternarChat() {
+        if (almaLocal && !chat.isVisivel()) return; // alma nao fala
         if (!chat.isVisivel()) fecharOutrasJanelas();
         chat.setVisivel(!chat.isVisivel());
         atualizarVisibilidadeJoystick();
@@ -2831,6 +2850,7 @@ public class WorldScreen extends ScreenAdapter {
             // ao esbarrar num NPC) - sem esse if, inventario/moedas/skills
             // eram zerados no client.
             if (data.has("inventory")) {
+                definirAlmaLocal(data.getBoolean("soul", false));
                 if (socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
                 if (socket.isConnected()) socket.emitRaw("get_party_status", "{}");
                 definirSkins(local.nome, data.get("skins"));
@@ -3327,6 +3347,10 @@ public class WorldScreen extends ScreenAdapter {
 
         // Skins: confirmacao das minhas (depois do Equip na aba Vanity) e
         // troca de skin de outro jogador da area.
+        // Virou personagem (passou no portal) ou o admin voltou pra alma (/soul).
+        socket.on("soul_state", (nomeEvt, data) -> {
+            if (data != null) definirAlmaLocal(data.getBoolean("soul", false));
+        });
         socket.on("skins_synced", (nomeEvt, data) -> {
             if (data == null) return;
             definirSkins(local.nome, data.get("skins"));
@@ -3919,7 +3943,7 @@ public class WorldScreen extends ScreenAdapter {
         // refocava o campo na hora (enviava e continuava digitando, bug
         // reportado pelo usuario).
         // Write (padrao Enter): comeca a digitar no chat (abre ele se estiver fechado).
-        if (Gdx.input.isKeyJustPressed(Controles.tecla("write")) && acaoCapturando == null
+        if (Gdx.input.isKeyJustPressed(Controles.tecla("write")) && acaoCapturando == null && !almaLocal
                 && !chat.estaDigitando() && !chatDigitandoFrameAnterior
                 && !settingsAberta() && !bookMenu.isVisible()) {
             if (!chat.isVisivel()) alternarChat();
@@ -4653,6 +4677,7 @@ public class WorldScreen extends ScreenAdapter {
             camadas.add(new CamadaSkin(anim, SkinsUtil.cor(SkinsUtil.corHex(skins, cat))));
         }
         skinsJogadores.put(nome, camadas);
+        if (skinDeAlma(skins)) almas.add(nome); else almas.remove(nome);
         if (nome.equals(local.nome)) atualizarRetrato(skins);
     }
 
@@ -5572,6 +5597,7 @@ public class WorldScreen extends ScreenAdapter {
      * continua podendo ficar atras de tile overlay - so' o nome e' sempre
      * legivel. */
     private void desenharNome(Jogador j) {
+        if (almas.contains(j.nome)) return; // alma nao tem nome
         float altura = quadroAtual(animacaoBase, j).getRegionHeight() * ESCALA_SPRITE;
         // Mesmo snap de ancoraX/Y que desenharJogador() usa (Math.round(v/zoom)*zoom)
         // - precisa bater exatamente, senao o nome treme independente do sprite.

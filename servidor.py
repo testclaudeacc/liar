@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.23"
+SERVER_VERSION = "v0.24"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -189,6 +189,7 @@ def payload_hora_do_mundo():
 
 # Teleports (camada Teleports do World.tmx): {map_id: {SQM do TP: SQM destino}}.
 teleportes = {}
+teleportes_despertar = {}  # {map_id: set de SQMs de TP com awaken=true}
 TP_COOLDOWN_SEG = 1.0
 _DELTA_DIRECAO = {'up': (0, -1), 'down': (0, 1), 'left': (-1, 0), 'right': (1, 0)}
 
@@ -2040,9 +2041,11 @@ def create_character():
         if c.fetchone()[0] >= 4: return jsonify({"erro": "No character slots."}), 403
         inventory_inicial, equipped_inicial = montar_kit_inicial(class_name)
 
-        query = """INSERT INTO characters (user_id, name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, current_hp, current_mp, currency)
-                   VALUES (%s, %s, %s, 1, 0, -1, -1, 'down', '{}', 1, %s, %s, '{}', -1, -1, 0)"""
-        c.execute(query, (user_id, name, class_name, json.dumps(inventory_inicial), json.dumps(equipped_inicial)))
+        # Personagem novo nasce como alma (ver eh_alma / despertar_alma).
+        query = """INSERT INTO characters (user_id, name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, current_hp, current_mp, currency, npc_dialogue_state)
+                   VALUES (%s, %s, %s, 1, 0, -1, -1, 'down', %s, 1, %s, %s, '{}', -1, -1, 0, %s)"""
+        c.execute(query, (user_id, name, class_name, json.dumps(skins_alma()), json.dumps(inventory_inicial),
+                          json.dumps(equipped_inicial), json.dumps({'soul': True})))
         conn.commit()
         return jsonify({"mensagem": "Character created!"}), 201
     except psycopg2.IntegrityError:
@@ -2224,6 +2227,54 @@ SKIN_DB = {
     ],
 }
 
+# ---- Alma (personagem novo) ----
+# Nasce como alma: so' a pele BaseSoul (esqueleto), pelado, sem nome, sem
+# chat e sem trocar skin. Passando pelo portal de ida unica (Teleports com
+# awaken=true, depois do Kharon) vira personagem: pele clara ou escura (50/50,
+# da' pra trocar depois), roupa e chapeu iniciais da classe.
+CAMINHO_BASE_ALMA = "res://sprites/base/BaseSoul.png"
+BASES_DESPERTAR = ("res://sprites/base/Base.png", "res://sprites/base/DarkBase.png")
+
+def eh_alma(p):
+    estado = p.get('npc_dialogue_state')
+    return isinstance(estado, dict) and bool(estado.get('soul'))
+
+def skins_alma():
+    return {'base': {'nome': 'Soul', 'caminho': CAMINHO_BASE_ALMA, 'cor': 'ffffffff'}}
+
+def _skin_item(categoria, caminho):
+    s = _skin_por_caminho(categoria, caminho)
+    return {'nome': s["nome"], 'caminho': s["caminho"], 'cor': 'ffffffff'} if s else None
+
+def skins_despertar(class_name):
+    skins = {'base': _skin_item('base', random.choice(BASES_DESPERTAR))}
+    roupa = _skin_item('body', f"res://sprites/body/{class_name}.png")
+    chapeu = _skin_item('helm', f"res://sprites/equip_previews/{class_name}_Inicial_Helm.png")
+    if roupa: skins['body'] = roupa
+    if chapeu: skins['helm'] = chapeu
+    return validar_skins(skins, class_name)
+
+def despertar_alma(sid, p):
+    if not isinstance(p.get('npc_dialogue_state'), dict): p['npc_dialogue_state'] = {}
+    p['npc_dialogue_state'].pop('soul', None)
+    p['skins'] = skins_despertar(p.get('class_name', 'Knight'))
+    _queue_save(p)
+    socketio.emit('skins_synced', {"skins": p['skins']}, room=sid)
+    socketio.emit('soul_state', {'soul': False}, room=sid)
+    if p.get('room'):
+        emit_area('player_skins_updated', {"name": p.get('name'), "skins": p['skins']}, p['room'], skip_sid=sid)
+
+def virar_alma(sid, p):
+    # So' admin (/soul on), pra testar o comeco de novo.
+    if not isinstance(p.get('npc_dialogue_state'), dict): p['npc_dialogue_state'] = {}
+    p['npc_dialogue_state']['soul'] = True
+    p['skins'] = skins_alma()
+    _queue_save(p)
+    socketio.emit('skins_synced', {"skins": p['skins']}, room=sid)
+    socketio.emit('soul_state', {'soul': True}, room=sid)
+    if p.get('room'):
+        emit_area('player_skins_updated', {"name": p.get('name'), "skins": p['skins']}, p['room'], skip_sid=sid)
+
 def _skin_por_caminho(categoria, caminho):
     for s in SKIN_DB.get(categoria, []):
         if s["caminho"] == caminho: return s
@@ -2260,7 +2311,7 @@ def validar_skins(skins, class_name):
 def montar_skin_db_cliente(class_name):
     """Catalogo filtrado pra classe do player (o client so' mostra o que pode usar)."""
     return {cat: [{"caminho": s["caminho"], "nome": s["nome"]} for s in lista
-                  if s["classes"] is None or class_name in s["classes"]]
+                  if (s["classes"] is None or class_name in s["classes"]) and s["caminho"] != CAMINHO_BASE_ALMA]
             for cat, lista in SKIN_DB.items()}
 
 def skins_do_join(skins_client, skins_banco):
@@ -2320,6 +2371,11 @@ def handle_join_game(data):
         # decorrido dessa sessão em cima disso, sem gravar nada extra sozinho.
         data['time_played_base'] = row[15] if row[15] is not None else 0
         data['npc_dialogue_state'] = json.loads(row[16]) if row[16] else {}
+        if eh_alma(data):
+            data['skins'] = skins_alma()  # o client nao escolhe: alma e' so' a BaseSoul
+        elif (data.get('skins') or {}).get('base', {}).get('caminho') == CAMINHO_BASE_ALMA:
+            # Ja' despertou mas ficou com a pele de alma (de antes): vira clara/escura.
+            data['skins']['base'] = _skin_item('base', random.choice(BASES_DESPERTAR))
         try: hb_salva = json.loads(row[17]) if row[17] else {}
         except (TypeError, ValueError): hb_salva = {}
         # Nunca configurou a barra: começa com o cookie no 1o slot de item.
@@ -2408,7 +2464,7 @@ def handle_join_game(data):
 
         # item_db vai so' no payload (nao fica guardado em online_players).
         max_hp_join, max_mp_join = calcular_max_vitais(data)
-        emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente(),
+        emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente(), 'soul': eh_alma(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
         emit('bestiary', montar_bestiario(data), room=sid)
@@ -2664,6 +2720,15 @@ def comando_admin(sid, p, texto):
         chat_sistema(sid, "Admin: /quest <name> complete|reset   /quests   /mobs")
         chat_sistema(sid, "Admin: /tp x<X> y<Y>  (minimap coordinates, ex: /tp x56 y200)")
         chat_sistema(sid, "Admin: /time day|afternoon|night|<seconds>s|<minutes>m  (20 min cycle, ex: /time 450s)")
+        chat_sistema(sid, "Admin: /soul on|off  (vira alma de novo / desperta)")
+        return
+    if cmd == 'soul':
+        if len(partes) < 2 or partes[1].lower() not in ('on', 'off'):
+            chat_sistema(sid, f"Soul: {'on' if eh_alma(p) else 'off'}. Usage: /soul on|off")
+            return
+        if partes[1].lower() == 'on': virar_alma(sid, p)
+        else: despertar_alma(sid, p)
+        chat_sistema(sid, f"Soul {partes[1].lower()}.")
         return
     if cmd == 'time':
         global _inicio_ciclo
@@ -2766,6 +2831,8 @@ def _filtrar_mensagem_chat(sid, p, texto):
     """Regras comuns do chat (Local e idiomas): limite de caracteres, mute,
     anti-spam e censura. Devolve a mensagem pronta pra repassar, ou None se
     ela foi barrada (o aviso pro jogador ja' foi mandado aqui)."""
+    # Alma nao fala (chat local, privado, party...).
+    if eh_alma(p): return None
     nome = p.get('name', '')
     msg = str(texto).strip()[:CHAT_MAX_CARACTERES]
     if not msg: return None
@@ -2943,8 +3010,16 @@ def handle_update_skins(data):
         if sid not in online_players: return
         p = online_players[sid]
         
+        # Alma nao troca de skin (so' depois do portal).
+        if eh_alma(p):
+            emit('skins_synced', {"skins": skins_alma()}, room=sid)
+            return
         # Valida contra SKIN_DB + classe (antes salvava/repassava qualquer coisa).
         skins = validar_skins(data.get('skins', {}) if isinstance(data, dict) else {}, p.get('class_name'))
+        # Pele de alma e' so' de quem ainda e' alma.
+        if skins.get('base', {}).get('caminho') == CAMINHO_BASE_ALMA:
+            skins['base'] = (p.get('skins') or {}).get('base') if (p.get('skins') or {}).get('base', {}).get('caminho') != CAMINHO_BASE_ALMA \
+                else _skin_item('base', BASES_DESPERTAR[0])
         p['skins'] = skins
         _queue_save(p)
         # Confirma pro proprio player o que ficou valendo de verdade.
@@ -4041,6 +4116,8 @@ def handle_tp(data):
             return recusar()
         p['_ultimo_tp'] = now
         _teleportar(sid, p, dest, direcao)
+        if eh_alma(p) and sqm_tp in teleportes_despertar.get(p.get('mapa'), set()):
+            despertar_alma(sid, p)
     except Exception:
         traceback.print_exc()
 
@@ -5536,6 +5613,7 @@ def carregar_mapa_do_servidor():
     areas_de_quest[MAPA_ID_SERVIDOR] = dados.get('quest_areas', [])
     zonas_protegidas[MAPA_ID_SERVIDOR] = dados.get('protection_zone', set())
     teleportes[MAPA_ID_SERVIDOR] = dados.get('teleports', {})
+    teleportes_despertar[MAPA_ID_SERVIDOR] = dados.get('teleports_awaken', set())
     MAPAS_DO_SERVIDOR.add(MAPA_ID_SERVIDOR)
     for m in active_mobs.values():
         m['path'] = None
@@ -5550,7 +5628,7 @@ carregar_mapa_do_servidor()
 
 # Muda a cada atualizacao do servidor - aparece no console ao iniciar, pra
 # confirmar qual versao esta rodando de verdade.
-VERSAO_SERVIDOR = "2026-10-09 pocoes pequenas"
+VERSAO_SERVIDOR = "2026-10-09 alma + portal do despertar"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)

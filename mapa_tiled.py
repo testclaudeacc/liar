@@ -398,6 +398,9 @@ def carregar_mapa(caminho_tmx):
         destinos_tp[nome] = (int((x + w / 2.0) // SQM), int((y + h / 2.0) // SQM))
 
     teleports = {}
+    # awaken=true: portal de ida unica que transforma a alma em personagem
+    # (servidor.py::despertar_alma).
+    teleports_despertar = set()
     for obj in objetos('Teleports'):
         props_t = _ler_props(obj)
         id_dest = str(props_t.get('dest', '') or '').strip().lower()
@@ -415,11 +418,13 @@ def carregar_mapa(caminho_tmx):
         x, y, w, h = caixa(obj)
         celulas = [(c, l) for c in faixa(x, w) for l in faixa(y, h)]
         for cel in celulas: teleports[cel] = dest
+        if str(props_t.get('awaken', '')).strip().lower() == 'true': teleports_despertar.update(celulas)
         print(f"[MAPA] Teleport x{celulas[0][0]}, y{celulas[0][1]} ({len(celulas)} SQM) -> "
               f"{id_dest + ' ' if id_dest else ''}x{dest[0]}, y{dest[1]}")
 
     return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru, 'velocidades': velocidades,
-            'quest_areas': quest_areas, 'protection_zone': protection_zone, 'teleports': teleports}
+            'quest_areas': quest_areas, 'protection_zone': protection_zone, 'teleports': teleports,
+            'teleports_awaken': teleports_despertar}
 
 
 def _rasterizar(hitboxes, bordas, altura_px):

@@ -3833,6 +3833,7 @@ public final class BookMenuUI {
 
     private void selecionarSecao(String secao) {
         if (atualizandoSecao) return;
+        if ("Vanity".equals(secao) && skinsBloqueadas) return;
         atualizandoSecao = true;
         try {
             secaoAtual = secao;
@@ -3948,7 +3949,21 @@ public final class BookMenuUI {
         return foco.getStage() != null;
     }
 
+    /** Alma (antes do portal do Kharon): aba de skins (Vanity) travada e cinza. */
+    private boolean skinsBloqueadas = false;
+
+    public void definirAlma(boolean alma) {
+        skinsBloqueadas = alma;
+        Button vanity = botoes.get("Vanity");
+        if (vanity != null) {
+            vanity.setDisabled(alma);
+            vanity.setColor(alma ? new Color(0.4f, 0.4f, 0.4f, 1f) : Color.WHITE);
+        }
+        if (alma && "Vanity".equals(secaoAtual) && root.isVisible()) selecionarSecao("Equip");
+    }
+
     private void acionarBotao(String nome) {
+        if ("Vanity".equals(nome) && skinsBloqueadas) return;
         if ("Exit".equals(nome)) {
             setVisible(false);
         } else {
