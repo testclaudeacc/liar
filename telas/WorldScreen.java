@@ -2282,20 +2282,23 @@ public class WorldScreen extends ScreenAdapter {
             }
             if (quadros.isEmpty()) return;
             // Escala inteira que cabe no botao (pixel art sem distorcer).
-            float alturaQuadro = 0f;
-            for (TextureRegion q : quadros) alturaQuadro = Math.max(alturaQuadro, q.getRegionHeight());
-            float escala = Math.min(getWidth() / FRAME_LARGURA, getHeight() / alturaQuadro);
+            float alturaQuadro = 0f, larguraQ = FRAME_LARGURA;
+            for (TextureRegion q : quadros) {
+                alturaQuadro = Math.max(alturaQuadro, q.getRegionHeight());
+                larguraQ = Math.max(larguraQ, q.getRegionWidth());
+            }
+            float escala = Math.min(getWidth() / larguraQ, getHeight() / alturaQuadro);
             // Botao do alvo: quadro alto (sprite com folga em cima) deixava o
             // boneco minusculo - ali o que manda e' a largura (a folga vazia
             // pode passar um pouco da area, nao aparece).
             if (nomeFixo == null && reserva == null) {
-                escala = Math.min(getWidth() * 0.95f / FRAME_LARGURA, getHeight() * 1.35f / alturaQuadro);
+                escala = Math.min(getWidth() * 0.95f / larguraQ, getHeight() * 1.35f / alturaQuadro);
             }
             // Escala inteira (pixel art certinho) quando da' 2x ou mais; entre
             // 1x e 2x, de meio em meio (senao caia pra 1x e ficava minusculo).
             if (escala >= 2f) escala = (float) Math.floor(escala);
             else if (escala >= 1f) escala = (float) Math.floor(escala * 2f) / 2f;
-            float w = FRAME_LARGURA * escala;
+            float w = larguraQ * escala;
             float x = getX() + (getWidth() - w) / 2f;
             float y = getY() + (getHeight() - alturaQuadro * escala) / 2f;
             Color anterior = new Color(batch.getColor());
@@ -4482,7 +4485,15 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Recorta 1 quadro nativo do spritesheet (16px de largura, altura toda). */
     private TextureRegion regiao(TextureRegion tex, int indice) {
-        return new TextureRegion(tex, indice * FRAME_LARGURA, 0, FRAME_LARGURA, tex.getRegionHeight());
+        int l = larguraQuadro(tex);
+        return new TextureRegion(tex, indice * l, 0, l, tex.getRegionHeight());
+    }
+
+    /** Largura de 1 quadro da sheet: as sheets completas tem 11 quadros
+     * (16x16 -> 176 de largura, 32x32 -> 352). Fora disso, 16. */
+    private static int larguraQuadro(TextureRegion tex) {
+        int w = tex.getRegionWidth();
+        return w % 11 == 0 && w / 11 >= FRAME_LARGURA ? w / 11 : FRAME_LARGURA;
     }
 
     private TextureRegion[] regioes(TextureRegion tex, int[] indices) {
@@ -4501,7 +4512,7 @@ public class WorldScreen extends ScreenAdapter {
         a.andarBaixo = regioes(tex, FRAME_ANDAR_BAIXO);
         a.andarEsquerda = regioes(tex, FRAME_ANDAR_ESQUERDA);
         a.andarDireita = regioes(tex, FRAME_ANDAR_DIREITA);
-        if (tex.getRegionWidth() >= (FRAME_MORTE + 1) * FRAME_LARGURA) a.morte = regiao(tex, FRAME_MORTE);
+        if (tex.getRegionWidth() >= (FRAME_MORTE + 1) * larguraQuadro(tex)) a.morte = regiao(tex, FRAME_MORTE);
         return a;
     }
 
@@ -4711,7 +4722,8 @@ public class WorldScreen extends ScreenAdapter {
         if (!mob.visivel || (mob.morto && mob.tempoCorpo <= 0f)) return;
         TextureRegion quadro = mob.morto ? mob.quadroMorto
             : quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
-        float largura = FRAME_LARGURA * ESCALA_SPRITE;
+        // Mob 32x32 (ou maior): mais largo, centralizado no SQM do mesmo jeito.
+        float largura = quadro.getRegionWidth() * ESCALA_SPRITE;
         float altura = quadro.getRegionHeight() * ESCALA_SPRITE;
         float ancoraX = Math.round(mob.x / camera.zoom) * camera.zoom;
         float ancoraY = Math.round(mob.y / camera.zoom) * camera.zoom;
@@ -4918,7 +4930,7 @@ public class WorldScreen extends ScreenAdapter {
         }
         for (MobVisual mob : mobs.values()) {
             if (mob.morto || !mob.visivel) continue;
-            float largura = FRAME_LARGURA * ESCALA_SPRITE;
+            float largura = mob.animacao.idleBaixo.getRegionWidth() * ESCALA_SPRITE;
             float altura = mob.animacao.idleBaixo.getRegionHeight() * ESCALA_SPRITE;
             if (wx >= mob.x - largura / 2f && wx <= mob.x + largura / 2f && wy >= mob.y && wy <= mob.y + altura) {
                 mirarMob(mob);

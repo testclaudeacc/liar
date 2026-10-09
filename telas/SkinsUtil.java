@@ -36,7 +36,15 @@ public final class SkinsUtil {
     }
 
     public static TextureRegion quadro(TextureRegion tira, int indice) {
-        return new TextureRegion(tira, indice * FRAME_LARGURA, 0, FRAME_LARGURA, tira.getRegionHeight());
+        int l = larguraQuadro(tira);
+        return new TextureRegion(tira, indice * l, 0, l, tira.getRegionHeight());
+    }
+
+    /** Sheets completas tem 11 quadros (16x16 -> 176, 32x32 -> 352); fora
+     * disso, quadros de FRAME_LARGURA. Igual WorldScreen.larguraQuadro. */
+    public static int larguraQuadro(TextureRegion tira) {
+        int w = tira.getRegionWidth();
+        return w % 11 == 0 && w / 11 >= FRAME_LARGURA ? w / 11 : FRAME_LARGURA;
     }
 
     public static Color cor(String hex) {

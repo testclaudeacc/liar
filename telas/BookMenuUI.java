@@ -3314,7 +3314,7 @@ public final class BookMenuUI {
         private final TextureRegion[] quadros;
         private float tempo = 0f;
         MobAnimado(TextureAtlas.AtlasRegion tira) {
-            int n = tira.getRegionWidth() / SkinsUtil.FRAME_LARGURA;
+            int n = tira.getRegionWidth() / SkinsUtil.larguraQuadro(tira);
             if (n >= 6) quadros = new TextureRegion[]{SkinsUtil.quadro(tira, 4), SkinsUtil.quadro(tira, 5)};
             else if (n >= 4) quadros = new TextureRegion[]{SkinsUtil.quadro(tira, SkinsUtil.FRAME_BAIXO)};
             else quadros = new TextureRegion[]{tira};
