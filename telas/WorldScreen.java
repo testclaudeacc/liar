@@ -3425,7 +3425,8 @@ public class WorldScreen extends ScreenAdapter {
                 e.duracaoQuadro = DURACAO_QUADRO_HIT;
                 efeitos.add(e);
             }
-            NumeroDano n = new NumeroDano(j.x, j.y + 4f, "+" + data.getInt("amount", 0), false);
+            // Mesmo numero do dano (mesma posicao, subida e sumico), so' na cor da cura.
+            NumeroDano n = new NumeroDano(j.x, j.y + 4f, String.valueOf(data.getInt("amount", 0)), false);
             n.cor = mana ? COR_CURA_MP : COR_CURA_HP;
             numerosDano.add(n);
         });
