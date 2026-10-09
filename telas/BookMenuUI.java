@@ -3833,7 +3833,7 @@ public final class BookMenuUI {
 
     private void selecionarSecao(String secao) {
         if (atualizandoSecao) return;
-        if ("Vanity".equals(secao) && skinsBloqueadas) return;
+        if (secaoTravada(secao)) return;
         atualizandoSecao = true;
         try {
             secaoAtual = secao;
@@ -3949,21 +3949,26 @@ public final class BookMenuUI {
         return foco.getStage() != null;
     }
 
-    /** Alma (antes do portal do Kharon): aba de skins (Vanity) travada e cinza. */
+    /** Alma (antes do portal do Kharon): skins (Vanity), amigos e party travados e cinza. */
+    private static final java.util.Set<String> SECOES_TRAVADAS_ALMA =
+        new java.util.HashSet<>(java.util.Arrays.asList("Vanity", "Friends", "Party"));
     private boolean skinsBloqueadas = false;
 
     public void definirAlma(boolean alma) {
         skinsBloqueadas = alma;
-        Button vanity = botoes.get("Vanity");
-        if (vanity != null) {
-            vanity.setDisabled(alma);
-            vanity.setColor(alma ? new Color(0.4f, 0.4f, 0.4f, 1f) : Color.WHITE);
+        for (String secao : SECOES_TRAVADAS_ALMA) {
+            Button b = botoes.get(secao);
+            if (b == null) continue;
+            b.setDisabled(alma);
+            b.setColor(alma ? new Color(0.4f, 0.4f, 0.4f, 1f) : Color.WHITE);
         }
-        if (alma && "Vanity".equals(secaoAtual) && root.isVisible()) selecionarSecao("Equip");
+        if (alma && SECOES_TRAVADAS_ALMA.contains(secaoAtual) && root.isVisible()) selecionarSecao("Equip");
     }
 
+    private boolean secaoTravada(String secao) { return skinsBloqueadas && SECOES_TRAVADAS_ALMA.contains(secao); }
+
     private void acionarBotao(String nome) {
-        if ("Vanity".equals(nome) && skinsBloqueadas) return;
+        if (secaoTravada(nome)) return;
         if ("Exit".equals(nome)) {
             setVisible(false);
         } else {

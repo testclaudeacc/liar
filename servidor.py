@@ -2066,15 +2066,19 @@ def get_characters():
         c = conn.cursor()
         # Sem token valido, qualquer um via os personagens de qualquer conta.
         if not token_valido(c, user_id, dados.get('token')): return jsonify({"erro": "Session expired."}), 401
-        c.execute("SELECT name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, time_played FROM characters WHERE user_id = %s AND deleted_at IS NULL ORDER BY id ASC", (user_id,))
+        c.execute("SELECT name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, time_played, npc_dialogue_state FROM characters WHERE user_id = %s AND deleted_at IS NULL ORDER BY id ASC", (user_id,))
         char_list = []
         for row in c.fetchall():
+            try: estado_npc = json.loads(row[13]) if row[13] else {}
+            except (TypeError, ValueError): estado_npc = {}
+            alma = isinstance(estado_npc, dict) and bool(estado_npc.get('soul'))
             char_list.append({
                 "name": row[0], "class_name": row[1], "level": row[2], "exp": row[3] if row[3] else 0,
                 "pos_x": row[4], "pos_y": row[5], "direction": row[6],
                 # Mesma validacao do jogo (roupa padrao da classe etc), pro
                 # preview da tela de slots bater com o que aparece no mundo.
-                "skins": validar_skins(json.loads(row[7]) if row[7] else {}, row[1]),
+                # Alma: so' a BaseSoul (pelada), igual no jogo.
+                "skins": skins_alma() if alma else validar_skins(json.loads(row[7]) if row[7] else {}, row[1]),
                 "floor": row[8] if row[8] else 1,
                 "inventory": normalizar_inventario(json.loads(row[9]) if row[9] else []),
                 "equipped_items": normalizar_equipados(json.loads(row[10]) if row[10] else {}),

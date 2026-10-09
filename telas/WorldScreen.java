@@ -1388,12 +1388,12 @@ public class WorldScreen extends ScreenAdapter {
         boolean comMinimapa = Controles.minimapaVisivel();
         float margemTopo = 10f;
         barra.add(botaoTopoAlvo).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(12);
-        barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(12);
+        if (!almaLocal) barra.add(botaoTopoChat).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(12);
         barra.add(botaoTopoMenu).size(TAMANHO_BOTAO_TOPO).top().padTop(margemTopo).padRight(comMinimapa ? 14 : 0);
         if (comMinimapa) barra.add(miniMapa).size(TAMANHO_MINIMAPA).top().padTop(margemTopo);
         barra.row();
         // Gaveta de debuffs (fome/battle, em trios) embaixo do minimapa.
-        barra.add(gavetaDebuffs).colspan(comMinimapa ? 4 : 3).right().top().padTop(10);
+        barra.add(gavetaDebuffs).colspan((comMinimapa ? 4 : 3) - (almaLocal ? 1 : 0)).right().top().padTop(10);
         // Ligado: o botao fica verde (borda verde, fundo verde escuro).
         botaoTopoMapa.setColor(comMinimapa ? COR_BOTAO_LIGADO : Color.WHITE);
     }
@@ -2064,7 +2064,8 @@ public class WorldScreen extends ScreenAdapter {
     private void definirAlmaLocal(boolean alma) {
         almaLocal = alma;
         if (alma && chat.isVisivel()) chat.setVisivel(false);
-        botaoTopoChat.setVisible(!alma);
+        // Sem o botao do chat, o do alvo vai pro lugar dele.
+        montarBarraMiniMapa();
         bookMenu.definirAlma(alma);
     }
 
@@ -5597,7 +5598,6 @@ public class WorldScreen extends ScreenAdapter {
      * continua podendo ficar atras de tile overlay - so' o nome e' sempre
      * legivel. */
     private void desenharNome(Jogador j) {
-        if (almas.contains(j.nome)) return; // alma nao tem nome
         float altura = quadroAtual(animacaoBase, j).getRegionHeight() * ESCALA_SPRITE;
         // Mesmo snap de ancoraX/Y que desenharJogador() usa (Math.round(v/zoom)*zoom)
         // - precisa bater exatamente, senao o nome treme independente do sprite.
@@ -5645,8 +5645,10 @@ public class WorldScreen extends ScreenAdapter {
         socket.emitRaw(evento, GameSocket.obj(jw -> jw.set("channel", canal)));
     }
 
-    private static String nomeVisivel(String nome) {
+    /** Alma (antes do portal do Kharon) nao tem nome: "?????"; depois, o nome de verdade. */
+    private String nomeVisivel(String nome) {
         if (nome == null) return "";
+        if (!almas.contains(nome)) return nome;
         return "?".repeat(nome.codePointCount(0, nome.length()));
     }
 
