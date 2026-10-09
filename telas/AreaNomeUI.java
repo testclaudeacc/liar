@@ -101,10 +101,9 @@ public final class AreaNomeUI {
         root.add(linhaBaixo).height(2f);
 
         root.setFillParent(true);
-        // No topo mesmo (so' uma folga minima pra nao colar na borda) - a
-        // pedido do usuario (antes tinha um padTop grande, empurrando pro
-        // meio da tela).
-        root.top().padTop(20f);
+        // Um pouco acima do centro da tela, igual Dark Souls (a pedido do
+        // usuario) - o padBottom empurra o bloco centralizado pra cima.
+        root.center().padBottom(200f);
         // So' leitura - nao deve roubar clique/toque de nada atras dela.
         root.setTouchable(Touchable.disabled);
         root.getColor().a = 0f;
@@ -117,7 +116,8 @@ public final class AreaNomeUI {
      * de novo no meio de uma animacao em curso reinicia ela (corta o fade
      * anterior e comeca do zero com o novo nome). */
     public void mostrar(String nome) {
-        label.setText(ICONE + " " + nome + " " + ICONE);
+        // So' o nome (sem os icones dos lados, a pedido do usuario).
+        label.setText(nome);
         // Nao precisa de root.pack() - Label recalcula getPrefWidth() sozinho
         // quando o texto muda (GlyphLayout interno), e pack() aqui brigaria
         // com setFillParent(true) (tentaria encolher o root pro tamanho
