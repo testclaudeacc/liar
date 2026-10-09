@@ -2468,7 +2468,7 @@ def handle_join_game(data):
 
         # item_db vai so' no payload (nao fica guardado em online_players).
         max_hp_join, max_mp_join = calcular_max_vitais(data)
-        emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente(), 'soul': eh_alma(data),
+        emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente(), 'soul': eh_alma(data), 'admin': eh_admin(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
         emit('bestiary', montar_bestiario(data), room=sid)

@@ -2060,6 +2060,10 @@ public class WorldScreen extends ScreenAdapter {
     // com a pele BaseSoul tambem fica sem nome pros outros.
     private boolean almaLocal = false;
     private final Set<String> almas = new HashSet<>();
+    // Admin (servidor.py::eh_admin): F9 abre/fecha o chat mesmo sendo alma,
+    // pra poder digitar comando (/soul off...).
+    private boolean adminLocal = false;
+    private boolean chatAdminLiberado = false;
 
     private void definirAlmaLocal(boolean alma) {
         almaLocal = alma;
@@ -2075,7 +2079,8 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void alternarChat() {
-        if (almaLocal && !chat.isVisivel()) return; // alma nao fala
+        if (almaLocal && !chat.isVisivel() && !chatAdminLiberado) return; // alma nao fala
+        chatAdminLiberado = false;
         if (!chat.isVisivel()) fecharOutrasJanelas();
         chat.setVisivel(!chat.isVisivel());
         atualizarVisibilidadeJoystick();
@@ -2851,6 +2856,7 @@ public class WorldScreen extends ScreenAdapter {
             // ao esbarrar num NPC) - sem esse if, inventario/moedas/skills
             // eram zerados no client.
             if (data.has("inventory")) {
+                adminLocal = data.getBoolean("admin", false);
                 definirAlmaLocal(data.getBoolean("soul", false));
                 if (socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
                 if (socket.isConnected()) socket.emitRaw("get_party_status", "{}");
@@ -3944,6 +3950,11 @@ public class WorldScreen extends ScreenAdapter {
         // refocava o campo na hora (enviava e continuava digitando, bug
         // reportado pelo usuario).
         // Write (padrao Enter): comeca a digitar no chat (abre ele se estiver fechado).
+        // Hotkey secreta do admin: F9 abre o chat ja' focado, mesmo sendo alma.
+        if (adminLocal && Gdx.input.isKeyJustPressed(Input.Keys.F9) && acaoCapturando == null && !settingsAberta()) {
+            if (!chat.isVisivel()) { chatAdminLiberado = true; alternarChat(); chat.focarCampoTexto(); }
+            else alternarChat();
+        }
         if (Gdx.input.isKeyJustPressed(Controles.tecla("write")) && acaoCapturando == null && !almaLocal
                 && !chat.estaDigitando() && !chatDigitandoFrameAnterior
                 && !settingsAberta() && !bookMenu.isVisible()) {
