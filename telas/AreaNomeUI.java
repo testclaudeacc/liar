@@ -36,7 +36,7 @@ public final class AreaNomeUI {
 
     private final Table root = new Table();
     private final Label label;
-    private final Image linhaBaixo;
+    private final Image linhaBaixo, linhaCima;
 
     public AreaNomeUI(Stage stage, Skin skin, TextureRegion iconeLados, float escalaFonte) {
         // Textura 1x1 branca reaproveitada (tintada via Image.setColor) pra
@@ -96,14 +96,18 @@ public final class AreaNomeUI {
 
         linhaBaixo = new Image(linhaDrawable);
         linhaBaixo.setColor(1f, 1f, 1f, 0.85f);
+        linhaCima = new Image(linhaDrawable);
+        linhaCima.setColor(1f, 1f, 1f, 0.85f);
 
+        // Linha em cima e embaixo do nome.
+        root.add(linhaCima).height(2f).padBottom(10f).row();
         root.add(label).padBottom(14f).row();
         root.add(linhaBaixo).height(2f);
 
         root.setFillParent(true);
         // Um pouco acima do centro da tela, igual Dark Souls (a pedido do
         // usuario) - o padBottom empurra o bloco centralizado pra cima.
-        root.center().padBottom(200f);
+        root.center().padBottom(300f);
         // So' leitura - nao deve roubar clique/toque de nada atras dela.
         root.setTouchable(Touchable.disabled);
         root.getColor().a = 0f;
@@ -125,6 +129,7 @@ public final class AreaNomeUI {
         // de volta no frame seguinte).
         float largura = label.getPrefWidth() + FOLGA_LINHA;
         root.getCell(linhaBaixo).width(largura);
+        root.getCell(linhaCima).width(largura);
         root.invalidateHierarchy();
 
         root.clearActions();
