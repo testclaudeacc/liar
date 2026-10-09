@@ -449,7 +449,8 @@ public final class HudVitais {
         if (img != null) pai.add(img).size(px(39)).padTop(px(-2)).padBottom(px(-2)).padRight(px(5));
         else pai.add().size(px(39)).padTop(px(-2)).padBottom(px(-2)).padRight(px(5));
         Table fundo = new Table();
-        fundo.setBackground(cor(new Color(0f, 0f, 0f, 0.25f))); // trilho vazio, semi transparente
+        // Trilho vazio (atras do vermelho/roxo): cinza escuro semi transparente.
+        fundo.setBackground(cor(new Color(0.16f, 0.16f, 0.16f, 0.6f)));
         Stack pilha = new Stack(fundo, barra.alinhador, barra.texto);
         Table comSombra = new Table();
         // Sombra so' na direita/embaixo (antes era um retangulo cheio por tras).
