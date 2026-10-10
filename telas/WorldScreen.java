@@ -3635,6 +3635,20 @@ public class WorldScreen extends ScreenAdapter {
                 velha.dispose();
             }
         });
+        // ---- Bank (servidor.py, BANK) ----
+        socket.on("bank_opened", (nomeEvt, data) -> {
+            if (bookMenu.emTrade()) return;
+            if (painelJogador.isVisivel()) painelJogador.fechar();
+            if (settingsAberta()) fecharSettings();
+            if (chat.isVisivel()) chat.setVisivel(false);
+            if (dialogoNPC.isVisible()) dialogoNPC.fechar();
+            bookMenu.abrirBanco();
+            atualizarVisibilidadeJoystick();
+        });
+        socket.on("bank_synced", (nomeEvt, data) -> bookMenu.atualizarBanco(data));
+        socket.on("bank_currency", (nomeEvt, data) -> {
+            if (data != null) bookMenu.atualizarMoedas(data.getLong("currency", 0L));
+        });
         socket.on("npc_pay_result", (nomeEvt, data) -> {
             if (data == null) return;
             if (data.has("currency")) bookMenu.atualizarMoedas(data.getLong("currency", 0L));
@@ -3876,10 +3890,20 @@ public class WorldScreen extends ScreenAdapter {
     };
     private static final String[] DIALOGO_NPC_LEMBRETE = { DIALOGO_NPC_PEDIDO };
 
+    /** NPC do bank aberto agora (pra fechar ao se afastar). */
+    private NPCVisual npcBanco;
+
     private void abrirDialogoNPC(NPCVisual npc) {
         if (chat.isVisivel()) chat.setVisivel(false);
         if (bookMenu.isVisible()) bookMenu.setVisible(false);
         if (settingsAberta()) fecharSettings();
+        // Jack (role "bank"): abre direto a tela do bank (o servidor confere
+        // a distancia e responde bank_opened + bank_synced).
+        if ("bank".equals(npc.papel)) {
+            npcBanco = npc;
+            if (socket.isConnected()) socket.emitRaw("bank_open", "{}");
+            return;
+        }
         npcEmDialogo = npc;
         TextureRegion retrato = new TextureRegion(
             npc.animacao.idleBaixo.getTexture(),
@@ -3939,6 +3963,12 @@ public class WorldScreen extends ScreenAdapter {
      * e mexer em outras GUIs com o dialogo aberto agora e' permitido, mas
      * sair dos SQMs do NPC encerra a conversa). Chamado todo frame. */
     private void fecharDialogoNPCSeForaDeAlcance() {
+        // Bank aberto: sair de perto do Jack fecha.
+        if (bookMenu.emBanco() && npcBanco != null && distanciaQuadradaAteNPC(npcBanco) > ALCANCE_NPC_AO_QUADRADO) {
+            bookMenu.setVisible(false);
+            npcBanco = null;
+            atualizarVisibilidadeJoystick();
+        }
         if (!dialogoNPC.isVisible() || npcEmDialogo == null) return;
         if (distanciaQuadradaAteNPC(npcEmDialogo) > ALCANCE_NPC_AO_QUADRADO) {
             dialogoNPC.fechar();

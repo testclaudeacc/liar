@@ -209,6 +209,7 @@ public final class BookMenuUI {
         construirPaginaFriends(skin);
         construirPaginaParty(skin);
         construirPaginasTrade(skin);
+        construirPaginaBanco(skin);
         colunaEsquerdaAbas = leftTab;
         colunaDireitaAbas = rightTab;
         mainWindow.add(bagPage).grow();
@@ -384,8 +385,12 @@ public final class BookMenuUI {
         final int bonusDamage, defense, stamina, mana, fourthStatValue, manaCost, fullness;
         final int healHp, healMp; // pocao: quanto cura (o que aparece)
         final String fourthStatType, icone;
+        final float cap; // peso de 1 unidade (servidor.py::ITEM_DB "cap")
+        final boolean empilhavel;
 
         EquipStats(JsonValue d) {
+            this.cap = d.getFloat("cap", 0f);
+            this.empilhavel = d.getBoolean("stackable", false) || d.getBoolean("ammo", false);
             this.nome = d.getString("name", "");
             this.tipo = d.getString("type", "");
             this.slot = d.getString("slot", null);
@@ -1710,6 +1715,8 @@ public final class BookMenuUI {
     private final Table confirmDetalhes = new Table();
     private JsonValue minhaOferta, ofertaOutro;
     private com.badlogic.gdx.scenes.scene2d.ui.TextField campoQtdTrade;
+    private Label passoTrade, resumoTrade, passoConfirm;
+    private static final Color COR_PASSO = new Color(0.62f, 0.62f, 0.62f, 1f);
 
     private static final Color COR_TRADE_SELECIONADO = new Color(0.25f, 0.85f, 0.3f, 1f);
     private static final boolean MOBILE_LIVRO = FONTE_STATS < 1f;
@@ -1791,16 +1798,26 @@ public final class BookMenuUI {
         esquerda.top().left();
         esquerda.setBackground(UiSkin.retangulo(
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
-        esquerda.add(tradeDetalhes).grow().top().left().pad(8);
+        esquerda.add(tradeDetalhes).grow().top().left().pad(8).row();
+        // Resumo do que ja' esta' na oferta (sempre visivel).
+        resumoTrade = new Label("", skin, "hud");
+        resumoTrade.setFontScale(0.6f * FONTE_STATS);
+        resumoTrade.setWrap(true);
+        resumoTrade.setColor(COR_TRADE_SELECIONADO);
+        esquerda.add(separadorEquip()).growX().height(1).row();
+        esquerda.add(resumoTrade).growX().left().pad(6, 8, 8, 8);
 
         tituloTrade = new Label("", skin, "hud");
         tituloTrade.setFontScale(0.7f * FONTE_STATS);
+        passoTrade = new Label("Step 1 of 2  -  Tap what you want to give", skin, "hud");
+        passoTrade.setFontScale(0.55f * FONTE_STATS);
+        passoTrade.setColor(COR_PASSO);
         ScrollPane scroll = new ScrollPane(tradeGrid, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
         scroll.setOverscroll(false, false);
         TextButton cancelar = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
-        botaoEnviarTrade = new TextButton("Send Trade", estiloBotaoTrade("verde"));
+        botaoEnviarTrade = new TextButton("Send Offer", estiloBotaoTrade("verde"));
         cancelar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { cancelarTrade(); }
         });
@@ -1817,7 +1834,8 @@ public final class BookMenuUI {
         direita.setBackground(UiSkin.retangulo(
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
         direita.add(tituloTrade).left().pad(8, 12, 0, 12).row();
-        direita.add(scroll).grow().pad(6, 12, 6, 12).row();
+        direita.add(passoTrade).left().pad(0, 12, 0, 12).row();
+        direita.add(caixaOfertaScroll(scroll)).grow().pad(6, 12, 6, 12).row();
         direita.add(rodape).growX().pad(0, 12, 10, 12);
 
         tradePage.add(esquerda).width(COLUNA_BAG).growY();
@@ -1835,6 +1853,9 @@ public final class BookMenuUI {
         tituloOfertaOutro = new Label("", skin, "hud");
         tituloMinhaOferta.setFontScale(0.7f * FONTE_STATS);
         tituloOfertaOutro.setFontScale(0.7f * FONTE_STATS);
+        passoConfirm = new Label("Step 2 of 2  -  Check both sides, then Accept", skin, "hud");
+        passoConfirm.setFontScale(0.55f * FONTE_STATS);
+        passoConfirm.setColor(COR_PASSO);
         statusTradeConfirm = new Label("", skin, "hud");
         statusTradeConfirm.setFontScale(0.7f * FONTE_STATS);
         statusTradeConfirm.setColor(COR_TRADE_SELECIONADO);
@@ -1867,7 +1888,8 @@ public final class BookMenuUI {
         direita2.top().left();
         direita2.setBackground(UiSkin.retangulo(
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
-        direita2.add(linhaMeuNome).growX().pad(8, 12, 2, 12).row();
+        direita2.add(passoConfirm).left().pad(8, 12, 2, 12).row();
+        direita2.add(linhaMeuNome).growX().pad(2, 12, 2, 12).row();
         direita2.add(caixaOferta(gradeMinhaOferta)).grow().pad(0, 12, 4, 12).row();
         direita2.add(linhaNomeOutro).growX().pad(4, 12, 2, 12).row();
         direita2.add(caixaOferta(gradeOfertaOutro)).grow().pad(0, 12, 6, 12).row();
@@ -1875,6 +1897,13 @@ public final class BookMenuUI {
 
         tradeConfirmPage.add(esquerda2).width(COLUNA_BAG).growY();
         tradeConfirmPage.add(direita2).grow();
+    }
+
+    private Table caixaOfertaScroll(ScrollPane sp) {
+        Table caixa = new Table();
+        caixa.setBackground(UiSkin.retangulo(new Color(0.11f, 0.11f, 0.11f, 1f), new Color(0.24f, 0.24f, 0.24f, 1f), 1));
+        caixa.add(sp).grow().pad(4);
+        return caixa;
     }
 
     private Table caixaOferta(Table grade) {
@@ -1892,6 +1921,7 @@ public final class BookMenuUI {
 
     /** trade_started: abre a tela 1 no lugar do livro. */
     public void abrirTrade(String outro) {
+        if (modoBanco) fecharBanco();
         modoTrade = true;
         tradeOutro = outro;
         tradeSelecao.clear();
@@ -1905,7 +1935,8 @@ public final class BookMenuUI {
         if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(false);
         if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(false);
         tituloTrade.setText("Trade with " + outro);
-        botaoEnviarTrade.setText("Send Trade");
+        passoTrade.setText("Step 1 of 2  -  Tap what you want to give");
+        botaoEnviarTrade.setText("Send Offer");
         botaoEnviarTrade.setDisabled(false);
         mostrarPaginaTrade(tradePage);
         atualizarGradeTrade();
@@ -2052,39 +2083,54 @@ public final class BookMenuUI {
 
     /** Pergunta quantos (1..max, so' numeros); Confirm chama aoConfirmar. */
     private void abrirPopupQuantidade(String titulo, int max, java.util.function.IntConsumer aoConfirmar) {
+        abrirPopupQuantidade(titulo, null, max, null, aoConfirmar);
+    }
+
+    /**
+     * icone: aparece do lado do nome (null = sem). cabe: com essa quantia da'
+     * pra confirmar? (null = sempre) - senao o Confirm vira vermelho "No Cap"
+     * (ex: sacar do bank mais do que cabe na mochila).
+     */
+    private void abrirPopupQuantidade(String titulo, TextureRegion icone, int max,
+                                      java.util.function.IntPredicate cabe, java.util.function.IntConsumer aoConfirmar) {
         fecharPopupQuantidade();
         Stage stage = root.getStage();
         if (stage == null) return;
         Table caixa = new Table();
-        caixa.setBackground(UiSkin.retangulo(new Color(0.1f, 0.1f, 0.1f, 0.98f), new Color(0.4f, 0.4f, 0.4f, 1f), 1));
+        caixa.setBackground(UiSkin.retangulo(COR_POPUP_FUNDO, COR_POPUP_BORDA, 2));
         caixa.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
-        caixa.pad(14);
+        caixa.pad(16, 18, 16, 18);
         Label rotulo = new Label(titulo, skin, "hud");
         rotulo.setFontScale(0.8f * FONTE_STATS);
-        Label limite = new Label("How many? (max " + max + ")", skin, "hud");
-        limite.setFontScale(0.65f * FONTE_STATS);
+        Label limite = new Label("You can choose up to " + max, skin, "hud");
+        limite.setFontScale(0.6f * FONTE_STATS);
         limite.setColor(Color.LIGHT_GRAY);
         final BarraQuantidade[] barraQtd = new BarraQuantidade[1];
+        final Runnable[] revalidar = new Runnable[1];
         com.badlogic.gdx.scenes.scene2d.ui.TextField campo = new com.badlogic.gdx.scenes.scene2d.ui.TextField(String.valueOf(max), skin);
         campo.setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
         campo.setMaxLength(String.valueOf(max).length());
+        campo.setAlignment(Align.center);
         campo.setTextFieldListener((c, ch) -> {
             String t = c.getText();
-            if (t.isEmpty()) return;
-            int v;
-            try { v = Integer.parseInt(t); } catch (NumberFormatException e) { v = max; }
-            int lim = Math.max(1, Math.min(max, v));
-            if (lim != v) {
-                c.setText(String.valueOf(lim));
-                c.setCursorPosition(c.getText().length());
+            if (!t.isEmpty()) {
+                int v;
+                try { v = Integer.parseInt(t); } catch (NumberFormatException e) { v = max; }
+                int lim = Math.max(1, Math.min(max, v));
+                if (lim != v) {
+                    c.setText(String.valueOf(lim));
+                    c.setCursorPosition(c.getText().length());
+                }
+                if (barraQtd[0] != null) barraQtd[0].definir(lim, false);
             }
-            if (barraQtd[0] != null) barraQtd[0].definir(lim, false);
-            if (ch == '\n' || ch == '\r') confirmarPopup(c, max, aoConfirmar);
+            revalidar[0].run();
+            if (ch == '\n' || ch == '\r') confirmarPopup(c, max, cabe, aoConfirmar);
         });
         // Barrinha arrastavel (1..max) + "-"/"+" pra acertar o numero exato.
         BarraQuantidade barra = new BarraQuantidade(max, v -> {
             campo.setText(String.valueOf(v));
             campo.setCursorPosition(campo.getText().length());
+            revalidar[0].run();
         });
         barraQtd[0] = barra;
         barra.definir(max, false);
@@ -2095,39 +2141,55 @@ public final class BookMenuUI {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 campo.setText(String.valueOf(max));
                 barra.definir(max, false);
+                revalidar[0].run();
             }
         });
         TextButton cancelar = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
-        TextButton confirmar = new TextButton("Confirm", estiloBotaoTrade("verde"));
+        TextButton.TextButtonStyle estiloOk = estiloBotaoTrade("verde"), estiloSemCap = estiloBotaoTrade("vermelho");
+        TextButton confirmar = new TextButton("Confirm", estiloOk);
+        revalidar[0] = () -> {
+            boolean ok = cabe == null || cabe.test(valorDoCampo(campo, max));
+            confirmar.setStyle(ok ? estiloOk : estiloSemCap);
+            confirmar.setText(ok ? "Confirm" : "No Cap");
+        };
         cancelar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { fecharPopupQuantidade(); }
         });
         confirmar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                confirmarPopup(campo, max, aoConfirmar);
+                confirmarPopup(campo, max, cabe, aoConfirmar);
             }
         });
+        Table cabecalho = new Table();
+        if (icone != null) {
+            Image img = new Image(new TextureRegionDrawable(icone));
+            img.setScaling(Scaling.fit);
+            Table moldura = new Table();
+            moldura.setBackground(skinDrawable("bag-slot"));
+            moldura.add(img).size(30).pad(5);
+            cabecalho.add(moldura).size(44).padRight(10);
+        }
+        Table textos = new Table();
+        textos.add(rotulo).left().row();
+        textos.add(limite).left();
+        cabecalho.add(textos).left();
         Table linhaCampo = new Table();
         linhaCampo.add(campo).width(140).height(40).padRight(6);
         linhaCampo.add(botaoMax).width(64).height(40);
         Table linhaBotoes = new Table();
         linhaBotoes.add(cancelar).width(110).height(44).padRight(10);
         linhaBotoes.add(confirmar).width(110).height(44);
-        caixa.add(rotulo).padBottom(4).row();
-        caixa.add(limite).padBottom(10).row();
+        caixa.add(cabecalho).left().padBottom(12).row();
         caixa.add(linhaCampo).padBottom(10).row();
         if (max > 1) {
             Table linhaBarra = new Table();
             linhaBarra.add(menos).size(40).padRight(8);
             linhaBarra.add(barra).width(240).height(40);
             linhaBarra.add(mais).size(40).padLeft(8);
-            caixa.add(linhaBarra).padBottom(4).row();
-            Label dica = new Label("Drag far from the bar for fine steps", skin, "hud");
-            dica.setFontScale(0.55f * FONTE_STATS);
-            dica.setColor(Color.GRAY);
-            caixa.add(dica).padBottom(12).row();
+            caixa.add(linhaBarra).padBottom(14).row();
         }
         caixa.add(linhaBotoes);
+        revalidar[0].run();
 
         popupQuantidade = new Table();
         popupQuantidade.setFillParent(true);
@@ -2138,6 +2200,15 @@ public final class BookMenuUI {
         stage.addActor(popupQuantidade);
         stage.setKeyboardFocus(campo);
         campo.selectAll();
+    }
+
+    private static final Color COR_POPUP_FUNDO = Color.valueOf("1c1c1c");
+    private static final Color COR_POPUP_BORDA = Color.valueOf("424242");
+
+    private static int valorDoCampo(com.badlogic.gdx.scenes.scene2d.ui.TextField campo, int max) {
+        int v;
+        try { v = Integer.parseInt(campo.getText()); } catch (NumberFormatException e) { v = max; }
+        return Math.max(1, Math.min(max, v));
     }
 
     /** Botao que repete enquanto segurado (devagar no comeco, depois rapido). */
@@ -2162,9 +2233,8 @@ public final class BookMenuUI {
     }
 
     /**
-     * Barrinha de quantidade (1..max), arrastavel. Tocar pula pro ponto;
-     * arrastar com o dedo longe da barra (pra cima/baixo) anda mais devagar
-     * (ajuste fino), entao da' pra chegar no numero exato mesmo com milhares.
+     * Barrinha de quantidade (1..max), arrastavel. Tocar pula pro ponto e
+     * arrastar leva o puxador junto (so' o X conta).
      * Desenha so' trilho, parte cheia e o puxador - nao cria nada por valor.
      */
     private final class BarraQuantidade extends com.badlogic.gdx.scenes.scene2d.ui.Widget {
@@ -2182,24 +2252,18 @@ public final class BookMenuUI {
         BarraQuantidade(int max, java.util.function.IntConsumer aoMudar) {
             this.max = Math.max(1, max);
             this.aoMudar = aoMudar;
+            // O puxador segue o X do dedo/mouse, venha o arrasto de onde
+            // vier (antes, arrastar na diagonal entrava num "ajuste fino" e
+            // quase nao mexia). Numero exato: "-"/"+" ou digitar.
             addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
-                float ultimoX;
                 @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p, int bt) {
                     if (p != 0) return false;
                     pularPara(x);
-                    ultimoX = x;
+                    e.stop();
                     return true;
                 }
                 @Override public void touchDragged(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p) {
-                    if (p != 0) return;
-                    // Quanto mais longe da barra (vertical), mais fino: ate' 1/20.
-                    float longe = Math.max(0f, Math.abs(y - getHeight() / 2f) - getHeight());
-                    float fino = 1f / (1f + longe / 12f);
-                    fino = Math.max(0.05f, fino);
-                    float porUnidade = (BarraQuantidade.this.max - 1) / Math.max(1f, larguraUtil());
-                    valorExato += (x - ultimoX) * porUnidade * fino;
-                    ultimoX = x;
-                    aplicar(Math.round(valorExato), true, false);
+                    if (p == 0) pularPara(x);
                 }
             });
         }
@@ -2242,10 +2306,10 @@ public final class BookMenuUI {
         }
     }
 
-    private void confirmarPopup(com.badlogic.gdx.scenes.scene2d.ui.TextField campo, int max, java.util.function.IntConsumer aoConfirmar) {
-        int v;
-        try { v = Integer.parseInt(campo.getText()); } catch (NumberFormatException e) { v = max; }
-        v = Math.max(1, Math.min(max, v));
+    private void confirmarPopup(com.badlogic.gdx.scenes.scene2d.ui.TextField campo, int max,
+                                java.util.function.IntPredicate cabe, java.util.function.IntConsumer aoConfirmar) {
+        int v = valorDoCampo(campo, max);
+        if (cabe != null && !cabe.test(v)) return; // "No Cap": nao faz nada
         fecharPopupQuantidade();
         aoConfirmar.accept(v);
     }
@@ -2283,7 +2347,37 @@ public final class BookMenuUI {
         return null;
     }
 
+    private void atualizarResumoTrade() {
+        if (resumoTrade == null) return;
+        int itens = 0;
+        for (String k : tradeSelecao.keySet()) if (indiceMoeda(k) < 0) itens++;
+        long moedas = valorMoedasSelecionadas(null);
+        if (itens == 0 && moedas == 0) {
+            resumoTrade.setText("Your offer: nothing yet");
+            resumoTrade.setColor(COR_PASSO);
+            return;
+        }
+        StringBuilder sb = new StringBuilder("Your offer: ");
+        if (itens > 0) sb.append(itens).append(itens == 1 ? " item" : " items");
+        if (moedas > 0) sb.append(itens > 0 ? " + " : "").append(textoMoedas(moedas));
+        resumoTrade.setText(sb.toString());
+        resumoTrade.setColor(COR_TRADE_SELECIONADO);
+    }
+
+    /** "1g 20s 5c" (so' as que tem). */
+    private static String textoMoedas(long total) {
+        String[] sufixo = {"c", "s", "g", "p"};
+        StringBuilder sb = new StringBuilder();
+        for (int i = MOEDAS_TRADE.length - 1; i >= 0; i--) {
+            long q = total / VALOR_MOEDA[i];
+            total -= q * VALOR_MOEDA[i];
+            if (q > 0) sb.append(sb.length() > 0 ? " " : "").append(q).append(sufixo[i]);
+        }
+        return sb.length() == 0 ? "0c" : sb.toString();
+    }
+
     private void atualizarDetalhesTrade() {
+        atualizarResumoTrade();
         int moeda = indiceMoeda(tradeFoco);
         if (moeda >= 0) {
             detalhesMoedaTrade(moeda);
@@ -2292,7 +2386,8 @@ public final class BookMenuUI {
         InventoryItem item = itemPorId(tradeFoco);
         if (item == null) {
             tradeDetalhes.clearChildren();
-            Label dica = new Label(tradeEnviado ? "Waiting for " + tradeOutro + "..." : "Click the items you want to trade.", skin, "hud");
+            Label dica = new Label(tradeEnviado ? "Offer sent! Waiting for " + tradeOutro + " to send theirs..."
+                : "Tap an item to add it to your offer. Tap it again to remove it.", skin, "hud");
             dica.setFontScale(0.6f * FONTE_STATS);
             dica.setWrap(true);
             tradeDetalhes.add(dica).growX().left();
@@ -2327,6 +2422,7 @@ public final class BookMenuUI {
         socket.emitRaw("trade_ready", "{}");
         tradeEnviado = true;
         botaoEnviarTrade.setText("Waiting...");
+        passoTrade.setText("Waiting for " + tradeOutro + "...");
         botaoEnviarTrade.setDisabled(true);
         if (root.getStage() != null && campoQtdTrade != null && root.getStage().getKeyboardFocus() == campoQtdTrade) {
             root.getStage().setKeyboardFocus(null);
@@ -2348,10 +2444,13 @@ public final class BookMenuUI {
         tradeAceito = false;
         botaoAceitarTrade.setText("Accept");
         botaoAceitarTrade.setDisabled(false);
-        statusTradeConfirm.setText("");
+        statusTradeConfirm.setText("Not yet");
+        statusTradeConfirm.setColor(COR_PASSO);
         statusMeuAceite.setText("");
-        tituloMinhaOferta.setText(meuNome != null ? meuNome : "You");
-        tituloOfertaOutro.setText(tradeOutro != null ? tradeOutro : "");
+        tituloMinhaOferta.setText("You give");
+        tituloMinhaOferta.setColor(Color.valueOf("ff9a6a"));
+        tituloOfertaOutro.setText("You receive" + (tradeOutro != null ? " (from " + tradeOutro + ")" : ""));
+        tituloOfertaOutro.setColor(COR_TRADE_SELECIONADO);
         tradeFoco = null;
         mostrarPaginaTrade(tradeConfirmPage);
         montarConfirmacaoTrade();
@@ -2362,7 +2461,7 @@ public final class BookMenuUI {
         montarGradeOferta(gradeOfertaOutro, ofertaOutro, "Nothing offered.");
         if (tradeFoco == null) {
             confirmDetalhes.clearChildren();
-            Label dica = new Label("Click an item to see it.", skin, "hud");
+            Label dica = new Label("Tap an item to see its details.", skin, "hud");
             dica.setFontScale(0.6f * FONTE_STATS);
             dica.setWrap(true);
             confirmDetalhes.add(dica).growX().left();
@@ -2443,8 +2542,347 @@ public final class BookMenuUI {
     /** trade_lock_state_updated. */
     public void estadoAceiteTrade(boolean euAceitei, boolean eleAceitou) {
         if (!modoTrade) return;
-        statusTradeConfirm.setText(eleAceitou ? "Accepted" : "");
+        statusTradeConfirm.setText(eleAceitou ? "Accepted" : "Not yet");
+        statusTradeConfirm.setColor(eleAceitou ? COR_TRADE_SELECIONADO : COR_PASSO);
         statusMeuAceite.setText(euAceitei ? "Accepted" : "");
+    }
+
+    // ===================== BANK (NPC Jack) =====================
+    // Abre no lugar do livro (abas laterais escondidas, igual o trade). Em
+    // cima, duas abas: Bag (o que da' pra guardar) e Bank (o que esta'
+    // guardado, compartilhado entre os personagens da conta). Clicar num
+    // item mostra os detalhes na esquerda e o botao Deposit/Withdraw; com
+    // mais de 1 (pilha ou moeda) abre a janelinha de quantidade. Sacar mais
+    // do que cabe na mochila: botao vermelho "No Cap". Tudo validado no
+    // servidor (servidor.py, BANK).
+
+    private boolean modoBanco = false;
+    private boolean abaBancoBank = false; // false = Bag, true = Bank
+    private String secaoAntesDoBanco = "Bag";
+    private final Table bankPage = new Table();
+    private final Table bancoGrid = new Table();
+    private final Table bancoDetalhes = new Table();
+    private Table bancoRodapeAcao;
+    private TextButton bancoAcao, abaBag, abaBank;
+    private TextButton.TextButtonStyle estiloBancoOk, estiloBancoBloqueado;
+    private Label bancoInfo, bancoAviso;
+    private final List<InventoryItem> itensBanco = new ArrayList<>();
+    private long moedasBanco = 0L;
+    private int slotsBanco = 100;
+    private String bancoFoco = null; // instanceId / id do bank / "$Copper"...
+
+    private static final Color COR_ABA_ATIVA = Color.valueOf("2f2f2f");
+    private static final Color COR_ABA_INATIVA = Color.valueOf("1c1c1c");
+    private static final Color COR_ABA_BORDA = Color.valueOf("424242");
+
+    public boolean emBanco() { return modoBanco; }
+
+    private TextButton.TextButtonStyle estiloAba(boolean ativa) {
+        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(estiloBotaoTrade("default"));
+        e.up = UiSkin.retangulo(ativa ? COR_ABA_ATIVA : COR_ABA_INATIVA, ativa ? Color.valueOf("f28c28") : COR_ABA_BORDA, ativa ? 2 : 1);
+        e.over = ativa ? e.up : UiSkin.retangulo(Color.valueOf("262626"), COR_ABA_BORDA, 1);
+        e.down = e.up;
+        e.fontColor = ativa ? Color.WHITE : new Color(0.6f, 0.6f, 0.6f, 1f);
+        return e;
+    }
+
+    private void construirPaginaBanco(Skin skin) {
+        bancoGrid.top().left();
+        bancoDetalhes.top().left();
+
+        estiloBancoOk = estiloBotaoTrade("verde");
+        estiloBancoBloqueado = estiloBotaoTrade("vermelho");
+        bancoAcao = new TextButton("Deposit", estiloBancoOk);
+        bancoAcao.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { acaoBanco(); }
+        });
+        bancoRodapeAcao = new Table();
+        bancoRodapeAcao.add(bancoAcao).growX().height(42);
+
+        Table esquerda = new Table();
+        esquerda.top().left();
+        esquerda.setBackground(UiSkin.retangulo(
+            new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        esquerda.add(bancoDetalhes).grow().top().left().pad(8).row();
+        esquerda.add(bancoRodapeAcao).growX().pad(6);
+
+        abaBag = new TextButton("Bag", estiloAba(true));
+        abaBank = new TextButton("Bank", estiloAba(false));
+        abaBag.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaBanco(false); }
+        });
+        abaBank.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaBanco(true); }
+        });
+        TextButton fechar = new TextButton("X", estiloBotaoTrade("vermelho"));
+        fechar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { setVisible(false); }
+        });
+        Table abas = new Table();
+        abas.add(abaBag).width(96).height(36).padRight(4);
+        abas.add(abaBank).width(96).height(36);
+        abas.add().expandX();
+        abas.add(fechar).size(36);
+
+        ScrollPane scroll = new ScrollPane(bancoGrid, skin);
+        scroll.setFadeScrollBars(false);
+        scroll.setScrollingDisabled(true, false);
+        scroll.setOverscroll(false, false);
+
+        bancoInfo = new Label("", skin, "hud");
+        bancoInfo.setFontScale(0.7f * FONTE_STATS);
+        bancoInfo.setColor(new Color(0.65f, 0.65f, 0.65f, 1f));
+        bancoAviso = new Label("", skin, "hud");
+        bancoAviso.setFontScale(0.6f * FONTE_STATS);
+        bancoAviso.setColor(Color.valueOf("ff6a6a"));
+
+        Table rodape = new Table();
+        rodape.add(bancoInfo).left().expandX();
+        rodape.add(bancoAviso).right();
+
+        Table direita = new Table();
+        direita.top().left();
+        direita.setBackground(UiSkin.retangulo(
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        direita.add(abas).growX().pad(10, 12, 0, 12).row();
+        direita.add(scroll).grow().pad(8, 12, 6, 12).row();
+        direita.add(rodape).growX().pad(0, 12, 10, 12);
+
+        bankPage.add(esquerda).width(COLUNA_BAG).growY();
+        bankPage.add(direita).grow();
+    }
+
+    /** bank_opened: abre a tela do bank no lugar do livro. */
+    public void abrirBanco() {
+        if (modoTrade) return;
+        if (!modoBanco) secaoAntesDoBanco = secaoAtual;
+        modoBanco = true;
+        bancoFoco = null;
+        bancoAviso.setText("");
+        cancelarExclusao();
+        if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(false);
+        if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(false);
+        mainWindow.clearChildren();
+        mainWindow.pad(1);
+        mainWindow.add(bankPage).grow();
+        actionBar.setVisible(false);
+        trocarAbaBanco(false);
+        root.setVisible(true);
+    }
+
+    /** Fecha a tela do bank e volta o livro ao normal (escondido). */
+    public void fecharBanco() {
+        fecharPopupQuantidade();
+        if (!modoBanco) return;
+        modoBanco = false;
+        if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(true);
+        if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(true);
+        root.setVisible(false);
+        selecionarSecao(secaoAntesDoBanco);
+    }
+
+    private void trocarAbaBanco(boolean bank) {
+        abaBancoBank = bank;
+        abaBag.setStyle(estiloAba(!bank));
+        abaBank.setStyle(estiloAba(bank));
+        bancoFoco = null;
+        bancoAviso.setText("");
+        atualizarTelaBanco();
+    }
+
+    /** bank_synced: conteudo do bank (e aviso "full"/"no_cap", se teve). */
+    public void atualizarBanco(JsonValue dados) {
+        if (dados == null) return;
+        itensBanco.clear();
+        JsonValue itens = dados.get("items");
+        if (itens != null) {
+            for (JsonValue e = itens.child; e != null; e = e.next) {
+                String caminho = e.getString("item", "");
+                if (caminho.isEmpty()) continue;
+                itensBanco.add(new InventoryItem(e.getString("id", ""), caminho, Math.max(1, e.getInt("qty", 1)), false));
+            }
+        }
+        moedasBanco = Math.max(0L, dados.getLong("currency", 0L));
+        slotsBanco = Math.max(1, dados.getInt("slots_max", 100));
+        String msg = dados.getString("msg", "");
+        bancoAviso.setText("full".equals(msg) ? "The bank is full." : "no_cap".equals(msg) ? "Not enough capacity." : "");
+        atualizarTelaBanco();
+    }
+
+    private void atualizarTelaBanco() {
+        if (!modoBanco) return;
+        // Foco que sumiu (item saiu da lista / moeda zerou) sai.
+        if (bancoFoco != null && indiceMoeda(bancoFoco) < 0 && itemDoBanco(bancoFoco) == null) bancoFoco = null;
+        if (bancoFoco != null && indiceMoeda(bancoFoco) >= 0 && maxMoedaBanco(indiceMoeda(bancoFoco)) <= 0) bancoFoco = null;
+        atualizarGradeBanco();
+        atualizarDetalhesBanco();
+        bancoInfo.setText(abaBancoBank
+            ? "Bank " + itensBanco.size() + "/" + slotsBanco + " slots"
+            : "Capacity " + formatarPeso(capacityUsed) + "/" + formatarPeso(capacityMaximum));
+    }
+
+    private long saldoDaAba() { return abaBancoBank ? moedasBanco : currencyTotal; }
+
+    private long moedasDaAba(int i) {
+        long total = saldoDaAba();
+        long resto = i + 1 < VALOR_MOEDA.length ? total % VALOR_MOEDA[i + 1] : total;
+        return resto / VALOR_MOEDA[i];
+    }
+
+    /** Maximo dessa moeda que da' pra mover (troca as maiores, igual o trade). */
+    private int maxMoedaBanco(int i) {
+        return (int) Math.min(Integer.MAX_VALUE, saldoDaAba() / VALOR_MOEDA[i]);
+    }
+
+    private List<InventoryItem> itensDaAba() { return abaBancoBank ? itensBanco : inventoryItems; }
+
+    private InventoryItem itemDoBanco(String id) {
+        if (id == null) return null;
+        for (InventoryItem it : itensDaAba()) if (it.instanceId.equals(id)) return it;
+        return null;
+    }
+
+    private void atualizarGradeBanco() {
+        bancoGrid.clearChildren();
+        int n = 0;
+        int maiorMoeda = -1;
+        for (int i = 0; i < VALOR_MOEDA.length; i++) if (saldoDaAba() >= VALOR_MOEDA[i]) maiorMoeda = i;
+        for (int i = 0; i <= maiorMoeda; i++) {
+            String tipo = MOEDAS_TRADE[i];
+            String chave = PREFIXO_MOEDA + tipo;
+            Button slot = slotMoeda(tipo, moedasDaAba(i), corMoeda(tipo), false, chave.equals(bancoFoco));
+            slot.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    bancoFoco = chave;
+                    bancoAviso.setText("");
+                    atualizarTelaBanco();
+                }
+            });
+            bancoGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
+            if (++n % COLUNAS_INVENTARIO == 0) bancoGrid.row();
+        }
+        for (InventoryItem item : itensDaAba()) {
+            Button.ButtonStyle estilo = new Button.ButtonStyle();
+            boolean foco = item.instanceId.equals(bancoFoco);
+            estilo.up = skinDrawable(foco ? "bag-slot-selected" : "bag-slot");
+            estilo.over = foco ? estilo.up : skinDrawable("bag-slot-hover");
+            estilo.down = skinDrawable("bag-slot-selected");
+            Button slot = new Button(estilo);
+            slot.add(conteudoSlot(item.itemPath, item.quantity, -1)).grow().pad(2);
+            slot.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    bancoFoco = item.instanceId;
+                    bancoAviso.setText("");
+                    atualizarTelaBanco();
+                }
+            });
+            bancoGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
+            if (++n % COLUNAS_INVENTARIO == 0) bancoGrid.row();
+        }
+        if (n == 0) {
+            Label vazio = new Label(abaBancoBank ? "Your bank is empty." : "Your bag is empty.", skin, "hud");
+            vazio.setFontScale(0.6f * FONTE_STATS);
+            vazio.setColor(new Color(0.6f, 0.6f, 0.6f, 1f));
+            bancoGrid.add(vazio).pad(10);
+        }
+    }
+
+    private float capLivre() { return Math.max(0f, capacityMaximum - capacityUsed); }
+
+    private float capUnitario(String caminho) {
+        EquipStats d = ITEM_STATS.get(caminho);
+        return d == null ? 0f : d.cap;
+    }
+
+    private boolean empilhavel(String caminho) {
+        EquipStats d = ITEM_STATS.get(caminho);
+        return d != null && d.empilhavel;
+    }
+
+    /** Quantos desse item cabem na mochila agora. */
+    private boolean cabeNaMochila(String caminho, int qtd) {
+        return capUnitario(caminho) * qtd <= capLivre() + 0.0001f;
+    }
+
+    private boolean bancoCheioPara(String caminho) {
+        if (itensBanco.size() < slotsBanco) return false;
+        if (!empilhavel(caminho)) return true;
+        for (InventoryItem it : itensBanco) if (it.itemPath.equals(caminho)) return false;
+        return true;
+    }
+
+    private void atualizarDetalhesBanco() {
+        bancoDetalhes.clearChildren();
+        bancoDetalhes.top().left();
+        int moeda = indiceMoeda(bancoFoco);
+        InventoryItem item = moeda >= 0 ? null : itemDoBanco(bancoFoco);
+        if (moeda < 0 && item == null) {
+            Label dica = new Label(abaBancoBank ? "Pick something to take out of the bank."
+                : "Pick something from your bag to store in the bank.", skin, "hud");
+            dica.setFontScale(0.6f * FONTE_STATS);
+            dica.setWrap(true);
+            dica.setColor(new Color(0.7f, 0.7f, 0.7f, 1f));
+            bancoDetalhes.add(dica).growX().left();
+            bancoRodapeAcao.setVisible(false);
+            return;
+        }
+        bancoRodapeAcao.setVisible(true);
+        boolean bloqueado = false;
+        String textoBloqueado = "";
+        if (moeda >= 0) {
+            String tipo = MOEDAS_TRADE[moeda];
+            Label nome = new Label(tipo + " Coins", skin, "hud");
+            nome.setFontScale(0.74f * FONTE_STATS);
+            nome.setColor(corMoeda(tipo));
+            bancoDetalhes.add(nome).left().padBottom(1).row();
+            bancoDetalhes.add(linhaStat((abaBancoBank ? "In bank " : "In bag ") + moedasDaAba(moeda), Color.LIGHT_GRAY)).left().row();
+            bancoDetalhes.add(linhaStat("Coins weigh nothing", new Color(0.55f, 0.55f, 0.55f, 1f))).left().row();
+        } else {
+            preencherBlocoStats(bancoDetalhes, item.itemPath, null);
+            if (item.quantity > 1) bancoDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
+            float unit = capUnitario(item.itemPath);
+            if (unit > 0f) bancoDetalhes.add(linhaStat("Weight " + formatarPeso(unit) + " each", new Color(0.55f, 0.55f, 0.55f, 1f))).left().row();
+            if (abaBancoBank) {
+                bloqueado = !cabeNaMochila(item.itemPath, 1);
+                textoBloqueado = "No Cap";
+            } else {
+                bloqueado = bancoCheioPara(item.itemPath);
+                textoBloqueado = "Bank Full";
+            }
+        }
+        bancoAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloBancoOk);
+        bancoAcao.setText(bloqueado ? textoBloqueado : abaBancoBank ? "Withdraw" : "Deposit");
+    }
+
+    private void acaoBanco() {
+        if (!modoBanco || !socket.isConnected()) return;
+        int moeda = indiceMoeda(bancoFoco);
+        String direcao = abaBancoBank ? "withdraw" : "deposit";
+        if (moeda >= 0) {
+            int max = maxMoedaBanco(moeda);
+            if (max <= 0) return;
+            long valor = VALOR_MOEDA[moeda];
+            TextureAtlas.AtlasRegion icone = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[moeda]);
+            abrirPopupQuantidade(MOEDAS_TRADE[moeda] + " Coins", icone, max, null, v ->
+                socket.emitRaw("bank_currency_move", GameSocket.obj(w -> {
+                    w.set("direction", direcao);
+                    w.set("amount", v * valor);
+                })));
+            return;
+        }
+        InventoryItem item = itemDoBanco(bancoFoco);
+        if (item == null) return;
+        String evento = abaBancoBank ? "bank_withdraw" : "bank_deposit";
+        String chaveId = abaBancoBank ? "id" : "instance_id";
+        if (abaBancoBank && !cabeNaMochila(item.itemPath, 1)) return;
+        if (!abaBancoBank && bancoCheioPara(item.itemPath)) return;
+        if (item.quantity > 1) {
+            java.util.function.IntPredicate cabe = abaBancoBank ? v -> cabeNaMochila(item.itemPath, v) : null;
+            abrirPopupQuantidade(nomeExibicao(item.itemPath), iconeDoItem(item.itemPath), item.quantity, cabe, v ->
+                socket.emitRaw(evento, GameSocket.obj(w -> { w.set(chaveId, item.instanceId); w.set("qty", v); })));
+        } else {
+            socket.emitRaw(evento, GameSocket.obj(w -> { w.set(chaveId, item.instanceId); w.set("qty", 1); }));
+        }
     }
 
     // ===================== PARTY =====================
@@ -3037,6 +3475,7 @@ public final class BookMenuUI {
         atualizarGradeEquip();
         atualizarDetalhesEquip();
         aoMudarBagOuAtalhos();
+        atualizarTelaBanco();
     }
 
     public void adicionarItens(JsonValue dados) {
@@ -3050,6 +3489,7 @@ public final class BookMenuUI {
         atualizarGrade();
         atualizarGradeEquip();
         aoMudarBagOuAtalhos();
+        atualizarTelaBanco();
     }
 
     // ===================== SPELLS (atalhos) =====================
@@ -3803,6 +4243,7 @@ public final class BookMenuUI {
             atualizarGradeTrade();
             atualizarDetalhesTrade();
         }
+        atualizarTelaBanco();
     }
 
     private static String formatarPeso(float valor) {
@@ -3815,6 +4256,7 @@ public final class BookMenuUI {
         capacityMaximum = maxima;
         capacityLabel.setText("Capacity " + formatarPeso(usada) + "/" + formatarPeso(maxima));
         atualizarTextoCapacidade();
+        atualizarTelaBanco();
     }
 
     private static final class InventoryItem {
@@ -3927,7 +4369,7 @@ public final class BookMenuUI {
         stage.addCaptureListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
             @Override
             public boolean keyDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, int keycode) {
-                if (!isVisible() || modoTrade || digitandoEmCampo(stage)) return false;
+                if (!isVisible() || modoTrade || modoBanco || digitandoEmCampo(stage)) return false;
                 for (int i = 0; i < ORDEM_ATALHOS.length; i++) {
                     for (int tecla : TECLAS_ATALHOS[i]) {
                         if (tecla == keycode) {
@@ -3986,6 +4428,13 @@ public final class BookMenuUI {
         if (!visible && modoTrade) {
             cancelarTrade(); // fechar o livro no meio do trade cancela pros dois
             return;
+        }
+        if (!visible && modoBanco) {
+            fecharBanco();
+            return;
+        }
+        if (visible && modoBanco && !root.isVisible()) {
+            fecharBanco(); // abrir o livro normal (tecla) sai do bank
         }
         if (!visible) cancelarExclusao();
         // Abrindo de novo ja' no Bestiary: pede os numeros atualizados.

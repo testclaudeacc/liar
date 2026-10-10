@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.26"
+SERVER_VERSION = "v0.27"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -334,7 +334,7 @@ ALCANCE_RANGED_SQM = 5
 # de uma copia propria e o que aparece na tela e' sempre o valor real.
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
-                       "fullness", "stackable", "heal_hp", "heal_mp", "icon")
+                       "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap")
 
 def montar_item_db_cliente():
     db = {}
@@ -1813,6 +1813,9 @@ def _queue_save(p, position_ack_sid=None):
         'hotbar': normalizar_hotbar(p.get('hotbar')),
         'time_played': tempo_jogado,
         'bestiary': dict(p['bestiary']) if isinstance(p.get('bestiary'), dict) else None,
+        # Bank vai junto do personagem (mesma transacao): guardar/sacar nunca
+        # duplica nem some item se o servidor cair entre um save e outro.
+        'bank': _copia_banco(p.get('user_id')),
         'position_ack_sid': position_ack_sid
     }
     save_queue.put(save_data)
@@ -1853,6 +1856,9 @@ def db_writer_worker():
             if player_data.get('bestiary') is not None:
                 c.execute("UPDATE users SET bestiary = %s WHERE id = %s",
                           (json.dumps(player_data['bestiary']), player_data.get('user_id')))
+            if player_data.get('bank') is not None:
+                c.execute("UPDATE users SET bank = %s WHERE id = %s",
+                          (json.dumps(player_data['bank']), player_data.get('user_id')))
             conn.commit()
             c.close()
             if player_data.get('position_ack_sid'):
@@ -1874,6 +1880,8 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code TEXT")
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code_expires DOUBLE PRECISION")
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bestiary TEXT DEFAULT '{}'")
+        # Bank da conta (todos os personagens): {"items": [...], "currency": N}.
+        c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bank TEXT DEFAULT '{}'")
         c.execute('''CREATE TABLE IF NOT EXISTS characters (
                         id SERIAL PRIMARY KEY, 
                         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, 
@@ -5165,6 +5173,179 @@ def handle_trade_cancel(data):
     sid = request.sid
     if sid not in online_players: return
     _remover_do_trade(sid, motivo="cancelled_by_peer")
+
+# ==================== BANK (Jack) ====================
+# Bank da CONTA: todos os personagens veem o mesmo. 100 slots; o peso (cap)
+# dos itens nao conta. Item empilhavel (flecha, comida, pocao) vira UMA
+# entrada so' por tipo, com a quantia que for (3k flechas = 1 slot). Moeda
+# nao ocupa slot. Fica em memoria (bancos) depois de carregado: e' a versao
+# valida enquanto o servidor roda, e vai pro banco de dados junto com o save
+# do personagem (_queue_save), na mesma transacao.
+BANK_SLOTS = 100
+BANK_QTD_MAX = 1_000_000_000
+BANK_DISTANCIA_SQM = NPC_PAY_DISTANCIA_SQM
+bancos = {}  # str(user_id) -> {'items': [...], 'currency': int}
+
+def normalizar_banco(dados):
+    if not isinstance(dados, dict): dados = {}
+    itens, por_tipo = [], {}
+    for e in dados.get('items', []) if isinstance(dados.get('items'), list) else []:
+        if not isinstance(e, dict): continue
+        caminho = validate_item(e.get('item'))
+        if not caminho: continue
+        if eh_empilhavel(caminho):
+            try: qtd = int(e.get('qty', 1))
+            except (TypeError, ValueError): qtd = 1
+            if qtd <= 0: continue
+            if caminho in por_tipo:
+                por_tipo[caminho]['qty'] = min(BANK_QTD_MAX, por_tipo[caminho]['qty'] + qtd)
+                continue
+            ent = {'id': str(e.get('id') or uuid.uuid4().hex), 'item': caminho, 'qty': min(BANK_QTD_MAX, qtd)}
+            por_tipo[caminho] = ent
+            itens.append(ent)
+        else:
+            itens.append({'id': str(e.get('id') or uuid.uuid4().hex), 'item': caminho, 'favorite': False})
+    try: moedas = max(0, int(dados.get('currency', 0)))
+    except (TypeError, ValueError): moedas = 0
+    return {'items': itens[:BANK_SLOTS * 2], 'currency': moedas}
+
+def _copia_banco(user_id):
+    b = bancos.get(str(user_id))
+    return json.loads(json.dumps(b)) if b is not None else None
+
+def _banco_da_conta(p):
+    """Bank em memoria; na 1a vez le do banco de dados."""
+    chave = str(p.get('user_id'))
+    if chave in bancos: return bancos[chave]
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        c = conn.cursor()
+        c.execute("SELECT bank FROM users WHERE id = %s", (p.get('user_id'),))
+        linha = c.fetchone()
+        c.close()
+        try: dados = json.loads(linha[0]) if linha and linha[0] else {}
+        except (TypeError, ValueError): dados = {}
+    except Exception:
+        traceback.print_exc()
+        return None
+    finally:
+        if conn: db_pool.putconn(conn)
+    bancos[chave] = normalizar_banco(dados)
+    return bancos[chave]
+
+def _perto_do_banco(p):
+    tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+    for n in active_npcs.values():
+        if NPC_DB.get(str(n.get('npc_id', '')).lower(), {}).get('role') != 'bank': continue
+        tn = tile_de(n.get('pos_x', 0), n.get('pos_y', 0))
+        if max(abs(tn[0] - tp[0]), abs(tn[1] - tp[1])) <= BANK_DISTANCIA_SQM: return True
+    return False
+
+def _emit_banco(sid, banco, aviso=''):
+    emit('bank_synced', {'items': banco['items'], 'currency': int(banco['currency']),
+                         'slots_max': BANK_SLOTS, 'msg': aviso}, room=sid)
+
+def _banco_do_evento(sid):
+    """(p, banco) se pode mexer no bank agora; senao (None, None)."""
+    p = online_players.get(sid)
+    if not p or p.get('is_dead') or p.get('trade_id'): return None, None
+    if not _perto_do_banco(p): return None, None
+    banco = _banco_da_conta(p)
+    return (p, banco) if banco is not None else (None, None)
+
+def _depois_do_banco(sid, p, banco, aviso=''):
+    _queue_save(p)
+    emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(p.get('inventory', [])),
+                              'equipped_items': p.get('equipped_items', {})}, room=sid)
+    emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+    emit('bank_currency', {'currency': int(p.get('currency', 0))}, room=sid)
+    _emit_banco(sid, banco, aviso)
+
+def _qtd_do_evento(data, maximo):
+    try: qtd = int(data.get('qty', 1))
+    except (TypeError, ValueError): return None
+    return qtd if 1 <= qtd <= maximo else None
+
+@socketio.on('bank_open')
+def handle_bank_open(data):
+    sid = request.sid
+    p, banco = _banco_do_evento(sid)
+    if not p: return
+    emit('bank_opened', {}, room=sid)
+    _emit_banco(sid, banco)
+
+@socketio.on('bank_deposit')
+def handle_bank_deposit(data):
+    sid = request.sid
+    if not isinstance(data, dict): return
+    p, banco = _banco_do_evento(sid)
+    if not p: return
+    inventario = p.setdefault('inventory', [])
+    inst = encontrar_instancia(inventario, str(data.get('instance_id', '')))
+    if inst is None: return _emit_banco(sid, banco)
+    caminho = inst.get('item')
+    if eh_empilhavel(caminho):
+        qtd = _qtd_do_evento(data, int(inst.get('qty', 1)))
+        if qtd is None: return _emit_banco(sid, banco)
+        pilha = next((e for e in banco['items'] if e.get('item') == caminho), None)
+        if pilha is None and len(banco['items']) >= BANK_SLOTS: return _emit_banco(sid, banco, 'full')
+        if pilha is None:
+            banco['items'].append({'id': uuid.uuid4().hex, 'item': caminho, 'qty': qtd})
+        else:
+            pilha['qty'] = min(BANK_QTD_MAX, int(pilha.get('qty', 1)) + qtd)
+        if qtd >= int(inst.get('qty', 1)): inventario.remove(inst)
+        else: inst['qty'] = int(inst.get('qty', 1)) - qtd
+    else:
+        if len(banco['items']) >= BANK_SLOTS: return _emit_banco(sid, banco, 'full')
+        inventario.remove(inst)
+        banco['items'].append({'id': inst.get('id') or uuid.uuid4().hex, 'item': caminho, 'favorite': False})
+    _depois_do_banco(sid, p, banco)
+
+@socketio.on('bank_withdraw')
+def handle_bank_withdraw(data):
+    sid = request.sid
+    if not isinstance(data, dict): return
+    p, banco = _banco_do_evento(sid)
+    if not p: return
+    ent = next((e for e in banco['items'] if e.get('id') == str(data.get('id', ''))), None)
+    if ent is None: return _emit_banco(sid, banco)
+    caminho = ent.get('item')
+    empilha = eh_empilhavel(caminho)
+    qtd = _qtd_do_evento(data, int(ent.get('qty', 1))) if empilha else 1
+    if qtd is None: return _emit_banco(sid, banco)
+    # Cap da mochila: o bank ignora o peso, a mochila nao.
+    peso = obter_cap_unitario_item(caminho) * qtd
+    if calcular_cap_usado(p) + peso > calcular_cap_maximo(p.get('level', 1)) + 1e-6:
+        return _emit_banco(sid, banco, 'no_cap')
+    if empilha:
+        if qtd >= int(ent.get('qty', 1)): banco['items'].remove(ent)
+        else: ent['qty'] = int(ent.get('qty', 1)) - qtd
+        adicionar_municao_ao_jogador(p, caminho, qtd)
+    else:
+        banco['items'].remove(ent)
+        p.setdefault('inventory', []).append({'id': ent.get('id') or uuid.uuid4().hex, 'item': caminho, 'favorite': False})
+    _depois_do_banco(sid, p, banco)
+
+@socketio.on('bank_currency_move')
+def handle_bank_currency_move(data):
+    # direction "deposit" (mochila -> bank) ou "withdraw" (bank -> mochila).
+    sid = request.sid
+    if not isinstance(data, dict): return
+    p, banco = _banco_do_evento(sid)
+    if not p: return
+    try: valor = int(data.get('amount', 0))
+    except (TypeError, ValueError): return
+    if valor <= 0: return
+    if data.get('direction') == 'deposit':
+        if valor > int(p.get('currency', 0)): return _emit_banco(sid, banco)
+        p['currency'] = int(p.get('currency', 0)) - valor
+        banco['currency'] = int(banco['currency']) + valor
+    else:
+        if valor > int(banco['currency']): return _emit_banco(sid, banco)
+        banco['currency'] = int(banco['currency']) - valor
+        p['currency'] = int(p.get('currency', 0)) + valor
+    _depois_do_banco(sid, p, banco)
 
 ICONES_AMIZADE_VALIDOS = {'pk': 'icon_pk', 'guild': 'icon_guild', 'seller': 'icon_seller'}
 
