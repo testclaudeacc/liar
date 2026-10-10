@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.25"
+SERVER_VERSION = "v0.26"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -566,7 +566,14 @@ def get_skill_multiplier(player_class, is_defense):
 
 BASE_MAX_HP = 50.0
 BASE_MAX_MP = 50.0
-SPEED_PCT_POR_LEVEL = 0.0001
+# +1% de velocidade de andar por level ganho (lv 1 = base; lv 101 = dobro,
+# lv 201 = triplo). Vale no client (Jogador) e na validacao dos passos (handle_m).
+SPEED_PCT_POR_LEVEL = 0.01
+
+def mult_velocidade_level(p):
+    try: level = int(p.get('level', 1) or 1)
+    except (TypeError, ValueError): level = 1
+    return 1.0 + max(0, level - 1) * SPEED_PCT_POR_LEVEL
 
 def calc_level_bonuses(level, player_class):
     niveis_ganhos = max(0, level - 1)
@@ -626,6 +633,8 @@ def _montar_payload_sync_stats(p):
         'skills': skills, 'base_damage': new_dmg, 'defense_value': new_def,
         'level': level, 'exp': p.get('exp', 0), 'kills': p.get('kills', 0),
         'hp_bonus': hp_bonus, 'mana_bonus': mp_bonus, 'speed_multiplier': speed_multiplier,
+        # Velocidade de andar pelo level (o client multiplica no passo).
+        'move_speed': mult_velocidade_level(p),
         'classe_penalizada': punido,
         'cap_atual': calcular_cap_usado(p), 'cap_maximo': calcular_cap_maximo(level),
         # Vitais pra barra de HP/MP do client.
@@ -4075,7 +4084,7 @@ MOVE_FOLGA = 1.05
 velocidade_tiles = {}
 
 def mult_velocidade_player(p):
-    mult = FOME_MULT_VELOCIDADE if esta_com_fome(p) else 1.0
+    mult = (FOME_MULT_VELOCIDADE if esta_com_fome(p) else 1.0) * mult_velocidade_level(p)
     if not (p.get('pos_x') == -1 and p.get('pos_y') == -1):
         mult *= mult_tile(p, tile_de(p.get('pos_x', 0), p.get('pos_y', 0)))
     return mult
@@ -4092,7 +4101,7 @@ def fator_tempo_passo(p, de, para):
     # (o speed_modifier entra/sai no meio do passo - igual o client,
     # Jogador.iniciarPasso). Inclui a fome.
     fome = FOME_MULT_VELOCIDADE if esta_com_fome(p) else 1.0
-    return (0.5 / max(0.05, mult_tile(p, de)) + 0.5 / max(0.05, mult_tile(p, para))) / fome
+    return (0.5 / max(0.05, mult_tile(p, de)) + 0.5 / max(0.05, mult_tile(p, para))) / (fome * mult_velocidade_level(p))
 
 @socketio.on('m')
 def handle_m(data):

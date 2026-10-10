@@ -502,7 +502,7 @@ public class WorldScreen extends ScreenAdapter {
     private final com.badlogic.gdx.math.Matrix4 projecaoTela = new com.badlogic.gdx.math.Matrix4();
 
     private void iniciarTeleporte(float dx, float dy, String direcao) {
-        local.multVelocidade = multFome * mapa.propriedades.velocidadeEm(local.x, local.y);
+        local.multVelocidade = multFome * multLevel * mapa.propriedades.velocidadeEm(local.x, local.y);
         local.multVelocidadeDestino = local.multVelocidade;
         local.iniciarPasso(dx, dy, direcao);
         ultimoPassoDx = Math.signum(dx);
@@ -1486,7 +1486,8 @@ public class WorldScreen extends ScreenAdapter {
         labelXpRetrato = new Label("0%", skin, "hud") {
             @Override public void act(float delta) {
                 super.act(delta);
-                String t = Math.round(fracaoStatRetrato() * 100f) + "%";
+                // Com 2 casas decimais (ex: 92.37%).
+                String t = String.format(java.util.Locale.US, "%.2f%%", fracaoStatRetrato() * 100f);
                 if (!t.contentEquals(getText())) setText(t);
             }
         };
@@ -2289,6 +2290,8 @@ public class WorldScreen extends ScreenAdapter {
     /** Igual servidor.py: DETECCAO_SQM (5) + PERSISTE_SQM (8) - o mob perde o player. */
     private static final int DISTANCIA_PERDE_ALVO_SQM = 13;
     private float multFome = 1f;
+    /** Velocidade de andar pelo level (servidor: sync_stats "move_speed", +1% por level). */
+    private float multLevel = 1f;
     private static final Color COR_NOTIF_AVISO = new Color(1f, 0.35f, 0.35f, 1f);
 
     /** Clique na notificacao de convite: abre o livro na aba Party. */
@@ -3665,6 +3668,7 @@ public class WorldScreen extends ScreenAdapter {
             boolean comFome = (skillsFome != null ? skillsFome.getFloat("fullness", BookMenuUI.FULLNESS_MAX) : BookMenuUI.FULLNESS_MAX) < FOME_LIMITE;
             hud.definirFome(comFome);
             multFome = comFome ? FOME_MULT_VELOCIDADE : 1f;
+            if (data.has("move_speed")) multLevel = Math.max(0.1f, data.getFloat("move_speed", 1f));
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
@@ -4433,8 +4437,8 @@ public class WorldScreen extends ScreenAdapter {
             tempoInsistindo = 0f;
             // Speed_modifier muda no MEIO do passo: 1a metade na velocidade do
             // SQM de saida, 2a na do de chegada (servidor.py::fator_tempo_passo).
-            local.multVelocidade = multFome * mapa.propriedades.velocidadeEm(local.x, local.y);
-            local.multVelocidadeDestino = multFome * mapa.propriedades.velocidadeEm(alvoX, alvoY);
+            local.multVelocidade = multFome * multLevel * mapa.propriedades.velocidadeEm(local.x, local.y);
+            local.multVelocidadeDestino = multFome * multLevel * mapa.propriedades.velocidadeEm(alvoX, alvoY);
             local.iniciarPasso(dx, dy, direcao);
             ultimoPassoDx = Math.signum(dx);
             ultimoPassoDy = Math.signum(dy);

@@ -46,6 +46,12 @@ public class Jogador {
     private static final float BUFFER_REMOTO = 0.12f;
     private static final int FILA_MAX = 4; // atrasou demais: pula pro ultimo
     private final java.util.ArrayDeque<Object[]> fila = new java.util.ArrayDeque<>();
+    // Ritmo real dos passos de um remoto (a velocidade cresce com o level:
+    // lv 101 anda no dobro). Media do intervalo entre os passos que chegam;
+    // com isso o tween acompanha o player rapido em vez de encher a fila e
+    // dar "pulo".
+    private float passoRemoto = TEMPO_PASSO;
+    private long ultimoAlvoNs = 0L;
 
     public Jogador(String nome, String classe, float x, float y) {
         this.nome = nome;
@@ -89,6 +95,14 @@ public class Jogador {
     /** Player remoto: o servidor manda a posicao alvo pronta (evento "m") -
      * tween ate la na mesma duracao de um passo, em vez de ficar teleportando. */
     public void definirAlvo(float alvoX, float alvoY, String direcao) {
+        long agora = System.nanoTime();
+        if (ultimoAlvoNs != 0L) {
+            float dt = (agora - ultimoAlvoNs) / 1e9f;
+            // Andando direto (intervalo curto): media; parou e voltou: reseta.
+            if (dt < TEMPO_PASSO * 1.5f) passoRemoto = 0.7f * passoRemoto + 0.3f * Math.max(0.05f, dt);
+            else passoRemoto = TEMPO_PASSO;
+        }
+        ultimoAlvoNs = agora;
         if (movendo || !fila.isEmpty()) {
             fila.add(new Object[]{alvoX, alvoY, direcao});
             if (fila.size() > FILA_MAX) {
@@ -97,7 +111,7 @@ public class Jogador {
             }
             return;
         }
-        iniciarAlvo(alvoX, alvoY, direcao, TEMPO_PASSO + BUFFER_REMOTO);
+        iniciarAlvo(alvoX, alvoY, direcao, Math.min(TEMPO_PASSO, passoRemoto) + BUFFER_REMOTO);
     }
 
     /** Vai direto pra posicao (sem passo), descartando a fila. */
@@ -148,7 +162,8 @@ public class Jogador {
                 // Proximo passo da fila, colado no anterior. Com a fila
                 // acumulando (atraso), anda um pouco mais rapido pra alcancar.
                 Object[] prox = fila.poll();
-                float dur = fila.size() >= 1 ? TEMPO_PASSO * 0.85f : TEMPO_PASSO;
+                float base = Math.min(TEMPO_PASSO, passoRemoto);
+                float dur = fila.size() >= 1 ? base * 0.85f : base;
                 iniciarAlvo((Float) prox[0], (Float) prox[1], (String) prox[2], dur);
                 continue;
             }
