@@ -158,7 +158,8 @@ public final class DialogoNPCUI {
         // etc) virar tag sem querer; (2) o glyph de "^" e' REMAPEADO pro
         // icone de moeda so' nesta instancia, sem bagunçar o "^" de verdade
         // em outro lugar do jogo que use a fonte "default".
-        BitmapFont fonteFala = UiSkin.gerarFonte("fonts/dejavu-sans.condensed.ttf", 20, 2, escalaFonte);
+        // Sem contorno preto (borda 0): dentro da caixa escura nao precisa.
+        BitmapFont fonteFala = UiSkin.gerarFonte("fonts/dejavu-sans.condensed.ttf", 20, 0, escalaFonte);
         fonteFala.getData().markupEnabled = true;
         BitmapFont.Glyph glifoMoeda = fonteFala.getData().getGlyph(ICONE_MOEDA);
         if (glifoMoeda != null) {
@@ -219,7 +220,7 @@ public final class DialogoNPCUI {
         // na ULTIMA pagina da fala; enquanto houver mais pagina, o mesmo
         // botao vira "Next" (cinza, estilo "cinza-popup" ja usado em
         // ChatUI/outros popups) - a pedido do usuario.
-        BitmapFont fonteBotao = skin.get("chat-log", Label.LabelStyle.class).font;
+        BitmapFont fonteBotao = skin.get("chat-log", Label.LabelStyle.class).font;   // ja' sem contorno
         // Nome na mesma fonte dos botoes: cabe na plaquinha (largura do retrato).
         nomeLabel.setStyle(new Label.LabelStyle(fonteBotao, COR_NOME));
         // Botoes no estilo do HUD (antes: vermelho vivo / cinza de popup).
