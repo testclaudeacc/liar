@@ -162,6 +162,9 @@ public class MapaPropriedades {
     public final List<CelulaOverlay> celulasOverlay = new ArrayList<>();
     /** Tiles com a property Above_Player=true (MapaMundo.desenharAcimaDoPlayer). */
     public final List<CelulaAcima> celulasAcimaDoPlayer = new ArrayList<>();
+    /** Tiles com a property Above_Dynamic=true: por cima ou por baixo do
+     * player conforme de onde ele veio (MapaMundo.atualizarAcimaDinamico). */
+    public final List<CelulaAcima> celulasAcimaDinamicas = new ArrayList<>();
 
     public static class CelulaAcima {
         public final TiledMapTileLayer camada;
@@ -459,6 +462,9 @@ public class MapaPropriedades {
 
                 if (propriedadeTrue(props, "Above_Player")) {
                     celulasAcimaDoPlayer.add(new CelulaAcima(camada, cx, cy, worldCellX, worldCellY, tile));
+                }
+                if (propriedadeTrue(props, "Above_Dynamic")) {
+                    celulasAcimaDinamicas.add(new CelulaAcima(camada, cx, cy, worldCellX, worldCellY, tile));
                 }
 
                 if (Boolean.TRUE.equals(props.get("overlap_transparency", Boolean.class))) {

@@ -4153,7 +4153,8 @@ public class WorldScreen extends ScreenAdapter {
         // precisar do renderer/batch interno do OrthogonalTiledMapRenderer,
         // ja que essas celulas foram removidas das layers normais).
         mapa.desenharOverlays(batch, local.x, local.y);
-        // Tiles com Above_Player=true: por cima do player.
+        // Tiles com Above_Player=true (e Above_Dynamic "por cima" agora): por cima do player.
+        mapa.atualizarAcimaDinamico((int) Math.floor(local.x / Jogador.TILE), (int) Math.floor((local.y - 1f) / Jogador.TILE));
         mapa.desenharAcimaDoPlayer(batch, camera);
         batch.end();
 

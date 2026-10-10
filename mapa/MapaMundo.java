@@ -272,19 +272,50 @@ public class MapaMundo {
      * do player (a camada normal ja' desenhou por baixo). Dentro do
      * batch.begin()/end() do WorldScreen, logo depois dos overlays. So' os
      * que estao na tela e que continuam na camada (ponte escondida pela
-     * quest nao aparece). */
+     * quest nao aparece). Os Above_Dynamic que estao "por cima" agora
+     * (ver atualizarAcimaDinamico) entram junto. */
     public void desenharAcimaDoPlayer(Batch batch, OrthographicCamera camera) {
-        if (propriedades.celulasAcimaDoPlayer.isEmpty()) return;
+        java.util.List<MapaPropriedades.CelulaAcima> fixas = propriedades.celulasAcimaDoPlayer;
+        java.util.List<MapaPropriedades.CelulaAcima> dinamicas = propriedades.celulasAcimaDinamicas;
+        if (fixas.isEmpty() && dinamicas.isEmpty()) return;
         float meiaL = camera.viewportWidth * camera.zoom / 2f + tileWidth * 4f;
         float meiaA = camera.viewportHeight * camera.zoom / 2f + tileHeight * 6f;
-        for (MapaPropriedades.CelulaAcima c : propriedades.celulasAcimaDoPlayer) {
-            if (Math.abs(c.worldX - camera.position.x) > meiaL || Math.abs(c.worldY - camera.position.y) > meiaA) continue;
-            TiledMapTileLayer.Cell cell = c.camada.getCell(c.cx, c.cy);
-            if (cell == null || cell.getTile() != c.tile) continue;
-            TextureRegion regiao = c.tile.getTextureRegion();
-            float w = regiao.getRegionWidth(), h = regiao.getRegionHeight();
-            batch.draw(regiao, c.worldX + (cell.getFlipHorizontally() ? w : 0f), c.worldY + (cell.getFlipVertically() ? h : 0f),
-                cell.getFlipHorizontally() ? -w : w, cell.getFlipVertically() ? -h : h);
+        for (MapaPropriedades.CelulaAcima c : fixas) desenharCelulaAcima(batch, camera, c, meiaL, meiaA);
+        for (int i = 0; i < dinamicas.size(); i++) {
+            if (dinamicaAcima != null && dinamicaAcima[i]) desenharCelulaAcima(batch, camera, dinamicas.get(i), meiaL, meiaA);
+        }
+    }
+
+    private void desenharCelulaAcima(Batch batch, OrthographicCamera camera, MapaPropriedades.CelulaAcima c, float meiaL, float meiaA) {
+        if (Math.abs(c.worldX - camera.position.x) > meiaL || Math.abs(c.worldY - camera.position.y) > meiaA) return;
+        TiledMapTileLayer.Cell cell = c.camada.getCell(c.cx, c.cy);
+        if (cell == null || cell.getTile() != c.tile) return;
+        TextureRegion regiao = c.tile.getTextureRegion();
+        float w = regiao.getRegionWidth(), h = regiao.getRegionHeight();
+        batch.draw(regiao, c.worldX + (cell.getFlipHorizontally() ? w : 0f), c.worldY + (cell.getFlipVertically() ? h : 0f),
+            cell.getFlipHorizontally() ? -w : w, cell.getFlipVertically() ? -h : h);
+    }
+
+    // Estado de cada Above_Dynamic (mesma ordem de celulasAcimaDinamicas):
+    // true = desenhado por cima do player.
+    private boolean[] dinamicaAcima;
+
+    /** Above_Dynamic: olha o 3x3 em volta do tile. Player na fileira de
+     * CIMA (inclusive diagonais) -> tile por cima dele; na fileira de
+     * BAIXO -> tile por baixo; na fileira do MEIO -> fica como estava, ou
+     * seja, depende de onde ele veio (desceu de cima = passa por tras;
+     * subiu de baixo = passa pela frente). Fora do 3x3 nao muda nada.
+     * Celula do player em coordenadas de tile do libGDX (y pra cima). */
+    public void atualizarAcimaDinamico(int playerCx, int playerCy) {
+        java.util.List<MapaPropriedades.CelulaAcima> dinamicas = propriedades.celulasAcimaDinamicas;
+        if (dinamicas.isEmpty()) return;
+        if (dinamicaAcima == null || dinamicaAcima.length != dinamicas.size()) dinamicaAcima = new boolean[dinamicas.size()];
+        for (int i = 0; i < dinamicas.size(); i++) {
+            MapaPropriedades.CelulaAcima c = dinamicas.get(i);
+            int dx = playerCx - c.cx, dy = playerCy - c.cy;
+            if (Math.abs(dx) > 1 || Math.abs(dy) > 1) continue;
+            if (dy == 1) dinamicaAcima[i] = true;          // fileira de cima (y do libGDX cresce pra cima)
+            else if (dy == -1) dinamicaAcima[i] = false;   // fileira de baixo
         }
     }
 
