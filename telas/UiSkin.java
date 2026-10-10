@@ -50,7 +50,29 @@ public class UiSkin {
      *               fontes, rasterizacao + upload de textura) nesse callback
      *               reintroduziria o mesmo lag que motivou a saida do Godot.
      */
+    /** Escala da ultima criar() (ver fonteHudEm). */
+    private static float escalaAtual = 1f;
+
+    /**
+     * Fonte "hud" (sem contorno) gerada JA' no tamanho final (18 * fator), em
+     * vez de encolher a de 18 com setFontScale: encolher a textura (filtro
+     * Linear, sem mipmap) pulava colunas de pixel e as letras pareciam
+     * cortadas (o "o" com risquinhos dos lados). Uma por tamanho, guardada
+     * no proprio skin.
+     */
+    public static BitmapFont fonteHudEm(Skin skin, float fator) {
+        int px = Math.max(6, Math.round(18f * fator * escalaAtual));
+        String nome = "hud-px-" + px;
+        if (skin.has(nome, BitmapFont.class)) return skin.getFont(nome);
+        BitmapFont fonte = gerarFonte("fonts/dejavu-sans.condensed.ttf", px, 0, 1f);
+        fonte.getData().setScale(1f / escalaAtual);
+        fonte.setUseIntegerPositions(false);
+        skin.add(nome, fonte);
+        return fonte;
+    }
+
     public static Skin criar(float escala) {
+        escalaAtual = escala;
         Skin skin = new Skin();
 
         // Contorno dos textos em martel (titulo/botoes/secoes) - uma rodada
