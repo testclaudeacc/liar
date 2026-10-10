@@ -329,11 +329,14 @@ def carregar_mapa(caminho_tmx):
 
     npcs = []
     for obj in objetos('NPCSpawns'):
-        npc_id = (_ler_props(obj).get('npc_id') or '').strip()
+        props = _ler_props(obj)
+        npc_id = (props.get('npc_id') or '').strip()
         if not npc_id: continue
         mx, my = ancora_mundo(obj)
         chave = f"{npc_id}_{_java_round(mx / SQM)}_{_java_round(my / SQM)}"
-        npcs.append({'id': chave, 'npc_id': npc_id, 'x': mx, 'y': altura_px - my, 'floor': 1})
+        # direction (up/down/left/right): pra onde o NPC fixo fica virado.
+        npcs.append({'id': chave, 'npc_id': npc_id, 'x': mx, 'y': altura_px - my, 'floor': 1,
+                     'direction': str(props.get('direction') or 'down').strip().lower()})
 
     mobs = []
     for obj in objetos('MobSpawns'):

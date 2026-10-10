@@ -3539,7 +3539,7 @@ def _spawn_do_player(p):
     return encaixar_no_tile(*SPAWN_PADRAO_RAW)
 
 _CAMPOS_MOB_MAPA = ('id', 'type', 'spawn_range', 'respawn_time', 'speed', 'cooldown', 'hit')
-_CAMPOS_NPC_MAPA = ('id', 'npc_id', 'x', 'y', 'floor')
+_CAMPOS_NPC_MAPA = ('id', 'npc_id', 'x', 'y', 'floor', 'direction')
 
 def _so_campos(lista, campos, limite):
     saida = []
