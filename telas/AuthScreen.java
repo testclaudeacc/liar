@@ -231,7 +231,9 @@ public class AuthScreen extends ScreenAdapter {
                 Sessao.limpar();
                 currentUserId = -1;
                 logoutBtn.setVisible(false);
-                telaMenuPrincipal();
+                // Vai direto pro login (antes voltava pro menu inicial e
+                // parecia que nao tinha deslogado).
+                telaLogin();
             }
         });
 
