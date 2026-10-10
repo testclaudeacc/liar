@@ -2577,27 +2577,76 @@ public final class BookMenuUI {
 
     public boolean emBanco() { return modoBanco; }
 
-    private TextButton.TextButtonStyle estiloAba(boolean ativa) {
-        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(estiloBotaoTrade("default"));
-        e.up = UiSkin.retangulo(ativa ? COR_ABA_ATIVA : COR_ABA_INATIVA, ativa ? Color.valueOf("f28c28") : COR_ABA_BORDA, ativa ? 2 : 1);
-        e.over = ativa ? e.up : UiSkin.retangulo(Color.valueOf("262626"), COR_ABA_BORDA, 1);
-        e.down = e.up;
-        e.fontColor = ativa ? Color.WHITE : new Color(0.6f, 0.6f, 0.6f, 1f);
+    // Abas e botoes do bank: chapados, fonte sem contorno (a do chat).
+    private static final Color COR_ABA_BAG = Color.valueOf("e07a1f"), COR_ABA_BAG_OFF = Color.valueOf("5a3410");
+    private static final Color COR_ABA_BANK = Color.valueOf("8a5a32"), COR_ABA_BANK_OFF = Color.valueOf("3e2a18");
+    private static final Color COR_BOTAO_BANCO = Color.valueOf("3a3a3a");
+    private static final Color COR_BLOQUEADO = Color.valueOf("a82828");
+    private static final String ICONE_ABA_BAG = "sheet/r58_c6", ICONE_ABA_BANK = "sheet/r60_c6", ICONE_DEPOSITO = "sheet/r81_c1";
+
+    private com.badlogic.gdx.graphics.g2d.BitmapFont fonteBanco() {
+        return skin.get("chat-log", Label.LabelStyle.class).font; // sem contorno
+    }
+
+    private TextButton.TextButtonStyle estiloPlano(Color cor, Color corTexto) {
+        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
+        e.font = fonteBanco();
+        e.fontColor = corTexto;
+        e.up = UiSkin.retangulo(cor, cor.cpy().lerp(Color.BLACK, 0.35f), 1);
+        e.over = UiSkin.retangulo(cor.cpy().lerp(Color.WHITE, 0.1f), cor.cpy().lerp(Color.BLACK, 0.35f), 1);
+        e.down = UiSkin.retangulo(cor.cpy().lerp(Color.BLACK, 0.15f), cor.cpy().lerp(Color.BLACK, 0.35f), 1);
         return e;
     }
+
+    private TextButton.TextButtonStyle estiloAba(boolean bank, boolean ativa) {
+        Color cor = bank ? (ativa ? COR_ABA_BANK : COR_ABA_BANK_OFF) : (ativa ? COR_ABA_BAG : COR_ABA_BAG_OFF);
+        return estiloPlano(cor, ativa ? Color.WHITE : new Color(0.7f, 0.7f, 0.7f, 1f));
+    }
+
+    /** Botao com icone (16px do atlas em 2x) antes do texto. */
+    private TextButton botaoComIcone(String texto, String regiao, TextButton.TextButtonStyle estilo) {
+        TextButton b = new TextButton(texto, estilo);
+        b.clearChildren();
+        TextureAtlas.AtlasRegion r = atlas.findRegion(regiao);
+        if (r != null) {
+            Image img = new Image(new TextureRegionDrawable(r));
+            img.setScaling(Scaling.fit);
+            b.add(img).size(32).padRight(6);
+        }
+        b.add(b.getLabel());
+        return b;
+    }
+
+    /** Barrinha cinza com "usado/maximo" no meio (Capacity e slots do bank). */
+    private static final class BarraUso extends com.badlogic.gdx.scenes.scene2d.ui.Widget {
+        float fracao;
+        private final com.badlogic.gdx.scenes.scene2d.utils.Drawable trilho =
+            UiSkin.retangulo(Color.valueOf("1c1c1c"), Color.valueOf("424242"), 1);
+        private final com.badlogic.gdx.scenes.scene2d.utils.Drawable cheio =
+            UiSkin.retangulo(Color.valueOf("5a5a5a"), Color.valueOf("5a5a5a"), 1);
+        @Override public float getPrefHeight() { return 22; }
+        @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha) {
+            batch.setColor(1f, 1f, 1f, parentAlpha);
+            trilho.draw(batch, getX(), getY(), getWidth(), getHeight());
+            float w = (getWidth() - 2f) * Math.max(0f, Math.min(1f, fracao));
+            if (w >= 1f) cheio.draw(batch, getX() + 1f, getY() + 1f, w, getHeight() - 2f);
+        }
+    }
+
+    private BarraUso barraUsoBanco;
 
     private void construirPaginaBanco(Skin skin) {
         bancoGrid.top().left();
         bancoDetalhes.top().left();
 
-        estiloBancoOk = estiloBotaoTrade("verde");
-        estiloBancoBloqueado = estiloBotaoTrade("vermelho");
-        bancoAcao = new TextButton("Deposit", estiloBancoOk);
+        estiloBancoOk = estiloPlano(COR_BOTAO_BANCO, Color.WHITE);
+        estiloBancoBloqueado = estiloPlano(COR_BLOQUEADO, Color.WHITE);
+        bancoAcao = botaoComIcone("Deposit", ICONE_DEPOSITO, estiloBancoOk);
         bancoAcao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { acaoBanco(); }
         });
         bancoRodapeAcao = new Table();
-        bancoRodapeAcao.add(bancoAcao).growX().height(42);
+        bancoRodapeAcao.add(bancoAcao).growX().height(44);
 
         Table esquerda = new Table();
         esquerda.top().left();
@@ -2606,47 +2655,46 @@ public final class BookMenuUI {
         esquerda.add(bancoDetalhes).grow().top().left().pad(8).row();
         esquerda.add(bancoRodapeAcao).growX().pad(6);
 
-        abaBag = new TextButton("Bag", estiloAba(true));
-        abaBank = new TextButton("Bank", estiloAba(false));
+        abaBag = botaoComIcone("Bag", ICONE_ABA_BAG, estiloAba(false, true));
+        abaBank = botaoComIcone("Bank", ICONE_ABA_BANK, estiloAba(true, false));
         abaBag.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaBanco(false); }
         });
         abaBank.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaBanco(true); }
         });
-        TextButton fechar = new TextButton("X", estiloBotaoTrade("vermelho"));
+        TextButton fechar = new TextButton("X", estiloPlano(COR_BLOQUEADO, Color.WHITE));
         fechar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { setVisible(false); }
         });
         Table abas = new Table();
-        abas.add(abaBag).width(96).height(36).padRight(4);
-        abas.add(abaBank).width(96).height(36);
+        abas.add(abaBag).width(112).height(42).padRight(4);
+        abas.add(abaBank).width(112).height(42);
         abas.add().expandX();
-        abas.add(fechar).size(36);
+        abas.add(fechar).size(42);
 
         ScrollPane scroll = new ScrollPane(bancoGrid, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
         scroll.setOverscroll(false, false);
 
-        bancoInfo = new Label("", skin, "hud");
-        bancoInfo.setFontScale(0.7f * FONTE_STATS);
-        bancoInfo.setColor(new Color(0.65f, 0.65f, 0.65f, 1f));
-        bancoAviso = new Label("", skin, "hud");
-        bancoAviso.setFontScale(0.6f * FONTE_STATS);
-        bancoAviso.setColor(Color.valueOf("ff6a6a"));
-
-        Table rodape = new Table();
-        rodape.add(bancoInfo).left().expandX();
-        rodape.add(bancoAviso).right();
+        bancoInfo = new Label("", new Label.LabelStyle(fonteBanco(), Color.WHITE));
+        bancoInfo.setAlignment(Align.center);
+        bancoAviso = new Label("", new Label.LabelStyle(fonteBanco(), Color.valueOf("ff6a6a")));
+        bancoAviso.setFontScale(0.8f);
+        barraUsoBanco = new BarraUso();
+        Table textoBarra = new Table();
+        textoBarra.add(bancoInfo).center();
+        Stack barra = new Stack(barraUsoBanco, textoBarra);
 
         Table direita = new Table();
         direita.top().left();
         direita.setBackground(UiSkin.retangulo(
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
         direita.add(abas).growX().pad(10, 12, 0, 12).row();
-        direita.add(scroll).grow().pad(8, 12, 6, 12).row();
-        direita.add(rodape).growX().pad(0, 12, 10, 12);
+        direita.add(scroll).grow().pad(8, 12, 4, 12).row();
+        direita.add(bancoAviso).right().pad(0, 12, 2, 12).row();
+        direita.add(barra).growX().height(24).pad(0, 12, 10, 12);
 
         bankPage.add(esquerda).width(COLUNA_BAG).growY();
         bankPage.add(direita).grow();
@@ -2683,8 +2731,8 @@ public final class BookMenuUI {
 
     private void trocarAbaBanco(boolean bank) {
         abaBancoBank = bank;
-        abaBag.setStyle(estiloAba(!bank));
-        abaBank.setStyle(estiloAba(bank));
+        abaBag.setStyle(estiloAba(false, !bank));
+        abaBank.setStyle(estiloAba(true, bank));
         bancoFoco = null;
         bancoAviso.setText("");
         atualizarTelaBanco();
@@ -2716,9 +2764,13 @@ public final class BookMenuUI {
         if (bancoFoco != null && indiceMoeda(bancoFoco) >= 0 && maxMoedaBanco(indiceMoeda(bancoFoco)) <= 0) bancoFoco = null;
         atualizarGradeBanco();
         atualizarDetalhesBanco();
-        bancoInfo.setText(abaBancoBank
-            ? "Bank " + itensBanco.size() + "/" + slotsBanco + " slots"
-            : "Capacity " + formatarPeso(capacityUsed) + "/" + formatarPeso(capacityMaximum));
+        if (abaBancoBank) {
+            bancoInfo.setText(itensBanco.size() + "/" + slotsBanco);
+            barraUsoBanco.fracao = itensBanco.size() / (float) slotsBanco;
+        } else {
+            bancoInfo.setText(formatarPeso(capacityUsed) + "/" + formatarPeso(capacityMaximum));
+            barraUsoBanco.fracao = capacityMaximum > 0f ? capacityUsed / capacityMaximum : 0f;
+        }
     }
 
     private long saldoDaAba() { return abaBancoBank ? moedasBanco : currencyTotal; }
@@ -2742,6 +2794,35 @@ public final class BookMenuUI {
         return null;
     }
 
+    /** Slot do bank: icone em 3x (48px), quantidade no canto. */
+    private Button slotBanco(TextureRegion icone, long qtd, boolean mostrarUm, Color corQtd, boolean foco, Runnable aoClicar) {
+        Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estilo.up = skinDrawable(foco ? "bag-slot-selected" : "bag-slot");
+        estilo.over = foco ? estilo.up : skinDrawable("bag-slot-hover");
+        estilo.down = skinDrawable("bag-slot-selected");
+        Button slot = new Button(estilo);
+        Stack conteudo = new Stack();
+        if (icone != null) {
+            Image img = new Image(new TextureRegionDrawable(icone));
+            img.setScaling(Scaling.fit);
+            Table moldura = new Table();
+            moldura.add(img).size(48);
+            conteudo.add(moldura);
+        }
+        if (qtd > 1 || (mostrarUm && qtd == 1)) {
+            Table marcadores = new Table();
+            marcadores.bottom();
+            adicionarQuantidade(marcadores, (int) Math.min(Integer.MAX_VALUE, qtd));
+            ((Label) marcadores.getChildren().peek()).setColor(corQtd);
+            conteudo.add(marcadores);
+        }
+        slot.add(conteudo).grow().pad(1);
+        slot.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
+        });
+        return slot;
+    }
+
     private void atualizarGradeBanco() {
         bancoGrid.clearChildren();
         int n = 0;
@@ -2750,40 +2831,24 @@ public final class BookMenuUI {
         for (int i = 0; i <= maiorMoeda; i++) {
             String tipo = MOEDAS_TRADE[i];
             String chave = PREFIXO_MOEDA + tipo;
-            Button slot = slotMoeda(tipo, moedasDaAba(i), corMoeda(tipo), false, chave.equals(bancoFoco));
-            slot.addListener(new ChangeListener() {
-                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+            Button slot = slotBanco(atlas.findRegion("ui/currency/" + tipo), moedasDaAba(i), true,
+                corMoeda(tipo), chave.equals(bancoFoco), () -> {
                     bancoFoco = chave;
                     bancoAviso.setText("");
                     atualizarTelaBanco();
-                }
-            });
+                });
             bancoGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
             if (++n % COLUNAS_INVENTARIO == 0) bancoGrid.row();
         }
         for (InventoryItem item : itensDaAba()) {
-            Button.ButtonStyle estilo = new Button.ButtonStyle();
-            boolean foco = item.instanceId.equals(bancoFoco);
-            estilo.up = skinDrawable(foco ? "bag-slot-selected" : "bag-slot");
-            estilo.over = foco ? estilo.up : skinDrawable("bag-slot-hover");
-            estilo.down = skinDrawable("bag-slot-selected");
-            Button slot = new Button(estilo);
-            slot.add(conteudoSlot(item.itemPath, item.quantity, -1)).grow().pad(2);
-            slot.addListener(new ChangeListener() {
-                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+            Button slot = slotBanco(iconeDoItem(item.itemPath), item.quantity, false, Color.WHITE,
+                item.instanceId.equals(bancoFoco), () -> {
                     bancoFoco = item.instanceId;
                     bancoAviso.setText("");
                     atualizarTelaBanco();
-                }
-            });
+                });
             bancoGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
             if (++n % COLUNAS_INVENTARIO == 0) bancoGrid.row();
-        }
-        if (n == 0) {
-            Label vazio = new Label(abaBancoBank ? "Your bank is empty." : "Your bag is empty.", skin, "hud");
-            vazio.setFontScale(0.6f * FONTE_STATS);
-            vazio.setColor(new Color(0.6f, 0.6f, 0.6f, 1f));
-            bancoGrid.add(vazio).pad(10);
         }
     }
 
@@ -2817,12 +2882,6 @@ public final class BookMenuUI {
         int moeda = indiceMoeda(bancoFoco);
         InventoryItem item = moeda >= 0 ? null : itemDoBanco(bancoFoco);
         if (moeda < 0 && item == null) {
-            Label dica = new Label(abaBancoBank ? "Pick something to take out of the bank."
-                : "Pick something from your bag to store in the bank.", skin, "hud");
-            dica.setFontScale(0.6f * FONTE_STATS);
-            dica.setWrap(true);
-            dica.setColor(new Color(0.7f, 0.7f, 0.7f, 1f));
-            bancoDetalhes.add(dica).growX().left();
             bancoRodapeAcao.setVisible(false);
             return;
         }
@@ -2835,13 +2894,9 @@ public final class BookMenuUI {
             nome.setFontScale(0.74f * FONTE_STATS);
             nome.setColor(corMoeda(tipo));
             bancoDetalhes.add(nome).left().padBottom(1).row();
-            bancoDetalhes.add(linhaStat((abaBancoBank ? "In bank " : "In bag ") + moedasDaAba(moeda), Color.LIGHT_GRAY)).left().row();
-            bancoDetalhes.add(linhaStat("Coins weigh nothing", new Color(0.55f, 0.55f, 0.55f, 1f))).left().row();
         } else {
             preencherBlocoStats(bancoDetalhes, item.itemPath, null);
             if (item.quantity > 1) bancoDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
-            float unit = capUnitario(item.itemPath);
-            if (unit > 0f) bancoDetalhes.add(linhaStat("Weight " + formatarPeso(unit) + " each", new Color(0.55f, 0.55f, 0.55f, 1f))).left().row();
             if (abaBancoBank) {
                 bloqueado = !cabeNaMochila(item.itemPath, 1);
                 textoBloqueado = "No Cap";
