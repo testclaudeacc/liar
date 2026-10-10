@@ -47,9 +47,9 @@ public final class DialogoNPCUI {
     private static final Color COR_BORDA = Color.valueOf("424242");
     private static final Color COR_CONTORNO = Color.valueOf("0c0c0c");
     private static final Color COR_SOMBRA_INTERNA = Color.valueOf("121212");
-    private static final Color COR_NOME = Color.valueOf("ffd56b");
+    private static final Color COR_NOME = Color.WHITE;
+    private static final Color COR_SETINHA = Color.valueOf("ffd56b");
     private static final Color COR_FALA = Color.valueOf("e8e4dc");
-    private static final Color COR_DESTAQUE = Color.valueOf("b8923a"); // borda do botao com mouse em cima
 
     /** Moldura pixel art (12x12, nine-patch de 4): canto cortado, contorno
      * escuro por fora, borda de 2px e um filete de sombra por dentro. */
@@ -76,22 +76,23 @@ public final class DialogoNPCUI {
             new com.badlogic.gdx.graphics.g2d.NinePatch(tex, 4, 4, 4, 4));
     }
 
-    /** Botao com a mesma moldura: borda dourada com o mouse em cima,
-     * fundo mais escuro apertado. */
-    private static TextButton.TextButtonStyle estiloBotao(BitmapFont fonte, Color corTexto) {
+    /** Botao chapado, sem borda (dentro da janela ja' tem moldura): clareia
+     * com o mouse em cima, escurece apertado. */
+    private static TextButton.TextButtonStyle estiloBotao(BitmapFont fonte, Color fundo) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
         e.font = fonte;
-        e.fontColor = corTexto;
-        e.up = moldura(COR_FUNDO_RETRATO, COR_BORDA);
-        e.over = moldura(Color.valueOf("383838"), COR_DESTAQUE);
-        e.down = moldura(COR_FUNDO, COR_DESTAQUE);
+        e.fontColor = Color.WHITE;
+        Color over = new Color(fundo).lerp(Color.WHITE, 0.12f), down = new Color(fundo).lerp(Color.BLACK, 0.25f);
+        e.up = UiSkin.retangulo(fundo, fundo, 1);
+        e.over = UiSkin.retangulo(over, over, 1);
+        e.down = UiSkin.retangulo(down, down, 1);
         return e;
     }
 
     /** Setinha (triangulo pra baixo) de "tem mais": 7x4 px dourados. */
     private static TextureRegionDrawable setinha() {
         com.badlogic.gdx.graphics.Pixmap pm = new com.badlogic.gdx.graphics.Pixmap(7, 4, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
-        pm.setColor(COR_NOME);
+        pm.setColor(COR_SETINHA);
         for (int y = 0; y < 4; y++) pm.drawLine(y, y, 6 - y, y);
         com.badlogic.gdx.graphics.Texture tex = new com.badlogic.gdx.graphics.Texture(pm);
         pm.dispose();
@@ -112,6 +113,7 @@ public final class DialogoNPCUI {
     private Runnable acao;
     private float escalaRodape = 1f;
     private int zoomRetrato = 4;
+    private float larguraColuna = 80f;
     private final TextButton.TextButtonStyle estiloProximo;
     private final TextButton.TextButtonStyle estiloFechar;
     private Runnable aoFechar = () -> {};
@@ -148,7 +150,6 @@ public final class DialogoNPCUI {
         retrato = new Image();
         retrato.setScaling(Scaling.fit);
         nomeLabel = new Label("", skin, "subtitulo");
-        nomeLabel.setColor(COR_NOME);
 
         // Fonte PROPRIA (nao a "default" compartilhada do skin, usada em
         // telas/labels no resto do jogo inteiro) - precisa disso porque:
@@ -219,10 +220,12 @@ public final class DialogoNPCUI {
         // botao vira "Next" (cinza, estilo "cinza-popup" ja usado em
         // ChatUI/outros popups) - a pedido do usuario.
         BitmapFont fonteBotao = skin.get("chat-log", Label.LabelStyle.class).font;
+        // Nome na mesma fonte dos botoes: cabe na plaquinha (largura do retrato).
+        nomeLabel.setStyle(new Label.LabelStyle(fonteBotao, COR_NOME));
         // Botoes no estilo do HUD (antes: vermelho vivo / cinza de popup).
         // Close num vinho escuro discreto, Next cinza.
-        estiloFechar = estiloBotao(fonteBotao, Color.valueOf("e09a8a"));   // Close: texto avermelhado
-        estiloProximo = estiloBotao(fonteBotao, COR_FALA);
+        estiloFechar = estiloBotao(fonteBotao, Color.valueOf("a82828"));   // Close vermelho
+        estiloProximo = estiloBotao(fonteBotao, Color.valueOf("4a4a4a"));
 
         fecharButton = new TextButton("Close", estiloFechar);
         fecharButton.addListener(new ChangeListener() {
@@ -234,7 +237,7 @@ public final class DialogoNPCUI {
 
         // Botao de acao (ex: "Pay" com o SellerIcon), so' na ultima pagina,
         // na direita - ver definirAcao().
-        TextButton.TextButtonStyle estiloAcao = estiloBotao(fonteBotao, Color.valueOf("9be39b"));
+        TextButton.TextButtonStyle estiloAcao = estiloBotao(fonteBotao, Color.valueOf("2e7d32"));
         botaoAcao = new TextButton("", estiloAcao);
         iconeAcao = new com.badlogic.gdx.scenes.scene2d.ui.Image();
         iconeAcao.setScaling(com.badlogic.gdx.utils.Scaling.fit);
@@ -269,13 +272,15 @@ public final class DialogoNPCUI {
 
         Table corpo = new Table();
         corpo.top();
-        corpo.add(retratoMoldura).size(16f * zoom + 16f, 17f * zoom + 16f).padRight(14f * escala).top();
+        // Coluna da esquerda: retrato e, embaixo, o botao - mesma largura
+        // da plaquinha do nome (ver larguraColuna).
+        larguraColuna = 16f * zoom + 16f;
+        Table colunaEsquerda = new Table();
+        colunaEsquerda.top();
+        colunaEsquerda.add(retratoMoldura).size(larguraColuna, 17f * zoom + 16f).row();
+        colunaEsquerda.add(rodape).width(larguraColuna).padTop(8f * escala);
+        corpo.add(colunaEsquerda).padRight(14f * escala).top();
         corpo.add(areaTexto).grow().top();
-
-        // Alinhamento trocado dinamicamente em atualizarBotaoRodape(): Next
-        // sempre na direita, Close sempre na esquerda (a pedido do usuario).
-        rodape.right();
-        rodape.add(fecharButton).width(86f * escala).height(34f * escala);
 
         Table painel = new Table();
         painel.setBackground(skin.getDrawable("dialogo-npc-fundo"));
@@ -283,20 +288,20 @@ public final class DialogoNPCUI {
         painel.pad(22f * escala, 14f * escala, 12f * escala, 14f * escala);
         // minHeight (nao height fixo) - deixa a caixa crescer conforme a
         // fala quebra em mais linhas, em vez de cortar o texto.
-        painel.add(corpo).growX().minHeight(17f * zoom + 16f).row();
-        painel.add(rodape).growX().padTop(8f * escala);
+        painel.add(corpo).growX();
 
         // Plaquinha do nome (estilo JRPG): por cima da borda de cima da
         // caixa, um pouco pra dentro da esquerda.
         Table placa = new Table();
         placa.setBackground(moldura(COR_FUNDO_RETRATO, COR_BORDA));
-        placa.pad(4f * escala, 14f * escala, 6f * escala, 14f * escala);
-        placa.add(nomeLabel);
+        placa.pad(4f * escala, 6f * escala, 6f * escala, 6f * escala);
+        placa.add(nomeLabel).center();
         Table caixa = new Table();
         caixa.add(painel).growX().padTop(nomeLabel.getPrefHeight() * 0.5f + 8f * escala);
         Table sobreposicao = new Table();
         sobreposicao.top().left();
-        sobreposicao.add(placa).padLeft(12f * escala);
+        // Mesma largura e mesmo x do retrato e do botao.
+        sobreposicao.add(placa).width(larguraColuna).padLeft(14f * escala);
         com.badlogic.gdx.scenes.scene2d.ui.Stack comPlaca = new com.badlogic.gdx.scenes.scene2d.ui.Stack(caixa, sobreposicao);
 
         // Table.center() SOBRESCREVE o align inteiro (nao faz OR com o
@@ -352,21 +357,20 @@ public final class DialogoNPCUI {
         atualizarBotaoRodape();
     }
 
-    /** Next (cinza, direita) enquanto houver mais pagina depois desta;
-     * Close (vermelho, esquerda) so' na ultima - a pedido do usuario. */
+    /** Next (cinza) enquanto houver mais pagina depois desta; Close
+     * (vermelho) so' na ultima - a pedido do usuario. */
     private void atualizarBotaoRodape() {
         boolean ultimaPagina = paginaAtual >= paginas.length - 1;
         fecharButton.setText(ultimaPagina ? "Close" : "Next");
         fecharButton.setStyle(ultimaPagina ? estiloFechar : estiloProximo);
         rodape.clearChildren();
-        if (ultimaPagina) {
-            // Close na esquerda; acao (Pay...) na direita, se tiver.
-            rodape.add(fecharButton).width(86f * escalaRodape).height(34f * escalaRodape).left();
-            rodape.add().expandX();
-            if (acao != null) rodape.add(botaoAcao).height(34f * escalaRodape).minWidth(86f * escalaRodape).right();
+        // Embaixo do retrato, com a mesma largura dele; acao (Pay...) em
+        // cima do Close, mesma largura tambem.
+        if (ultimaPagina && acao != null) {
+            rodape.add(botaoAcao).width(larguraColuna).height(34f * escalaRodape).row();
+            rodape.add(fecharButton).width(larguraColuna).height(34f * escalaRodape).padTop(6f * escalaRodape);
         } else {
-            rodape.add().expandX();
-            rodape.add(fecharButton).width(86f * escalaRodape).height(34f * escalaRodape).right();
+            rodape.add(fecharButton).width(larguraColuna).height(34f * escalaRodape);
         }
         rodape.invalidateHierarchy();
     }

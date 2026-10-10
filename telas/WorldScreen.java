@@ -5651,7 +5651,11 @@ public class WorldScreen extends ScreenAdapter {
         layout.setText(font, npc.nome);
         float x = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
         float y = Math.round((ancoraY + altura + 7f) / camera.zoom) * camera.zoom;
+        // Nome de NPC sempre branco.
+        Color antes = new Color(font.getColor());
+        font.setColor(Color.WHITE);
         font.draw(batch, npc.nome, x, y);
+        font.setColor(antes);
     }
 
     /** Nome SEMPRE por cima de tudo, incluindo as celulas overlap_transparency
