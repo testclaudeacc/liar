@@ -58,6 +58,7 @@ public final class BookMenuUI {
     private final Table inventoryGrid = new Table();
     private final Table bagDetalhes = new Table();
     private final Label capacityLabel;
+    private BarraUso barraCapBag;
     // No celular o livro ja' e' ampliado (organizer 1.2x) e a fonte "hud"
     // sai grande demais nos stats/capacity - reduz so' esses textos.
     private static final float FONTE_STATS = (Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
@@ -365,7 +366,14 @@ public final class BookMenuUI {
         colunaDireita.setBackground(UiSkin.retangulo(
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
         colunaDireita.add(scroll).grow().pad(12, 12, 6, 12).row();
-        colunaDireita.add(capacityLabel).center().padBottom(8).row();
+        barraCapBag = new BarraUso();
+        capacityLabel.setStyle(new Label.LabelStyle(skin.get("chat-log", Label.LabelStyle.class).font, Color.WHITE));
+        capacityLabel.setFontScale(1f);
+        capacityLabel.setColor(Color.WHITE);
+        capacityLabel.setAlignment(Align.center);
+        Table textoCap = new Table();
+        textoCap.add(capacityLabel).center();
+        colunaDireita.add(new Stack(barraCapBag, textoCap)).growX().height(24).pad(0, 12, 8, 12).row();
         colunaDireita.add(moedas).left().padLeft(8).padBottom(10);
 
         bagPage.add(colunaEsquerda).width(COLUNA_BAG).growY();
@@ -1800,7 +1808,7 @@ public final class BookMenuUI {
 
     private TextButton.TextButtonStyle estiloBotaoTrade(String base) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(skin.get(base, TextButton.TextButtonStyle.class));
-        e.font = skin.getFont("botao-pequeno-font");
+        e.font = skin.get("chat-log", Label.LabelStyle.class).font; // texto sem contorno
         return e;
     }
 
@@ -2069,7 +2077,7 @@ public final class BookMenuUI {
             } else {
                 int max = maxMoeda(i, chave);
                 if (max > 0) {
-                    abrirPopupQuantidade(MOEDAS_TRADE[i] + " Coins", max, v -> {
+                    abrirPopupQuantidade(MOEDAS_TRADE[i] + " Coins", atlas.findRegion("ui/currency/" + MOEDAS_TRADE[i]), max, null, v -> {
                         tradeSelecao.put(chave, v);
                         atualizarGradeTrade();
                         atualizarDetalhesTrade();
@@ -2120,6 +2128,8 @@ public final class BookMenuUI {
         caixa.pad(16, 18, 16, 18);
         Label rotulo = new Label(titulo, skin, "hud");
         escalarFonte(rotulo, 0.8f * FONTE_STATS);
+        // Moeda: nome na cor dela (Copper laranja etc).
+        for (String tipo : MOEDAS_TRADE) if (titulo.equals(tipo + " Coins")) rotulo.setColor(corMoeda(tipo));
         Label limite = new Label("You can choose up to " + max, skin, "hud");
         escalarFonte(limite, 0.6f * FONTE_STATS);
         limite.setColor(Color.LIGHT_GRAY);
@@ -2346,7 +2356,7 @@ public final class BookMenuUI {
             if (tradeSelecao.containsKey(item.instanceId)) {
                 tradeSelecao.remove(item.instanceId); // clicar no marcado desmarca direto
             } else if (item.quantity > 1) {
-                abrirPopupQuantidade(nomeExibicao(item.itemPath), item.quantity, v -> {
+                abrirPopupQuantidade(nomeExibicao(item.itemPath), iconeDoItem(item.itemPath), item.quantity, null, v -> {
                     tradeSelecao.put(item.instanceId, v);
                     atualizarGradeTrade();
                     atualizarDetalhesTrade();
@@ -4332,7 +4342,8 @@ public final class BookMenuUI {
     public void atualizarCapacidade(float usada, float maxima) {
         capacityUsed = usada;
         capacityMaximum = maxima;
-        capacityLabel.setText("Capacity " + formatarPeso(usada) + "/" + formatarPeso(maxima));
+        capacityLabel.setText(formatarPeso(usada) + "/" + formatarPeso(maxima));
+        if (barraCapBag != null) barraCapBag.fracao = maxima > 0f ? usada / maxima : 0f;
         atualizarTextoCapacidade();
         atualizarTelaBanco();
     }
