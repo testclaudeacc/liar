@@ -1896,6 +1896,8 @@ public final class BookMenuUI {
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
         direita2.add(linhaMeuNome).growX().pad(10, 12, 4, 12).row();
         direita2.add(rolagem(gradeMinhaOferta)).grow().pad(0, 12, 6, 12).row();
+        // Linha separando a minha oferta da do outro.
+        direita2.add(separadorEquip()).growX().height(1).pad(2, 12, 2, 12).row();
         direita2.add(linhaNomeOutro).growX().pad(4, 12, 4, 12).row();
         direita2.add(rolagem(gradeOfertaOutro)).grow().pad(0, 12, 10, 12);
 
@@ -2324,11 +2326,24 @@ public final class BookMenuUI {
         popupQuantidade = null;
     }
 
+    /** Maximo de itens (slots) numa oferta - igual servidor.py::TRADE_MAX_ITENS. Moedas nao contam. */
+    private static final int TRADE_MAX_ITENS = 10;
+    private boolean tradeLimiteAviso = false;
+
+    private int itensNaOferta() {
+        int n = 0;
+        for (String k : tradeSelecao.keySet()) if (indiceMoeda(k) < 0) n++;
+        return n;
+    }
+
     private void clicarItemTrade(InventoryItem item) {
         tradeFoco = item.instanceId;
+        tradeLimiteAviso = false;
         if (!tradeEnviado) {
             if (tradeSelecao.containsKey(item.instanceId)) {
                 tradeSelecao.remove(item.instanceId); // clicar no marcado desmarca direto
+            } else if (itensNaOferta() >= TRADE_MAX_ITENS) {
+                tradeLimiteAviso = true; // ja' tem 10: nao entra mais
             } else if (item.quantity > 1) {
                 abrirPopupQuantidade(nomeExibicao(item.itemPath), iconeDoItem(item.itemPath), item.quantity, null, v -> {
                     tradeSelecao.put(item.instanceId, v);
@@ -2391,6 +2406,7 @@ public final class BookMenuUI {
             return;
         }
         preencherBlocoStats(tradeDetalhes, item.itemPath, null);
+        if (tradeLimiteAviso) tradeDetalhes.add(linhaStat("Max " + TRADE_MAX_ITENS + " items", Color.valueOf("ff6a6a"))).left().row();
         if (item.quantity > 1) tradeDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
         if (tradeSelecao.containsKey(item.instanceId) && item.quantity > 1) {
             tradeDetalhes.add(linhaStat("Selected " + tradeSelecao.get(item.instanceId), COR_TRADE_SELECIONADO)).left().row();

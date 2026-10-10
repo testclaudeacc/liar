@@ -4878,6 +4878,8 @@ TRADE_INVITE_TIMEOUT_SEG = 60
 # Distancia maxima (SQMs) pra mandar/aceitar trade. +1 de folga no servidor
 # pro atraso do movimento (o client ja' esconde o botao acima de 5).
 TRADE_DISTANCIA_SQM = 5
+# Maximo de itens (slots) por oferta; moedas nao contam (igual BookMenuUI.TRADE_MAX_ITENS).
+TRADE_MAX_ITENS = 10
 # Um player pode convidar varios ao mesmo tempo; o primeiro que aceitar
 # cancela os outros convites (dos dois lados).
 trade_pending_invites = {}  # (inviter_sid, target_sid) -> criado_em
@@ -4938,7 +4940,7 @@ def _validar_oferta(sid, offer):
     vistos = set()
     itens_validados = []
     itens_oferta = offer.get('items', [])
-    if not isinstance(itens_oferta, list) or len(itens_oferta) > 50: return None
+    if not isinstance(itens_oferta, list) or len(itens_oferta) > TRADE_MAX_ITENS: return None
     for entrada in itens_oferta:
         if not isinstance(entrada, dict): continue
         instance_id = str(entrada.get('instance_id', ''))
