@@ -41,6 +41,24 @@ public final class DialogoNPCUI {
         return ICONE_MOEDA + COR_MOEDA_MARKUP + rotulo + FIM_COR_MARKUP;
     }
 
+    private static final Color COR_FUNDO = Color.valueOf("2f2f2f");
+    private static final Color COR_BORDA = Color.valueOf("424242");
+    private static final Color COR_FUNDO_RETRATO = Color.valueOf("1c1c1c");
+    private static final Color COR_NOME = Color.valueOf("ffd56b");
+    private static final Color COR_FALA = Color.valueOf("e8e4dc");
+
+    /** Botao no estilo do HUD: cinza com borda, clareia no mouse, escurece
+     * apertado. */
+    private static TextButton.TextButtonStyle estiloBotao(BitmapFont fonte, Color fundo, Color borda) {
+        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
+        e.font = fonte;
+        e.fontColor = Color.WHITE;
+        e.up = UiSkin.retangulo(fundo, borda, 2);
+        e.over = UiSkin.retangulo(new Color(fundo).lerp(Color.WHITE, 0.10f), new Color(borda).lerp(Color.WHITE, 0.15f), 2);
+        e.down = UiSkin.retangulo(new Color(fundo).lerp(Color.BLACK, 0.25f), borda, 2);
+        return e;
+    }
+
     private final Table root = new Table();
     private final Table rodape = new Table();
     private final Image retrato;
@@ -77,17 +95,17 @@ public final class DialogoNPCUI {
             || Gdx.app.getType() == Application.ApplicationType.iOS;
         float escala = mobile ? 1.35f : 1f;
 
-        skin.add("dialogo-npc-fundo", UiSkin.retangulo(
-            new Color(0.008f, 0.008f, 0.008f, 0.98f), new Color(0.15f, 0.15f, 0.15f, 1f), 1),
+        // Mesmo visual do painel de HP/MP e do anel do retrato: fundo
+        // 2f2f2f, borda 424242; retrato num quadro mais escuro.
+        skin.add("dialogo-npc-fundo", UiSkin.retangulo(COR_FUNDO, COR_BORDA, 2),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
-        skin.add("dialogo-npc-retrato", UiSkin.retangulo(
-            new Color(0.025f, 0.025f, 0.03f, 1f), new Color(0.15f, 0.15f, 0.15f, 1f), 1),
+        skin.add("dialogo-npc-retrato", UiSkin.retangulo(COR_FUNDO_RETRATO, COR_BORDA, 2),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
 
         retrato = new Image();
         retrato.setScaling(Scaling.fit);
         nomeLabel = new Label("", skin, "subtitulo");
-        nomeLabel.setColor(new Color(1f, 0.84f, 0.42f, 1f));
+        nomeLabel.setColor(COR_NOME);
 
         // Fonte PROPRIA (nao a "default" compartilhada do skin, usada em
         // telas/labels no resto do jogo inteiro) - precisa disso porque:
@@ -146,7 +164,7 @@ public final class DialogoNPCUI {
             glifoMoeda.xadvance = ladoGlifo + Math.round(3f * escalaFonte);
             glifoMoeda.kerning = null;
         }
-        Label.LabelStyle estiloFala = new Label.LabelStyle(fonteFala, Color.WHITE);
+        Label.LabelStyle estiloFala = new Label.LabelStyle(fonteFala, COR_FALA);
         falaLabel = new Label("", estiloFala);
         falaLabel.setWrap(true);
         falaLabel.setAlignment(Align.topLeft);
@@ -158,14 +176,10 @@ public final class DialogoNPCUI {
         // botao vira "Next" (cinza, estilo "cinza-popup" ja usado em
         // ChatUI/outros popups) - a pedido do usuario.
         BitmapFont fonteBotao = skin.get("chat-log", Label.LabelStyle.class).font;
-        estiloFechar = new TextButton.TextButtonStyle(skin.get("vermelho-popup", TextButton.TextButtonStyle.class));
-        estiloFechar.font = fonteBotao;
-        // "vermelho-popup" vem com fontColor vermelho-claro (pra combinar
-        // com o fundo vermelho escuro) - trocado pra branco, a pedido do
-        // usuario.
-        estiloFechar.fontColor = Color.WHITE;
-        estiloProximo = new TextButton.TextButtonStyle(skin.get("cinza-popup", TextButton.TextButtonStyle.class));
-        estiloProximo.font = fonteBotao;
+        // Botoes no estilo do HUD (antes: vermelho vivo / cinza de popup).
+        // Close num vinho escuro discreto, Next cinza.
+        estiloFechar = estiloBotao(fonteBotao, Color.valueOf("4a2626"), Color.valueOf("6a3a3a"));
+        estiloProximo = estiloBotao(fonteBotao, Color.valueOf("3a3a3a"), Color.valueOf("555555"));
 
         fecharButton = new TextButton("Close", estiloFechar);
         fecharButton.addListener(new ChangeListener() {
@@ -177,9 +191,7 @@ public final class DialogoNPCUI {
 
         // Botao de acao (ex: "Pay" com o SellerIcon), so' na ultima pagina,
         // na direita - ver definirAcao().
-        TextButton.TextButtonStyle estiloAcao = new TextButton.TextButtonStyle(skin.get("verde-popup", TextButton.TextButtonStyle.class));
-        estiloAcao.font = fonteBotao;
-        estiloAcao.fontColor = Color.WHITE;
+        TextButton.TextButtonStyle estiloAcao = estiloBotao(fonteBotao, Color.valueOf("2c4a2c"), Color.valueOf("447044"));
         botaoAcao = new TextButton("", estiloAcao);
         iconeAcao = new com.badlogic.gdx.scenes.scene2d.ui.Image();
         iconeAcao.setScaling(com.badlogic.gdx.utils.Scaling.fit);
@@ -196,16 +208,19 @@ public final class DialogoNPCUI {
 
         Table retratoMoldura = new Table();
         retratoMoldura.setBackground(skin.getDrawable("dialogo-npc-retrato"));
-        retratoMoldura.add(retrato).size(58f * escala, 70f * escala).pad(4f * escala);
+        retratoMoldura.add(retrato).size(62f * escala, 72f * escala);
 
+        // Nome dourado com um filete embaixo separando da fala.
+        Image filete = new Image(UiSkin.retangulo(COR_BORDA, COR_BORDA, 1));
         Table texto = new Table();
         texto.top().left();
-        texto.add(nomeLabel).growX().left().padBottom(5f * escala).row();
+        texto.add(nomeLabel).growX().left().row();
+        texto.add(filete).growX().height(2f).padTop(3f * escala).padBottom(7f * escala).row();
         texto.add(falaLabel).grow().top().left();
 
         Table corpo = new Table();
         corpo.top();
-        corpo.add(retratoMoldura).size(70f * escala, 80f * escala).padRight(10f * escala).top();
+        corpo.add(retratoMoldura).size(78f * escala, 88f * escala).padRight(12f * escala).top();
         corpo.add(texto).growX().top();
 
         // Alinhamento trocado dinamicamente em atualizarBotaoRodape(): Next
@@ -215,11 +230,11 @@ public final class DialogoNPCUI {
 
         Table painel = new Table();
         painel.setBackground(skin.getDrawable("dialogo-npc-fundo"));
-        painel.pad(8f * escala);
+        painel.pad(12f * escala);
         // minHeight (nao height fixo) - deixa a caixa crescer conforme a
         // fala quebra em mais linhas, em vez de cortar o texto.
-        painel.add(corpo).growX().minHeight(82f * escala).row();
-        painel.add(rodape).growX().padTop(4f * escala);
+        painel.add(corpo).growX().minHeight(88f * escala).row();
+        painel.add(rodape).growX().padTop(8f * escala);
 
         // Table.center() SOBRESCREVE o align inteiro (nao faz OR com o
         // bottom() anterior, ver fonte do Table) - por isso "bottom().
@@ -234,7 +249,7 @@ public final class DialogoNPCUI {
         // Sem height fixo tambem, pelo mesmo motivo do painel - a altura
         // segue o conteudo (preferred height), crescendo pra CIMA porque o
         // root inteiro fica ancorado embaixo (fillParent + bottom()).
-        root.add(painel).width(400f * escala);
+        root.add(painel).width(460f * escala);
         stage.addActor(root);
         // Fica atras de QUALQUER outro menu (chat/settings/bookmenu/
         // joystick, ja existentes neste stage nesse ponto da construcao) -
