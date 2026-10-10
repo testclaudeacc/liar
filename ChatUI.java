@@ -278,7 +278,26 @@ public class ChatUI {
             if (c == '\n' || c == '\r') {
                 enviarMensagem(textField.getText());
                 textField.setText("");
+                atualizarSugestoes();
                 stage.setKeyboardFocus(null);
+            }
+        });
+
+        // Sugestoes de comando de admin (estilo Minecraft): digitou "/",
+        // aparece a lista com o uso de cada um; Tab completa o 1o.
+        sugestoes = new Table();
+        sugestoes.setBackground(criarFundo(new Color(0.05f, 0.05f, 0.05f, 0.95f)));
+        sugestoes.pad(6);
+        sugestoes.setVisible(false);
+        stage.addActor(sugestoes);
+        // Tab nao pula pro proximo campo: aqui ele completa o comando.
+        campoTexto.setFocusTraversal(false);
+        campoTexto.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { atualizarSugestoes(); }
+        });
+        campoTexto.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override public boolean keyDown(InputEvent event, int keycode) {
+                return keycode == com.badlogic.gdx.Input.Keys.TAB && completarComando();
             }
         });
         conteudo.addListener(new ClickListener() {
@@ -879,8 +898,79 @@ public class ChatUI {
         }
     }
 
+    // ---- Sugestoes de comando (so' admin) ----
+    private Table sugestoes;
+    private final List<String[]> comandosAdmin = new java.util.ArrayList<>(); // {cmd, uso, descricao}
+    private final List<String> sugeridos = new java.util.ArrayList<>();
+
+    /** Lista de comandos que o servidor manda so' pra admin (sync_local_player
+     * "admin_commands"); null/vazio = sem sugestoes (jogador normal). */
+    public void definirComandosAdmin(com.badlogic.gdx.utils.JsonValue lista) {
+        comandosAdmin.clear();
+        if (lista != null && lista.isArray()) {
+            for (com.badlogic.gdx.utils.JsonValue c = lista.child; c != null; c = c.next) {
+                comandosAdmin.add(new String[]{c.getString("cmd", ""), c.getString("usage", ""), c.getString("desc", "")});
+            }
+        }
+        atualizarSugestoes();
+    }
+
+    private void atualizarSugestoes() {
+        if (sugestoes == null) return;
+        String t = campoTexto.getText();
+        sugeridos.clear();
+        sugestoes.clearChildren();
+        if (comandosAdmin.isEmpty() || !t.startsWith("/") || !janela.isVisible()) {
+            sugestoes.setVisible(false);
+            return;
+        }
+        String resto = t.substring(1);
+        int espaco = resto.indexOf(' ');
+        String digitado = (espaco < 0 ? resto : resto.substring(0, espaco)).toLowerCase();
+        for (String[] c : comandosAdmin) {
+            // Sem espaco ainda: todos que comecam com o que foi digitado.
+            // Ja' com espaco (digitando os argumentos): so' o uso daquele.
+            boolean bate = espaco < 0 ? c[0].startsWith(digitado) : c[0].equals(digitado);
+            if (!bate) continue;
+            sugeridos.add(c[0]);
+            final String cmd = c[0];
+            Label linha = new Label("[#FFD56B]" + c[1] + "[]   [#9A9A9A]" + c[2] + "[]", skin, "chat-log");
+            linha.addListener(new ClickListener() {
+                @Override public void clicked(InputEvent event, float x, float y) { completarCom(cmd); }
+            });
+            sugestoes.add(linha).left().pad(2, 4, 2, 4).row();
+        }
+        if (sugeridos.isEmpty()) { sugestoes.setVisible(false); return; }
+        if (espaco < 0) {
+            Label dica = new Label("[#6A6A6A]Tab: completar[]", skin, "chat-log");
+            sugestoes.add(dica).left().pad(4, 4, 0, 4).row();
+        }
+        sugestoes.pack();
+        com.badlogic.gdx.math.Vector2 v = campoTexto.localToStageCoordinates(new com.badlogic.gdx.math.Vector2(0, 0));
+        sugestoes.setPosition(v.x, v.y - sugestoes.getHeight() - 4);
+        sugestoes.setVisible(true);
+        sugestoes.toFront();
+    }
+
+    /** Tab: completa com o 1o comando sugerido (so' enquanto ainda nao tem espaco). */
+    private boolean completarComando() {
+        if (sugestoes == null || !sugestoes.isVisible() || sugeridos.isEmpty()) return false;
+        if (campoTexto.getText().indexOf(' ') >= 0) return true;   // ja' completo: so' engole o Tab
+        completarCom(sugeridos.get(0));
+        return true;
+    }
+
+    private void completarCom(String cmd) {
+        String novo = "/" + cmd + " ";
+        campoTexto.setText(novo);
+        campoTexto.setCursorPosition(novo.length());
+        stage.setKeyboardFocus(campoTexto);
+        atualizarSugestoes();
+    }
+
     public void setVisivel(boolean visivel) {
         janela.setVisible(visivel);
+        if (!visivel && sugestoes != null) sugestoes.setVisible(false);
         if (visivel && naoLidas.remove(abaAtual) != null) reconstruirAbas();
         if (!visivel) {
             popupAdicionar.setVisible(false);

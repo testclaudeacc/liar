@@ -2550,7 +2550,8 @@ def handle_join_game(data):
 
         # item_db vai so' no payload (nao fica guardado em online_players).
         max_hp_join, max_mp_join = calcular_max_vitais(data)
-        emit('sync_local_player', {**data, 'item_db': montar_item_db_cliente(), 'soul': eh_alma(data), 'admin': eh_admin(data),
+        extra_admin = {'admin_commands': [{'cmd': c, 'usage': u, 'desc': d} for c, u, d in ADMIN_COMANDOS]} if eh_admin(data) else {}
+        emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(), 'soul': eh_alma(data), 'admin': eh_admin(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
         emit('bestiary', montar_bestiario(data), room=sid)
@@ -2797,16 +2798,28 @@ def _tipo_do_mob_pelo_nome(nome):
             return tipo
     return None
 
+# Lista dos comandos de admin: usada no /help e mandada SO' pra admin no
+# sync_local_player ('admin_commands') - o chat mostra as sugestoes ao
+# digitar "/" e o Tab completa. (comando, uso, descricao)
+ADMIN_COMANDOS = [
+    ("help", "/help", "lista os comandos"),
+    ("tp", "/tp x<X> y<Y>", "teleporta (coordenadas do minimapa, ex: /tp x56 y200)"),
+    ("time", "/time day|afternoon|night|<seg>s|<min>m", "muda a hora do mundo (ciclo de 20 min)"),
+    ("soul", "/soul on|off", "vira alma de novo / desperta"),
+    ("npcs", "/npcs", "NPCs lidos do mapa e se estao ativos"),
+    ("mobs", "/mobs", "lista os mobs"),
+    ("quests", "/quests", "quests e se voce ja fez"),
+    ("quest", "/quest <nome> complete|reset", "completa ou reseta uma quest"),
+    ("bestiary", "/bestiary <mob> <0-3|clear>", "bestiario: 0 descoberto, 1 cobre, 2 prata, 3 ouro"),
+]
+
 def comando_admin(sid, p, texto):
     partes = texto[1:].split()
     if not partes: return
     cmd = partes[0].lower()
     if cmd in ('help', 'admin'):
-        chat_sistema(sid, "Admin: /bestiary <mob> <0-3|clear>  (0 discovered, 1 copper, 2 silver, 3 gold)")
-        chat_sistema(sid, "Admin: /quest <name> complete|reset   /quests   /mobs   /npcs")
-        chat_sistema(sid, "Admin: /tp x<X> y<Y>  (minimap coordinates, ex: /tp x56 y200)")
-        chat_sistema(sid, "Admin: /time day|afternoon|night|<seconds>s|<minutes>m  (20 min cycle, ex: /time 450s)")
-        chat_sistema(sid, "Admin: /soul on|off  (vira alma de novo / desperta)")
+        for _, uso, desc in ADMIN_COMANDOS:
+            chat_sistema(sid, f"Admin: {uso}  - {desc}")
         return
     if cmd == 'soul':
         if len(partes) < 2 or partes[1].lower() not in ('on', 'off'):

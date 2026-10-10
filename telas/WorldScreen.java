@@ -2902,6 +2902,8 @@ public class WorldScreen extends ScreenAdapter {
             // eram zerados no client.
             if (data.has("inventory")) {
                 adminLocal = data.getBoolean("admin", false);
+                // Sugestoes de comando no chat (so' admin recebe a lista).
+                if (chat != null) chat.definirComandosAdmin(adminLocal ? data.get("admin_commands") : null);
                 definirAlmaLocal(data.getBoolean("soul", false));
                 if (socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
                 if (socket.isConnected()) socket.emitRaw("get_party_status", "{}");
