@@ -147,16 +147,19 @@ def bestiario_ouro(p, tipo):
 NPC_DB = {
     # price (em cobre) + quest: botao "Pay" no dialogo (handle_npc_pay). Pagar
     # libera a quest pro personagem (ex: a ponte da area "kharon" no Tiled).
-    "kharon": {"name": "Kharon", "price": 200, "quest": "kharon"},
+    # role: icone no minimapa/mapa (client): quest, food, spell, pot,
+    # weapon, market, bank.
+    "kharon": {"name": "Kharon", "price": 200, "quest": "kharon", "role": "quest"},
     # Vendedores: fixo=True -> nao passeia (fica no SQM do Tiled, virado pra
     # property "direction" do objeto). Tirar o "fixo" faz andar igual o
     # Kharon. "falas" = paginas do dialogo (o client mostra no lugar do texto
     # do Kharon). A loja em si vem depois.
-    "syron": {"name": "Syron", "fixo": True, "falas": ["Hungry, traveler? Fresh food, right here."]},            # comida
-    "nyla":  {"name": "Nyla",  "fixo": True, "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},  # magias
-    "luke":  {"name": "Luke",  "fixo": True, "falas": ["Looking for a blade? Finest steel in town."]},           # armas
-    "jack":  {"name": "Jack",  "fixo": True, "falas": ["Welcome to your private vault. Your belongings are safe with me."]},  # banco
-    "luna":  {"name": "Luna",  "fixo": True, "falas": ["Welcome to the market! Trade your goods with other adventurers."]},    # market
+    "syron": {"name": "Syron", "fixo": True, "role": "food", "falas": ["Hungry, traveler? Fresh food, right here."]},
+    "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
+    "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "falas": ["Looking for a blade? Finest steel in town."]},
+    "jack":  {"name": "Jack",  "fixo": True, "role": "bank", "falas": ["Welcome to your private vault. Your belongings are safe with me."]},
+    "luna":  {"name": "Luna",  "fixo": True, "role": "market", "falas": ["Welcome to the market! Trade your goods with other adventurers."]},
+    "valth": {"name": "Valth", "fixo": True, "role": "pot", "falas": ["Potions, fresh from the cauldron. Don't ask what's in them."]},
 }
 NPC_PAY_DISTANCIA_SQM = 4
 NPC_TEXTO_SEM_DINHEIRO = "Do not try to deceive me, mortal."
@@ -1265,6 +1268,7 @@ def _npc_payload(npc_id, npc):
         'y': npc.get('pos_y', 0),
         'direction': npc.get('direction', 'down'),
         'name': info.get('name', ''),
+        'role': info.get('role', ''),
     }
     if info.get('falas'): payload['falas'] = list(info['falas'])
     return payload

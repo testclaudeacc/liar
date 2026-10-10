@@ -450,6 +450,8 @@ public class WorldScreen extends ScreenAdapter {
         final AnimacaoCorpo animacao;
         /** Paginas do dialogo vindas do servidor (NPC_DB "falas"); vazio = Kharon. */
         String[] falas = new String[0];
+        /** Funcao (NPC_DB "role"): icone no minimapa/mapa - ver iconeDoPapel. */
+        String papel = "";
 
         NPCVisual(String id, String tipo, String nome, Jogador movimento, AnimacaoCorpo animacao) {
             this.id = id;
@@ -1408,20 +1410,45 @@ public class WorldScreen extends ScreenAdapter {
     private final float TAMANHO_MINIMAPA = mobile ? 165f : 150f;
     private static final float TILES_MINIMAPA = 34f, TILES_MAPA_GRANDE = 80f, TILES_MAPA_MIN = 20f, TILES_MAPA_MAX = 300f;
 
-    /** Pontinhos do minimapa: players azul, NPC amarelo, mob vermelho (voce = branco, no MiniMapa). */
+    /** Minimapa/mapa grande: NPC com icone da funcao, party e voce com o
+     * icone da classe, mob = pontinho vermelho. */
     private final MiniMapa.Fonte fonteMiniMapa = new MiniMapa.Fonte() {
         @Override public float jogadorX() { return local.x; }
         @Override public float jogadorY() { return local.y; }
+        @Override public TextureRegion iconeJogador() { return regiaoCache(BookMenuUI.iconeClasse(local.classe)); }
         @Override public void pontos(MiniMapa.Coletor c) {
-            for (NPCVisual n : npcs.values()) c.ponto(n.movimento.x, n.movimento.y, MiniMapa.COR_NPC);
             for (MobVisual m : mobs.values()) if (m.visivel && !m.morto) c.ponto(m.x, m.y, MiniMapa.COR_MOB);
-            // Outros players: so' quem esta na party (e perto, em "remotos"), na cor da classe.
+            for (NPCVisual n : npcs.values()) c.icone(n.movimento.x, n.movimento.y, iconeDoPapel(n.papel));
+            // Outros players: so' quem esta na party (e perto, em "remotos").
             for (BookMenuUI.MembroParty m : bookMenu.membrosParty()) {
                 Jogador j = remotos.get(m.nome);
-                if (j != null) c.ponto(j.x, j.y, MiniMapa.corDaClasse(m.classe));
+                if (j != null) c.icone(j.x, j.y, regiaoCache(BookMenuUI.iconeClasse(m.classe)));
             }
         }
     };
+
+    /** Icone do NPC no mapa pela funcao (NPC_DB "role" do servidor). */
+    private static final String[][] ICONES_PAPEL = {
+        {"quest", "ui/items/Flag", "Quests"},
+        {"food", "sheet/r19_c12", "Food"},
+        {"spell", "sheet/r76_c9", "Spells"},
+        {"pot", "sheet/r41_c4", "Potions"},
+        {"weapon", "sheet/r103_c14", "Weapons"},
+        {"market", "ui/currency/Gold", "Market"},
+        {"bank", "sheet/r59_c14", "Bank"},
+    };
+    private final java.util.Map<String, TextureRegion> cacheRegioes = new java.util.HashMap<>();
+
+    private TextureRegion regiaoCache(String nome) {
+        if (!cacheRegioes.containsKey(nome)) cacheRegioes.put(nome, atlas.findRegion(nome));
+        return cacheRegioes.get(nome);
+    }
+
+    /** null (papel desconhecido) = pontinho laranja de NPC. */
+    private TextureRegion iconeDoPapel(String papel) {
+        for (String[] p : ICONES_PAPEL) if (p[0].equals(papel)) return regiaoCache(p[1]);
+        return null;
+    }
 
     /** Retrato (rosto do personagem, com a skin atual) no estilo dos botoes
      * do topo. Bolinha vermelha = mensagem nova no chat. */
@@ -1865,6 +1892,7 @@ public class WorldScreen extends ScreenAdapter {
 
     private void criarMapaGrande() {
         mapaGrande = new MiniMapa(mapa, pinturaMiniMapa, fonteMiniMapa, TILES_MAPA_GRANDE, TILES_MAPA_MIN, TILES_MAPA_MAX, true, 2f);
+        mapaGrande.definirTamanhoIcone(20f);
         mapaGrande.definirFonteCoordenadas(skin.getFont("hud-font"), 1.2f); // um pouco maior no mapa grande
         painelMapaGrande = new Table();
         painelMapaGrande.setFillParent(true);
@@ -1888,14 +1916,18 @@ public class WorldScreen extends ScreenAdapter {
         topo.add(centro).height(tb).padRight(16);
         topo.add(fechar).size(tb);
 
+        // Legenda com os mesmos icones do mapa: voce, party (classes), a
+        // funcao de cada NPC e os monstros (pontinho vermelho).
+        // 2 linhas: pessoas/monstros em cima, NPCs (por funcao) embaixo.
+        Table linhaPessoas = new Table(), linhaNpcs = new Table();
+        adicionarLegendaIcone(linhaPessoas, regiaoCache(BookMenuUI.iconeClasse(local.classe)), "You");
+        adicionarLegendaIcone(linhaPessoas, regiaoCache(BookMenuUI.iconeClasse("Knight")), "Party");
+        adicionarLegenda(linhaPessoas, MiniMapa.COR_MOB, "Monsters");
+        for (String[] p : ICONES_PAPEL) adicionarLegendaIcone(linhaNpcs, regiaoCache(p[1]), p[2]);
         Table legenda = new Table();
-        adicionarLegenda(legenda, MiniMapa.COR_VOCE, "You");
-        adicionarLegenda(legenda, MiniMapa.COR_KNIGHT, "Knight");
-        adicionarLegenda(legenda, MiniMapa.COR_RANGER, "Ranger");
-        adicionarLegenda(legenda, MiniMapa.COR_MAGE, "Mage");
-        adicionarLegenda(legenda, MiniMapa.COR_BARD, "Bard");
-        adicionarLegenda(legenda, MiniMapa.COR_NPC, "NPCs");
-        adicionarLegenda(legenda, MiniMapa.COR_MOB, "Monsters");
+        legenda.left();
+        legenda.add(linhaPessoas).left().row();
+        legenda.add(linhaNpcs).left().padTop(4);
 
         painelMapaGrande.pad(14, 24, 14, 24);
         painelMapaGrande.add(topo).growX().row();
@@ -1916,6 +1948,14 @@ public class WorldScreen extends ScreenAdapter {
         painelMapaGrande.add(rodape).growX().padTop(8);
         painelMapaGrande.setVisible(false);
         uiStage.addActor(painelMapaGrande);
+    }
+
+    private void adicionarLegendaIcone(Table legenda, TextureRegion regiao, String texto) {
+        if (regiao == null) return;
+        Image icone = new Image(regiao);
+        icone.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+        legenda.add(icone).size(20).padRight(5);
+        legenda.add(new Label(texto, skin, "hud")).padRight(16);
     }
 
     private void adicionarLegenda(Table legenda, Color cor, String texto) {
@@ -3742,6 +3782,7 @@ public class WorldScreen extends ScreenAdapter {
         NPCVisual visual = new NPCVisual(id, tipo, nome.isEmpty() ? nomeSprite : nome, movimento, criarAnimacao(sprite));
         JsonValue falas = data.get("falas");
         if (falas != null && falas.isArray()) visual.falas = falas.asStringArray();
+        visual.papel = data.getString("role", "");
         npcs.put(id, visual);
     }
 

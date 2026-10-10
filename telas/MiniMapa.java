@@ -28,11 +28,19 @@ public class MiniMapa extends Actor {
         float jogadorX();
         float jogadorY();
         void pontos(Coletor c);
+        /** Icone do proprio jogador (classe); null = quadradinho branco. */
+        default com.badlogic.gdx.graphics.g2d.TextureRegion iconeJogador() { return null; }
     }
 
     public interface Coletor {
         void ponto(float mundoX, float mundoY, Color cor);
+        /** Icone (NPC por funcao, membro da party pela classe), centrado no SQM. */
+        default void icone(float mundoX, float mundoY, com.badlogic.gdx.graphics.g2d.TextureRegion regiao) {}
     }
+
+    /** Lado dos icones, em unidades do stage (o mapa grande usa maior). */
+    private float tamanhoIcone = 13f;
+    public void definirTamanhoIcone(float t) { this.tamanhoIcone = t; }
 
     public static final Color COR_VOCE = Color.WHITE;
     // Outros players so' aparecem se estiverem na party, na cor da classe.
@@ -231,15 +239,36 @@ public class MiniMapa extends Actor {
             // Cada um = 1 "pixel" do minimapa (tamanho de 1 SQM), sem contorno.
             // Na posicao continua (nao presa no SQM): anda liso junto com o
             // mapa e voce fica sempre no centro, sem pular de SQM em SQM.
-            Coletor coletor = (mx, my, cor) -> {
-                float px = Math.round((origemX + (mx - mapa.tileWidth / 2f) * s) * k) / k;
-                float py = Math.round((origemY + my * s) * k) / k;
-                if (px + sqm < ax || px > ax + aw || py + sqm < ay || py > ay + ah) return;
-                batch.setColor(cor.r, cor.g, cor.b, cor.a * parentAlpha);
-                batch.draw(pixel, px, py, sqm, sqm);
+            // Icones vao numa 2a passada, por cima dos pontinhos.
+            final java.util.List<Object[]> icones = new java.util.ArrayList<>();
+            Coletor coletor = new Coletor() {
+                @Override public void ponto(float mx, float my, Color cor) {
+                    float px = Math.round((origemX + (mx - mapa.tileWidth / 2f) * s) * k) / k;
+                    float py = Math.round((origemY + my * s) * k) / k;
+                    if (px + sqm < ax || px > ax + aw || py + sqm < ay || py > ay + ah) return;
+                    batch.setColor(cor.r, cor.g, cor.b, cor.a * parentAlpha);
+                    batch.draw(pixel, px, py, sqm, sqm);
+                }
+                @Override public void icone(float mx, float my, com.badlogic.gdx.graphics.g2d.TextureRegion regiao) {
+                    if (regiao == null) { ponto(mx, my, COR_NPC); return; }
+                    icones.add(new Object[]{mx, my, regiao});
+                }
             };
             fonte.pontos(coletor);
-            coletor.ponto(fonte.jogadorX(), fonte.jogadorY(), COR_VOCE);
+            com.badlogic.gdx.graphics.g2d.TextureRegion meuIcone = fonte.iconeJogador();
+            if (meuIcone != null) coletor.icone(fonte.jogadorX(), fonte.jogadorY(), meuIcone);
+            else coletor.ponto(fonte.jogadorX(), fonte.jogadorY(), COR_VOCE);
+            // Tamanho fixo na tela (nao cresce com o zoom), centro no SQM e
+            // preso no pixel; o seu por ultimo (por cima de tudo).
+            float lado = Math.max(sqm, tamanhoIcone);
+            batch.setColor(1f, 1f, 1f, parentAlpha);
+            for (Object[] ic : icones) {
+                float mx = (Float) ic[0], my = (Float) ic[1];
+                float px = Math.round((origemX + mx * s - lado / 2f) * k) / k;
+                float py = Math.round((origemY + (my + mapa.tileHeight / 2f) * s - lado / 2f) * k) / k;
+                if (px + lado < ax || px > ax + aw || py + lado < ay || py > ay + ah) continue;
+                batch.draw((com.badlogic.gdx.graphics.g2d.TextureRegion) ic[2], px, py, lado, lado);
+            }
             // Marcador (link de coordenada do chat): quadradinho piscando.
             if (temMarcador && ((int) (System.currentTimeMillis() / 350L)) % 2 == 0) {
                 float mx = origemX + (marcadorX - mapa.tileWidth / 2f) * s;
