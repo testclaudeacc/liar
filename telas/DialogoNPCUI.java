@@ -232,7 +232,14 @@ public final class DialogoNPCUI {
         fecharButton.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                avancarOuFechar();
+                // Botao: Next vai pra proxima pagina, Close fecha na hora -
+                // pular a digitacao e' clicando em qualquer lugar da janela.
+                if (paginaAtual < paginas.length - 1) {
+                    paginaAtual++;
+                    iniciarPagina();
+                } else {
+                    fechar();
+                }
             }
         });
 
@@ -304,6 +311,18 @@ public final class DialogoNPCUI {
         // Mesma largura e mesmo x do retrato e do botao.
         sobreposicao.add(placa).width(larguraColuna).padLeft(14f * escala);
         com.badlogic.gdx.scenes.scene2d.ui.Stack comPlaca = new com.badlogic.gdx.scenes.scene2d.ui.Stack(caixa, sobreposicao);
+        // Clique em qualquer lugar da janela (fora dos botoes) completa a
+        // pagina que ainda esta' sendo digitada.
+        painel.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        placa.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        comPlaca.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override
+            public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                com.badlogic.gdx.scenes.scene2d.Actor alvo = event.getTarget();
+                if (fecharButton.isAscendantOf(alvo) || botaoAcao.isAscendantOf(alvo)) return;
+                completarPagina();
+            }
+        });
 
         // Table.center() SOBRESCREVE o align inteiro (nao faz OR com o
         // bottom() anterior, ver fonte do Table) - por isso "bottom().
@@ -436,6 +455,13 @@ public final class DialogoNPCUI {
     /** Completa a pagina atual (se ainda digitando), senao avanca pra
      * proxima pagina, senao fecha (ultima pagina) - mesma acao pro clique no
      * botao (Next/Close), tecla E e o avanco manual existente. */
+    /** Mostra o resto da pagina atual de uma vez (se ainda digitando). */
+    private void completarPagina() {
+        if (!root.isVisible() || caracteresVisiveis >= falaCompleta.length()) return;
+        caracteresVisiveis = falaCompleta.length();
+        falaLabel.setText(falaCompleta);
+    }
+
     public boolean avancarOuFechar() {
         if (!root.isVisible()) return false;
         if (caracteresVisiveis < falaCompleta.length()) {
