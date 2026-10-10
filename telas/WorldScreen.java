@@ -3316,7 +3316,10 @@ public class WorldScreen extends ScreenAdapter {
                 if (dano <= 0) nd.cor = new Color(1f, 0.9f, 0.1f, 1f);
                 numerosDano.add(nd);
                 if (dano > 0) sangrar(j.x, j.y);
-                Efeito e = tocarEfeito(data.getString("hit_type", "physical_hit"), j.x, j.y);
+                // Golpe fisico de mob (ex: rotworm): efeito proprio, PhysATK.
+                String hitMob = data.getString("hit_type", "physical_hit");
+                if ("physical_hit".equals(hitMob) || "Physical".equals(hitMob)) hitMob = "PhysATK";
+                Efeito e = tocarEfeito(hitMob, j.x, j.y);
                 if (e != null) e.jogadorAlvo = j;
             }
             if (!alvo.equals(local.nome) && data.has("new_hp")) {
@@ -4960,7 +4963,8 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     /** Efeito de hit pelo nome que vai no hit_type (o mesmo pra todo client):
-     * Sword/Mana/Music1/Arrow (armas das classes) ou Physical (padrao, mob). */
+     * Sword/Mana/Music1/Arrow (armas das classes), PhysATK (mob fisico
+     * batendo no player) ou Physical (padrao). */
     private TextureRegion[] quadrosEfeito(String nome) {
         String chave = nome == null ? "Physical" : nome;
         TextureRegion[] quadros = cacheEfeitos.get(chave);
@@ -4971,6 +4975,7 @@ public class WorldScreen extends ScreenAdapter {
             case "Mana": tira = atlas.findRegion("ui/Mana"); break;
             case "Music1": tira = atlas.findRegion("ui/items/Music1"); break;
             case "Arrow": tira = atlas.findRegion("ui/items/Arrow"); break;
+            case "PhysATK": tira = atlas.findRegion("sprites/spawn/PhysATK"); break;   // mob fisico no player
             default: tira = atlas.findRegion("ui/items/Physical"); break;
         }
         if (tira == null) tira = atlas.findRegion("ui/items/Physical");
