@@ -4115,6 +4115,10 @@ public class WorldScreen extends ScreenAdapter {
         // refocava o campo na hora (enviava e continuava digitando, bug
         // reportado pelo usuario).
         // Write (padrao Enter): comeca a digitar no chat (abre ele se estiver fechado).
+        // F8 (admin): mostra/esconde o medidor de desempenho.
+        if (labelPerf != null && Gdx.input.isKeyJustPressed(Input.Keys.F8) && acaoCapturando == null) {
+            labelPerf.setVisible(!labelPerf.isVisible());
+        }
         // Hotkey secreta do admin: F9 abre o chat ja' focado, mesmo sendo alma.
         if (adminLocal && Gdx.input.isKeyJustPressed(Input.Keys.F9) && acaoCapturando == null && !settingsAberta()) {
             if (!chat.isVisivel()) { chatAdminLiberado = true; alternarChat(); chat.focarCampoTexto(); }
@@ -4373,7 +4377,7 @@ public class WorldScreen extends ScreenAdapter {
         if (perf != null) {
             perf.marca("ui-draw");
             perf.fimFrame(delta);
-            labelPerf.setText(perf.texto());
+            if (labelPerf.isVisible()) labelPerf.setText(perf.texto());
         }
     }
 
