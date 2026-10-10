@@ -1,6 +1,7 @@
 package com.teste.game;
 
 import com.badlogic.gdx.Game;
+import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Graphics;
 import com.badlogic.gdx.Input;
@@ -49,6 +50,34 @@ public class InvertedRealmsGame extends Game {
             alternarFullscreen();
         }
         super.render();
+        limitarFpsCelular();
+    }
+
+    // No Android o setForegroundFPS(60) nao faz nada (o jogo roda no ritmo
+    // da tela: 90/120 Hz nos celulares mais novos). Aqui o proprio jogo
+    // espera ate' completar ~16.7 ms por frame - 60 fixo, e um frame mais
+    // pesado de vez em quando nao aparece como queda.
+    private static final long FRAME_ALVO_NS = 1_000_000_000L / 60L;
+    private long proximoFrameNs = 0L;
+
+    private void limitarFpsCelular() {
+        Application.ApplicationType tipo = Gdx.app.getType();
+        if (tipo != Application.ApplicationType.Android && tipo != Application.ApplicationType.iOS) return;
+        long agora = System.nanoTime();
+        if (proximoFrameNs == 0L || agora - proximoFrameNs > FRAME_ALVO_NS) {
+            // 1o frame ou atrasou mais de 1 frame: recomeca a contagem daqui.
+            proximoFrameNs = agora + FRAME_ALVO_NS;
+            return;
+        }
+        long falta = proximoFrameNs - agora;
+        if (falta > 0L) {
+            try {
+                Thread.sleep(falta / 1_000_000L, (int) (falta % 1_000_000L));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        proximoFrameNs += FRAME_ALVO_NS;
     }
 
     /** Mesmo toggle do F11/Alt+Enter, exposto pra tela poder chamar direto de
