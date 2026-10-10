@@ -148,15 +148,15 @@ NPC_DB = {
     # price (em cobre) + quest: botao "Pay" no dialogo (handle_npc_pay). Pagar
     # libera a quest pro personagem (ex: a ponte da area "kharon" no Tiled).
     "kharon": {"name": "Kharon", "price": 200, "quest": "kharon"},
-    # Vendedores: passeiam igual o Kharon (comecam virados pra property
-    # "direction" do objeto no Tiled). "fixo": True deixa um parado no SQM.
-    # "falas" = paginas do dialogo (o client mostra no lugar do texto do
-    # Kharon). A loja em si vem depois.
-    "syron": {"name": "Syron", "falas": ["Welcome, traveler. Take a look at my wares."]},
-    "nyla":  {"name": "Nyla",  "falas": ["Hello there! Need something?"]},
-    "luke":  {"name": "Luke",  "falas": ["Good day. What can I get you?"]},
-    "jack":  {"name": "Jack",  "falas": ["Hey! Best prices in town."]},
-    "luna":  {"name": "Luna",  "falas": ["Oh, a customer! Come, come."]},
+    # Vendedores: fixo=True -> nao passeia (fica no SQM do Tiled, virado pra
+    # property "direction" do objeto). Tirar o "fixo" faz andar igual o
+    # Kharon. "falas" = paginas do dialogo (o client mostra no lugar do texto
+    # do Kharon). A loja em si vem depois.
+    "syron": {"name": "Syron", "fixo": True, "falas": ["Welcome, traveler. Take a look at my wares."]},
+    "nyla":  {"name": "Nyla",  "fixo": True, "falas": ["Hello there! Need something?"]},
+    "luke":  {"name": "Luke",  "fixo": True, "falas": ["Good day. What can I get you?"]},
+    "jack":  {"name": "Jack",  "fixo": True, "falas": ["Hey! Best prices in town."]},
+    "luna":  {"name": "Luna",  "fixo": True, "falas": ["Oh, a customer! Come, come."]},
 }
 NPC_PAY_DISTANCIA_SQM = 4
 NPC_TEXTO_SEM_DINHEIRO = "Do not try to deceive me, mortal."
