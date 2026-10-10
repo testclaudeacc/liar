@@ -1812,6 +1812,7 @@ def _queue_save(p, position_ack_sid=None):
         'npc_dialogue_state': p.get('npc_dialogue_state', {}).copy() if isinstance(p.get('npc_dialogue_state'), dict) else {},
         'hotbar': normalizar_hotbar(p.get('hotbar')),
         'time_played': tempo_jogado,
+        'last_seen': time.time(),
         'bestiary': dict(p['bestiary']) if isinstance(p.get('bestiary'), dict) else None,
         # Bank vai junto do personagem (mesma transacao): guardar/sacar nunca
         # duplica nem some item se o servidor cair entre um save e outro.
@@ -1837,7 +1838,7 @@ def db_writer_worker():
                 SET pos_x = %s, pos_y = %s, direction = %s, floor = %s, level = %s,
                     exp = %s, kills = %s, current_hp = %s, current_mp = %s,
                     inventory = %s, equipped_items = %s, skills = %s, skins = %s, currency = %s,
-                    time_played = %s, npc_dialogue_state = %s, hotbar = %s
+                    time_played = %s, npc_dialogue_state = %s, hotbar = %s, last_seen = %s
                 WHERE user_id = %s AND name = %s
             """
             params = (
@@ -1849,6 +1850,7 @@ def db_writer_worker():
                 int(player_data.get('currency', 0)), player_data.get('time_played', 0),
                 json.dumps(player_data.get('npc_dialogue_state', {})),
                 json.dumps(normalizar_hotbar(player_data.get('hotbar'))),
+                player_data.get('last_seen'),
                 player_data.get('user_id'), player_data.get('name')
             )
             c.execute(query, params)
@@ -1911,6 +1913,8 @@ def init_db():
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS hotbar TEXT DEFAULT '{}'")
         # Personagem "apagado" (soft delete, ver delete_character): NULL = ativo.
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS deleted_at DOUBLE PRECISION")
+        # Ultima vez visto (epoch): atualizado a cada save do personagem.
+        c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS last_seen DOUBLE PRECISION")
         c.execute('''CREATE TABLE IF NOT EXISTS friendships (
                         id SERIAL PRIMARY KEY,
                         owner_name TEXT NOT NULL,
@@ -2213,6 +2217,33 @@ def handle_disconnect():
         emit('player_left', {"name": p_name}, broadcast=True, include_self=False)
         players_by_name.pop(p_name, None)
         del online_players[sid]
+
+@socketio.on('get_player_info')
+def handle_get_player_info(data):
+    # Janela do player: online/offline e ha' quanto tempo foi visto.
+    sid = request.sid
+    if sid not in online_players or not isinstance(data, dict): return
+    nome = str(data.get('name', '')).strip()[:32]
+    if not nome: return
+    alvo = online_players.get(players_by_name.get(nome))
+    if alvo and not alvo.get('corpo_ausente'):
+        emit('player_info', {'name': nome, 'online': True, 'last_seen_ago': 0}, room=sid)
+        return
+    visto = None
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        c = conn.cursor()
+        c.execute("SELECT last_seen FROM characters WHERE name = %s AND deleted_at IS NULL", (nome,))
+        linha = c.fetchone()
+        c.close()
+        if linha and linha[0]: visto = float(linha[0])
+    except Exception:
+        traceback.print_exc()
+    finally:
+        if conn: db_pool.putconn(conn)
+    emit('player_info', {'name': nome, 'online': False,
+                         'last_seen_ago': int(max(0, time.time() - visto)) if visto else -1}, room=sid)
 
 @socketio.on('get_bestiary')
 def handle_get_bestiary(data=None):

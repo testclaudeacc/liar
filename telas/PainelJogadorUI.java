@@ -45,7 +45,7 @@ public class PainelJogadorUI {
 
     // Foto na esquerda, botoes (icone + o que faz) empilhados na direita.
     private static final float LARGURA = 330f;
-    private static final float TAM_FOTO = 96f;
+    private static final float TAM_FOTO = 128f;
     private static final float LARGURA_BOTAO = 170f;
     private static final float ALTURA_BOTAO = 38f;
     private static final float TAM_ICONE_BOTAO = 26f;
@@ -75,7 +75,19 @@ public class PainelJogadorUI {
     private final Skin skin;
     private final TextureAtlas atlas;
     private final Ouvinte ouvinte;
-    private final Table raiz = new Table();
+    // Janela arrastavel pela topbar: o deslocamento entra depois do layout
+    // (senao qualquer relayout voltava ela pro meio).
+    private float deslocX = 0f, deslocY = 0f;
+    private Table conteudoArrastavel;
+    private final Table raiz = new Table() {
+        @Override public void layout() {
+            super.layout();
+            if (conteudoArrastavel != null) conteudoArrastavel.moveBy(deslocX, deslocY);
+        }
+    };
+    private final Table statusFoto = new Table();
+    private final Image iconeStatus = new Image();
+    private Label textoStatus, textoVisto;
     private final Table janela = new Table();
     private final Table barraIcones = new Table();
     private final Label nomeLabel;
@@ -109,7 +121,8 @@ public class PainelJogadorUI {
                 barraIcones.setVisible(!barraIcones.isVisible());
             }
         });
-        nomeLabel = new Label("", skin, "subtitulo");
+        // Nome sem contorno e um pouco menor que o titulo.
+        nomeLabel = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 1.35f), Color.WHITE));
         nomeLabel.setAlignment(Align.center);
         Button fechar = botaoIcone("ui/buttons/CloseBtn", null, 30f);
         fechar.addListener(new ChangeListener() {
@@ -118,7 +131,7 @@ public class PainelJogadorUI {
         Table topo = new Table();
         topo.setBackground(UiSkin.retanguloBordaUnica(COR_TOPBAR, COR_BORDA, false));
         topo.pad(4f, 10f, 4f, 6f);
-        topo.add().size(32f); // equilibra o X pro nome ficar no meio
+        topo.add(botaoIconBtn).size(32f).left(); // icones de amizade (so' amigo)
         topo.add(nomeLabel).expandX().center();
         topo.add(fechar).size(32f).right();
 
@@ -142,8 +155,7 @@ public class PainelJogadorUI {
         // Esquerda: botao dos icones de amizade (so' amigo) em cima da foto.
         Table esquerda = new Table();
         esquerda.top();
-        esquerda.add(botaoIconBtn).size(34f).left().row();
-        esquerda.add(areaFoto).size(TAM_FOTO).padTop(4f);
+        esquerda.add(areaFoto).size(TAM_FOTO);
         Table corpo = new Table();
         corpo.pad(8f, 10f, 6f, 10f);
         corpo.add(esquerda).expandX().top();
@@ -171,6 +183,7 @@ public class PainelJogadorUI {
                 setOrigin(getWidth() / 2f, getHeight() / 2f);
             }
         };
+        conteudoArrastavel = conteudo;
         conteudo.add(barraIcones).left().padLeft(4f).row();
         conteudo.add(janela).width(LARGURA);
         boolean mobile = com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
@@ -186,6 +199,41 @@ public class PainelJogadorUI {
             @Override public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) { return true; }
         };
         janela.addListener(engolir);
+        // Arrastar pela topbar move a janela (da' pra mexer no resto do jogo).
+        topo.setTouchable(Touchable.enabled);
+        topo.addListener(new InputListener() {
+            float ultimoX, ultimoY;
+            @Override public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                ultimoX = event.getStageX();
+                ultimoY = event.getStageY();
+                return true;
+            }
+            @Override public void touchDragged(InputEvent event, float x, float y, int pointer) {
+                float dx = event.getStageX() - ultimoX, dy = event.getStageY() - ultimoY;
+                ultimoX = event.getStageX();
+                ultimoY = event.getStageY();
+                Stage st = raiz.getStage();
+                float limX = st != null ? st.getWidth() * 0.5f : 2000f, limY = st != null ? st.getHeight() * 0.5f : 2000f;
+                float nx = Math.max(-limX, Math.min(limX, deslocX + dx)), ny = Math.max(-limY, Math.min(limY, deslocY + dy));
+                conteudoArrastavel.moveBy(nx - deslocX, ny - deslocY);
+                deslocX = nx;
+                deslocY = ny;
+            }
+        });
+
+        // Status no canto de cima da foto: online/offline e "Last seen".
+        Label.LabelStyle estiloStatus = new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f), Color.WHITE);
+        textoStatus = new Label("", estiloStatus);
+        textoVisto = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.6f), Color.WHITE));
+        textoVisto.setColor(new Color(0.65f, 0.65f, 0.65f, 1f));
+        iconeStatus.setScaling(Scaling.fit);
+        Table linhaStatus = new Table();
+        linhaStatus.add(iconeStatus).size(16f).padRight(4f);
+        linhaStatus.add(textoStatus).left();
+        statusFoto.top().left();
+        statusFoto.add(linhaStatus).left().row();
+        statusFoto.add(textoVisto).left();
+        statusFoto.setVisible(false);
         barraIcones.addListener(engolir);
 
         raiz.setFillParent(true);
@@ -209,15 +257,38 @@ public class PainelJogadorUI {
         Label.LabelStyle estiloNome = nomeExibido.indexOf('?') >= 0
             ? new Label.LabelStyle(skin.getFont("simbolo-font"), Color.WHITE)
             : skin.get("subtitulo", Label.LabelStyle.class);
+        estiloNome = new Label.LabelStyle(UiSkin.fonteHudEm(skin, 1.35f), Color.WHITE); // tem "?" e sem contorno
         nomeLabel.setStyle(estiloNome);
         nomeLabel.setText(nomeExibido);
         // Nome escondido ("???"): sem cor, senao entregava a classe.
         boolean escondido = nomeExibido.indexOf('?') >= 0;
         nomeLabel.setColor(classe != null && !escondido ? com.teste.game.ChatUI.corDaClasse(classe) : Color.WHITE);
         areaFoto.clearChildren();
-        if (foto != null) areaFoto.add(foto).grow();
+        statusFoto.setVisible(false);
+        com.badlogic.gdx.scenes.scene2d.ui.Stack pilha = new com.badlogic.gdx.scenes.scene2d.ui.Stack();
+        if (foto != null) pilha.add(foto);
+        pilha.add(statusFoto);
+        areaFoto.add(pilha).grow();
         barraIcones.setVisible(false);
         raiz.setVisible(true);
+    }
+
+    /** player_info do servidor: online, ou ha' quantos segundos foi visto (-1 = nunca). */
+    public void definirStatus(String nome, boolean online, long vistoHaSeg) {
+        if (nome == null || !nome.equals(nomeAtual)) return;
+        TextureRegion r = atlas.findRegion(online ? "ui/OnlineIcon" : "ui/OfflineIcon");
+        iconeStatus.setDrawable(r != null ? new TextureRegionDrawable(r) : null);
+        textoStatus.setText(online ? "Online" : "Offline");
+        textoStatus.setColor(online ? Color.valueOf("5ee36a") : new Color(0.75f, 0.75f, 0.75f, 1f));
+        textoVisto.setText(online || vistoHaSeg < 0 ? "" : "Last seen " + tempoAtras(vistoHaSeg));
+        statusFoto.setVisible(true);
+    }
+
+    private static String tempoAtras(long seg) {
+        if (seg < 60) return "just now";
+        if (seg < 3600) return (seg / 60) + "m ago";
+        if (seg < 86400) return (seg / 3600) + "h ago";
+        return (seg / 86400) + "d ago";
     }
 
     /** Estado dos botoes (amigo/ignorado ficam verdes; IconBtn so' pra amigo). */

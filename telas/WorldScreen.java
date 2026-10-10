@@ -1012,11 +1012,7 @@ public class WorldScreen extends ScreenAdapter {
                         dialogoNPC.avancarOuFechar();
                         return true;
                     }
-                    NPCVisual npcProximo = npcMaisProximoParaConversar();
-                    if (npcProximo != null) {
-                        abrirDialogoNPC(npcProximo);
-                        return true;
-                    }
+                    // E nao abre mais conversa com NPC (so' clicando nele).
                     alternarBookMenu();
                     return true;
                 }
@@ -2316,6 +2312,7 @@ public class WorldScreen extends ScreenAdapter {
     private void abrirPainelDe(String nome) {
         TextureRegion reserva = atlas.findRegion(BookMenuUI.iconeClasse(classeDe(nome)));
         painelJogador.abrir(nome, nomeVisivel(nome), classeDe(nome), new AtorAlvo(nome, reserva));
+        if (socket.isConnected()) socket.emitRaw("get_player_info", GameSocket.obj(w -> w.set("name", nome)));
         atualizarEstadoPainel();
     }
 
@@ -3646,6 +3643,10 @@ public class WorldScreen extends ScreenAdapter {
             if (dialogoNPC.isVisible()) dialogoNPC.fechar();
             bookMenu.abrirBanco();
             atualizarVisibilidadeJoystick();
+        });
+        socket.on("player_info", (nomeEvt, data) -> {
+            if (data != null && painelJogador != null) painelJogador.definirStatus(data.getString("name", ""),
+                data.getBoolean("online", false), data.getLong("last_seen_ago", -1L));
         });
         socket.on("bank_synced", (nomeEvt, data) -> bookMenu.atualizarBanco(data));
         socket.on("bank_currency", (nomeEvt, data) -> {
