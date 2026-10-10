@@ -152,11 +152,11 @@ NPC_DB = {
     # property "direction" do objeto). Tirar o "fixo" faz andar igual o
     # Kharon. "falas" = paginas do dialogo (o client mostra no lugar do texto
     # do Kharon). A loja em si vem depois.
-    "syron": {"name": "Syron", "fixo": True, "falas": ["Welcome, traveler. Take a look at my wares."]},
-    "nyla":  {"name": "Nyla",  "fixo": True, "falas": ["Hello there! Need something?"]},
-    "luke":  {"name": "Luke",  "fixo": True, "falas": ["Good day. What can I get you?"]},
-    "jack":  {"name": "Jack",  "fixo": True, "falas": ["Hey! Best prices in town."]},
-    "luna":  {"name": "Luna",  "fixo": True, "falas": ["Oh, a customer! Come, come."]},
+    "syron": {"name": "Syron", "fixo": True, "falas": ["Hungry, traveler? Fresh food, right here."]},            # comida
+    "nyla":  {"name": "Nyla",  "fixo": True, "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},  # magias
+    "luke":  {"name": "Luke",  "fixo": True, "falas": ["Looking for a blade? Finest steel in town."]},           # armas
+    "jack":  {"name": "Jack",  "fixo": True, "falas": ["Welcome to your private vault. Your belongings are safe with me."]},  # banco
+    "luna":  {"name": "Luna",  "fixo": True, "falas": ["Welcome to the market! Trade your goods with other adventurers."]},    # market
 }
 NPC_PAY_DISTANCIA_SQM = 4
 NPC_TEXTO_SEM_DINHEIRO = "Do not try to deceive me, mortal."
@@ -1269,13 +1269,19 @@ def _npc_payload(npc_id, npc):
     if info.get('falas'): payload['falas'] = list(info['falas'])
     return payload
 
+_npc_avisado = set()
+
 def _registrar_npcs_do_mapa(map_id, definicoes, sid):
     agora = time.time()
     for definicao in (definicoes or [])[:256]:
         if not isinstance(definicao, dict): continue
         npc_id = str(definicao.get('npc_id', '')).strip().lower()
         instance_id = str(definicao.get('id', '')).strip()[:120]
-        if npc_id not in NPC_DB or not instance_id: continue
+        if npc_id not in NPC_DB or not instance_id:
+            if npc_id and f'{map_id}:{npc_id}' not in _npc_avisado:
+                _npc_avisado.add(f'{map_id}:{npc_id}')
+                print(f"[NPC] AVISO: npc_id '{npc_id}' do mapa nao esta no NPC_DB do servidor - ignorado")
+            continue
         try:
             x, y = float(definicao['x']), float(definicao['y'])
             floor = max(1, min(100, int(definicao.get('floor', 1))))
@@ -5703,6 +5709,10 @@ def carregar_mapa_do_servidor():
           f"{len(velocidade_tiles[MAPA_ID_SERVIDOR])} SQM(s) com speed_modifier, "
           f"{len(zonas_protegidas[MAPA_ID_SERVIDOR])} SQM(s) de Protection Zone, "
           f"{len(teleportes[MAPA_ID_SERVIDOR])} SQM(s) de teleport")
+    for n in dados['npcs']:
+        c, l = tile_de(n['x'], n['y'])
+        extra = '' if str(n['npc_id']).strip().lower() in NPC_DB else '  <- NAO esta no NPC_DB, vai ser ignorado'
+        print(f"[NPC] {n['npc_id']!r} em x{c}, y{l} (virado {n.get('direction', 'down')}){extra}")
 
 carregar_mapa_do_servidor()
 

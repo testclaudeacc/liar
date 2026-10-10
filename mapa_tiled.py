@@ -307,10 +307,14 @@ def carregar_mapa(caminho_tmx):
 
     # ---- Objetos (SpawnPoints, NPCSpawns, MobSpawns) ----
     def objetos(nome_camada):
-        for grupo in raiz.findall('objectgroup'):
+        # TODAS as camadas com esse nome, inclusive dentro de pastas (group)
+        # do Tiled - antes so' a 1a do nivel de cima: objeto numa 2a camada
+        # "NPCSpawns" (ou numa pasta) sumia sem aviso.
+        achados = []
+        for grupo in raiz.iter('objectgroup'):
             if grupo.get('name') == nome_camada:
-                return grupo.findall('object')
-        return []
+                achados += grupo.findall('object')
+        return achados
 
     def ancora_mundo(obj):
         # RectangleMapObject do libGDX: y = altura_mapa - y_tiled - height.
