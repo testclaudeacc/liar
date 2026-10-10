@@ -44,24 +44,26 @@ public class PainelJogadorUI {
     }
 
     // Foto na esquerda, botoes (icone + o que faz) empilhados na direita.
-    private static final float LARGURA = 400f;
-    private static final float TAM_FOTO = 120f;
-    private static final float LARGURA_BOTAO = 200f;
+    private static final float LARGURA = 330f;
+    private static final float TAM_FOTO = 96f;
+    private static final float LARGURA_BOTAO = 170f;
     private static final float ALTURA_BOTAO = 38f;
     private static final float TAM_ICONE_BOTAO = 26f;
     private static final float TAM_MINI = 44f;
     /** No PC a janela fica menor (no celular continua do tamanho de antes). */
     private static final float ESCALA_PC = 0.8f;
 
-    // Cores dos botoes.
-    private static final Color COR_CINZA = Color.valueOf("4a4a4a");
-    private static final Color COR_ROSA = Color.valueOf("f3a6c8");
-    private static final Color COR_VERDE = Color.valueOf("2e7d32");
-    private static final Color COR_VERMELHO = Color.valueOf("a82828");
-    private static final Color COR_AMARELO = Color.valueOf("e8c547");
-    private static final Color COR_PARTY = Color.valueOf("b07a45");
-    private static final Color COR_MENSAGEM = Color.valueOf("3a6fc4");
-    private static final Color COR_TEXTO_ESCURO = Color.valueOf("2a2a2a");
+    // Cores dos botoes: as mesmas das notificacoes (HudVitais.COR_NOTIF_*)
+    // - amigo rosa, trade amarelo, party azul - e o resto no mesmo tom.
+    private static final Color COR_CINZA = Color.valueOf("3a3a3a");
+    private static final Color COR_ROSA = new Color(0.45f, 0.12f, 0.3f, 1f);
+    private static final Color COR_VERDE = Color.valueOf("1e6b2a");
+    private static final Color COR_VERMELHO = Color.valueOf("7a1a1a");
+    private static final Color COR_AMARELO = new Color(0.42f, 0.33f, 0.05f, 1f);
+    private static final Color COR_PARTY = new Color(0.16f, 0.32f, 0.45f, 1f);
+    private static final Color COR_MENSAGEM = Color.valueOf("2a5a52");
+    private static final Color COR_TEXTO_ESCURO = Color.WHITE;
+    private static final Color COR_TOPBAR = Color.valueOf("2f2f2f");
 
     private static final Color COR_FUNDO = new Color(0.10f, 0.10f, 0.10f, 0.97f);
     private static final Color COR_BORDA = new Color(0.36f, 0.36f, 0.36f, 1f);
@@ -100,8 +102,8 @@ public class PainelJogadorUI {
         estiloBlock = estiloTexto(COR_CINZA, Color.WHITE);
         estiloBlocked = estiloTexto(COR_VERMELHO, Color.WHITE);
 
-        // ---- Topo: Icons | nome | X ----
-        botaoIconBtn = botaoTexto("ui/buttons/IconBtn", "Icons", estiloTexto(COR_CINZA, Color.WHITE), 20f);
+        // ---- Topbar so' com o nome e o X ----
+        botaoIconBtn = botaoTexto("ui/buttons/IconBtn", "", estiloTexto(COR_CINZA, Color.WHITE), 22f);
         botaoIconBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
                 barraIcones.setVisible(!barraIcones.isVisible());
@@ -114,9 +116,11 @@ public class PainelJogadorUI {
             @Override public void changed(ChangeEvent event, Actor actor) { fechar(); }
         });
         Table topo = new Table();
-        topo.add(botaoIconBtn).width(96f).height(32f).left();
+        topo.setBackground(UiSkin.retanguloBordaUnica(COR_TOPBAR, COR_BORDA, false));
+        topo.pad(4f, 10f, 4f, 6f);
+        topo.add().size(32f); // equilibra o X pro nome ficar no meio
         topo.add(nomeLabel).expandX().center();
-        topo.add(fechar).size(36f).right();
+        topo.add(fechar).size(32f).right();
 
         // ---- Botoes de baixo (ordem do mock, esquerda -> direita) ----
         botaoAmigo = botaoTexto("ui/buttons/FriendsBtn", "Add Friend", estiloAddFriend, TAM_ICONE_BOTAO);
@@ -133,10 +137,16 @@ public class PainelJogadorUI {
 
         janela.setBackground(UiSkin.retangulo(COR_FUNDO, COR_BORDA, 1));
         janela.setTouchable(Touchable.enabled);
-        janela.pad(8f, 10f, 10f, 10f);
-        janela.add(topo).growX().padBottom(6f).row();
+        janela.pad(1f);
+        janela.add(topo).growX().row();
+        // Esquerda: botao dos icones de amizade (so' amigo) em cima da foto.
+        Table esquerda = new Table();
+        esquerda.top();
+        esquerda.add(botaoIconBtn).size(34f).left().row();
+        esquerda.add(areaFoto).size(TAM_FOTO).padTop(4f);
         Table corpo = new Table();
-        corpo.add(areaFoto).size(TAM_FOTO).expandX().center();
+        corpo.pad(8f, 10f, 6f, 10f);
+        corpo.add(esquerda).expandX().top();
         corpo.add(botoes).top();
         janela.add(corpo).grow();
 
@@ -283,10 +293,13 @@ public class PainelJogadorUI {
         if (r != null) {
             Image img = new Image(new TextureRegionDrawable(r));
             img.setScaling(Scaling.fit);
-            b.add(img).size(tamIcone).padLeft(8f).padRight(8f);
+            if (texto.isEmpty()) b.add(img).size(tamIcone);
+            else b.add(img).size(tamIcone).padLeft(8f).padRight(8f);
         }
-        b.add(b.getLabel()).left().expandX();
-        b.getLabel().setAlignment(Align.left);
+        if (!texto.isEmpty()) {
+            b.add(b.getLabel()).left().expandX();
+            b.getLabel().setAlignment(Align.left);
+        }
         return b;
     }
 
