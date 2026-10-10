@@ -4154,7 +4154,8 @@ public class WorldScreen extends ScreenAdapter {
         // ja que essas celulas foram removidas das layers normais).
         mapa.desenharOverlays(batch, local.x, local.y);
         // Tiles com Above_Player=true (e Above_Dynamic "por cima" agora): por cima do player.
-        mapa.atualizarAcimaDinamico((int) Math.floor(local.x / Jogador.TILE), (int) Math.floor((local.y - 1f) / Jogador.TILE));
+        // local.y = pe' do player no fundo do SQM: mesma conta de naCaverna().
+        mapa.atualizarAcimaDinamico((int) Math.floor(local.x / Jogador.TILE), (int) Math.floor((local.y + Jogador.TILE / 2f) / Jogador.TILE));
         mapa.desenharAcimaDoPlayer(batch, camera);
         batch.end();
 
