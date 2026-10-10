@@ -19,7 +19,7 @@ import com.badlogic.gdx.utils.Scaling;
 /**
  * HUD do canto superior esquerdo, medido pixel a pixel em
  * prints/tela desejada barras.png (1366x768):
- *   painel: borda 2px (83,83,83), fundo (48,48,48); coracao + barra de HP
+ *   painel: borda 2px (66,66,66), fundo (30,30,30) - os tons do botao do retrato; coracao + barra de HP
  *   (198,0,0) e mana + barra de MP (96,153,255), 314x34 cada, com 1px de
  *   sombra (45,45,45) a direita/embaixo e 5px entre elas;
  *   XP: painel 262x34, borda 1px preta, fundo (14,14,14), icone a esquerda
@@ -30,9 +30,10 @@ import com.badlogic.gdx.utils.Scaling;
  */
 public final class HudVitais {
 
-    private static final Color COR_BORDA_PAINEL = new Color(83 / 255f, 83 / 255f, 83 / 255f, 1f);
-    private static final Color COR_PAINEL = new Color(48 / 255f, 48 / 255f, 48 / 255f, 1f);
-    private static final Color COR_SOMBRA = new Color(45 / 255f, 45 / 255f, 45 / 255f, 1f);
+    private static final Color COR_BORDA_PAINEL = new Color(66 / 255f, 66 / 255f, 66 / 255f, 1f); // = aro do botao do retrato
+    private static final Color COR_PAINEL = new Color(30 / 255f, 30 / 255f, 30 / 255f, 1f);     // = fundo do botao do retrato
+    private static final Color COR_SOMBRA = new Color(14 / 255f, 14 / 255f, 14 / 255f, 1f);
+    private static final Color COR_TRILHO = new Color(0.12f, 0.12f, 0.12f, 0.45f);
     private static final Color COR_HP = new Color(198 / 255f, 0f, 0f, 1f);
     private static final Color COR_MP = Color.valueOf("6a3ad8"); // mesmo roxo do arco de MP
     private static final Color COR_XP_FUNDO = new Color(14 / 255f, 14 / 255f, 14 / 255f, 1f);
@@ -169,6 +170,10 @@ public final class HudVitais {
         final Table alinhador;
         final Label texto;
         final float largura;
+        // HP/MP: o painel desenha a barra (cor x pct) no lugar da 'pilha'.
+        Color cor = Color.WHITE;
+        float pct = 0f;
+        com.badlogic.gdx.scenes.scene2d.Actor pilha;
         Barra(Image preenchimento, Table alinhador, Label texto, float largura) {
             this.preenchimento = preenchimento;
             this.alinhador = alinhador;
@@ -200,39 +205,71 @@ public final class HudVitais {
         // ---- Painel HP/MP ----
         // Fundo do painel cinza escuro SOLIDO; so' o trilho das barras (atras
         // do vermelho/roxo) e' semi transparente - ali da' pra ver o jogo.
-        // Por isso o painel pinta tudo MENOS o retangulo de cada barra.
-        final java.util.List<com.badlogic.gdx.scenes.scene2d.Actor> barrasPainel = new java.util.ArrayList<>();
+        // Tudo do painel (fundo, trilho, preenchimento e sombra das barras) e'
+        // desenhado AQUI, num lugar so', com as bordas presas no pixel de
+        // tela: antes o painel deixava um "furo" e cada barra se desenhava
+        // nele por conta propria - quando a posicao caia em meio pixel, um
+        // arredondava pra um lado e o outro pro outro e sobrava 1px vazio.
+        final java.util.List<Barra> barrasPainel = new java.util.ArrayList<>();
         final TextureRegion regiaoPixel = new TextureRegion(pixel);
         Table interno = new Table() {
             @Override protected void drawBackground(com.badlogic.gdx.graphics.g2d.Batch batch, float parentAlpha, float x, float y) {
                 Color antes = new Color(batch.getColor());
-                batch.setColor(COR_PAINEL.r, COR_PAINEL.g, COR_PAINEL.b, parentAlpha * getColor().a);
-                // Barras em coordenadas do painel, de baixo pra cima.
+                float a = parentAlpha * getColor().a;
+                float x0 = pixelInteiro(x), y0 = pixelInteiro(y);
+                float x1 = pixelInteiro(x + getWidth()), y1 = pixelInteiro(y + getHeight());
+                float um = 1f / escala;                       // 1 pixel de tela
+                float sombra = Math.max(1, Math.round(FATOR)) * um;
                 java.util.List<float[]> furos = new java.util.ArrayList<>();
-                for (com.badlogic.gdx.scenes.scene2d.Actor a : barrasPainel) {
-                    com.badlogic.gdx.math.Vector2 v = a.localToAscendantCoordinates(this, new com.badlogic.gdx.math.Vector2(0, 0));
-                    furos.add(new float[]{v.x, v.y, a.getWidth(), a.getHeight()});
+                for (Barra b : barrasPainel) {
+                    com.badlogic.gdx.math.Vector2 v = b.pilha.localToAscendantCoordinates(this, new com.badlogic.gdx.math.Vector2(0, 0));
+                    float bx0 = pixelInteiro(x + v.x), by0 = pixelInteiro(y + v.y);
+                    float bx1 = pixelInteiro(x + v.x + b.pilha.getWidth()), by1 = pixelInteiro(y + v.y + b.pilha.getHeight());
+                    furos.add(new float[]{bx0, by0 - sombra, bx1 + sombra, by1}); // x0, y0, x1, y1 (com a sombra)
                 }
-                furos.sort((a, b) -> Float.compare(a[1], b[1]));
-                float w = getWidth(), h = getHeight();
-                if (furos.isEmpty()) { batch.draw(regiaoPixel, x, y, w, h); batch.setColor(antes); return; }
-                float fx0 = furos.get(0)[0], fx1 = fx0 + furos.get(0)[2];
-                batch.draw(regiaoPixel, x, y, fx0, h);                 // esquerda (icones)
-                batch.draw(regiaoPixel, x + fx1, y, w - fx1, h);       // direita
-                float baixo = 0f;
-                for (float[] f : furos) {                              // vaos entre as barras
-                    if (f[1] > baixo) batch.draw(regiaoPixel, x + fx0, y + baixo, fx1 - fx0, f[1] - baixo);
-                    baixo = f[1] + f[3];
+                furos.sort((p, q) -> Float.compare(p[1], q[1]));
+                batch.setColor(COR_PAINEL.r, COR_PAINEL.g, COR_PAINEL.b, a);
+                if (furos.isEmpty()) batch.draw(regiaoPixel, x0, y0, x1 - x0, y1 - y0);
+                else {
+                    float fx0 = furos.get(0)[0], fx1 = furos.get(0)[2];
+                    batch.draw(regiaoPixel, x0, y0, fx0 - x0, y1 - y0);        // esquerda (icones)
+                    batch.draw(regiaoPixel, fx1, y0, x1 - fx1, y1 - y0);       // direita
+                    float baixo = y0;
+                    for (float[] f : furos) {                                  // entre as barras
+                        if (f[1] > baixo) batch.draw(regiaoPixel, fx0, baixo, fx1 - fx0, f[1] - baixo);
+                        baixo = f[3];
+                    }
+                    if (y1 > baixo) batch.draw(regiaoPixel, fx0, baixo, fx1 - fx0, y1 - baixo);
                 }
-                if (h > baixo) batch.draw(regiaoPixel, x + fx0, y + baixo, fx1 - fx0, h - baixo);
+                for (Barra b : barrasPainel) {
+                    com.badlogic.gdx.math.Vector2 v = b.pilha.localToAscendantCoordinates(this, new com.badlogic.gdx.math.Vector2(0, 0));
+                    float bx0 = pixelInteiro(x + v.x), by0 = pixelInteiro(y + v.y);
+                    float bx1 = pixelInteiro(x + v.x + b.pilha.getWidth()), by1 = pixelInteiro(y + v.y + b.pilha.getHeight());
+                    // trilho (semi transparente: da' pra ver o jogo atras)
+                    batch.setColor(COR_TRILHO.r, COR_TRILHO.g, COR_TRILHO.b, COR_TRILHO.a * a);
+                    batch.draw(regiaoPixel, bx0, by0, bx1 - bx0, by1 - by0);
+                    // preenchimento
+                    float cheio = pixelInteiro(bx0 + (bx1 - bx0) * b.pct) - bx0;
+                    if (cheio > 0f) {
+                        batch.setColor(b.cor.r, b.cor.g, b.cor.b, a);
+                        batch.draw(regiaoPixel, bx0, by0, cheio, by1 - by0);
+                    }
+                    // sombra so' na direita/embaixo
+                    batch.setColor(COR_SOMBRA.r, COR_SOMBRA.g, COR_SOMBRA.b, a);
+                    // (cobre o furo inteiro: barra + 1 faixa embaixo + 1 na direita)
+                    batch.draw(regiaoPixel, bx0, by0 - sombra, bx1 - bx0 + sombra, sombra);
+                    batch.draw(regiaoPixel, bx1, by0, sombra, by1 - by0);
+                }
                 batch.setColor(antes);
             }
         };
         interno.setBackground(cor(COR_PAINEL)); // so' pra Table desenhar o fundo (drawBackground acima)
         interno.pad(px(3), 0, px(2), px(3));
-        barrasPainel.add(adicionarLinhaVital(interno, atlas, "ui/HPIcon", hp).getActor());
+        adicionarLinhaVital(interno, atlas, "ui/HPIcon", hp);
+        barrasPainel.add(hp);
         interno.row();
-        barrasPainel.add(adicionarLinhaVital(interno, atlas, "ui/MPIcon", mp).padTop(px(5)).getActor());
+        adicionarLinhaVital(interno, atlas, "ui/MPIcon", mp).padTop(px(5));
+        barrasPainel.add(mp);
         Table painel = new Table();
         painel.setBackground(moldura(COR_BORDA_PAINEL, px(2), px(1), px(1), px(1)));
         // Borda: 2px em cima, 1px nos outros lados (medido na print).
@@ -429,10 +466,16 @@ public final class HudVitais {
             @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch b, float x, float y, float w, float h) {
                 Color antes = new Color(b.getColor());
                 b.setColor(cor.r, cor.g, cor.b, cor.a * antes.a);
-                if (cima > 0f) b.draw(r, x, y + h - cima, w, cima);
-                if (baixo > 0f) b.draw(r, x, y, w, baixo);
-                if (esq > 0f) b.draw(r, x, y + baixo, esq, h - cima - baixo);
-                if (dir > 0f) b.draw(r, x + w - dir, y + baixo, dir, h - cima - baixo);
+                // Presa no pixel de tela e 1px mais grossa pra dentro (fica por
+                // baixo do conteudo): sem fresta entre a borda e o que ela segura.
+                float um = 1f / escala;
+                float x0 = pixelInteiro(x), y0 = pixelInteiro(y), x1 = pixelInteiro(x + w), y1 = pixelInteiro(y + h);
+                float c = cima > 0f ? pixelInteiro(cima) + um : 0f, bx = baixo > 0f ? pixelInteiro(baixo) + um : 0f;
+                float e = esq > 0f ? pixelInteiro(esq) + um : 0f, d = dir > 0f ? pixelInteiro(dir) + um : 0f;
+                if (c > 0f) b.draw(r, x0, y1 - c, x1 - x0, c);
+                if (bx > 0f) b.draw(r, x0, y0, x1 - x0, bx);
+                if (e > 0f) b.draw(r, x0, y0, e, y1 - y0);
+                if (d > 0f) b.draw(r, x1 - d, y0, d, y1 - y0);
                 b.setColor(antes);
             }
         };
@@ -465,7 +508,11 @@ public final class HudVitais {
         alinhador.add(preenchimento).size(0f, px(34));
         Label texto = new Label("", estilo);
         texto.setAlignment(Align.center);
-        return new Barra(preenchimento, alinhador, texto, px(larguraPx));
+        Barra b = new Barra(preenchimento, alinhador, texto, px(larguraPx));
+        b.cor = new Color(cor);
+        // Quem desenha o preenchimento de HP/MP e' o painel (pixel inteiro).
+        preenchimento.setVisible(false);
+        return b;
     }
 
     /** [icone 39px + 5] [barra 314x34 + 1px de sombra a direita/embaixo]. */
@@ -475,13 +522,11 @@ public final class HudVitais {
         // negativo pra ele nao aumentar a altura da linha (que e' a da barra).
         if (img != null) pai.add(img).size(px(39)).padTop(px(-2)).padBottom(px(-2)).padRight(px(5));
         else pai.add().size(px(39)).padTop(px(-2)).padBottom(px(-2)).padRight(px(5));
-        Table fundo = new Table();
-        // Trilho vazio (atras do vermelho/roxo): cinza escuro semi transparente.
-        fundo.setBackground(cor(new Color(0.12f, 0.12f, 0.12f, 0.45f)));
-        Stack pilha = new Stack(fundo, barra.alinhador, barra.texto);
+        // Trilho, preenchimento e sombra: desenhados pelo painel (ver
+        // drawBackground do 'interno'); aqui so' o lugar e o texto.
+        Stack pilha = new Stack(barra.alinhador, barra.texto);
+        barra.pilha = pilha;
         Table comSombra = new Table();
-        // Sombra so' na direita/embaixo (antes era um retangulo cheio por tras).
-        comSombra.setBackground(moldura(COR_SOMBRA, 0f, 0f, px(1), px(1)));
         comSombra.pad(0, 0, px(1), px(1));
         comSombra.add(pilha).size(barra.largura, px(34));
         return pai.add(comSombra);
@@ -798,6 +843,7 @@ public final class HudVitais {
 
     private static void preencher(Barra barra, float pct) {
         pct = Math.max(0f, Math.min(1f, pct));
+        barra.pct = pct;
         barra.alinhador.getCell(barra.preenchimento).width(barra.largura * pct);
         barra.alinhador.invalidateHierarchy();
     }

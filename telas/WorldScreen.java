@@ -1530,45 +1530,83 @@ public class WorldScreen extends ScreenAdapter {
         if ("skill".equals(stat) && bookMenu != null) return bookMenu.corDaSkillPrincipal();
         return COR_ANEL_XP;
     }
+    /** Anel de XP desenhado pixel a pixel numa textura (do tamanho real em
+     * pixels de tela): antes eram ~96 retangulos girados, que deixavam
+     * frestas transparentes e nao encostavam direito no botao. Contorno e
+     * trilho vazio nos tons do botao; so' refaz a textura quando muda o
+     * tamanho, o progresso ou a cor. */
     private class AnelXp extends com.badlogic.gdx.scenes.scene2d.Actor {
-        private static final int SEGMENTOS = 96;
+        private Texture textura;
+        private int ladoFeito = -1, cheioFeito = -1;
+        private Color corFeita = new Color();
         AnelXp() { setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); }
         @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch b, float alpha) {
             mascaraDoRetrato();
             float lado = Math.min(getWidth(), getHeight());
-            float cx = getX() + getWidth() / 2f, cy = getY() + getHeight() / 2f;
-            float espessura = lado * 0.085f;
-            // Logo fora do fundo (Button1 encolhido), dentro da celula.
-            float raio = lado * FATOR_RETRATO / 2f + espessura / 2f + lado * 0.01f;
-            float fracao = fracaoStatRetrato();
-            int cheios = Math.round(fracao * SEGMENTOS);
-            // Borda escura nas duas beiradas (o meio vazio e' transparente).
-            float borda = Math.max(1f, lado * 0.018f);
-            anel(b, cx, cy, raio - espessura / 2f, borda, SEGMENTOS, COR_ANEL_BORDA, alpha);
-            anel(b, cx, cy, raio + espessura / 2f, borda, SEGMENTOS, COR_ANEL_BORDA, alpha);
-            anel(b, cx, cy, raio, espessura - borda, cheios, corStatRetrato(), alpha);
+            if (lado <= 0f || getStage() == null) return;
+            com.badlogic.gdx.utils.viewport.Viewport vp = getStage().getViewport();
+            float escalaTela = vp.getScreenWidth() / Math.max(1f, vp.getWorldWidth());
+            int n = Math.max(8, Math.round(lado * escalaTela));
+            // progresso em 1/1000 (refaz a textura so' quando muda de verdade)
+            int cheio = Math.round(fracaoStatRetrato() * 1000f);
+            Color cor = corStatRetrato();
+            if (textura == null || n != ladoFeito || cheio != cheioFeito || !cor.equals(corFeita)) {
+                if (textura != null) textura.dispose();
+                textura = gerarAnel(n, cheio / 1000f, cor);
+                ladoFeito = n; cheioFeito = cheio; corFeita.set(cor);
+            }
+            // Preso no pixel de tela (textura 1:1, sem borrar).
+            float tam = n / escalaTela;
+            float x = Math.round((getX() + (getWidth() - tam) / 2f) * escalaTela) / escalaTela;
+            float y = Math.round((getY() + (getHeight() - tam) / 2f) * escalaTela) / escalaTela;
+            b.setColor(1f, 1f, 1f, alpha);
+            b.draw(textura, x, y, tam, tam);
             b.setColor(Color.WHITE);
+        }
+        @Override protected void setStage(com.badlogic.gdx.scenes.scene2d.Stage stage) {
+            super.setStage(stage);
+            if (stage == null && textura != null) { textura.dispose(); textura = null; }
         }
     }
 
-    private static final Color COR_ANEL_BORDA = new Color(0.05f, 0.04f, 0.03f, 1f);
+    // Tons do botao do retrato (aro 66, meio 47): contorno e trilho vazio
+    // combinam com ele em vez do marrom/transparente de antes.
+    private static final Color COR_ANEL_BORDA = Color.valueOf("141414");
+    private static final Color COR_ANEL_TRILHO = Color.valueOf("2f2f2f");
 
-    /** Arco de "segmentos" pedacos (de AnelXp.SEGMENTOS na volta toda),
-     * comecando em cima e indo no sentido horario. */
-    private void anel(com.badlogic.gdx.graphics.g2d.Batch b, float cx, float cy, float raio, float espessura,
-                      int segmentos, Color c, float alpha) {
-        int total = AnelXp.SEGMENTOS;
-        // Comprimento de cada pedaco = arco + um pouco (sem frestas).
-        float comp = (float) (2 * Math.PI * raio / total) * 1.15f;
-        b.setColor(c.r, c.g, c.b, c.a * alpha);
-        for (int i = 0; i < segmentos; i++) {
-            float ang = 90f - (i + 0.5f) * 360f / total;
-            float rad = ang * com.badlogic.gdx.math.MathUtils.degreesToRadians;
-            float px = cx + raio * com.badlogic.gdx.math.MathUtils.cos(rad);
-            float py = cy + raio * com.badlogic.gdx.math.MathUtils.sin(rad);
-            b.draw(pixelBrancoRegiao(), px - comp / 2f, py - espessura / 2f, comp / 2f, espessura / 2f,
-                comp, espessura, 1f, 1f, ang - 90f);
+    /** Anel n x n px: contorno + (cor ate' 'fracao', trilho no resto) +
+     * contorno, comecando em cima e indo no sentido horario. Encosta (1px por
+     * cima) no aro do botao encolhido (FATOR_RETRATO), sem fresta. */
+    private static Texture gerarAnel(int n, float fracao, Color cor) {
+        Pixmap pm = new Pixmap(n, n, Pixmap.Format.RGBA8888);
+        pm.setBlending(Pixmap.Blending.None);
+        float c = n / 2f;
+        int borda = Math.max(1, Math.round(n * 0.018f));
+        int grossura = Math.max(3, Math.round(n * 0.085f));
+        float r0 = n * FATOR_RETRATO / 2f - 1f;     // 1px por cima do aro do botao
+        float r1 = Math.min(c, r0 + grossura + borda * 2);
+        int corBorda = Color.rgba8888(COR_ANEL_BORDA), corTrilho = Color.rgba8888(COR_ANEL_TRILHO);
+        int corCheia = Color.rgba8888(cor.r, cor.g, cor.b, 1f);
+        for (int py = 0; py < n; py++) {
+            for (int px = 0; px < n; px++) {
+                float dx = px + 0.5f - c, dy = c - (py + 0.5f);   // dy pra cima
+                float d = (float) Math.sqrt(dx * dx + dy * dy);
+                if (d < r0 || d >= r1) continue;
+                int corPx;
+                if (d < r0 + borda || d >= r1 - borda) corPx = corBorda;
+                else {
+                    // angulo a partir de cima, sentido horario, 0..1
+                    float ang = (float) Math.atan2(dx, dy);
+                    if (ang < 0f) ang += (float) (Math.PI * 2);
+                    corPx = ang / (float) (Math.PI * 2) < fracao ? corCheia : corTrilho;
+                }
+                pm.drawPixel(px, py, corPx);
+            }
         }
+        Texture t = new Texture(pm);
+        t.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+        pm.dispose();
+        return t;
     }
 
     /** Arco de "varredura" graus a partir de angInicio (graus, 0 = direita,
