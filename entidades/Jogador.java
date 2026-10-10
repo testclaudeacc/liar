@@ -122,6 +122,12 @@ public class Jogador {
         movendo = true;
     }
 
+    /** Passo em andamento: de onde saiu e pra onde vai (parado: a posicao atual). */
+    public float passoOrigemX() { return movendo ? origemX : x; }
+    public float passoOrigemY() { return movendo ? origemY : y; }
+    public float passoDestinoX() { return movendo ? destinoX : x; }
+    public float passoDestinoY() { return movendo ? destinoY : y; }
+
     /** Ultima posicao pedida (fim da fila, ou o passo atual). */
     public float ultimoAlvoX() { return !fila.isEmpty() ? (Float) fila.peekLast()[0] : movendo ? destinoX : x; }
 

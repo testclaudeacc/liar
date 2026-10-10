@@ -305,18 +305,25 @@ public class MapaMundo {
      * BAIXO -> tile por baixo; na fileira do MEIO -> fica como estava, ou
      * seja, depende de onde ele veio (desceu de cima = passa por tras;
      * subiu de baixo = passa pela frente). Fora do 3x3 nao muda nada.
-     * Celula do player em coordenadas de tile do libGDX (y pra cima). */
-    public void atualizarAcimaDinamico(int playerCx, int playerCy) {
+     * Decide pelo PASSO inteiro (SQM de onde saiu e o de chegada, nessa
+     * ordem), nao pela posicao que vai deslizando: assim troca no comeco do
+     * passo, antes do sprite encostar no tile, e nao no meio da diagonal.
+     * Celulas em coordenadas de tile do libGDX (y pra cima). */
+    public void atualizarAcimaDinamico(int origemCx, int origemCy, int destinoCx, int destinoCy) {
         java.util.List<MapaPropriedades.CelulaAcima> dinamicas = propriedades.celulasAcimaDinamicas;
         if (dinamicas.isEmpty()) return;
         if (dinamicaAcima == null || dinamicaAcima.length != dinamicas.size()) dinamicaAcima = new boolean[dinamicas.size()];
         for (int i = 0; i < dinamicas.size(); i++) {
             MapaPropriedades.CelulaAcima c = dinamicas.get(i);
-            int dx = playerCx - c.cx, dy = playerCy - c.cy;
-            if (Math.abs(dx) > 1 || Math.abs(dy) > 1) continue;
-            if (dy == 1) dinamicaAcima[i] = true;          // fileira de cima (y do libGDX cresce pra cima)
-            else if (dy == -1) dinamicaAcima[i] = false;   // fileira de baixo
+            aplicarFileira(i, origemCx - c.cx, origemCy - c.cy);
+            aplicarFileira(i, destinoCx - c.cx, destinoCy - c.cy);
         }
+    }
+
+    private void aplicarFileira(int i, int dx, int dy) {
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) return;
+        if (dy == 1) dinamicaAcima[i] = true;          // fileira de cima (y do libGDX cresce pra cima)
+        else if (dy == -1) dinamicaAcima[i] = false;   // fileira de baixo
     }
 
     /** Indices das camadas que existem no mapa (sem as que faltam). */
