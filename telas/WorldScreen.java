@@ -1571,7 +1571,7 @@ public class WorldScreen extends ScreenAdapter {
 
     // Tons do botao do retrato (aro 66, meio 47): contorno e trilho vazio
     // combinam com ele em vez do marrom/transparente de antes.
-    private static final Color COR_ANEL_BORDA = Color.valueOf("141414");
+    private static final Color COR_ANEL_BORDA = Color.valueOf("424242");
     private static final Color COR_ANEL_TRILHO = Color.valueOf("2f2f2f");
 
     /** Anel n x n px: contorno + (cor ate' 'fracao', trilho no resto) +
