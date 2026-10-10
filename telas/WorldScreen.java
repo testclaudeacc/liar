@@ -1575,16 +1575,20 @@ public class WorldScreen extends ScreenAdapter {
     private static final Color COR_ANEL_TRILHO = Color.valueOf("2f2f2f");
 
     /** Anel n x n px: contorno + (cor ate' 'fracao', trilho no resto) +
-     * contorno, comecando em cima e indo no sentido horario. Encosta (1px por
-     * cima) no aro do botao encolhido (FATOR_RETRATO), sem fresta. */
+     * contorno, comecando em cima e indo no sentido horario. Entra uns
+     * pixels por cima do aro do botao encolhido (FATOR_RETRATO), sem fresta. */
     private static Texture gerarAnel(int n, float fracao, Color cor) {
         Pixmap pm = new Pixmap(n, n, Pixmap.Format.RGBA8888);
         pm.setBlending(Pixmap.Blending.None);
         float c = n / 2f;
         int borda = Math.max(1, Math.round(n * 0.018f));
         int grossura = Math.max(3, Math.round(n * 0.085f));
-        float r0 = n * FATOR_RETRATO / 2f - 1f;     // 1px por cima do aro do botao
-        float r1 = Math.min(c, r0 + grossura + borda * 2);
+        // rIn = onde fica o contorno de dentro (encostado no aro do botao).
+        // De r0 ate' rIn: o cinza do botao, por cima do aro - o aro e' um
+        // circulo pixelado escalado e nas diagonais ficava fresta.
+        float rIn = n * FATOR_RETRATO / 2f - 1f;
+        float r0 = rIn - Math.max(3f, n * 0.025f);
+        float r1 = Math.min(c, rIn + grossura + borda * 2);
         int corBorda = Color.rgba8888(COR_ANEL_BORDA), corTrilho = Color.rgba8888(COR_ANEL_TRILHO);
         int corCheia = Color.rgba8888(cor.r, cor.g, cor.b, 1f);
         for (int py = 0; py < n; py++) {
@@ -1593,7 +1597,8 @@ public class WorldScreen extends ScreenAdapter {
                 float d = (float) Math.sqrt(dx * dx + dy * dy);
                 if (d < r0 || d >= r1) continue;
                 int corPx;
-                if (d < r0 + borda || d >= r1 - borda) corPx = corBorda;
+                if (d < rIn) corPx = corTrilho;
+                else if (d < rIn + borda || d >= r1 - borda) corPx = corBorda;
                 else {
                     // angulo a partir de cima, sentido horario, 0..1
                     float ang = (float) Math.atan2(dx, dy);

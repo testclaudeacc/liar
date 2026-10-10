@@ -19,7 +19,7 @@ import com.badlogic.gdx.utils.Scaling;
 /**
  * HUD do canto superior esquerdo, medido pixel a pixel em
  * prints/tela desejada barras.png (1366x768):
- *   painel: borda 2px (66,66,66), fundo (30,30,30) - os tons do botao do retrato; coracao + barra de HP
+ *   painel: borda 2px (66,66,66), fundo 2f2f2f - os tons do botao do retrato; coracao + barra de HP
  *   (198,0,0) e mana + barra de MP (96,153,255), 314x34 cada, com 1px de
  *   sombra (45,45,45) a direita/embaixo e 5px entre elas;
  *   XP: painel 262x34, borda 1px preta, fundo (14,14,14), icone a esquerda
@@ -31,7 +31,7 @@ import com.badlogic.gdx.utils.Scaling;
 public final class HudVitais {
 
     private static final Color COR_BORDA_PAINEL = new Color(66 / 255f, 66 / 255f, 66 / 255f, 1f); // = aro do botao do retrato
-    private static final Color COR_PAINEL = new Color(30 / 255f, 30 / 255f, 30 / 255f, 1f);     // = fundo do botao do retrato
+    private static final Color COR_PAINEL = Color.valueOf("2f2f2f");   // = cinza do botao do retrato
     private static final Color COR_SOMBRA = new Color(14 / 255f, 14 / 255f, 14 / 255f, 1f);
     private static final Color COR_TRILHO = new Color(0.12f, 0.12f, 0.12f, 0.45f);
     private static final Color COR_HP = new Color(198 / 255f, 0f, 0f, 1f);
