@@ -2315,7 +2315,7 @@ public class WorldScreen extends ScreenAdapter {
     /** Janela de um player pelo nome (alvo do topo ou clique na lista de amigos). */
     private void abrirPainelDe(String nome) {
         TextureRegion reserva = atlas.findRegion(BookMenuUI.iconeClasse(classeDe(nome)));
-        painelJogador.abrir(nome, nomeVisivel(nome), new AtorAlvo(nome, reserva));
+        painelJogador.abrir(nome, nomeVisivel(nome), classeDe(nome), new AtorAlvo(nome, reserva));
         atualizarEstadoPainel();
     }
 

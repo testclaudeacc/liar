@@ -13,6 +13,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
@@ -42,13 +43,25 @@ public class PainelJogadorUI {
         void alternarIconeAmigo(String nome, String icone);
     }
 
-    // Medidas do mock (em px da imagem) * ~1.4, mesma escala do BookMenu.
-    private static final float LARGURA = 430f;
-    private static final float ALTURA = 262f;
-    private static final float TAM_BOTAO = 76f;
-    private static final float TAM_ICONE_BOTAO = 46f;
-    private static final float TAM_FOTO = 96f;
+    // Foto na esquerda, botoes (icone + o que faz) empilhados na direita.
+    private static final float LARGURA = 400f;
+    private static final float TAM_FOTO = 120f;
+    private static final float LARGURA_BOTAO = 200f;
+    private static final float ALTURA_BOTAO = 38f;
+    private static final float TAM_ICONE_BOTAO = 26f;
     private static final float TAM_MINI = 44f;
+    /** No PC a janela fica menor (no celular continua do tamanho de antes). */
+    private static final float ESCALA_PC = 0.8f;
+
+    // Cores dos botoes.
+    private static final Color COR_CINZA = Color.valueOf("4a4a4a");
+    private static final Color COR_ROSA = Color.valueOf("f3a6c8");
+    private static final Color COR_VERDE = Color.valueOf("2e7d32");
+    private static final Color COR_VERMELHO = Color.valueOf("a82828");
+    private static final Color COR_AMARELO = Color.valueOf("e8c547");
+    private static final Color COR_PARTY = Color.valueOf("b07a45");
+    private static final Color COR_MENSAGEM = Color.valueOf("3a6fc4");
+    private static final Color COR_TEXTO_ESCURO = Color.valueOf("2a2a2a");
 
     private static final Color COR_FUNDO = new Color(0.10f, 0.10f, 0.10f, 0.97f);
     private static final Color COR_BORDA = new Color(0.36f, 0.36f, 0.36f, 1f);
@@ -65,8 +78,9 @@ public class PainelJogadorUI {
     private final Table barraIcones = new Table();
     private final Label nomeLabel;
     private final Table areaFoto = new Table();
-    private final Button botaoIconBtn;
-    private final Button botaoAmigo, botaoIgnorar, botaoParty, botaoTrade, botaoChat;
+    private final TextButton botaoIconBtn;
+    private final TextButton botaoAmigo, botaoIgnorar, botaoParty, botaoTrade, botaoChat;
+    private final TextButton.TextButtonStyle estiloAddFriend, estiloAdded, estiloBlock, estiloBlocked;
     private final Table botoes = new Table();
     private boolean mostrarParty = true, mostrarTrade = true;
     private final Button miniPk, miniGuild, miniSeller;
@@ -81,8 +95,13 @@ public class PainelJogadorUI {
         estiloSlot = estilo(COR_SLOT, COR_SLOT_BORDA);
         estiloSlotAtivo = estilo(COR_ATIVO, COR_ATIVO_BORDA);
 
-        // ---- Topo: IconBtn | nome | X ----
-        botaoIconBtn = botaoIcone("ui/buttons/IconBtn", null, 30f);
+        estiloAddFriend = estiloTexto(COR_ROSA, COR_TEXTO_ESCURO);
+        estiloAdded = estiloTexto(COR_VERDE, Color.WHITE);
+        estiloBlock = estiloTexto(COR_CINZA, Color.WHITE);
+        estiloBlocked = estiloTexto(COR_VERMELHO, Color.WHITE);
+
+        // ---- Topo: Icons | nome | X ----
+        botaoIconBtn = botaoTexto("ui/buttons/IconBtn", "Icons", estiloTexto(COR_CINZA, Color.WHITE), 20f);
         botaoIconBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
                 barraIcones.setVisible(!barraIcones.isVisible());
@@ -95,16 +114,16 @@ public class PainelJogadorUI {
             @Override public void changed(ChangeEvent event, Actor actor) { fechar(); }
         });
         Table topo = new Table();
-        topo.add(botaoIconBtn).size(36f).left();
+        topo.add(botaoIconBtn).width(96f).height(32f).left();
         topo.add(nomeLabel).expandX().center();
         topo.add(fechar).size(36f).right();
 
         // ---- Botoes de baixo (ordem do mock, esquerda -> direita) ----
-        botaoAmigo = botaoIcone("ui/buttons/FriendsBtn", estiloSlot, TAM_ICONE_BOTAO);
-        botaoIgnorar = botaoIcone("ui/buttons/IgnoreBtn", estiloSlot, TAM_ICONE_BOTAO);
-        botaoParty = botaoIcone("ui/buttons/PartyBtn", estiloSlot, TAM_ICONE_BOTAO);
-        botaoTrade = botaoIcone("ui/currency/Gold", estiloSlot, TAM_ICONE_BOTAO);
-        botaoChat = botaoIcone("ui/ChatButton", estiloSlot, TAM_ICONE_BOTAO);
+        botaoAmigo = botaoTexto("ui/buttons/FriendsBtn", "Add Friend", estiloAddFriend, TAM_ICONE_BOTAO);
+        botaoIgnorar = botaoTexto("ui/buttons/IgnoreBtn", "Block", estiloBlock, TAM_ICONE_BOTAO);
+        botaoParty = botaoTexto("ui/buttons/PartyBtn", "Party", estiloTexto(COR_PARTY, Color.WHITE), TAM_ICONE_BOTAO);
+        botaoTrade = botaoTexto("ui/currency/Gold", "Trade", estiloTexto(COR_AMARELO, COR_TEXTO_ESCURO), TAM_ICONE_BOTAO);
+        botaoChat = botaoTexto("ui/ChatButton", "Message", estiloTexto(COR_MENSAGEM, Color.WHITE), TAM_ICONE_BOTAO);
         acao(botaoAmigo, () -> ouvinte.alternarAmigo(nomeAtual));
         acao(botaoIgnorar, () -> ouvinte.alternarIgnorar(nomeAtual));
         acao(botaoParty, () -> ouvinte.convidarParty(nomeAtual));
@@ -114,10 +133,12 @@ public class PainelJogadorUI {
 
         janela.setBackground(UiSkin.retangulo(COR_FUNDO, COR_BORDA, 1));
         janela.setTouchable(Touchable.enabled);
-        janela.pad(8f, 10f, 8f, 10f);
-        janela.add(topo).growX().row();
-        janela.add(areaFoto).size(TAM_FOTO).expandY().row();
-        janela.add(botoes).padTop(4f);
+        janela.pad(8f, 10f, 10f, 10f);
+        janela.add(topo).growX().padBottom(6f).row();
+        Table corpo = new Table();
+        corpo.add(areaFoto).size(TAM_FOTO).expandX().center();
+        corpo.add(botoes).top();
+        janela.add(corpo).grow();
 
         // ---- Barrinha dos motivos da amizade (em cima, a esquerda) ----
         miniPk = botaoIcone("ui/PkIcon", estiloSlot, 30f);
@@ -134,9 +155,20 @@ public class PainelJogadorUI {
         barraIcones.add(miniSeller).size(TAM_MINI);
         barraIcones.setVisible(false);
 
-        Table conteudo = new Table();
+        Table conteudo = new Table() {
+            @Override public void layout() {
+                super.layout();
+                setOrigin(getWidth() / 2f, getHeight() / 2f);
+            }
+        };
         conteudo.add(barraIcones).left().padLeft(4f).row();
-        conteudo.add(janela).size(LARGURA, ALTURA);
+        conteudo.add(janela).width(LARGURA);
+        boolean mobile = com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
+            || com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
+        if (!mobile) {
+            conteudo.setTransform(true);
+            conteudo.setScale(ESCALA_PC);
+        }
 
         // Clique em cima da janela nao pode "vazar" pro mundo atras dela
         // (senao mirava/andava no SQM embaixo).
@@ -155,6 +187,11 @@ public class PainelJogadorUI {
 
     /** foto: ator que desenha o player (o mesmo sprite animado do jogo). */
     public void abrir(String nomeReal, String nomeExibido, Actor foto) {
+        abrir(nomeReal, nomeExibido, null, foto);
+    }
+
+    /** classe: pinta o nome na cor dela (null = branco). */
+    public void abrir(String nomeReal, String nomeExibido, String classe, Actor foto) {
         nomeAtual = nomeReal;
         // A Martel (fonte do titulo) nao tem "?" - o nome escondido ("???",
         // ver WorldScreen.nomeVisivel) saia em branco. Nesse caso usa a
@@ -164,6 +201,9 @@ public class PainelJogadorUI {
             : skin.get("subtitulo", Label.LabelStyle.class);
         nomeLabel.setStyle(estiloNome);
         nomeLabel.setText(nomeExibido);
+        // Nome escondido ("???"): sem cor, senao entregava a classe.
+        boolean escondido = nomeExibido.indexOf('?') >= 0;
+        nomeLabel.setColor(classe != null && !escondido ? com.teste.game.ChatUI.corDaClasse(classe) : Color.WHITE);
         areaFoto.clearChildren();
         if (foto != null) areaFoto.add(foto).grow();
         barraIcones.setVisible(false);
@@ -172,8 +212,10 @@ public class PainelJogadorUI {
 
     /** Estado dos botoes (amigo/ignorado ficam verdes; IconBtn so' pra amigo). */
     public void definirEstado(boolean amigo, boolean ignorado, boolean pk, boolean guild, boolean seller) {
-        botaoAmigo.setStyle(amigo ? estiloSlotAtivo : estiloSlot);
-        botaoIgnorar.setStyle(ignorado ? estiloSlotAtivo : estiloSlot);
+        botaoAmigo.setStyle(amigo ? estiloAdded : estiloAddFriend);
+        botaoAmigo.setText(amigo ? "Added" : "Add Friend");
+        botaoIgnorar.setStyle(ignorado ? estiloBlocked : estiloBlock);
+        botaoIgnorar.setText(ignorado ? "Blocked" : "Block");
         botaoIconBtn.setVisible(amigo);
         if (!amigo) barraIcones.setVisible(false);
         miniPk.setStyle(pk ? estiloSlotAtivo : estiloSlot);
@@ -186,7 +228,7 @@ public class PainelJogadorUI {
         for (Button b : new Button[]{botaoAmigo, botaoIgnorar, botaoParty, botaoTrade, botaoChat}) {
             if (b == botaoParty && !mostrarParty) continue;
             if (b == botaoTrade && !mostrarTrade) continue;
-            botoes.add(b).size(TAM_BOTAO).pad(0, 2, 0, 2);
+            botoes.add(b).width(LARGURA_BOTAO).height(ALTURA_BOTAO).padBottom(4f).row();
         }
     }
 
@@ -219,6 +261,33 @@ public class PainelJogadorUI {
         e.over = UiSkin.retangulo(fundo.cpy().lerp(Color.WHITE, 0.1f), borda, 2);
         e.down = UiSkin.retangulo(fundo.cpy().mul(0.75f, 0.75f, 0.75f, 1f), borda, 2);
         return e;
+    }
+
+    /** Botao chapado (sem contorno no texto), cor de fundo e do texto. */
+    private TextButton.TextButtonStyle estiloTexto(Color fundo, Color texto) {
+        TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
+        e.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        e.fontColor = texto;
+        Color borda = fundo.cpy().lerp(Color.BLACK, 0.35f);
+        e.up = UiSkin.retangulo(fundo, borda, 1);
+        e.over = UiSkin.retangulo(fundo.cpy().lerp(Color.WHITE, 0.12f), borda, 1);
+        e.down = UiSkin.retangulo(fundo.cpy().lerp(Color.BLACK, 0.15f), borda, 1);
+        return e;
+    }
+
+    /** Icone na esquerda + o que o botao faz do lado. */
+    private TextButton botaoTexto(String regiao, String texto, TextButton.TextButtonStyle estilo, float tamIcone) {
+        TextButton b = new TextButton(texto, estilo);
+        b.clearChildren();
+        TextureRegion r = atlas.findRegion(regiao);
+        if (r != null) {
+            Image img = new Image(new TextureRegionDrawable(r));
+            img.setScaling(Scaling.fit);
+            b.add(img).size(tamIcone).padLeft(8f).padRight(8f);
+        }
+        b.add(b.getLabel()).left().expandX();
+        b.getLabel().setAlignment(Align.left);
+        return b;
     }
 
     /** Botao com um icone do atlas no meio. estilo null = so' o icone (sem fundo). */
