@@ -2236,47 +2236,42 @@ SKIN_DB = {
 # sem precisar mexer aqui. O atlas e' procurado em ATLAS_PATH, do lado do
 # servidor, ou junto dos assets do client (a pasta 'maps' e' um link pra
 # core/assets/maps, entao o atlas fica um nivel acima dela).
-def _achar_atlas():
+def _atlas_candidatos():
+    """Todos os .atlas que podem ser o do client: ATLAS_PATH, ao lado do
+    servidor, ao lado da pasta real de 'maps' e, subindo a partir dela,
+    qualquer .atlas ate' 2 niveis abaixo (assets/, atlas/...). Le' TODOS e
+    junta os cabelos - uma copia velha na pasta do servidor nao esconde os
+    cabelos novos do atlas do client."""
     aqui = os.path.dirname(os.path.abspath(__file__))
-    candidatos = [os.getenv('ATLAS_PATH', ''),
-                  os.path.join(aqui, 'graphics.atlas'),
-                  os.path.join(os.path.dirname(os.path.realpath(os.path.join(aqui, 'maps'))), 'graphics.atlas')]
-    achado = next((c for c in candidatos if c and os.path.isfile(c)), None)
-    if achado: return achado
-    # Nao achou no lugar padrao: procura qualquer .atlas com cabelo subindo a
-    # partir da pasta real de 'maps' (ex: core/assets/maps -> core/assets,
-    # core, projeto) e descendo ate' 2 niveis em cada uma (assets/, atlas/...).
-    def tem_cabelo(p):
-        try:
-            with open(p, encoding='utf-8', errors='replace') as f:
-                return any(l.startswith('sprites/hair/') for l in f)
-        except OSError: return False
-    pasta = os.path.realpath(os.path.join(aqui, 'maps'))
-    vistos = set()
+    real_maps = os.path.realpath(os.path.join(aqui, 'maps'))
+    achados = [c for c in (os.getenv('ATLAS_PATH', ''), os.path.join(aqui, 'graphics.atlas'),
+                           os.path.join(os.path.dirname(real_maps), 'graphics.atlas'))
+               if c and os.path.isfile(c)]
+    pasta = real_maps
     for _ in range(4):
         pasta = os.path.dirname(pasta)
         for raiz, dirs, arqs in os.walk(pasta):
             if raiz[len(pasta):].count(os.sep) >= 2: dirs[:] = []
             dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('build', 'node_modules', 'meu_ambiente')]
-            for a in arqs:
-                p = os.path.join(raiz, a)
-                if a.endswith('.atlas') and p not in vistos:
-                    vistos.add(p)
-                    if tem_cabelo(p): return p
-    return None
+            achados += [os.path.join(raiz, a) for a in arqs if a.endswith('.atlas')]
+    return list(dict.fromkeys(os.path.realpath(p) for p in achados))
 
 def _cabelos_do_atlas():
-    caminho = _achar_atlas()
-    if not caminho:
-        print("[SKINS] graphics.atlas nao encontrado (defina ATLAS_PATH) - so' os cabelos fixos")
+    nomes, usados = [], []
+    for caminho in _atlas_candidatos():
+        try:
+            with open(caminho, encoding='utf-8', errors='replace') as f:
+                deste = [l.strip() for l in f if l.startswith('sprites/hair/')]
+        except OSError: continue
+        if deste: nomes += deste; usados.append(f"{caminho} ({len(set(deste))})")
+    if not usados:
+        print("[SKINS] nenhum .atlas com sprites/hair/ encontrado (defina ATLAS_PATH) - so' os cabelos fixos")
         return []
-    with open(caminho, encoding='utf-8', errors='replace') as f:
-        nomes = [l.strip() for l in f if l.startswith('sprites/hair/')]
     def ordem(n):   # MascHair2 antes de MascHair10; masculinos antes dos femininos
         base = n.rsplit('/', 1)[-1]
         m = re.match(r'(\D*)(\d*)$', base)
         return (0 if base.startswith('Masc') else 1, m.group(1), int(m.group(2) or 0))
-    return sorted(dict.fromkeys(nomes), key=ordem), caminho
+    return sorted(dict.fromkeys(nomes), key=ordem), ', '.join(usados)
 
 def _registrar_cabelos_do_atlas():
     achados = _cabelos_do_atlas()
@@ -2292,7 +2287,7 @@ def _registrar_cabelos_do_atlas():
         numero += 1
         helm.insert(pos, _skin(regiao, f"Hair {numero}")); pos += 1
         novos.append(regiao.rsplit('/', 1)[-1])
-    print(f"[SKINS] atlas {caminho}: {len(nomes)} cabelo(s) no atlas, {len(novos)} novo(s) {novos}")
+    print(f"[SKINS] atlas lidos: {caminho} -> {len(nomes)} cabelo(s), {len(novos)} novo(s) {novos}")
 
 _registrar_cabelos_do_atlas()
 
