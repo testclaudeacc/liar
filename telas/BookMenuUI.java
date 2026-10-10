@@ -253,6 +253,11 @@ public final class BookMenuUI {
             estilo.checkedOver = estilo.checked;
 
             Button botao = new Button(estilo);
+            // setChecked() feito pelo codigo (selecionarSecao) NAO pode virar
+            // clique: o Exit ficava marcado depois de fechar o livro e, ao
+            // trocar de aba, desmarcar ele disparava acionarBotao("Exit")
+            // - qualquer botao fechava o livro.
+            botao.setProgrammaticChangeEvents(false);
             Image icone = new Image(new TextureRegionDrawable(atlas.findRegion(secao[1])));
             icone.setScaling(Scaling.fit);
             // Centraliza o icone no circulo (a aba fica do lado do painel).
@@ -354,7 +359,7 @@ public final class BookMenuUI {
             Image icone = new Image(new TextureRegionDrawable(atlas.findRegion("ui/currency/" + tipo)));
             icone.setScaling(Scaling.fit);
             Label quantidade = new Label("0", skin, "hud");
-            escalarFonte(quantidade, 0.7f);
+            escalarFonte(quantidade, 0.7f * FONTE_STATS);
             quantidade.setColor(corMoeda(tipo));
             moedas.add(icone).size(24).padRight(4);
             moedas.add(quantidade).left().padRight(10);
@@ -1816,96 +1821,71 @@ public final class BookMenuUI {
         skin.add("trade-slot-selected", UiSkin.retangulo(
             new Color(0.12f, 0.24f, 0.12f, 1f), COR_TRADE_SELECIONADO, 2),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
+        // Mesmo visual do bank: botoes chapados, fonte sem contorno, sem
+        // textos de explicacao.
+        Label.LabelStyle estiloTitulo = new Label.LabelStyle(fonteBanco(), Color.WHITE);
+        // Textos antigos (passos/resumo) ficam fora da tela.
+        resumoTrade = new Label("", estiloTitulo);
+        passoTrade = new Label("", estiloTitulo);
+        passoConfirm = new Label("", estiloTitulo);
 
         // ---- Tela 1: escolher itens ----
         tradeGrid.top().left();
         tradeDetalhes.top().left();
+        botaoEnviarTrade = botaoComIcone("Send Offer", "ui/currency/Gold", estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
+        botaoEnviarTrade.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { enviarOfertaTrade(); }
+        });
         Table esquerda = new Table();
         esquerda.top().left();
         esquerda.setBackground(UiSkin.retangulo(
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
         esquerda.add(tradeDetalhes).grow().top().left().pad(8).row();
-        // Resumo do que ja' esta' na oferta (sempre visivel).
-        resumoTrade = new Label("", skin, "hud");
-        escalarFonte(resumoTrade, 0.6f * FONTE_STATS);
-        resumoTrade.setWrap(true);
-        resumoTrade.setColor(COR_TRADE_SELECIONADO);
-        esquerda.add(separadorEquip()).growX().height(1).row();
-        esquerda.add(resumoTrade).growX().left().pad(6, 8, 8, 8);
+        esquerda.add(botaoEnviarTrade).width(COLUNA_BAG - 14f).height(44).pad(6);
 
-        tituloTrade = new Label("", skin, "hud");
-        escalarFonte(tituloTrade, 0.7f * FONTE_STATS);
-        passoTrade = new Label("Step 1 of 2  -  Tap what you want to give", skin, "hud");
-        escalarFonte(passoTrade, 0.55f * FONTE_STATS);
-        passoTrade.setColor(COR_PASSO);
+        tituloTrade = new Label("", estiloTitulo);
         ScrollPane scroll = new ScrollPane(tradeGrid, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
         scroll.setOverscroll(false, false);
-        TextButton cancelar = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
-        botaoEnviarTrade = new TextButton("Send Offer", estiloBotaoTrade("verde"));
-        cancelar.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { cancelarTrade(); }
-        });
-        botaoEnviarTrade.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { enviarOfertaTrade(); }
-        });
-        Table rodape = new Table();
-        rodape.add(cancelar).width(110).height(44).left();
-        rodape.add().expandX();
-        rodape.add(botaoEnviarTrade).width(140).height(44).right();
+        Table topo = new Table();
+        topo.add(tituloTrade).left().expandX();
+        topo.add(botaoFecharTrade()).size(42);
 
         Table direita = new Table();
         direita.top().left();
         direita.setBackground(UiSkin.retangulo(
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
-        direita.add(tituloTrade).left().pad(8, 12, 0, 12).row();
-        direita.add(passoTrade).left().pad(0, 12, 0, 12).row();
-        direita.add(caixaOfertaScroll(scroll)).grow().pad(6, 12, 6, 12).row();
-        direita.add(rodape).growX().pad(0, 12, 10, 12);
+        direita.add(topo).growX().pad(10, 12, 0, 12).row();
+        direita.add(scroll).grow().pad(8, 12, 10, 12);
 
         tradePage.add(esquerda).width(COLUNA_BAG).growY();
         tradePage.add(direita).grow();
 
         // ---- Tela 2: confirmar ----
         confirmDetalhes.top().left();
+        botaoAceitarTrade = botaoComIcone("Accept", "ui/Confirm", estiloPlano(COR_BOTAO_ACEITAR, Color.WHITE));
+        botaoAceitarTrade.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aceitarTrade(); }
+        });
         Table esquerda2 = new Table();
         esquerda2.top().left();
         esquerda2.setBackground(UiSkin.retangulo(
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
-        esquerda2.add(confirmDetalhes).grow().top().left().pad(8);
+        esquerda2.add(confirmDetalhes).grow().top().left().pad(8).row();
+        esquerda2.add(botaoAceitarTrade).width(COLUNA_BAG - 14f).height(44).pad(6);
 
-        tituloMinhaOferta = new Label("", skin, "hud");
-        tituloOfertaOutro = new Label("", skin, "hud");
-        escalarFonte(tituloMinhaOferta, 0.7f * FONTE_STATS);
-        escalarFonte(tituloOfertaOutro, 0.7f * FONTE_STATS);
-        passoConfirm = new Label("Step 2 of 2  -  Check both sides, then Accept", skin, "hud");
-        escalarFonte(passoConfirm, 0.55f * FONTE_STATS);
-        passoConfirm.setColor(COR_PASSO);
-        statusTradeConfirm = new Label("", skin, "hud");
-        escalarFonte(statusTradeConfirm, 0.7f * FONTE_STATS);
-        statusTradeConfirm.setColor(COR_TRADE_SELECIONADO);
-        statusMeuAceite = new Label("", skin, "hud");
-        escalarFonte(statusMeuAceite, 0.7f * FONTE_STATS);
+        tituloMinhaOferta = new Label("", estiloTitulo);
+        tituloOfertaOutro = new Label("", estiloTitulo);
+        statusTradeConfirm = new Label("", estiloTitulo);
+        statusMeuAceite = new Label("", estiloTitulo);
         statusMeuAceite.setColor(COR_TRADE_SELECIONADO);
         gradeMinhaOferta.top().left();
         gradeOfertaOutro.top().left();
-        TextButton cancelar2 = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
-        botaoAceitarTrade = new TextButton("Accept", estiloBotaoTrade("verde"));
-        cancelar2.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { cancelarTrade(); }
-        });
-        botaoAceitarTrade.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aceitarTrade(); }
-        });
-        Table rodape2 = new Table();
-        rodape2.add(cancelar2).width(110).height(44).left();
-        rodape2.add().expandX();
-        rodape2.add(botaoAceitarTrade).width(140).height(44).right();
-        // "Accepted" na ponta direita da linha do nome de cada oferta.
         Table linhaMeuNome = new Table();
         linhaMeuNome.add(tituloMinhaOferta).left().expandX();
-        linhaMeuNome.add(statusMeuAceite).right();
+        linhaMeuNome.add(statusMeuAceite).right().padRight(8);
+        linhaMeuNome.add(botaoFecharTrade()).size(42);
         Table linhaNomeOutro = new Table();
         linhaNomeOutro.add(tituloOfertaOutro).left().expandX();
         linhaNomeOutro.add(statusTradeConfirm).right();
@@ -1914,15 +1894,33 @@ public final class BookMenuUI {
         direita2.top().left();
         direita2.setBackground(UiSkin.retangulo(
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
-        direita2.add(passoConfirm).left().pad(8, 12, 2, 12).row();
-        direita2.add(linhaMeuNome).growX().pad(2, 12, 2, 12).row();
-        direita2.add(caixaOferta(gradeMinhaOferta)).grow().pad(0, 12, 4, 12).row();
-        direita2.add(linhaNomeOutro).growX().pad(4, 12, 2, 12).row();
-        direita2.add(caixaOferta(gradeOfertaOutro)).grow().pad(0, 12, 6, 12).row();
-        direita2.add(rodape2).growX().pad(0, 12, 10, 12);
+        direita2.add(linhaMeuNome).growX().pad(10, 12, 4, 12).row();
+        direita2.add(rolagem(gradeMinhaOferta)).grow().pad(0, 12, 6, 12).row();
+        direita2.add(linhaNomeOutro).growX().pad(4, 12, 4, 12).row();
+        direita2.add(rolagem(gradeOfertaOutro)).grow().pad(0, 12, 10, 12);
 
         tradeConfirmPage.add(esquerda2).width(COLUNA_BAG).growY();
         tradeConfirmPage.add(direita2).grow();
+    }
+
+    private static final Color COR_BOTAO_TRADE = new Color(0.62f, 0.48f, 0.06f, 1f);  // amarelo
+    private static final Color COR_BOTAO_ACEITAR = Color.valueOf("2e7d32");
+
+    /** X vermelho (cancela o trade pros dois), igual o do bank. */
+    private TextButton botaoFecharTrade() {
+        TextButton x = new TextButton("X", estiloPlano(COR_BLOQUEADO, Color.WHITE));
+        x.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { cancelarTrade(); }
+        });
+        return x;
+    }
+
+    private ScrollPane rolagem(Table grade) {
+        ScrollPane sp = new ScrollPane(grade, skin);
+        sp.setFadeScrollBars(false);
+        sp.setScrollingDisabled(true, false);
+        sp.setOverscroll(false, false);
+        return sp;
     }
 
     private Table caixaOfertaScroll(ScrollPane sp) {
@@ -2006,42 +2004,19 @@ public final class BookMenuUI {
             String tipo = MOEDAS_TRADE[i];
             String chave = PREFIXO_MOEDA + tipo;
             boolean marcado = tradeSelecao.containsKey(chave);
-            Button slot = slotMoeda(tipo, marcado ? tradeSelecao.get(chave) : moedasTidas(i),
-                marcado ? COR_TRADE_SELECIONADO : corMoeda(tipo), marcado, chave.equals(tradeFoco));
             final int indice = i;
-            slot.addListener(new ChangeListener() {
-                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                    clicarMoedaTrade(indice);
-                }
-            });
+            Button slot = slotBanco(atlas.findRegion("ui/currency/" + tipo), marcado ? tradeSelecao.get(chave) : moedasTidas(i), true,
+                marcado ? COR_TRADE_SELECIONADO : corMoeda(tipo), chave.equals(tradeFoco), marcado, () -> clicarMoedaTrade(indice));
             tradeGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
             if (++n % COLUNAS_INVENTARIO == 0) tradeGrid.row();
         }
-        for (int i = 0; i < inventoryItems.size(); i++) {
-            InventoryItem item = inventoryItems.get(i);
+        for (InventoryItem item : inventoryItems) {
             boolean marcado = tradeSelecao.containsKey(item.instanceId);
-            Button.ButtonStyle estilo = new Button.ButtonStyle();
-            estilo.up = skinDrawable(marcado ? "trade-slot-selected" : "bag-slot");
-            estilo.over = marcado ? estilo.up : skinDrawable("bag-slot-hover");
-            estilo.down = skinDrawable("bag-slot-selected");
-            Button slot = new Button(estilo);
-            if (item.instanceId.equals(tradeFoco) && !marcado) {
-                estilo.up = estilo.over = skinDrawable("bag-slot-selected");
-            }
-            int qtdEscolhida = marcado ? tradeSelecao.get(item.instanceId) : item.quantity;
-            slot.add(conteudoSlot(item.itemPath, item.quantity, marcado ? qtdEscolhida : -1)).grow().pad(2);
-            slot.addListener(new ChangeListener() {
-                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                    clicarItemTrade(item);
-                }
-            });
+            int qtd = marcado ? tradeSelecao.get(item.instanceId) : item.quantity;
+            Button slot = slotBanco(iconeDoItem(item.itemPath), qtd, marcado && item.quantity > 1,
+                marcado ? COR_TRADE_SELECIONADO : Color.WHITE, item.instanceId.equals(tradeFoco), marcado, () -> clicarItemTrade(item));
             tradeGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
             if (++n % COLUNAS_INVENTARIO == 0) tradeGrid.row();
-        }
-        if (n == 0) {
-            Label vazio = new Label("Your bag is empty.", skin, "hud");
-            escalarFonte(vazio, 0.6f);
-            tradeGrid.add(vazio).pad(10);
         }
     }
 
@@ -2098,7 +2073,6 @@ public final class BookMenuUI {
         escalarFonte(nome, 0.74f * FONTE_STATS);
         nome.setColor(corMoeda(tipo));
         tradeDetalhes.add(nome).left().padBottom(1).row();
-        tradeDetalhes.add(linhaStat("You have " + moedasTidas(i), Color.LIGHT_GRAY)).left().row();
         if (tradeSelecao.containsKey(chave)) {
             tradeDetalhes.add(linhaStat("Selected " + tradeSelecao.get(chave), COR_TRADE_SELECIONADO)).left().row();
         }
@@ -2414,11 +2388,6 @@ public final class BookMenuUI {
         InventoryItem item = itemPorId(tradeFoco);
         if (item == null) {
             tradeDetalhes.clearChildren();
-            Label dica = new Label(tradeEnviado ? "Offer sent! Waiting for " + tradeOutro + " to send theirs..."
-                : "Tap an item to add it to your offer. Tap it again to remove it.", skin, "hud");
-            escalarFonte(dica, 0.6f * FONTE_STATS);
-            dica.setWrap(true);
-            tradeDetalhes.add(dica).growX().left();
             return;
         }
         preencherBlocoStats(tradeDetalhes, item.itemPath, null);
@@ -2472,12 +2441,11 @@ public final class BookMenuUI {
         tradeAceito = false;
         botaoAceitarTrade.setText("Accept");
         botaoAceitarTrade.setDisabled(false);
-        statusTradeConfirm.setText("Not yet");
-        statusTradeConfirm.setColor(COR_PASSO);
+        statusTradeConfirm.setText("");
         statusMeuAceite.setText("");
         tituloMinhaOferta.setText("You give");
         tituloMinhaOferta.setColor(Color.valueOf("ff9a6a"));
-        tituloOfertaOutro.setText("You receive" + (tradeOutro != null ? " (from " + tradeOutro + ")" : ""));
+        tituloOfertaOutro.setText("You receive");
         tituloOfertaOutro.setColor(COR_TRADE_SELECIONADO);
         tradeFoco = null;
         mostrarPaginaTrade(tradeConfirmPage);
@@ -2489,10 +2457,6 @@ public final class BookMenuUI {
         montarGradeOferta(gradeOfertaOutro, ofertaOutro, "Nothing offered.");
         if (tradeFoco == null) {
             confirmDetalhes.clearChildren();
-            Label dica = new Label("Tap an item to see its details.", skin, "hud");
-            escalarFonte(dica, 0.6f * FONTE_STATS);
-            dica.setWrap(true);
-            confirmDetalhes.add(dica).growX().left();
         }
     }
 
@@ -2507,21 +2471,16 @@ public final class BookMenuUI {
             moeda -= qtd * VALOR_MOEDA[i];
             String tipo = MOEDAS_TRADE[i];
             String chave = (grade == gradeMinhaOferta ? "eu" : "ele") + PREFIXO_MOEDA + tipo;
-            Button slot = slotMoeda(tipo, qtd, corMoeda(tipo), false, chave.equals(tradeFoco));
-            final long qtdFinal = qtd;
-            slot.addListener(new ChangeListener() {
-                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                    tradeFoco = chave;
-                    confirmDetalhes.clearChildren();
-                    confirmDetalhes.top().left();
-                    Label nome = new Label(tipo + " Coins", skin, "hud");
-                    escalarFonte(nome, 0.74f * FONTE_STATS);
-                    nome.setColor(corMoeda(tipo));
-                    confirmDetalhes.add(nome).left().padBottom(1).row();
-                    confirmDetalhes.add(linhaStat("Amount " + qtdFinal, Color.LIGHT_GRAY)).left().row();
-                    montarGradeOferta(gradeMinhaOferta, minhaOferta, vazioTexto);
-                    montarGradeOferta(gradeOfertaOutro, ofertaOutro, vazioTexto);
-                }
+            Button slot = slotBanco(atlas.findRegion("ui/currency/" + tipo), qtd, true, corMoeda(tipo), chave.equals(tradeFoco), () -> {
+                tradeFoco = chave;
+                confirmDetalhes.clearChildren();
+                confirmDetalhes.top().left();
+                Label nome = new Label(tipo + " Coins", skin, "hud");
+                escalarFonte(nome, 0.74f * FONTE_STATS);
+                nome.setColor(corMoeda(tipo));
+                confirmDetalhes.add(nome).left().padBottom(1).row();
+                montarGradeOferta(gradeMinhaOferta, minhaOferta, vazioTexto);
+                montarGradeOferta(gradeOfertaOutro, ofertaOutro, vazioTexto);
             });
             grade.add(slot).size(SLOT_EQUIP).pad(1.5f);
             if (++n % COLUNAS_INVENTARIO == 0) grade.row();
@@ -2531,31 +2490,17 @@ public final class BookMenuUI {
                 String caminho = e.getString("item", "");
                 int qtd = Math.max(1, e.getInt("qty", 1));
                 String chave = (grade == gradeMinhaOferta ? "eu:" : "ele:") + e.getString("instance_id", "" + n);
-                Button.ButtonStyle estilo = new Button.ButtonStyle();
-                estilo.up = skinDrawable(chave.equals(tradeFoco) ? "bag-slot-selected" : "bag-slot");
-                estilo.over = skinDrawable("bag-slot-hover");
-                estilo.down = skinDrawable("bag-slot-selected");
-                Button slot = new Button(estilo);
-                slot.add(conteudoSlot(caminho, qtd, -1)).grow().pad(2);
-                slot.addListener(new ChangeListener() {
-                    @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                        tradeFoco = chave;
-                        preencherBlocoStats(confirmDetalhes, caminho, null);
-                        if (qtd > 1) confirmDetalhes.add(linhaStat("Quantity " + qtd, Color.LIGHT_GRAY)).left().row();
-                        montarGradeOferta(gradeMinhaOferta, minhaOferta, vazioTexto);
-                        montarGradeOferta(gradeOfertaOutro, ofertaOutro, vazioTexto);
-                    }
+                Button slot = slotBanco(iconeDoItem(caminho), qtd, false, Color.WHITE, chave.equals(tradeFoco), () -> {
+                    tradeFoco = chave;
+                    preencherBlocoStats(confirmDetalhes, caminho, null);
+                    if (qtd > 1) confirmDetalhes.add(linhaStat("Quantity " + qtd, Color.LIGHT_GRAY)).left().row();
+                    montarGradeOferta(gradeMinhaOferta, minhaOferta, vazioTexto);
+                    montarGradeOferta(gradeOfertaOutro, ofertaOutro, vazioTexto);
                 });
                 grade.add(slot).size(SLOT_EQUIP).pad(1.5f);
                 n++;
                 if (n % COLUNAS_INVENTARIO == 0) grade.row();
             }
-        }
-        if (n == 0) {
-            Label vazio = new Label(vazioTexto, skin, "hud");
-            escalarFonte(vazio, 0.6f * FONTE_STATS);
-            vazio.setColor(new Color(0.6f, 0.6f, 0.6f, 1f));
-            grade.add(vazio).pad(8);
         }
     }
 
@@ -2570,8 +2515,8 @@ public final class BookMenuUI {
     /** trade_lock_state_updated. */
     public void estadoAceiteTrade(boolean euAceitei, boolean eleAceitou) {
         if (!modoTrade) return;
-        statusTradeConfirm.setText(eleAceitou ? "Accepted" : "Not yet");
-        statusTradeConfirm.setColor(eleAceitou ? COR_TRADE_SELECIONADO : COR_PASSO);
+        statusTradeConfirm.setText(eleAceitou ? "Accepted" : "");
+        statusTradeConfirm.setColor(COR_TRADE_SELECIONADO);
         statusMeuAceite.setText(euAceitei ? "Accepted" : "");
     }
 
@@ -2827,8 +2772,13 @@ public final class BookMenuUI {
 
     /** Slot do bank: icone em 3x (48px), quantidade no canto. */
     private Button slotBanco(TextureRegion icone, long qtd, boolean mostrarUm, Color corQtd, boolean foco, Runnable aoClicar) {
+        return slotBanco(icone, qtd, mostrarUm, corQtd, foco, false, aoClicar);
+    }
+
+    /** marcado: no trade, item ja' na oferta (borda verde). */
+    private Button slotBanco(TextureRegion icone, long qtd, boolean mostrarUm, Color corQtd, boolean foco, boolean marcado, Runnable aoClicar) {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
-        estilo.up = skinDrawable(foco ? "bag-slot-selected" : "bag-slot");
+        estilo.up = skinDrawable(marcado ? "trade-slot-selected" : foco ? "bag-slot-selected" : "bag-slot");
         estilo.over = foco ? estilo.up : skinDrawable("bag-slot-hover");
         estilo.down = skinDrawable("bag-slot-selected");
         Button slot = new Button(estilo);
@@ -4520,6 +4470,8 @@ public final class BookMenuUI {
     private void acionarBotao(String nome) {
         if (secaoTravada(nome)) return;
         if ("Exit".equals(nome)) {
+            Button exit = botoes.get("Exit");
+            if (exit != null) exit.setChecked(false);
             setVisible(false);
         } else {
             selecionarSecao(nome);

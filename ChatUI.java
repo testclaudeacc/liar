@@ -647,6 +647,7 @@ public class ChatUI {
 
     private void enviarMensagem(String texto) {
         if (texto == null || texto.trim().isEmpty()) return;
+        fecharTecladoCelular();
         texto = texto.trim();
         if (texto.length() > MAX_CARACTERES) texto = texto.substring(0, MAX_CARACTERES);
         if (ouvinteCanais != null) {
@@ -659,6 +660,14 @@ public class ChatUI {
             if (foiProServidor) return;
         }
         adicionarNaAba(abaAtual, linhaDeJogador(nomeJogadorLocal, corJogadorLocal, texto));
+    }
+
+    /** Celular: depois de mandar, fecha o teclado. */
+    private static void fecharTecladoCelular() {
+        com.badlogic.gdx.Application.ApplicationType t = com.badlogic.gdx.Gdx.app.getType();
+        if (t == com.badlogic.gdx.Application.ApplicationType.Android || t == com.badlogic.gdx.Application.ApplicationType.iOS) {
+            com.badlogic.gdx.Gdx.input.setOnscreenKeyboardVisible(false);
+        }
     }
 
     /** Formato pedido pelo usuario: "[HH:MM] Nome: mensagem", com o horario

@@ -53,6 +53,7 @@ public class PainelJogadorUI {
     private static final float TAM_MINI = 44f;
     /** No PC a janela fica menor (no celular continua do tamanho de antes). */
     private static final float ESCALA_PC = 0.8f;
+    private static final float ESCALA_CELULAR = 1.15f;
 
     // Cores dos botoes: as mesmas das notificacoes (HudVitais.COR_NOTIF_*)
     // - amigo rosa, trade amarelo, party azul - e o resto no mesmo tom.
@@ -189,10 +190,9 @@ public class PainelJogadorUI {
         conteudo.add(janela).width(LARGURA);
         boolean mobile = com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
             || com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
-        if (!mobile) {
-            conteudo.setTransform(true);
-            conteudo.setScale(ESCALA_PC);
-        }
+        // PC menor; celular um pouco maior (dedo).
+        conteudo.setTransform(true);
+        conteudo.setScale(mobile ? ESCALA_CELULAR : ESCALA_PC);
 
         // Clique em cima da janela nao pode "vazar" pro mundo atras dela
         // (senao mirava/andava no SQM embaixo).

@@ -1329,6 +1329,7 @@ public class WorldScreen extends ScreenAdapter {
         // fps/ms embaixo dele.
         pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
         miniMapa = new MiniMapa(mapa, pinturaMiniMapa, fonteMiniMapa, TILES_MINIMAPA, TILES_MAPA_MIN, TILES_MAPA_MAX, false, 2f);
+        miniMapa.definirTamanhoIcone(mobile ? 20f : 17f);
         // Coordenadas (SQM) no canto de baixo a esquerda.
         miniMapa.definirFonteCoordenadas(skin.getFont("hud-font"), 0.8f);
         miniMapa.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {

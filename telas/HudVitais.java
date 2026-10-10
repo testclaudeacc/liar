@@ -63,6 +63,7 @@ public final class HudVitais {
         if ((celulaPainel.getActor() != null) == visivel) return;
         celulaPainel.setActor(visivel ? painelVitais : null);
         linhaTopo.invalidateHierarchy();
+        posicionarStatus();
         centralizarNoRetrato();
     }
 
@@ -70,7 +71,8 @@ public final class HudVitais {
         // Sem o painel reto (barras em arco): nada pra centralizar, a
         // municao/notificacoes sobem pro topo, do lado do retrato.
         boolean comPainel = celulaPainel != null && celulaPainel.getActor() != null;
-        raiz.getCell(conteudo).padTop(comPainel ? Math.max(0f, (alturaTopo - linhaTopo.getPrefHeight()) / 2f) : px(6));
+        // So' a altura do painel conta (os debuffs embaixo dele nao empurram).
+        raiz.getCell(conteudo).padTop(comPainel ? Math.max(0f, (alturaTopo - painelVitais.getPrefHeight()) / 2f) : px(6));
         raiz.invalidate();
     }
     private final com.badlogic.gdx.scenes.scene2d.ui.Container<com.badlogic.gdx.scenes.scene2d.Actor> colunaEsquerda =
@@ -643,9 +645,29 @@ public final class HudVitais {
     /** Celular: os debuffs voltam pro lado do retrato/barras de HP-MP. */
     public void colocarStatusNoTopo() {
         statusNoTopo = true;
-        linhaTopo.add(iconesStatus).center().left().padLeft(px(10));
+        statusLado.left();
+        statusAbaixo.left();
+        linhaTopo.add(statusLado).center().left().padLeft(px(10));
+        linhaTopo.row();
+        linhaTopo.add(statusAbaixo).left().padTop(px(4)).colspan(2);
         iconesStatus.center().left();
+        posicionarStatus();
         centralizarNoRetrato();
+    }
+
+    // Celular: com as barras retas (quadradas) os debuffs ficam embaixo
+    // delas; com as em arco, do lado do retrato (como ja' era).
+    private final com.badlogic.gdx.scenes.scene2d.ui.Container<Table> statusLado =
+        new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
+    private final com.badlogic.gdx.scenes.scene2d.ui.Container<Table> statusAbaixo =
+        new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
+
+    private void posicionarStatus() {
+        if (!statusNoTopo) return;
+        boolean comPainel = celulaPainel != null && celulaPainel.getActor() != null;
+        statusLado.setActor(comPainel ? null : iconesStatus);
+        statusAbaixo.setActor(comPainel ? iconesStatus : null);
+        linhaTopo.invalidateHierarchy();
     }
 
     /** Gaveta de debuffs (fome/battle...) - WorldScreen poe embaixo do minimapa. */
