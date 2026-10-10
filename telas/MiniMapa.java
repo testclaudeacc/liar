@@ -246,6 +246,10 @@ public class MiniMapa extends Actor {
                     float px = Math.round((origemX + (mx - mapa.tileWidth / 2f) * s) * k) / k;
                     float py = Math.round((origemY + my * s) * k) / k;
                     if (px + sqm < ax || px > ax + aw || py + sqm < ay || py > ay + ah) return;
+                    // Bordinha preta de 1px de tela em volta (destaca do mapa).
+                    float b = 1f / k;
+                    batch.setColor(0f, 0f, 0f, parentAlpha);
+                    batch.draw(pixel, px - b, py - b, sqm + b * 2f, sqm + b * 2f);
                     batch.setColor(cor.r, cor.g, cor.b, cor.a * parentAlpha);
                     batch.draw(pixel, px, py, sqm, sqm);
                 }

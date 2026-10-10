@@ -330,6 +330,9 @@ def carregar_mapa(caminho_tmx):
         if sid: spawns.setdefault(sid, ancora_mundo(obj))
     spawn = spawns.get('initial') or (next(iter(spawns.values())) if spawns else None)
     spawn_cru = [spawn[0], altura_px - spawn[1]] if spawn else None
+    # Todos os SpawnPoints por spawn_id (cru): o player pode renascer num
+    # especifico (ex: second_temple depois de sair do estado de alma).
+    spawns_cru = {sid: [p[0], altura_px - p[1]] for sid, p in spawns.items()}
 
     npcs = []
     for obj in objetos('NPCSpawns'):
@@ -429,7 +432,7 @@ def carregar_mapa(caminho_tmx):
         print(f"[MAPA] Teleport x{celulas[0][0]}, y{celulas[0][1]} ({len(celulas)} SQM) -> "
               f"{id_dest + ' ' if id_dest else ''}x{dest[0]}, y{dest[1]}")
 
-    return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru, 'velocidades': velocidades,
+    return {'grade': grade, 'mobs': mobs, 'npcs': npcs, 'spawn': spawn_cru, 'spawns': spawns_cru, 'velocidades': velocidades,
             'quest_areas': quest_areas, 'protection_zone': protection_zone, 'teleports': teleports,
             'teleports_awaken': teleports_despertar}
 

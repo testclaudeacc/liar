@@ -2344,9 +2344,15 @@ def skins_despertar(class_name):
     if chapeu: skins['helm'] = chapeu
     return validar_skins(skins, class_name)
 
+# Depois de despertar o player sempre renasce aqui (SpawnPoints, spawn_id).
+SPAWN_DEPOIS_DE_DESPERTAR = "second_temple"
+
 def despertar_alma(sid, p):
     if not isinstance(p.get('npc_dialogue_state'), dict): p['npc_dialogue_state'] = {}
     p['npc_dialogue_state'].pop('soul', None)
+    p['npc_dialogue_state']['spawn'] = SPAWN_DEPOIS_DE_DESPERTAR
+    if not any(SPAWN_DEPOIS_DE_DESPERTAR in (c.get('spawns') or {}) for c in conteudo_mapas.values()):
+        print(f"[SPAWN] AVISO: SpawnPoint '{SPAWN_DEPOIS_DE_DESPERTAR}' nao existe no mapa - vai renascer no spawn padrao")
     p['skins'] = skins_despertar(p.get('class_name', 'Knight'))
     _queue_save(p)
     socketio.emit('skins_synced', {"skins": p['skins']}, room=sid)
@@ -2358,6 +2364,7 @@ def virar_alma(sid, p):
     # So' admin (/soul on), pra testar o comeco de novo.
     if not isinstance(p.get('npc_dialogue_state'), dict): p['npc_dialogue_state'] = {}
     p['npc_dialogue_state']['soul'] = True
+    p['npc_dialogue_state'].pop('spawn', None)   # alma volta a nascer no spawn inicial
     p['skins'] = skins_alma()
     _queue_save(p)
     socketio.emit('skins_synced', {"skins": p['skins']}, room=sid)
@@ -3574,10 +3581,18 @@ def _eh_admin(p):
     return str(p.get('user_id')) in ADMIN_USER_IDS
 
 def _spawn_do_player(p):
-    """Onde o player (re)nasce: spawn salvo do mapa dele, ou o padrao."""
+    """Onde o player (re)nasce: o SpawnPoint dele (npc_dialogue_state
+    'spawn', ex: second_temple depois de despertar), senao o spawn do
+    mapa, senao o padrao."""
     conteudo = conteudo_mapas.get(p.get('mapa')) if p.get('mapa') else None
     if conteudo is None and len(conteudo_mapas) == 1:
         conteudo = next(iter(conteudo_mapas.values()))
+    estado = p.get('npc_dialogue_state')
+    proprio = estado.get('spawn') if isinstance(estado, dict) else None
+    if proprio and conteudo:
+        ponto = (conteudo.get('spawns') or {}).get(proprio)
+        if isinstance(ponto, list) and len(ponto) == 2:
+            return encaixar_no_tile(float(ponto[0]), float(ponto[1]))
     spawn = conteudo.get('spawn') if conteudo else None
     if isinstance(spawn, list) and len(spawn) == 2:
         return encaixar_no_tile(float(spawn[0]), float(spawn[1]))
@@ -5732,7 +5747,8 @@ def carregar_mapa_do_servidor():
     grade = dados['grade']
     mapas_colisao[MAPA_ID_SERVIDOR] = grade
     conteudo_mapas[MAPA_ID_SERVIDOR] = {'fp': grade['fp'], 'mobs': dados['mobs'],
-                                        'npcs': dados['npcs'], 'spawn': dados['spawn']}
+                                        'npcs': dados['npcs'], 'spawn': dados['spawn'],
+                                        'spawns': dados.get('spawns', {})}
     velocidade_tiles[MAPA_ID_SERVIDOR] = dados.get('velocidades', {})
     areas_de_quest[MAPA_ID_SERVIDOR] = dados.get('quest_areas', [])
     zonas_protegidas[MAPA_ID_SERVIDOR] = dados.get('protection_zone', set())
