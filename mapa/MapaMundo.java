@@ -66,6 +66,9 @@ public class MapaMundo {
 
     public MapaMundo() {
         mapa = new TmxMapLoader().load("maps/World.tmx");
+        // Todos os tilesets numa textura so' (menos troca de textura = bem
+        // mais rapido no celular, ver UnificadorTilesets).
+        UnificadorTilesets.unificar(mapa);
         renderer = new OrthogonalTiledMapRenderer(mapa);
 
         MapProperties props = mapa.getProperties();
