@@ -45,7 +45,8 @@ public class PainelJogadorUI {
 
     // Foto na esquerda, botoes (icone + o que faz) empilhados na direita.
     private static final float LARGURA = 330f;
-    private static final float TAM_FOTO = 128f;
+    private static final float TAM_FOTO = 100f;
+    private static final float ALTURA_STATUS = 34f;
     private static final float LARGURA_BOTAO = 170f;
     private static final float ALTURA_BOTAO = 38f;
     private static final float TAM_ICONE_BOTAO = 26f;
@@ -155,7 +156,7 @@ public class PainelJogadorUI {
         // Esquerda: botao dos icones de amizade (so' amigo) em cima da foto.
         Table esquerda = new Table();
         esquerda.top();
-        esquerda.add(areaFoto).size(TAM_FOTO);
+        esquerda.add(areaFoto).width(TAM_FOTO + 20f).height(TAM_FOTO + ALTURA_STATUS);
         Table corpo = new Table();
         corpo.pad(8f, 10f, 6f, 10f);
         corpo.add(esquerda).expandX().top();
@@ -250,6 +251,13 @@ public class PainelJogadorUI {
 
     /** classe: pinta o nome na cor dela (null = branco). */
     public void abrir(String nomeReal, String nomeExibido, String classe, Actor foto) {
+        if (!raiz.isVisible()) {
+            // Reabrindo: sempre no centro, e por baixo das outras janelas.
+            deslocX = 0f;
+            deslocY = 0f;
+            raiz.invalidate();
+            raiz.toBack();
+        }
         nomeAtual = nomeReal;
         // A Martel (fonte do titulo) nao tem "?" - o nome escondido ("???",
         // ver WorldScreen.nomeVisivel) saia em branco. Nesse caso usa a
@@ -265,10 +273,11 @@ public class PainelJogadorUI {
         nomeLabel.setColor(classe != null && !escondido ? com.teste.game.ChatUI.corDaClasse(classe) : Color.WHITE);
         areaFoto.clearChildren();
         statusFoto.setVisible(false);
-        com.badlogic.gdx.scenes.scene2d.ui.Stack pilha = new com.badlogic.gdx.scenes.scene2d.ui.Stack();
-        if (foto != null) pilha.add(foto);
-        pilha.add(statusFoto);
-        areaFoto.add(pilha).grow();
+        // Status em cima (Online/Last seen) e a foto embaixo, sem sobrepor.
+        areaFoto.top();
+        areaFoto.add(statusFoto).left().height(ALTURA_STATUS).top().row();
+        if (foto != null) areaFoto.add(foto).size(TAM_FOTO);
+        else areaFoto.add().size(TAM_FOTO);
         barraIcones.setVisible(false);
         raiz.setVisible(true);
     }
