@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.24"
+SERVER_VERSION = "v0.25"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -148,6 +148,14 @@ NPC_DB = {
     # price (em cobre) + quest: botao "Pay" no dialogo (handle_npc_pay). Pagar
     # libera a quest pro personagem (ex: a ponte da area "kharon" no Tiled).
     "kharon": {"name": "Kharon", "price": 200, "quest": "kharon"},
+    # Vendedores: fixo=True -> nao passeia (fica no SQM do Tiled, virado pra
+    # property "direction" do objeto). "falas" = paginas do dialogo (o client
+    # mostra no lugar do texto do Kharon). A loja em si vem depois.
+    "syron": {"name": "Syron", "fixo": True, "falas": ["Welcome, traveler. Take a look at my wares."]},
+    "nyla":  {"name": "Nyla",  "fixo": True, "falas": ["Hello there! Need something?"]},
+    "luke":  {"name": "Luke",  "fixo": True, "falas": ["Good day. What can I get you?"]},
+    "jack":  {"name": "Jack",  "fixo": True, "falas": ["Hey! Best prices in town."]},
+    "luna":  {"name": "Luna",  "fixo": True, "falas": ["Oh, a customer! Come, come."]},
 }
 NPC_PAY_DISTANCIA_SQM = 4
 NPC_TEXTO_SEM_DINHEIRO = "Do not try to deceive me, mortal."
@@ -1247,14 +1255,18 @@ def _virar_para(m, origem, alvo):
     m['direction'] = _direcao_para(m.get('direction', 'down'), origem, alvo)
 
 def _npc_payload(npc_id, npc):
-    return {
+    info = NPC_DB.get(npc.get('npc_id', ''), {})
+    payload = {
         'id': npc_id,
         'npc_id': npc.get('npc_id', ''),
         'map': npc.get('mapa', ''),
         'x': npc.get('pos_x', 0),
         'y': npc.get('pos_y', 0),
         'direction': npc.get('direction', 'down'),
+        'name': info.get('name', ''),
     }
+    if info.get('falas'): payload['falas'] = list(info['falas'])
+    return payload
 
 def _registrar_npcs_do_mapa(map_id, definicoes, sid):
     agora = time.time()
@@ -1273,6 +1285,8 @@ def _registrar_npcs_do_mapa(map_id, definicoes, sid):
         if chave in active_npcs: continue
         spawn = tile_de(x, y)
         pos_x, pos_y = centro_tile(spawn)
+        direcao = str(definicao.get('direction', 'down')).lower()
+        if direcao not in ('up', 'down', 'left', 'right'): direcao = 'down'
         active_npcs[chave] = {
             'npc_id': npc_id,
             'mapa': map_id,
@@ -1280,7 +1294,7 @@ def _registrar_npcs_do_mapa(map_id, definicoes, sid):
             'spawn': spawn,
             'pos_x': pos_x,
             'pos_y': pos_y,
-            'direction': 'down',
+            'direction': direcao,
             'path': None,
             'move_until': 0.0,
             'next_move_at': agora + random.uniform(NPC_WANDER_MIN_WAIT, NPC_WANDER_MAX_WAIT),
@@ -1305,6 +1319,7 @@ def _npc_dar_passo(npc_id, npc, origem, destino, now):
     return True
 
 def _npc_tick(npc_id, npc, now):
+    if NPC_DB.get(npc.get('npc_id'), {}).get('fixo'): return   # vendedor: nao passeia
     grade = mapas_colisao.get(npc.get('mapa'))
     if grade is None or npc.get('spawn') is None: return
     if now < npc.get('next_move_at', 0.0) or now < npc.get('move_until', 0.0): return

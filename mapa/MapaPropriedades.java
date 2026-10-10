@@ -100,11 +100,15 @@ public class MapaPropriedades {
         public final String spawnKey;
         public final float worldX;
         public final float worldY;
+        /** Property "direction" do objeto no Tiled (up/down/left/right):
+         * pra onde o NPC fixo (vendedor) fica virado. */
+        public final String direcao;
 
-        NPCSpawn(String npcId, float worldX, float worldY) {
+        NPCSpawn(String npcId, float worldX, float worldY, String direcao) {
             this.npcId = npcId;
             this.worldX = worldX;
             this.worldY = worldY;
+            this.direcao = direcao;
             this.spawnKey = npcId + "_" + Math.round(worldX / Jogador.TILE) + "_" + Math.round(worldY / Jogador.TILE);
         }
     }
@@ -284,7 +288,8 @@ public class MapaPropriedades {
                 Rectangle r = ((RectangleMapObject) obj).getRectangle();
                 float mundoX = (float) Math.round(r.x / Jogador.TILE) * Jogador.TILE + (Jogador.TILE / 2f);
                 float mundoY = (float) Math.round(r.y / Jogador.TILE) * Jogador.TILE;
-                npcSpawns.add(new NPCSpawn(npcId.trim(), mundoX, mundoY));
+                String direcao = obj.getProperties().get("direction", "down", String.class);
+                npcSpawns.add(new NPCSpawn(npcId.trim(), mundoX, mundoY, direcao == null ? "down" : direcao.trim().toLowerCase()));
             }
         }
 

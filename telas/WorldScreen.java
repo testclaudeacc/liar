@@ -448,6 +448,8 @@ public class WorldScreen extends ScreenAdapter {
         final String nome;
         final Jogador movimento;
         final AnimacaoCorpo animacao;
+        /** Paginas do dialogo vindas do servidor (NPC_DB "falas"); vazio = Kharon. */
+        String[] falas = new String[0];
 
         NPCVisual(String id, String tipo, String nome, Jogador movimento, AnimacaoCorpo animacao) {
             this.id = id;
@@ -3654,6 +3656,7 @@ public class WorldScreen extends ScreenAdapter {
                 w.set("x", conversor.mundoParaRawX(npc.worldX));
                 w.set("y", conversor.mundoParaRawY(npc.worldY));
                 w.set("floor", 1);
+                w.set("direction", npc.direcao);
                 w.pop();
             }
             w.pop();
@@ -3690,7 +3693,11 @@ public class WorldScreen extends ScreenAdapter {
         }
         Jogador movimento = new Jogador(nomeSprite, "Knight", x, y);
         movimento.direcao = data.getString("direction", "down");
-        npcs.put(id, new NPCVisual(id, tipo, nomeSprite, movimento, criarAnimacao(sprite)));
+        String nome = data.getString("name", "");
+        NPCVisual visual = new NPCVisual(id, tipo, nome.isEmpty() ? nomeSprite : nome, movimento, criarAnimacao(sprite));
+        JsonValue falas = data.get("falas");
+        if (falas != null && falas.isArray()) visual.falas = falas.asStringArray();
+        npcs.put(id, visual);
     }
 
     private void atualizarMovimentoNPC(JsonValue data) {
@@ -3763,7 +3770,8 @@ public class WorldScreen extends ScreenAdapter {
             npc.animacao.idleBaixo.getRegionHeight());
         // Quest dele ja feita (pagou): so' "You shall pass.", sem botao.
         boolean questFeita = questsFeitas.contains(npc.tipo.toLowerCase());
-        String[] paginas = questFeita ? new String[]{"You shall pass."}
+        String[] paginas = npc.falas.length > 0 ? npc.falas
+            : questFeita ? new String[]{"You shall pass."}
             : npcDialogoVisto.contains(npc.tipo)
             ? DIALOGO_NPC_LEMBRETE
             : DIALOGO_NPC_INTRO;
