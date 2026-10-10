@@ -2231,6 +2231,49 @@ SKIN_DB = {
     ],
 }
 
+# Cabelos novos: todo "sprites/hair/<Nome>" que estiver no graphics.atlas e
+# ainda nao estiver na lista acima entra sozinho ("Hair 11", "Hair 12"...),
+# sem precisar mexer aqui. O atlas e' procurado em ATLAS_PATH, do lado do
+# servidor, ou junto dos assets do client (a pasta 'maps' e' um link pra
+# core/assets/maps, entao o atlas fica um nivel acima dela).
+def _achar_atlas():
+    aqui = os.path.dirname(os.path.abspath(__file__))
+    candidatos = [os.getenv('ATLAS_PATH', ''),
+                  os.path.join(aqui, 'graphics.atlas'),
+                  os.path.join(os.path.dirname(os.path.realpath(os.path.join(aqui, 'maps'))), 'graphics.atlas')]
+    return next((c for c in candidatos if c and os.path.isfile(c)), None)
+
+def _cabelos_do_atlas():
+    caminho = _achar_atlas()
+    if not caminho:
+        print("[SKINS] graphics.atlas nao encontrado (defina ATLAS_PATH) - so' os cabelos fixos")
+        return []
+    with open(caminho, encoding='utf-8', errors='replace') as f:
+        nomes = [l.strip() for l in f if l.startswith('sprites/hair/')]
+    def ordem(n):   # MascHair2 antes de MascHair10; masculinos antes dos femininos
+        base = n.rsplit('/', 1)[-1]
+        m = re.match(r'(\D*)(\d*)$', base)
+        return (0 if base.startswith('Masc') else 1, m.group(1), int(m.group(2) or 0))
+    return sorted(dict.fromkeys(nomes), key=ordem), caminho
+
+def _registrar_cabelos_do_atlas():
+    achados = _cabelos_do_atlas()
+    if not achados: return
+    nomes, caminho = achados
+    helm = SKIN_DB['helm']
+    ja = {s['caminho'] for s in helm}
+    numero = sum(1 for s in helm if s['caminho'].startswith('res://sprites/hair/'))
+    pos = max((i for i, s in enumerate(helm) if s['caminho'].startswith('res://sprites/hair/')), default=-1) + 1
+    novos = []
+    for regiao in nomes:
+        if "res://" + regiao + ".png" in ja: continue
+        numero += 1
+        helm.insert(pos, _skin(regiao, f"Hair {numero}")); pos += 1
+        novos.append(regiao.rsplit('/', 1)[-1])
+    print(f"[SKINS] atlas {caminho}: {len(novos)} cabelo(s) novo(s) {novos}")
+
+_registrar_cabelos_do_atlas()
+
 # ---- Alma (personagem novo) ----
 # Nasce como alma: so' a pele BaseSoul (esqueleto), pelado, sem nome, sem
 # chat e sem trocar skin. Passando pelo portal de ida unica (Teleports com
