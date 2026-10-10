@@ -28,7 +28,7 @@ public class MiniMapa extends Actor {
         float jogadorX();
         float jogadorY();
         void pontos(Coletor c);
-        /** Icone do proprio jogador (classe); null = quadradinho branco. */
+        /** Icone do proprio jogador; null (padrao) = pontinho branco. */
         default com.badlogic.gdx.graphics.g2d.TextureRegion iconeJogador() { return null; }
     }
 
@@ -257,9 +257,8 @@ public class MiniMapa extends Actor {
             fonte.pontos(coletor);
             com.badlogic.gdx.graphics.g2d.TextureRegion meuIcone = fonte.iconeJogador();
             if (meuIcone != null) coletor.icone(fonte.jogadorX(), fonte.jogadorY(), meuIcone);
-            else coletor.ponto(fonte.jogadorX(), fonte.jogadorY(), COR_VOCE);
             // Tamanho fixo na tela (nao cresce com o zoom), centro no SQM e
-            // preso no pixel; o seu por ultimo (por cima de tudo).
+            // preso no pixel.
             float lado = Math.max(sqm, tamanhoIcone);
             batch.setColor(1f, 1f, 1f, parentAlpha);
             for (Object[] ic : icones) {
@@ -269,6 +268,8 @@ public class MiniMapa extends Actor {
                 if (px + lado < ax || px > ax + aw || py + lado < ay || py > ay + ah) continue;
                 batch.draw((com.badlogic.gdx.graphics.g2d.TextureRegion) ic[2], px, py, lado, lado);
             }
+            // Voce: pontinho branco, por cima dos icones.
+            if (meuIcone == null) coletor.ponto(fonte.jogadorX(), fonte.jogadorY(), COR_VOCE);
             // Marcador (link de coordenada do chat): quadradinho piscando.
             if (temMarcador && ((int) (System.currentTimeMillis() / 350L)) % 2 == 0) {
                 float mx = origemX + (marcadorX - mapa.tileWidth / 2f) * s;

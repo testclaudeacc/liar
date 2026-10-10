@@ -1410,12 +1410,11 @@ public class WorldScreen extends ScreenAdapter {
     private final float TAMANHO_MINIMAPA = mobile ? 165f : 150f;
     private static final float TILES_MINIMAPA = 34f, TILES_MAPA_GRANDE = 80f, TILES_MAPA_MIN = 20f, TILES_MAPA_MAX = 300f;
 
-    /** Minimapa/mapa grande: NPC com icone da funcao, party e voce com o
-     * icone da classe, mob = pontinho vermelho. */
+    /** Minimapa/mapa grande: NPC com icone da funcao, party com o icone da
+     * classe, mob = pontinho vermelho, voce = pontinho branco. */
     private final MiniMapa.Fonte fonteMiniMapa = new MiniMapa.Fonte() {
         @Override public float jogadorX() { return local.x; }
         @Override public float jogadorY() { return local.y; }
-        @Override public TextureRegion iconeJogador() { return regiaoCache(BookMenuUI.iconeClasse(local.classe)); }
         @Override public void pontos(MiniMapa.Coletor c) {
             for (MobVisual m : mobs.values()) if (m.visivel && !m.morto) c.ponto(m.x, m.y, MiniMapa.COR_MOB);
             for (NPCVisual n : npcs.values()) c.icone(n.movimento.x, n.movimento.y, iconeDoPapel(n.papel));
@@ -1920,7 +1919,7 @@ public class WorldScreen extends ScreenAdapter {
         // funcao de cada NPC e os monstros (pontinho vermelho).
         // 2 linhas: pessoas/monstros em cima, NPCs (por funcao) embaixo.
         Table linhaPessoas = new Table(), linhaNpcs = new Table();
-        adicionarLegendaIcone(linhaPessoas, regiaoCache(BookMenuUI.iconeClasse(local.classe)), "You");
+        adicionarLegenda(linhaPessoas, MiniMapa.COR_VOCE, "You");
         adicionarLegendaIcone(linhaPessoas, regiaoCache(BookMenuUI.iconeClasse("Knight")), "Party");
         adicionarLegenda(linhaPessoas, MiniMapa.COR_MOB, "Monsters");
         for (String[] p : ICONES_PAPEL) adicionarLegendaIcone(linhaNpcs, regiaoCache(p[1]), p[2]);
