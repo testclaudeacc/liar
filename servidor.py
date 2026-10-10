@@ -2803,7 +2803,7 @@ def comando_admin(sid, p, texto):
     cmd = partes[0].lower()
     if cmd in ('help', 'admin'):
         chat_sistema(sid, "Admin: /bestiary <mob> <0-3|clear>  (0 discovered, 1 copper, 2 silver, 3 gold)")
-        chat_sistema(sid, "Admin: /quest <name> complete|reset   /quests   /mobs")
+        chat_sistema(sid, "Admin: /quest <name> complete|reset   /quests   /mobs   /npcs")
         chat_sistema(sid, "Admin: /tp x<X> y<Y>  (minimap coordinates, ex: /tp x56 y200)")
         chat_sistema(sid, "Admin: /time day|afternoon|night|<seconds>s|<minutes>m  (20 min cycle, ex: /time 450s)")
         chat_sistema(sid, "Admin: /soul on|off  (vira alma de novo / desperta)")
@@ -2849,6 +2849,27 @@ def comando_admin(sid, p, texto):
             return
         dest = _teleportar(sid, p, (nums[0], nums[1]), p.get('direction', 'down'))
         chat_sistema(sid, f"Teleported to x{dest[0]}, y{dest[1]}.")
+        return
+    if cmd == 'npcs':
+        # NPCs que o servidor leu do mapa (camada NPCSpawns) e se cada um
+        # esta' ativo - pra achar NPC que nao aparece sem olhar o terminal.
+        mapa = p.get('mapa') or MAPA_ID_SERVIDOR
+        lidos = (conteudo_mapas.get(mapa) or {}).get('npcs') or []
+        if not lidos:
+            chat_sistema(sid, "NPCs: nenhum lido do mapa (camada 'NPCSpawns' vazia ou nao encontrada).", 'red')
+        for n in lidos:
+            npc_id = str(n.get('npc_id', '')).strip().lower()
+            try: c, l = tile_de(float(n['x']), float(n['y']))
+            except (KeyError, TypeError, ValueError): c, l = '?', '?'
+            ativo = f"{mapa}:{n.get('id', '')}" in active_npcs
+            if npc_id not in NPC_DB:
+                chat_sistema(sid, f"NPC '{n.get('npc_id')}' x{c}, y{l}: nao esta no NPC_DB do servidor (ignorado)", 'red')
+            elif not ativo:
+                chat_sistema(sid, f"NPC '{npc_id}' x{c}, y{l}: lido mas NAO ativo (ninguem registrou o mapa ainda?)", 'red')
+            else:
+                chat_sistema(sid, f"NPC '{npc_id}' x{c}, y{l}: ativo, virado {n.get('direction', 'down')}")
+        faltando = [k for k in NPC_DB if k not in {str(n.get('npc_id', '')).strip().lower() for n in lidos}]
+        if faltando: chat_sistema(sid, "No NPC_DB mas fora do mapa: " + ", ".join(faltando))
         return
     if cmd == 'mobs':
         chat_sistema(sid, "Mobs: " + (", ".join(f"{t} ({i.get('name', t.capitalize())})" for t, i in MOB_DB.items()) or "none"))
