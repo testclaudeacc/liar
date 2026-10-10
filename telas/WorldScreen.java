@@ -3627,10 +3627,12 @@ public class WorldScreen extends ScreenAdapter {
             Set<String> novas = new HashSet<>();
             if (questsRecebidas) for (String q : questsFeitas) if (!antes.contains(q)) novas.add(q);
             questsRecebidas = true;
+            int versaoAntes = mapa.versaoQuests;
             mapa.aplicarQuests(questsFeitas, novas, local.x, local.y);
             tempoProximaLinhaPonte = 0f;
-            // Minimapa refeito (a ponte aparece/some nele tambem).
-            if (pinturaMiniMapa != null) {
+            // Minimapa refeito (a ponte aparece/some nele tambem) - so' se
+            // algum tile mudou mesmo (no login quase nunca muda).
+            if (pinturaMiniMapa != null && mapa.versaoQuests != versaoAntes) {
                 MiniMapa.Pintura velha = pinturaMiniMapa;
                 pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
                 miniMapa.trocarPintura(pinturaMiniMapa);

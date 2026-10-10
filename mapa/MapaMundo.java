@@ -138,6 +138,14 @@ public class MapaMundo {
     // as celulas de uma linha (3 SQMs numa ponte de 3 de largura).
     private final java.util.ArrayDeque<java.util.List<CelulaGuardada>> linhasPendentes = new java.util.ArrayDeque<>();
 
+    /** Muda sempre que aplicarQuests mostra/esconde algum tile (o minimapa
+     * so' precisa ser refeito quando isso muda). */
+    public int versaoQuests = 0;
+
+    /** Cor de cada tile no minimapa - nao muda, entao fica guardada entre
+     * uma geracao e outra (refazer o minimapa nao rele os PNGs). */
+    private final Map<TiledMapTile, Integer> cacheCoresMiniMapa = new HashMap<>();
+
     /** Mostra/esconde os tiles de cada area conforme as quests feitas. */
     public void aplicarQuests(java.util.Collection<String> feitas) {
         aplicarQuests(feitas, java.util.Collections.emptySet(), 0f, 0f);
@@ -155,6 +163,7 @@ public class MapaMundo {
             if (liberada) {
                 if (guardadas == null) continue;
                 escondidas.remove(a);
+                versaoQuests++;
                 if (animar.contains(a.quest)) {
                     enfileirarLinhas(a, guardadas, pertoX, pertoY);
                     continue;
@@ -180,6 +189,7 @@ public class MapaMundo {
                     }
                 }
                 escondidas.put(a, guardadas);
+                if (!guardadas.isEmpty()) versaoQuests++;
                 // Diagnostico (console do jogo): quantas celulas da ponte sumiram.
                 com.badlogic.gdx.Gdx.app.log("MapaMundo", "QuestArea '" + a.quest + "': SQMs x " + c[0] + ".." + c[1]
                     + ", y " + c[2] + ".." + c[3] + " - escondeu " + guardadas.size() + " tile(s) em " + nomes
@@ -393,7 +403,7 @@ public class MapaMundo {
     public Pixmap gerarPixmapMiniMapa(Color fundo) {
         int w = mapaLarguraTiles, h = mapaAlturaTiles;
         int[] cores = new int[w * h];
-        Map<TiledMapTile, Integer> cache = new HashMap<>();
+        Map<TiledMapTile, Integer> cache = cacheCoresMiniMapa;
         Map<Texture, Pixmap> fontes = new HashMap<>();
         try {
             for (int indice : indicesCamadas) {
