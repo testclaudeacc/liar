@@ -1172,32 +1172,34 @@ public final class BookMenuUI {
     private final Table vanityPreview = new Table();
     private TextButton botaoAplicarSkins;
     private TextButton.TextButtonStyle estiloAplicarNormal, estiloAplicarAlterado;
+    // Variacoes de cada matiz (saturacao, brilho): pastel, clara, viva,
+    // profunda, escura e apagada (cor "terrosa", ex: vermelho amarronzado).
+    private static final float[][] VARIACOES_COR = {
+        {0.30f, 1.00f}, {0.55f, 1.00f}, {0.85f, 0.95f}, {0.88f, 0.70f}, {0.80f, 0.45f}, {0.42f, 0.60f}};
+
+    // Depois de VARIACOES_COR: static inicializa na ordem do arquivo.
     private static final List<Color> PALETA = criarPaleta();
 
     private static List<Color> criarPaleta() {
         List<Color> cores = new ArrayList<>();
-        // Branco -> cinza escuro
-        for (int i = 0; i < 8; i++) {
-            float v = 1f - i * 0.1f;
-            cores.add(new Color(v, v, v, 1f));
-        }
-        // Tons de pele/marrom
-        for (String h : new String[]{"ffe0bd", "f1c27d", "e0ac69", "c68642", "8d5524", "6b4a3e", "5c3a1e", "3b2414"}) {
+        // 2 linhas de neutros: cinzas (sem preto puro, que some no contorno)
+        // e bege -> marrom.
+        for (String h : new String[]{"ffffff", "e0e0e0", "c0c0c0", "a0a0a0", "808080", "646464", "4a4a4a", "343434",
+                                     "f3dcc0", "e0bf96", "c99a6b", "b07d4f", "8a5a35", "6b4026", "553220", "3e2416"}) {
             cores.add(Color.valueOf(h));
         }
-        // Arco-iris (6 linhas de 8)
-        for (int i = 0; i < 48; i++) {
-            Color c = new Color();
-            c.fromHsv(i * (360f / 48f), 0.88f, 0.94f);
-            c.a = 1f;
-            cores.add(c);
-        }
-        // Versoes escuras
-        for (int i = 0; i < 8; i++) {
-            Color c = new Color();
-            c.fromHsv(i * 45f, 0.85f, 0.45f);
-            c.a = 1f;
-            cores.add(c);
+        // 24 matizes (de 15 em 15 graus: da' ciano, ciano-esverdeado,
+        // carmesim...) x 6 variacoes, em 3 blocos de 8 colunas: cada coluna
+        // e' um matiz e as 6 linhas do bloco descem as variacoes dele.
+        for (int bloco = 0; bloco < 3; bloco++) {
+            for (float[] var : VARIACOES_COR) {
+                for (int col = 0; col < 8; col++) {
+                    Color c = new Color();
+                    c.fromHsv((bloco * 8 + col) * 15f, var[0], var[1]);
+                    c.a = 1f;
+                    cores.add(c);
+                }
+            }
         }
         return cores;
     }
