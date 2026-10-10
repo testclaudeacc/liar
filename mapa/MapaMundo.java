@@ -61,6 +61,9 @@ public class MapaMundo {
     public final ConversorCoordenadas conversor;
     public final MapaPropriedades propriedades;
 
+    private int indicePillars = -1;
+    private int[] somentePillars;
+
     public MapaMundo() {
         mapa = new TmxMapLoader().load("maps/World.tmx");
         renderer = new OrthogonalTiledMapRenderer(mapa);
@@ -96,6 +99,8 @@ public class MapaMundo {
         };
         camadaRoofs = (TiledMapTileLayer) mapa.getLayers().get("Roofs");
         camadaPillars = (TiledMapTileLayer) mapa.getLayers().get("Pillars");
+        indicePillars = mapa.getLayers().getIndex("Pillars");
+        somentePillars = indicePillars >= 0 ? new int[]{indicePillars} : null;
         // O jogo controla visibilidade dinamicamente (ver desenharTelhados) -
         // ignora o checkbox "visible" que o Tiled grava no .tmx (o usuario
         // deixa a camada Pillars escondida la' so' pra editar outra coisa
@@ -345,9 +350,17 @@ public class MapaMundo {
      * jogador esta ocupando agora - as outras celulas overlay (mesmo tipo
      * de tile, vizinhas) ficam 100% opacas. */
     public void desenharOverlays(Batch batch, float jogadorMundoX, float jogadorMundoY) {
+        desenharOverlays(batch, jogadorMundoX, jogadorMundoY, null);
+    }
+
+    /** camera != null: so' as celulas na tela (antes desenhava as do mapa inteiro todo frame). */
+    public void desenharOverlays(Batch batch, float jogadorMundoX, float jogadorMundoY, OrthographicCamera camera) {
         int jcx = (int) Math.floor(jogadorMundoX / tileWidth);
         int jcy = (int) Math.floor(jogadorMundoY / tileHeight);
+        float meiaL = camera != null ? camera.viewportWidth * camera.zoom / 2f + tileWidth * 4f : 0f;
+        float meiaA = camera != null ? camera.viewportHeight * camera.zoom / 2f + tileHeight * 4f : 0f;
         for (MapaPropriedades.CelulaOverlay c : propriedades.celulasOverlay) {
+            if (camera != null && (Math.abs(c.worldX - camera.position.x) > meiaL || Math.abs(c.worldY - camera.position.y) > meiaA)) continue;
             TextureRegion regiao = c.tile.getTextureRegion();
             boolean jogadorAqui = c.cx == jcx && c.cy == jcy;
             batch.setColor(1f, 1f, 1f, jogadorAqui ? 0.5f : 1f);
@@ -541,7 +554,13 @@ public class MapaMundo {
         if (camadaRoofs != null) camadaRoofs.setOpacity(celulaOcupada(camadaRoofs, jcx, jcy) ? 0f : 1f);
         if (camadaPillars != null) camadaPillars.setOpacity(celulaOcupada(camadaPillars, jcx, jcy) ? 0.5f : 1f);
 
-        renderer.render(indicesTelhados);
+        // Telhado escondido (dentro da casa): nem desenha a camada (antes
+        // desenhava ela inteira com alpha 0 - custo a toa).
+        if (camadaRoofs != null && camadaRoofs.getOpacity() <= 0f) {
+            if (somentePillars != null) renderer.render(somentePillars);
+        } else {
+            renderer.render(indicesTelhados);
+        }
 
         if (camadaRoofs != null) camadaRoofs.setOpacity(alphaAnteriorRoofs);
         if (camadaPillars != null) camadaPillars.setOpacity(alphaAnteriorPillars);

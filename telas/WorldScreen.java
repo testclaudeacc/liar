@@ -4260,7 +4260,7 @@ public class WorldScreen extends ScreenAdapter {
         // jogador esta ocupando fica semi-transparente). Mesmo batch (sem
         // precisar do renderer/batch interno do OrthogonalTiledMapRenderer,
         // ja que essas celulas foram removidas das layers normais).
-        mapa.desenharOverlays(batch, local.x, local.y);
+        mapa.desenharOverlays(batch, local.x, local.y, camera);
         // Tiles com Above_Player=true (e Above_Dynamic "por cima" agora): por cima do player.
         // y = pe' do player no fundo do SQM: mesma conta de naCaverna().
         mapa.atualizarAcimaDinamico(

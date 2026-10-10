@@ -126,7 +126,10 @@ public class MapaIluminacao implements Disposable {
      * FORA de qualquer outro batch.begin()/end() (usa o batch recebido pra
      * desenhar DENTRO do proprio FBO, nao na tela). */
     public void renderizar(Batch batch, OrthographicCamera camera, List<MapaPropriedades.Luz> luzes) {
-        garantirFbo(Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
+        // Metade da resolucao: a luz e' um degrade suave (Linear), nao perde
+        // nada visivel, e o celular pinta 4x menos pixels (as luzes somam
+        // umas por cima das outras - perto de casa/tochas pesava muito).
+        garantirFbo(Math.max(1, Gdx.graphics.getBackBufferWidth() / 2), Math.max(1, Gdx.graphics.getBackBufferHeight() / 2));
 
         fbo.begin();
         Gdx.gl.glClearColor(corAmbiente.r, corAmbiente.g, corAmbiente.b, 1f);
@@ -135,7 +138,11 @@ public class MapaIluminacao implements Disposable {
         batch.setProjectionMatrix(camera.combined);
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
         batch.begin();
+        // So' as luzes que encostam na tela (antes ia o mapa inteiro todo frame).
+        float meiaL = camera.viewportWidth * camera.zoom / 2f, meiaA = camera.viewportHeight * camera.zoom / 2f;
+        float cx = camera.position.x, cy = camera.position.y;
         for (MapaPropriedades.Luz luz : luzes) {
+            if (Math.abs(luz.x - cx) > meiaL + luz.raio || Math.abs(luz.y - cy) > meiaA + luz.raio) continue;
             batch.setColor(luz.cor);
             float diametro = luz.raio * 2f;
             batch.draw(regiaoLuz, luz.x - luz.raio, luz.y - luz.raio, diametro, diametro);
