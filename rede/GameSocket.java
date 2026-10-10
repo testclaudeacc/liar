@@ -121,7 +121,13 @@ public class GameSocket {
             JsonValue eventData = parsed.size > 1 ? parsed.get(1) : null;
             EventListener listener = listeners.get(eventName);
             if (listener != null) {
-                Gdx.app.postRunnable(() -> listener.onEvent(eventName, eventData));
+                Gdx.app.postRunnable(() -> {
+                    java.util.function.BiConsumer<String, Long> medidor = medidorEventos;
+                    if (medidor == null) { listener.onEvent(eventName, eventData); return; }
+                    long t0 = System.nanoTime();
+                    listener.onEvent(eventName, eventData);
+                    medidor.accept(eventName, System.nanoTime() - t0);
+                });
             }
         }
     }
@@ -131,6 +137,9 @@ public class GameSocket {
         if (!isConnected()) return;
         client.send("42[\"" + eventName + "\"," + payloadJson + "]");
     }
+
+    /** Admin: mede quanto cada evento do servidor leva pra ser tratado (PerfAdmin). */
+    public static volatile java.util.function.BiConsumer<String, Long> medidorEventos;
 
     public interface PayloadWriter {
         void write(JsonWriter w) throws java.io.IOException;

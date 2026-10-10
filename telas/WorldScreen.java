@@ -1352,7 +1352,8 @@ public class WorldScreen extends ScreenAdapter {
         // Lado a lado: "60 fps   16 ms".
         infoDesempenho.add(labelFps).left().padRight(14);
         infoDesempenho.add(labelMs).left();
-        cantoFps.add(infoDesempenho);
+        cantoFps.add(infoDesempenho).left();
+        cantoFpsTabela = cantoFps;
         cantoFps.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
         uiStage.getRoot().addActorAt(0, cantoFps);
         gavetaDebuffs = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
@@ -1404,6 +1405,7 @@ public class WorldScreen extends ScreenAdapter {
     private MiniMapa miniMapa, mapaGrande;
     private MiniMapa.Pintura pinturaMiniMapa;
     private Table painelMapaGrande;
+    private Table cantoFpsTabela;
     private final float TAMANHO_MINIMAPA = mobile ? 165f : 150f;
     private static final float TILES_MINIMAPA = 34f, TILES_MAPA_GRANDE = 80f, TILES_MAPA_MIN = 20f, TILES_MAPA_MAX = 300f;
 
@@ -2971,6 +2973,7 @@ public class WorldScreen extends ScreenAdapter {
             // eram zerados no client.
             if (data.has("inventory")) {
                 adminLocal = data.getBoolean("admin", false);
+                if (adminLocal) ligarPerfAdmin(); // medidor de desempenho embaixo do fps
                 // Sugestoes de comando no chat (so' admin recebe a lista).
                 if (chat != null) chat.definirComandosAdmin(adminLocal ? data.get("admin_commands") : null);
                 definirAlmaLocal(data.getBoolean("soul", false));
@@ -4046,6 +4049,7 @@ public class WorldScreen extends ScreenAdapter {
 
     @Override
     public void render(float delta) {
+        if (perf != null) perf.inicioFrame();
         atualizarCamera();
         // Atualiza ANTES de checar entrada (ordem importa): se checassemos
         // "!local.movendo" antes de atualizar(), estariamos lendo o estado do
@@ -4203,6 +4207,7 @@ public class WorldScreen extends ScreenAdapter {
         camera.update();
 
         mapa.atualizar(delta);
+        if (perf != null) perf.marca("logic");
 
         // 1. Renderiza o framebuffer da iluminação ANTES da cena real
         // O Godot usava light_offset Y de 22; com a escala pela metade, usamos 11.
@@ -4226,12 +4231,14 @@ public class WorldScreen extends ScreenAdapter {
         for (AvisoSpawn a : avisosSpawn) luzesDoFrame.add(a.luz);
         iluminacao.atualizar(delta, mapa.propriedades.naCaverna(local.x, local.y));
         iluminacao.renderizar(batch, camera, luzesDoFrame);
+        if (perf != null) perf.marca("lights");
 
         // Mundo inteiro desenhado DIRETO na tela real, num passo so' - igual
         // o Godot (Camera2D comum, sem viewport/buffer intermediario nenhum).
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         mapa.desenharMapa(camera);
+        if (perf != null) perf.marca("map");
 
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
@@ -4268,12 +4275,14 @@ public class WorldScreen extends ScreenAdapter {
             (int) Math.floor(local.passoDestinoX() / Jogador.TILE), (int) Math.floor((local.passoDestinoY() + Jogador.TILE / 2f) / Jogador.TILE));
         mapa.desenharAcimaDoPlayer(batch, camera);
         batch.end();
+        if (perf != null) perf.marca("entities");
 
         // Roofs/Pillars (camadas INTEIRAS, nao celula por celula) tambem na
         // frente do player - usa o renderer/batch interno do
         // OrthogonalTiledMapRenderer (igual desenharMapa), por isso fora do
         // batch.begin()/end() do WorldScreen.
         mapa.desenharTelhados(camera, local.x, local.y);
+        if (perf != null) perf.marca("roofs");
 
         // Nomes e baloes dos jogadores e NPCs recebem a mesma iluminacao.
         batch.begin();
@@ -4306,7 +4315,9 @@ public class WorldScreen extends ScreenAdapter {
 
         // 2. Aplica a iluminação multiplicativa SOBRE a cena renderizada
         // A iluminação vai escurecer os roofs, pillars, tiles do mapa e os jogadores
+        if (perf != null) perf.marca("names");
         iluminacao.compositar(batch, camera);
+        if (perf != null) perf.marca("light-mix");
 
         // Arcos de HP/MP (coordenadas do uiStage) e, POR CIMA deles, os baloes
         // de fala e o texto de acao ("Om Noom") - senao o arco cobria o texto.
@@ -4355,8 +4366,30 @@ public class WorldScreen extends ScreenAdapter {
         }
 
         desenharEscuroTeleporte();
+        if (perf != null) perf.marca("hud-logic");
         uiStage.act(delta);
+        if (perf != null) perf.marca("ui-act");
         uiStage.draw();
+        if (perf != null) {
+            perf.marca("ui-draw");
+            perf.fimFrame(delta);
+            labelPerf.setText(perf.texto());
+        }
+    }
+
+    // ---- Medidor de desempenho (so' admin, ver PerfAdmin) ----
+    private PerfAdmin perf;
+    private Label labelPerf;
+
+    private void ligarPerfAdmin() {
+        if (perf != null || cantoFpsTabela == null) return;
+        perf = new PerfAdmin();
+        GameSocket.medidorEventos = (nome, ns) -> { if (perf != null) perf.eventoMedido(nome, ns); };
+        labelPerf = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f), Color.WHITE));
+        labelPerf.setColor(new Color(1f, 1f, 0.6f, 1f));
+        cantoFpsTabela.clearChildren();
+        cantoFpsTabela.add(labelPerf).left().row();
+        cantoFpsTabela.add(infoDesempenho).left();
     }
 
     /** Debug (tecla C): pinta de vermelho translucido cada SQM que ColisaoGrid
@@ -5859,6 +5892,8 @@ public class WorldScreen extends ScreenAdapter {
 
     @Override
     public void dispose() {
+        GameSocket.medidorEventos = null;
+        if (perf != null) perf.dispose();
         mapa.dispose();
         batch.dispose();
         font.dispose();
