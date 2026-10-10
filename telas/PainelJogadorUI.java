@@ -46,7 +46,7 @@ public class PainelJogadorUI {
     // Foto na esquerda, botoes (icone + o que faz) empilhados na direita.
     private static final float LARGURA = 330f;
     private static final float TAM_FOTO = 100f;
-    private static final float ALTURA_STATUS = 34f;
+    private static final float ALTURA_STATUS = 42f;
     private static final float LARGURA_BOTAO = 170f;
     private static final float ALTURA_BOTAO = 38f;
     private static final float TAM_ICONE_BOTAO = 26f;
@@ -156,7 +156,7 @@ public class PainelJogadorUI {
         // Esquerda: botao dos icones de amizade (so' amigo) em cima da foto.
         Table esquerda = new Table();
         esquerda.top();
-        esquerda.add(areaFoto).width(TAM_FOTO + 20f).height(TAM_FOTO + ALTURA_STATUS);
+        esquerda.add(areaFoto).width(TAM_FOTO + 20f).height(TAM_FOTO + ALTURA_STATUS + 14f);
         Table corpo = new Table();
         corpo.pad(8f, 10f, 6f, 10f);
         corpo.add(esquerda).expandX().top();
@@ -223,13 +223,13 @@ public class PainelJogadorUI {
         });
 
         // Status no canto de cima da foto: online/offline e "Last seen".
-        Label.LabelStyle estiloStatus = new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f), Color.WHITE);
+        Label.LabelStyle estiloStatus = new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.95f), Color.WHITE);
         textoStatus = new Label("", estiloStatus);
-        textoVisto = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.6f), Color.WHITE));
+        textoVisto = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.75f), Color.WHITE));
         textoVisto.setColor(new Color(0.65f, 0.65f, 0.65f, 1f));
         iconeStatus.setScaling(Scaling.fit);
         Table linhaStatus = new Table();
-        linhaStatus.add(iconeStatus).size(16f).padRight(4f);
+        linhaStatus.add(iconeStatus).size(20f).padRight(5f);
         linhaStatus.add(textoStatus).left();
         statusFoto.top().left();
         statusFoto.add(linhaStatus).left().row();
@@ -276,7 +276,7 @@ public class PainelJogadorUI {
         // Status em cima (Online/Last seen) e a foto embaixo, sem sobrepor.
         areaFoto.top();
         areaFoto.add(statusFoto).left().height(ALTURA_STATUS).top().row();
-        if (foto != null) areaFoto.add(foto).size(TAM_FOTO);
+        if (foto != null) areaFoto.add(foto).size(TAM_FOTO).padTop(14f);
         else areaFoto.add().size(TAM_FOTO);
         barraIcones.setVisible(false);
         raiz.setVisible(true);
