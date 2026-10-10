@@ -41,23 +41,65 @@ public final class DialogoNPCUI {
         return ICONE_MOEDA + COR_MOEDA_MARKUP + rotulo + FIM_COR_MARKUP;
     }
 
-    private static final Color COR_FUNDO = Color.valueOf("2f2f2f");
+    // Caixa escura; retrato e plaquinha do nome no cinza do HUD.
+    private static final Color COR_FUNDO = Color.valueOf("1c1c1c");
+    private static final Color COR_FUNDO_RETRATO = Color.valueOf("2f2f2f");
     private static final Color COR_BORDA = Color.valueOf("424242");
-    private static final Color COR_FUNDO_RETRATO = Color.valueOf("1c1c1c");
+    private static final Color COR_CONTORNO = Color.valueOf("0c0c0c");
+    private static final Color COR_SOMBRA_INTERNA = Color.valueOf("121212");
     private static final Color COR_NOME = Color.valueOf("ffd56b");
     private static final Color COR_FALA = Color.valueOf("e8e4dc");
+    private static final Color COR_DESTAQUE = Color.valueOf("b8923a"); // borda do botao com mouse em cima
 
-    /** Botao no estilo do HUD: cinza com borda, clareia no mouse, escurece
-     * apertado. */
-    private static TextButton.TextButtonStyle estiloBotao(BitmapFont fonte, Color fundo, Color borda) {
+    /** Moldura pixel art (12x12, nine-patch de 4): canto cortado, contorno
+     * escuro por fora, borda de 2px e um filete de sombra por dentro. */
+    private static com.badlogic.gdx.scenes.scene2d.utils.NinePatchDrawable moldura(Color fundo, Color borda) {
+        int t = 12;
+        com.badlogic.gdx.graphics.Pixmap pm = new com.badlogic.gdx.graphics.Pixmap(t, t, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+        pm.setBlending(com.badlogic.gdx.graphics.Pixmap.Blending.None);
+        for (int y = 0; y < t; y++) {
+            for (int x = 0; x < t; x++) {
+                int anel = Math.min(Math.min(x, y), Math.min(t - 1 - x, t - 1 - y));
+                boolean canto = (x == 0 || x == t - 1) && (y == 0 || y == t - 1);
+                Color c;
+                if (canto) continue;                      // canto cortado (transparente)
+                else if (anel == 0) c = COR_CONTORNO;
+                else if (anel <= 2) c = borda;
+                else if (anel == 3) c = COR_SOMBRA_INTERNA;
+                else c = fundo;
+                pm.drawPixel(x, y, com.badlogic.gdx.graphics.Color.rgba8888(c));
+            }
+        }
+        com.badlogic.gdx.graphics.Texture tex = new com.badlogic.gdx.graphics.Texture(pm);
+        pm.dispose();
+        return new com.badlogic.gdx.scenes.scene2d.utils.NinePatchDrawable(
+            new com.badlogic.gdx.graphics.g2d.NinePatch(tex, 4, 4, 4, 4));
+    }
+
+    /** Botao com a mesma moldura: borda dourada com o mouse em cima,
+     * fundo mais escuro apertado. */
+    private static TextButton.TextButtonStyle estiloBotao(BitmapFont fonte, Color corTexto) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
         e.font = fonte;
-        e.fontColor = Color.WHITE;
-        e.up = UiSkin.retangulo(fundo, borda, 2);
-        e.over = UiSkin.retangulo(new Color(fundo).lerp(Color.WHITE, 0.10f), new Color(borda).lerp(Color.WHITE, 0.15f), 2);
-        e.down = UiSkin.retangulo(new Color(fundo).lerp(Color.BLACK, 0.25f), borda, 2);
+        e.fontColor = corTexto;
+        e.up = moldura(COR_FUNDO_RETRATO, COR_BORDA);
+        e.over = moldura(Color.valueOf("383838"), COR_DESTAQUE);
+        e.down = moldura(COR_FUNDO, COR_DESTAQUE);
         return e;
     }
+
+    /** Setinha (triangulo pra baixo) de "tem mais": 7x4 px dourados. */
+    private static TextureRegionDrawable setinha() {
+        com.badlogic.gdx.graphics.Pixmap pm = new com.badlogic.gdx.graphics.Pixmap(7, 4, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+        pm.setColor(COR_NOME);
+        for (int y = 0; y < 4; y++) pm.drawLine(y, y, 6 - y, y);
+        com.badlogic.gdx.graphics.Texture tex = new com.badlogic.gdx.graphics.Texture(pm);
+        pm.dispose();
+        return new TextureRegionDrawable(new TextureRegion(tex));
+    }
+
+    private final Image indicadorMais = new Image(setinha());
+    private float relogioPisca;
 
     private final Table root = new Table();
     private final Table rodape = new Table();
@@ -69,6 +111,7 @@ public final class DialogoNPCUI {
     private final com.badlogic.gdx.scenes.scene2d.ui.Image iconeAcao;
     private Runnable acao;
     private float escalaRodape = 1f;
+    private int zoomRetrato = 4;
     private final TextButton.TextButtonStyle estiloProximo;
     private final TextButton.TextButtonStyle estiloFechar;
     private Runnable aoFechar = () -> {};
@@ -97,9 +140,9 @@ public final class DialogoNPCUI {
 
         // Mesmo visual do painel de HP/MP e do anel do retrato: fundo
         // 2f2f2f, borda 424242; retrato num quadro mais escuro.
-        skin.add("dialogo-npc-fundo", UiSkin.retangulo(COR_FUNDO, COR_BORDA, 2),
+        skin.add("dialogo-npc-fundo", moldura(COR_FUNDO, COR_BORDA),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
-        skin.add("dialogo-npc-retrato", UiSkin.retangulo(COR_FUNDO_RETRATO, COR_BORDA, 2),
+        skin.add("dialogo-npc-retrato", moldura(COR_FUNDO_RETRATO, COR_BORDA),
             com.badlogic.gdx.scenes.scene2d.utils.Drawable.class);
 
         retrato = new Image();
@@ -178,8 +221,8 @@ public final class DialogoNPCUI {
         BitmapFont fonteBotao = skin.get("chat-log", Label.LabelStyle.class).font;
         // Botoes no estilo do HUD (antes: vermelho vivo / cinza de popup).
         // Close num vinho escuro discreto, Next cinza.
-        estiloFechar = estiloBotao(fonteBotao, Color.valueOf("4a2626"), Color.valueOf("6a3a3a"));
-        estiloProximo = estiloBotao(fonteBotao, Color.valueOf("3a3a3a"), Color.valueOf("555555"));
+        estiloFechar = estiloBotao(fonteBotao, Color.valueOf("e09a8a"));   // Close: texto avermelhado
+        estiloProximo = estiloBotao(fonteBotao, COR_FALA);
 
         fecharButton = new TextButton("Close", estiloFechar);
         fecharButton.addListener(new ChangeListener() {
@@ -191,7 +234,7 @@ public final class DialogoNPCUI {
 
         // Botao de acao (ex: "Pay" com o SellerIcon), so' na ultima pagina,
         // na direita - ver definirAcao().
-        TextButton.TextButtonStyle estiloAcao = estiloBotao(fonteBotao, Color.valueOf("2c4a2c"), Color.valueOf("447044"));
+        TextButton.TextButtonStyle estiloAcao = estiloBotao(fonteBotao, Color.valueOf("9be39b"));
         botaoAcao = new TextButton("", estiloAcao);
         iconeAcao = new com.badlogic.gdx.scenes.scene2d.ui.Image();
         iconeAcao.setScaling(com.badlogic.gdx.utils.Scaling.fit);
@@ -206,35 +249,55 @@ public final class DialogoNPCUI {
         });
         this.escalaRodape = escala;
 
+        // Retrato em escala INTEIRA (nitido, sem borrar o pixel art).
+        int zoom = Math.max(1, Math.round(4f * escala));
         Table retratoMoldura = new Table();
         retratoMoldura.setBackground(skin.getDrawable("dialogo-npc-retrato"));
-        retratoMoldura.add(retrato).size(62f * escala, 72f * escala);
+        retratoMoldura.add(retrato).size(16f * zoom, 17f * zoom);
+        this.zoomRetrato = zoom;
 
-        // Nome dourado com um filete embaixo separando da fala.
-        Image filete = new Image(UiSkin.retangulo(COR_BORDA, COR_BORDA, 1));
         Table texto = new Table();
         texto.top().left();
-        texto.add(nomeLabel).growX().left().row();
-        texto.add(filete).growX().height(2f).padTop(3f * escala).padBottom(7f * escala).row();
-        texto.add(falaLabel).grow().top().left();
+        texto.add(falaLabel).grow().top().left().padTop(4f * escala);
+
+        // Setinha piscando no canto quando a pagina acabou e tem outra.
+        Table cantoSetinha = new Table();
+        cantoSetinha.bottom().right();
+        cantoSetinha.add(indicadorMais).size(7f * 3f * escala * 0.75f, 4f * 3f * escala * 0.75f).pad(0, 0, 2f * escala, 4f * escala);
+        indicadorMais.setVisible(false);
+        com.badlogic.gdx.scenes.scene2d.ui.Stack areaTexto = new com.badlogic.gdx.scenes.scene2d.ui.Stack(texto, cantoSetinha);
 
         Table corpo = new Table();
         corpo.top();
-        corpo.add(retratoMoldura).size(78f * escala, 88f * escala).padRight(12f * escala).top();
-        corpo.add(texto).growX().top();
+        corpo.add(retratoMoldura).size(16f * zoom + 16f, 17f * zoom + 16f).padRight(14f * escala).top();
+        corpo.add(areaTexto).grow().top();
 
         // Alinhamento trocado dinamicamente em atualizarBotaoRodape(): Next
         // sempre na direita, Close sempre na esquerda (a pedido do usuario).
         rodape.right();
-        rodape.add(fecharButton).width(86f * escala).height(42f * escala);
+        rodape.add(fecharButton).width(86f * escala).height(34f * escala);
 
         Table painel = new Table();
         painel.setBackground(skin.getDrawable("dialogo-npc-fundo"));
-        painel.pad(12f * escala);
+        // Em cima sobra espaco pra plaquinha do nome, que encaixa na borda.
+        painel.pad(22f * escala, 14f * escala, 12f * escala, 14f * escala);
         // minHeight (nao height fixo) - deixa a caixa crescer conforme a
         // fala quebra em mais linhas, em vez de cortar o texto.
-        painel.add(corpo).growX().minHeight(88f * escala).row();
+        painel.add(corpo).growX().minHeight(17f * zoom + 16f).row();
         painel.add(rodape).growX().padTop(8f * escala);
+
+        // Plaquinha do nome (estilo JRPG): por cima da borda de cima da
+        // caixa, um pouco pra dentro da esquerda.
+        Table placa = new Table();
+        placa.setBackground(moldura(COR_FUNDO_RETRATO, COR_BORDA));
+        placa.pad(4f * escala, 14f * escala, 6f * escala, 14f * escala);
+        placa.add(nomeLabel);
+        Table caixa = new Table();
+        caixa.add(painel).growX().padTop(nomeLabel.getPrefHeight() * 0.5f + 8f * escala);
+        Table sobreposicao = new Table();
+        sobreposicao.top().left();
+        sobreposicao.add(placa).padLeft(12f * escala);
+        com.badlogic.gdx.scenes.scene2d.ui.Stack comPlaca = new com.badlogic.gdx.scenes.scene2d.ui.Stack(caixa, sobreposicao);
 
         // Table.center() SOBRESCREVE o align inteiro (nao faz OR com o
         // bottom() anterior, ver fonte do Table) - por isso "bottom().
@@ -249,7 +312,7 @@ public final class DialogoNPCUI {
         // Sem height fixo tambem, pelo mesmo motivo do painel - a altura
         // segue o conteudo (preferred height), crescendo pra CIMA porque o
         // root inteiro fica ancorado embaixo (fillParent + bottom()).
-        root.add(painel).width(460f * escala);
+        root.add(comPlaca).width(460f * escala);
         stage.addActor(root);
         // Fica atras de QUALQUER outro menu (chat/settings/bookmenu/
         // joystick, ja existentes neste stage nesse ponto da construcao) -
@@ -298,12 +361,12 @@ public final class DialogoNPCUI {
         rodape.clearChildren();
         if (ultimaPagina) {
             // Close na esquerda; acao (Pay...) na direita, se tiver.
-            rodape.add(fecharButton).width(86f * escalaRodape).height(42f * escalaRodape).left();
+            rodape.add(fecharButton).width(86f * escalaRodape).height(34f * escalaRodape).left();
             rodape.add().expandX();
-            if (acao != null) rodape.add(botaoAcao).height(42f * escalaRodape).minWidth(86f * escalaRodape).right();
+            if (acao != null) rodape.add(botaoAcao).height(34f * escalaRodape).minWidth(86f * escalaRodape).right();
         } else {
             rodape.add().expandX();
-            rodape.add(fecharButton).width(86f * escalaRodape).height(42f * escalaRodape).right();
+            rodape.add(fecharButton).width(86f * escalaRodape).height(34f * escalaRodape).right();
         }
         rodape.invalidateHierarchy();
     }
@@ -326,7 +389,12 @@ public final class DialogoNPCUI {
     }
 
     public void atualizar() {
-        if (!root.isVisible() || caracteresVisiveis >= falaCompleta.length()) return;
+        if (!root.isVisible()) return;
+        // Setinha: so' com a pagina toda escrita e outra pagina depois; pisca.
+        boolean mais = caracteresVisiveis >= falaCompleta.length() && paginaAtual < paginas.length - 1;
+        relogioPisca = mais ? relogioPisca + Gdx.graphics.getDeltaTime() : 0f;
+        indicadorMais.setVisible(mais && (relogioPisca % 1f) < 0.6f);
+        if (caracteresVisiveis >= falaCompleta.length()) return;
         relogioLetraMs += Gdx.graphics.getDeltaTime() * 1000f;
         long necessarioMs = INTERVALO_LETRA_MS + atrasoExtraPendenteMs;
         if (relogioLetraMs < necessarioMs) return;
