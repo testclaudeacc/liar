@@ -2241,7 +2241,29 @@ def _achar_atlas():
     candidatos = [os.getenv('ATLAS_PATH', ''),
                   os.path.join(aqui, 'graphics.atlas'),
                   os.path.join(os.path.dirname(os.path.realpath(os.path.join(aqui, 'maps'))), 'graphics.atlas')]
-    return next((c for c in candidatos if c and os.path.isfile(c)), None)
+    achado = next((c for c in candidatos if c and os.path.isfile(c)), None)
+    if achado: return achado
+    # Nao achou no lugar padrao: procura qualquer .atlas com cabelo subindo a
+    # partir da pasta real de 'maps' (ex: core/assets/maps -> core/assets,
+    # core, projeto) e descendo ate' 2 niveis em cada uma (assets/, atlas/...).
+    def tem_cabelo(p):
+        try:
+            with open(p, encoding='utf-8', errors='replace') as f:
+                return any(l.startswith('sprites/hair/') for l in f)
+        except OSError: return False
+    pasta = os.path.realpath(os.path.join(aqui, 'maps'))
+    vistos = set()
+    for _ in range(4):
+        pasta = os.path.dirname(pasta)
+        for raiz, dirs, arqs in os.walk(pasta):
+            if raiz[len(pasta):].count(os.sep) >= 2: dirs[:] = []
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('build', 'node_modules', 'meu_ambiente')]
+            for a in arqs:
+                p = os.path.join(raiz, a)
+                if a.endswith('.atlas') and p not in vistos:
+                    vistos.add(p)
+                    if tem_cabelo(p): return p
+    return None
 
 def _cabelos_do_atlas():
     caminho = _achar_atlas()
@@ -2270,7 +2292,7 @@ def _registrar_cabelos_do_atlas():
         numero += 1
         helm.insert(pos, _skin(regiao, f"Hair {numero}")); pos += 1
         novos.append(regiao.rsplit('/', 1)[-1])
-    print(f"[SKINS] atlas {caminho}: {len(novos)} cabelo(s) novo(s) {novos}")
+    print(f"[SKINS] atlas {caminho}: {len(nomes)} cabelo(s) no atlas, {len(novos)} novo(s) {novos}")
 
 _registrar_cabelos_do_atlas()
 
