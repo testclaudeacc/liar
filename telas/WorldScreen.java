@@ -1920,7 +1920,8 @@ public class WorldScreen extends ScreenAdapter {
         // 2 linhas: pessoas/monstros em cima, NPCs (por funcao) embaixo.
         Table linhaPessoas = new Table(), linhaNpcs = new Table();
         adicionarLegenda(linhaPessoas, MiniMapa.COR_VOCE, "You");
-        adicionarLegendaIcone(linhaPessoas, regiaoCache(BookMenuUI.iconeClasse("Knight")), "Party");
+        // Party: o icone vai trocando entre as 4 classes (devagar).
+        adicionarLegendaParty(linhaPessoas);
         adicionarLegenda(linhaPessoas, MiniMapa.COR_MOB, "Monsters");
         for (String[] p : ICONES_PAPEL) adicionarLegendaIcone(linhaNpcs, regiaoCache(p[1]), p[2]);
         Table legenda = new Table();
@@ -1947,6 +1948,32 @@ public class WorldScreen extends ScreenAdapter {
         painelMapaGrande.add(rodape).growX().padTop(8);
         painelMapaGrande.setVisible(false);
         uiStage.addActor(painelMapaGrande);
+    }
+
+    private static final String[] CLASSES_LEGENDA = {"Knight", "Mage", "Ranger", "Bard"};
+    private static final float TEMPO_CLASSE_LEGENDA = 1.6f; // segundos em cada classe
+
+    private void adicionarLegendaParty(Table legenda) {
+        final TextureRegionDrawable[] icones = new TextureRegionDrawable[CLASSES_LEGENDA.length];
+        for (int i = 0; i < icones.length; i++) {
+            TextureRegion r = regiaoCache(BookMenuUI.iconeClasse(CLASSES_LEGENDA[i]));
+            icones[i] = r != null ? new TextureRegionDrawable(r) : null;
+        }
+        Image icone = new Image(icones[0]) {
+            private float tempo;
+            private int atual;
+            @Override public void act(float delta) {
+                super.act(delta);
+                tempo += delta;
+                if (tempo < TEMPO_CLASSE_LEGENDA) return;
+                tempo = 0f;
+                atual = (atual + 1) % icones.length;
+                if (icones[atual] != null) setDrawable(icones[atual]);
+            }
+        };
+        icone.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+        legenda.add(icone).size(20).padRight(5);
+        legenda.add(new Label("Party", skin, "hud")).padRight(16);
     }
 
     private void adicionarLegendaIcone(Table legenda, TextureRegion regiao, String texto) {
