@@ -5476,12 +5476,15 @@ def _montar_ranking(categoria):
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
-        c.execute("SELECT name, class_name, level, exp, skills FROM characters WHERE deleted_at IS NULL")
-        for nome, classe, level, exp, skills_txt in c.fetchall():
+        c.execute("SELECT name, class_name, level, exp, skills, skins FROM characters WHERE deleted_at IS NULL")
+        for nome, classe, level, exp, skills_txt, skins_txt in c.fetchall():
             try: skills = json.loads(skills_txt) if skills_txt else {}
             except (TypeError, ValueError): skills = {}
+            try: skins = json.loads(skins_txt) if skins_txt else {}
+            except (TypeError, ValueError): skins = {}
             por_nome[nome] = {"name": nome, "class": classe or "Knight", "level": level or 1,
-                              "exp": exp or 0, "skills": skills if isinstance(skills, dict) else {}}
+                              "exp": exp or 0, "skills": skills if isinstance(skills, dict) else {},
+                              "skins": skins if isinstance(skins, dict) else {}}
         c.close()
     finally:
         if conn: db_pool.putconn(conn)
@@ -5490,13 +5493,16 @@ def _montar_ranking(categoria):
         nome = p.get('name')
         if not nome: continue
         por_nome[nome] = {"name": nome, "class": p.get('class_name', 'Knight'), "level": p.get('level', 1),
-                          "exp": p.get('exp', 0), "skills": p.get('skills') or {}}
+                          "exp": p.get('exp', 0), "skills": p.get('skills') or {}, "skins": p.get('skins') or {}}
     lista = []
     so_classe = RANKING_CLASSE.get(categoria)
     for d in por_nome.values():
         if _fora_do_ranking(d["name"]): continue
         if so_classe and str(d["class"] or "Knight").strip().lower() != so_classe.lower(): continue
         e = {"name": d["name"], "class": d["class"], "level": int(d["level"] or 1), "exp": int(d["exp"] or 0)}
+        # Skin pra foto da janela do player (clicar no nome no Rank).
+        try: e["skins"] = validar_skins(d.get("skins") or {}, d["class"] or "Knight")
+        except Exception: e["skins"] = {}
         if chave: e["value"] = _skill_nivel(d["skills"], chave)
         lista.append(e)
     if chave: lista.sort(key=lambda e: (-e["value"], -e["level"], e["name"].lower()))

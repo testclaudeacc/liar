@@ -367,7 +367,7 @@ public final class BookMenuUI {
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
         colunaDireita.add(scroll).grow().pad(12, 12, 6, 12).row();
         barraCapBag = new BarraUso();
-        capacityLabel.setStyle(new Label.LabelStyle(skin.get("chat-log", Label.LabelStyle.class).font, Color.WHITE));
+        capacityLabel.setStyle(new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
         capacityLabel.setFontScale(1f);
         capacityLabel.setColor(Color.WHITE);
         capacityLabel.setAlignment(Align.center);
@@ -2709,7 +2709,7 @@ public final class BookMenuUI {
         scroll.setScrollingDisabled(true, false);
         scroll.setOverscroll(false, false);
 
-        bancoInfo = new Label("", new Label.LabelStyle(fonteBanco(), Color.WHITE));
+        bancoInfo = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
         bancoInfo.setAlignment(Align.center);
         bancoAviso = new Label("", new Label.LabelStyle(fonteBanco(), Color.valueOf("ff6a6a")));
         escalarFonte(bancoAviso, 0.8f);
@@ -3422,6 +3422,10 @@ public final class BookMenuUI {
 
     public AmigoInfo amigo(String nome) { return amigos.get(nome); }
 
+    /** Classe/skin de quem apareceu no Rank (pra janela do player). */
+    private final Map<String, AmigoInfo> infoRanking = new HashMap<>();
+    public AmigoInfo infoRanking(String nome) { return infoRanking.get(nome); }
+
     public void definirAoMudarAmigos(Runnable r) { aoMudarAmigos = r; }
 
     public void definirAoClicarAmigo(java.util.function.Consumer<String> c) { aoClicarAmigo = c; }
@@ -3831,6 +3835,19 @@ public final class BookMenuUI {
                     Label valor = new Label(String.valueOf(e.getInt("value", 10)), skin, "hud");
                     escalarFonte(valor, 0.7f * FONTE_STATS);
                     linha.add(valor).right().width(70).padRight(6);
+                }
+                // Clicar no nome abre a janela do player (igual Friends).
+                AmigoInfo info = new AmigoInfo(nome);
+                info.classe = classe;
+                info.skins = e.get("skins");
+                infoRanking.put(nome, info);
+                if (!eu) {
+                    linha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+                    linha.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+                        @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent ev, float x, float y) {
+                            if (aoClicarAmigo != null) aoClicarAmigo.accept(nome);
+                        }
+                    });
                 }
                 listaRank.add(linha).growX().height(34).padBottom(2).row();
             }

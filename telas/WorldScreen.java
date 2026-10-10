@@ -2324,6 +2324,7 @@ public class WorldScreen extends ScreenAdapter {
     private Jogador jogadorDeAmigoOffline(String nome) {
         if (remotos.containsKey(nome) || remotosForaDeVisao.containsKey(nome)) return null;
         BookMenuUI.AmigoInfo a = bookMenu.amigo(nome);
+        if (a == null || a.skins == null) a = bookMenu.infoRanking(nome);
         if (a == null || a.skins == null) return null;
         definirSkins(nome, a.skins);
         return new Jogador(nome, a.classe != null ? a.classe : "Knight", 0f, 0f);
@@ -2335,6 +2336,7 @@ public class WorldScreen extends ScreenAdapter {
         if (j == null) j = remotosForaDeVisao.get(nome);
         if (j != null) return j.classe;
         BookMenuUI.AmigoInfo a = bookMenu.amigo(nome);
+        if (a == null || a.classe == null) a = bookMenu.infoRanking(nome);
         return a != null ? a.classe : null;
     }
 
