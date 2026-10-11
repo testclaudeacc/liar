@@ -3550,6 +3550,16 @@ public final class BookMenuUI {
         int n = 0;
         for (ItemLoja it : itensLoja) {
             if (ehMagia(it.item) && conheceMagia(it.item)) continue; // aprendida: sai da loja
+            if (ehMagia(it.item)) {
+                // Magia: gaveta (nome, mana, descricao, dano e preco) em vez do slot.
+                lojaGridCompra.add(gavetaMagia(it.item, it.item.equals(lojaFoco), () -> {
+                    lojaFoco = it.item;
+                    lojaAviso.setText("");
+                    atualizarTelaLoja();
+                }, it.preco)).growX().padBottom(6).colspan(COLUNAS_INVENTARIO).row();
+                n = 0;
+                continue;
+            }
             Button slot = slotComPreco(it.item, it.preco, 0, it.item.equals(lojaFoco), false, () -> {
                 lojaFoco = it.item;
                 lojaAviso.setText("");
@@ -5083,6 +5093,12 @@ public final class BookMenuUI {
     private Table conteudoMagias;
 
     private Button gavetaMagia(String caminho, boolean noSlot, Runnable aoClicar) {
+        return gavetaMagia(caminho, noSlot, aoClicar, 0L);
+    }
+
+    /** preco > 0: gaveta da loja (Nyla) - mostra o preco e quebra a descricao
+     * na largura do painel (a loja nao alarga a janela pra isso). */
+    private Button gavetaMagia(String caminho, boolean noSlot, Runnable aoClicar, long preco) {
         EquipStats dados = ITEM_STATS.get(caminho);
         Button.ButtonStyle estilo = new Button.ButtonStyle();
         estilo.up = UiSkin.retangulo(new Color(0.11f, 0.06f, 0.03f, 1f), noSlot ? COR_MAGIA_SELECIONADA : new Color(0.35f, 0.2f, 0.08f, 1f), 1);
@@ -5099,13 +5115,30 @@ public final class BookMenuUI {
         if (dados != null) {
             texto.add(linhaComIcone("ui/MPIcon", dados.magiaMana + " Mana", COR_MANA)).left().row();
             if (dados.magiaDescricao != null && !dados.magiaDescricao.isEmpty()) {
-                // Numa linha so': a janela alarga pra caber (ajustarLarguraDetalhes).
-                texto.add(linhaStat(dados.magiaDescricao, Color.LIGHT_GRAY)).left().row();
+                // Aba Spells: numa linha so' (a janela alarga, ajustarLarguraDetalhes).
+                Label desc = linhaStat(dados.magiaDescricao, Color.LIGHT_GRAY);
+                if (preco > 0) { desc.setWrap(true); texto.add(desc).growX().left().row(); }
+                else texto.add(desc).left().row();
             }
             Table linhaDano = new Table();
             linhaDano.add(linhaStat(dados.magiaDano + "% Damage", COR_SET));
             linhaDano.add(linhaStat(dados.magiaArea ? "Area Damage" : "Single Target", COR_ALVO_MAGIA)).padLeft(10);
             texto.add(linhaDano).left().row();
+        }
+        if (preco > 0) {
+            // Preco: moedinha + valor na cor da moeda (igual os slots da loja).
+            int m = maiorMoeda(preco);
+            Table linhaPreco = new Table();
+            TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[m]);
+            if (r != null) {
+                Image moeda = new Image(new TextureRegionDrawable(r));
+                moeda.setScaling(Scaling.fit);
+                linhaPreco.add(moeda).size(20).padRight(3);
+            }
+            Label numero = new LabelPixel(valorNaMoeda(preco, m), new Label.LabelStyle(UiSkin.fontePreco(skin), Color.WHITE));
+            numero.setColor(corMoeda(MOEDAS_TRADE[m]));
+            linhaPreco.add(numero);
+            texto.add(linhaPreco).left().padTop(2).row();
         }
         gaveta.add(texto).growX().center().left();
         gaveta.addListener(new ChangeListener() {

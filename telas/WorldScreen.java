@@ -5256,7 +5256,8 @@ public class WorldScreen extends ScreenAdapter {
         if (quadros == null) return null;
         Efeito e = new Efeito(quadros, x, y);
         boolean rapido = !"Sword".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome); // Arrow ou Physical
-        e.duracaoQuadro = "Fire".equals(nome) ? DURACAO_QUADRO_HIT_FOGO
+        // Mana (sprite novo, 7 quadros) na mesma velocidade do fogo.
+        e.duracaoQuadro = "Fire".equals(nome) || "Mana".equals(nome) ? DURACAO_QUADRO_HIT_FOGO
             : "Arrow".equals(nome) ? DURACAO_QUADRO_HIT_FLECHA
             : rapido ? DURACAO_QUADRO_HIT_RAPIDO : DURACAO_QUADRO_HIT;
         efeitos.add(e);
@@ -5799,6 +5800,12 @@ public class WorldScreen extends ScreenAdapter {
             float y = pr.y0 + (pr.y1() - pr.y0) * t;
             float angulo = (float) Math.toDegrees(Math.atan2(pr.y1() - pr.y0, pr.x1() - pr.x0));
             float w = pr.regiao.getRegionWidth(), h = pr.regiao.getRegionHeight();
+            // A "cabeca" do projetil (fogo/mana) fica na frente do sprite: quem
+            // segue o caminho e chega no centro do mob e' ela, nao o meio do
+            // sprite (senao some com a cabeca ja' passada do mob).
+            float recuo = w * 0.22f, rad = angulo * com.badlogic.gdx.math.MathUtils.degreesToRadians;
+            x -= com.badlogic.gdx.math.MathUtils.cos(rad) * recuo;
+            y -= com.badlogic.gdx.math.MathUtils.sin(rad) * recuo;
             batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, 1f, 1f, angulo);
         }
         for (Efeito e : efeitos) {
