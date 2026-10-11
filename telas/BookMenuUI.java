@@ -401,6 +401,7 @@ public final class BookMenuUI {
         final String fourthStatType, icone;
         final float cap; // peso de 1 unidade (servidor.py::ITEM_DB "cap")
         final int regenHp, regenMp, regenSeg, preco; // comida com buff de regen; preco em copper
+        final boolean usavel; // scroll etc: botao Use na Bag
         final boolean empilhavel;
 
         EquipStats(JsonValue d) {
@@ -409,6 +410,7 @@ public final class BookMenuUI {
             this.regenMp = d.getInt("regen_mp", 0);
             this.regenSeg = d.getInt("regen_seg", 0);
             this.preco = d.getInt("price", 0);
+            this.usavel = d.getBoolean("usable", false);
             this.empilhavel = d.getBoolean("stackable", false) || d.getBoolean("ammo", false);
             this.nome = d.getString("name", "");
             this.tipo = d.getString("type", "");
@@ -738,6 +740,14 @@ public final class BookMenuUI {
             if (dados.regenMp > 0) bloco.add(linhaComIcone("ui/MPIcon", "+" + dados.regenMp + " Regen", COR_POCAO_MP)).left().row();
             if (dados.regenHp > 0 || dados.regenMp > 0)
                 bloco.add(linhaStat("for " + dados.regenSeg + " seconds", new Color(0.6f, 0.6f, 0.6f, 1f))).left().row();
+            return;
+        }
+        if (dados.usavel) {
+            // Scroll: o tipo e o que faz.
+            bloco.add(linhaStat(dados.tipo.isEmpty() ? "Scroll" : dados.tipo, Color.LIGHT_GRAY)).left().row();
+            Label efeito = linhaStat("Teleports you to the city. Can't be used in battle.", new Color(0.7f, 0.85f, 1f, 1f));
+            efeito.setWrap(true);
+            bloco.add(efeito).growX().left().row();
             return;
         }
         if (dados.ehPocao()) {
@@ -1725,7 +1735,7 @@ public final class BookMenuUI {
         EquipStats comida = ITEM_STATS.get(item.itemPath);
         // Comida/pocao nao mostram "Quantity" (a quantidade ja' aparece no icone).
         boolean ehPocao = comida != null && comida.ehPocao();
-        boolean ehComida = comida != null && (comida.fullness > 0 || ehPocao);
+        boolean ehComida = comida != null && (comida.fullness > 0 || ehPocao || comida.usavel);
         if (item.quantity > 1 && !ehComida) bagDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
         if (item.favorite) bagDetalhes.add(linhaStat("Favorite", new Color(1f, 0.82f, 0.24f, 1f))).left().row();
         if (ehComida && !item.instanceId.isEmpty()) {
@@ -1733,7 +1743,7 @@ public final class BookMenuUI {
                 skin.get("verde", TextButton.TextButtonStyle.class));
             estiloComer.font = skin.get("chat-log", Label.LabelStyle.class).font; // sem contorno
             // Pocao: "Use" (o servidor decide: eat_food usa comida ou pocao).
-            TextButton comer = new TextButton(ehPocao ? "Use" : "Eat", estiloComer);
+            TextButton comer = new TextButton(ehPocao || comida.usavel ? "Use" : "Eat", estiloComer);
             String id = item.instanceId;
             comer.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
@@ -4148,7 +4158,7 @@ public final class BookMenuUI {
     /** Item que pode ir num slot da barra: comida e pocao. */
     private boolean usavelNoAtalho(String caminho) {
         EquipStats dados = ITEM_STATS.get(caminho);
-        return dados != null && (dados.fullness > 0 || dados.ehPocao());
+        return dados != null && (dados.fullness > 0 || dados.ehPocao() || dados.usavel);
     }
 
     /** Aba da direita na pagina Spells: itens da bag ou magias. */

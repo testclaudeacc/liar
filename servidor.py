@@ -163,7 +163,11 @@ NPC_DB = {
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "falas": ["Looking for a blade? Finest steel in town."]},
     "jack":  {"name": "Jack",  "fixo": True, "role": "bank", "falas": ["Welcome to your private vault. Your belongings are safe with me."]},
     "luna":  {"name": "Luna",  "fixo": True, "role": "market", "falas": ["Welcome to the market! Trade your goods with other adventurers."]},
-    "valth": {"name": "Valth", "fixo": True, "role": "pot", "falas": ["Potions, fresh from the cauldron. Don't ask what's in them."]},
+    "valth": {"name": "Valth", "fixo": True, "role": "pot", "shop": [
+        "res://sprites/items/Potions/SmallHealthPotion.tres", "res://sprites/items/Potions/SmallManaPotion.tres",
+        "res://sprites/items/Potions/SmallHealthPot.tres", "res://sprites/items/Potions/SmallManaPot.tres",
+        "res://sprites/items/Potions/MediumHealthPot.tres", "res://sprites/items/Potions/MediumManaPot.tres",
+        "res://sprites/items/Scrolls/PortusNovaScroll.tres"], "falas": ["Potions, fresh from the cauldron. Don't ask what's in them."]},
 }
 NPC_PAY_DISTANCIA_SQM = 4
 NPC_TEXTO_SEM_DINHEIRO = "Do not try to deceive me, mortal."
@@ -328,12 +332,18 @@ ITEM_DB = {
     # Pocoes: "heal_hp"/"heal_mp" = o que aparece pro player ("Heals 50");
     # a cura de verdade e' um dos valores de CURA_POCAO (perto disso).
     # "icon" = regiao do atlas.
-    "res://sprites/items/Potions/SmallHealthPotion.tres": {"name": "Small Health Potion", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_hp": 50, "icon": "sheet/r44_c2", "stackable": True, "max_stack": 9999, "cap": 0.2},
-    "res://sprites/items/Potions/SmallManaPotion.tres": {"name": "Small Mana Potion", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 50, "icon": "sheet/r44_c9", "stackable": True, "max_stack": 9999, "cap": 0.2},
+    "res://sprites/items/Potions/SmallHealthPotion.tres": {"name": "Basic Health Pot", "price": 100, "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_hp": 50, "icon": "sheet/r44_c2", "stackable": True, "max_stack": 9999, "cap": 0.2},
+    "res://sprites/items/Potions/SmallManaPotion.tres": {"name": "Basic Mana Pot", "price": 100, "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 50, "icon": "sheet/r44_c9", "stackable": True, "max_stack": 9999, "cap": 0.2},
+    "res://sprites/items/Potions/SmallHealthPot.tres": {"name": "Small Health Pot", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_hp": 100, "price": 150, "icon": "sheet/r45_c2", "stackable": True, "max_stack": 9999, "cap": 0.3},
+    "res://sprites/items/Potions/SmallManaPot.tres": {"name": "Small Mana Pot", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 100, "price": 150, "icon": "sheet/r49_c7", "stackable": True, "max_stack": 9999, "cap": 0.3},
+    "res://sprites/items/Potions/MediumHealthPot.tres": {"name": "Medium Health Pot", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_hp": 250, "price": 250, "icon": "sheet/r40_c5", "stackable": True, "max_stack": 9999, "cap": 0.4},
+    "res://sprites/items/Potions/MediumManaPot.tres": {"name": "Medium Mana Pot", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 250, "price": 250, "icon": "sheet/r48_c9", "stackable": True, "max_stack": 9999, "cap": 0.4},
+    # Scroll: "teleport" = usar leva pro spawn da cidade (fora de battle).
+    "res://sprites/items/Scrolls/PortusNovaScroll.tres": {"name": "Portus Nova Scroll", "type": "Scroll", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "teleport": True, "usable": True, "price": 500, "icon": "sheet/r53_c2", "stackable": True, "max_stack": 9999, "cap": 0.1},
 }
 # Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
 # que aparece na descricao.
-CURA_POCAO = {50: (42, 44, 46, 48, 50)}
+CURA_POCAO = {50: (42, 44, 46, 48, 50), 100: (88, 91, 94, 97, 100), 250: (220, 228, 235, 243, 250)}
 POCAO_COOLDOWN_SEG = 5.0  # usou uma: TODAS travam (igual CooldownPocao.DURACAO no client)
 
 SLOT_MUNICAO = "Hand"
@@ -349,7 +359,7 @@ ALCANCE_RANGED_SQM = 5
 # de uma copia propria e o que aparece na tela e' sempre o valor real.
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
-                       "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap",
+                       "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap", "usable",
                        "regen_hp", "regen_mp", "regen_seg", "price")
 
 def montar_item_db_cliente():
@@ -5994,8 +6004,31 @@ def handle_eat_food(data):
 def _usar_item(sid, p, inst):
     # Botao Eat/Use da bag ou atalho da hotbar: comida ou pocao.
     dados = ITEM_DB.get(inst.get('item'), {})
-    if dados.get('heal_hp') or dados.get('heal_mp'): _beber_pocao(sid, p, inst, dados)
+    if dados.get('teleport'): _usar_scroll_teleporte(sid, p, inst)
+    elif dados.get('heal_hp') or dados.get('heal_mp'): _beber_pocao(sid, p, inst, dados)
     else: _comer(sid, p, inst)
+
+def _usar_scroll_teleporte(sid, p, inst):
+    # Portus Nova Scroll: volta pro spawn da cidade (o mesmo de quem desperta).
+    if p.get('is_dead'): return
+    if p.get('battle_until', 0) > time.time():
+        emit('food_result', {'ok': False, 'reason': 'battle'}, room=sid)
+        chat_sistema(sid, "You can't use this while in battle.", 'red')
+        return
+    ox, oy = p.get('pos_x', 0), p.get('pos_y', 0)
+    sala_antiga = p.get('room')
+    alvo = _spawn_do_player({**p, 'npc_dialogue_state': {**(p.get('npc_dialogue_state') or {}), 'spawn': SPAWN_DEPOIS_DE_DESPERTAR}})
+    inventario = p.get('inventory', [])
+    qty = int(inst.get('qty', 1))
+    if qty > 1: inst['qty'] = qty - 1
+    else: inventario.remove(inst)
+    destino = _teleportar(sid, p, tile_de(*alvo), p.get('direction', 'down'))
+    dx, dy = centro_tile(destino)
+    # Fumacinha onde ele estava e onde chegou.
+    if sala_antiga: emit_area('tp_smoke', {'pos_x': ox, 'pos_y': oy}, sala_antiga)
+    emit_area('tp_smoke', {'pos_x': dx, 'pos_y': dy}, p.get('room'))
+    _queue_save(p)
+    emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(inventario), 'equipped_items': p.get('equipped_items', {})}, room=sid)
 
 def _beber_pocao(sid, p, inst, dados):
     now = time.time()
@@ -6070,7 +6103,7 @@ HOTBAR_SLOTS = 9
 def item_usavel_no_atalho(item_path):
     # Comida e pocao (magia entra aqui quando existir).
     dados = ITEM_DB.get(item_path, {})
-    try: return int(dados.get('fullness', 0)) > 0 or bool(dados.get('heal_hp') or dados.get('heal_mp'))
+    try: return int(dados.get('fullness', 0)) > 0 or bool(dados.get('heal_hp') or dados.get('heal_mp') or dados.get('usable'))
     except (TypeError, ValueError): return False
 
 def normalizar_hotbar(hb):

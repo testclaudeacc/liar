@@ -3416,6 +3416,12 @@ public class WorldScreen extends ScreenAdapter {
             moverMob(mob, data.getFloat("pos_x", 0f), data.getFloat("pos_y", 0f), "down", 0f, true);
             efeitos.add(new Efeito(quadrosFumaca(), mob.x, mob.y));
         });
+        // Scroll de teleporte: fumacinha onde saiu e onde chegou.
+        socket.on("tp_smoke", (nomeEvt, data) -> {
+            if (data == null) return;
+            efeitos.add(new Efeito(quadrosFumaca(), conversor.rawParaMundoX(data.getFloat("pos_x", 0f)),
+                conversor.rawParaMundoY(data.getFloat("pos_y", 0f))));
+        });
         socket.on("mob_target", (nomeEvt, data) -> {
             if (data == null) return;
             MobVisual mob = mobs.get(data.getString("mob_id", ""));
@@ -3974,7 +3980,7 @@ public class WorldScreen extends ScreenAdapter {
     /** NPC da loja aberta agora (idem). */
     private NPCVisual npcLoja;
     /** Funcoes de NPC que abrem a loja (os outros vendedores entram aqui quando tiverem "shop"). */
-    private static final java.util.Set<String> PAPEIS_COM_LOJA = new java.util.HashSet<>(java.util.Arrays.asList("food"));
+    private static final java.util.Set<String> PAPEIS_COM_LOJA = new java.util.HashSet<>(java.util.Arrays.asList("food", "pot"));
 
     private void abrirDialogoNPC(NPCVisual npc) {
         if (chat.isVisivel()) chat.setVisivel(false);
