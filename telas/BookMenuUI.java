@@ -212,7 +212,6 @@ public final class BookMenuUI {
         construirPaginasTrade(skin);
         construirPaginaBanco(skin);
         construirPaginaLoja();
-        construirPaginaLoja();
         colunaEsquerdaAbas = leftTab;
         colunaDireitaAbas = rightTab;
         mainWindow.add(bagPage).grow();
