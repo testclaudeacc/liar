@@ -64,12 +64,18 @@ public class UiSkin {
         int px = Math.max(6, Math.round(18f * fator * escalaAtual));
         String nome = "hud-px-" + px;
         if (skin.has(nome, BitmapFont.class)) return skin.getFont(nome);
-        BitmapFont fonte = gerarFonte("fonts/dejavu-sans.condensed.ttf", px, 0, 1f);
+        // Hinting Full: em tamanho pequeno o FreeType encaixa os tracos das
+        // letras na grade de pixels (sem isso as hastes caiam entre 2 pixels
+        // e o texto ficava com cara de borrado).
+        FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal("fonts/dejavu-sans.condensed.ttf"));
+        FreeTypeFontParameter parametros = new FreeTypeFontParameter();
+        parametros.size = px;
+        parametros.hinting = FreeTypeFontGenerator.Hinting.Full;
+        parametros.minFilter = TextureFilter.Linear;
+        parametros.magFilter = TextureFilter.Linear;
+        BitmapFont fonte = gerador.generateFont(parametros);
+        gerador.dispose();
         fonte.getData().setScale(1f / escalaAtual);
-        // Nearest: a fonte ja' e' do tamanho exato da tela - com Linear, meio
-        // pixel de diferenca na posicao ja' borrava a letra inteira.
-        for (com.badlogic.gdx.graphics.g2d.TextureRegion r : fonte.getRegions())
-            r.getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
         fonte.setUseIntegerPositions(false);
         skin.add(nome, fonte);
         return fonte;
@@ -79,7 +85,7 @@ public class UiSkin {
      * e com contorno mais fino (1px). */
     public static BitmapFont fontePreco(Skin skin) {
         if (skin.has("preco-font", BitmapFont.class)) return skin.getFont("preco-font");
-        BitmapFont fonte = gerarFonte("fonts/dejavu-sans.condensed.ttf", 14, 1, escalaAtual);
+        BitmapFont fonte = gerarFonte("fonts/dejavu-sans.condensed.ttf", 16, 1, escalaAtual);
         fonte.setUseIntegerPositions(false);
         skin.add("preco-font", fonte);
         return fonte;

@@ -3300,7 +3300,7 @@ public final class BookMenuUI {
             img.setScaling(Scaling.fit);
             Table moldura = new Table();
             moldura.top();
-            moldura.add(img).size(34).padTop(2);
+            moldura.add(img).size(40).padTop(1);
             conteudo.add(moldura);
         }
         if (preco > 0) {
@@ -3311,7 +3311,7 @@ public final class BookMenuUI {
             if (r != null) {
                 Image moeda = new Image(new TextureRegionDrawable(r));
                 moeda.setScaling(Scaling.fit);
-                linhaPreco.add(moeda).size(17).padLeft(2).padRight(2);
+                linhaPreco.add(moeda).size(20).padLeft(2).padRight(2);
             }
             Label numero = new LabelPixel(valorNaMoeda(preco, m),
                 new Label.LabelStyle(UiSkin.fontePreco(skin), Color.WHITE));
