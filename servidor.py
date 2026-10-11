@@ -376,6 +376,7 @@ POCAO_COOLDOWN_SEG = 5.0  # usou uma: TODAS travam (igual CooldownPocao.DURACAO 
 SLOT_MUNICAO = "Hand"
 # Classes que atacam a distancia (o resto e' corpo a corpo) e o alcance delas.
 CLASSES_RANGED = ("Ranger", "Mage", "Bard")
+CLASSES_VALIDAS = ("Knight", "Ranger", "Mage", "Bard")
 ALCANCE_LOOT_SQM = 4
 # Arma a distancia alcanca o mesmo raio em que o mob detecta o player
 # (DETECCAO_SQM, mas aqui em linha reta - circulo; a deteccao do mob e' quadrada).
@@ -2001,7 +2002,8 @@ def db_writer_worker():
                 SET pos_x = %s, pos_y = %s, direction = %s, floor = %s, level = %s,
                     exp = %s, kills = %s, current_hp = %s, current_mp = %s,
                     inventory = %s, equipped_items = %s, skills = %s, skins = %s, currency = %s,
-                    time_played = %s, npc_dialogue_state = %s, hotbar = %s, last_seen = %s
+                    time_played = %s, npc_dialogue_state = %s, hotbar = %s, last_seen = %s,
+                    class_name = %s
                 WHERE user_id = %s AND name = %s
             """
             params = (
@@ -2014,6 +2016,8 @@ def db_writer_worker():
                 json.dumps(player_data.get('npc_dialogue_state', {})),
                 json.dumps(normalizar_hotbar(player_data.get('hotbar'))),
                 player_data.get('last_seen'),
+                # /class do admin troca a classe (o resto nunca muda isso).
+                player_data.get('class_name') if player_data.get('class_name') in CLASSES_VALIDAS else 'Knight',
                 player_data.get('user_id'), player_data.get('name')
             )
             c.execute(query, params)
@@ -3039,6 +3043,7 @@ ADMIN_COMANDOS = [
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
     ("atkspd", "/atkspd <1-50>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
     ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
+    ("class", "/class <Knight|Ranger|Mage|Bard>", "troca sua classe (equip separado por classe; recarrega o personagem)"),
     ("spells", "/spells reset", "esquece todas as magias aprendidas (da' pra comprar de novo)"),
     ("money", "/money add <quantia><c|s|g|p>", "da' moedas (ex: /money add 5g, /money add 1p)"),
     ("quests", "/quests", "quests e se voce ja fez"),
@@ -3053,6 +3058,7 @@ def argumentos_admin():
         'summons': mobs, 'bestiary': mobs + ['clear'],
         'soul': ['on', 'off'], 'ghost': ['on', 'off'],
         'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'], 'spells': ['reset'],
+        'class': list(CLASSES_VALIDAS),
         'time': list(FASES_DO_DIA.keys()), 'money': ['add'],
         'quest': list(_todas_as_quests()) + ['complete', 'reset'],
     }
@@ -3190,6 +3196,38 @@ def comando_admin(sid, p, texto):
             msg = f"Damage x{v}."
         _queue_save(p)
         chat_sistema(sid, msg)
+        return
+    if cmd == 'class':
+        alvo = next((c for c in CLASSES_VALIDAS if len(partes) > 1 and c.lower() == partes[1].lower()), None)
+        atual = p.get('class_name', 'Knight')
+        if alvo is None:
+            chat_sistema(sid, f"Class: {atual}. Usage: /class <Knight|Ranger|Mage|Bard>")
+            return
+        if alvo == atual:
+            chat_sistema(sid, f"You are already a {alvo}.")
+            return
+        if not isinstance(p.get('skills'), dict): p['skills'] = {}
+        sk = p['skills']
+        # Equip separado por classe (nada de penalidade de item de outra
+        # classe): guarda o desta e veste o da outra (1a vez: o kit inicial).
+        sk['admin_equip_' + atual] = p.get('equipped_items', {})
+        guardado = sk.pop('admin_equip_' + alvo, None)
+        p['equipped_items'] = guardado if isinstance(guardado, dict) else montar_kit_inicial(alvo)[1]
+        # A skill principal vai junto (ex: Melee 30 vira Magic 30).
+        de, para = SKILL_DA_CLASSE.get(atual), SKILL_DA_CLASSE.get(alvo)
+        if de and para:
+            sk[para] = sk.get(de, 10)
+            sk[para + '_hits'] = sk.get(de + '_hits', 0)
+        p['class_name'] = alvo
+        max_hp, max_mp = calcular_max_vitais(p)
+        p['current_hp'] = min(float(p.get('current_hp', max_hp) or max_hp), max_hp)
+        p['current_mp'] = min(float(p.get('current_mp', max_mp) or max_mp), max_mp)
+        # Sai do battle pra desconectar sem deixar o corpo no mapa.
+        p['battle_until'] = 0
+        p['em_batalha'] = False
+        _queue_save(p)
+        chat_sistema(sid, f"Class changed to {alvo}. Reloading...")
+        socketio.emit('class_changed', {'class': alvo}, room=sid)
         return
     if cmd == 'spells':
         if len(partes) < 2 or partes[1].lower() != 'reset':

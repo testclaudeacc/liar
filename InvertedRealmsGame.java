@@ -110,6 +110,19 @@ public class InvertedRealmsGame extends Game {
             if (motivo.isEmpty()) motivo = "Someone logged in your account.";
             setScreen(new AuthScreen(InvertedRealmsGame.this::entrarNoMundo, motivo));
         });
+        // /class do admin: o servidor ja' trocou e salvou a classe - entra de
+        // novo no mesmo personagem (a classe e' fixa na WorldScreen). Espera
+        // um pouco pro save da fila chegar no banco antes do join.
+        socket.on("class_changed", (nomeEvt, data) -> {
+            if (data == null) return;
+            desconexaoEsperada = true;
+            socket.disconnect();
+            personagem.className = data.getString("class", personagem.className);
+            setScreen(new LoadingScreen(() -> {}));
+            com.badlogic.gdx.utils.Timer.schedule(new com.badlogic.gdx.utils.Timer.Task() {
+                @Override public void run() { entrarNoMundo(userId, personagem); }
+            }, 1.5f);
+        });
         socket.setConnectionListener(new GameSocket.ConnectionListener() {
             @Override
             public void onConnected() {
