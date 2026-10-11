@@ -4021,13 +4021,29 @@ def handle_request_loot(data):
 
 @socketio.on('collect_loot')
 def handle_collect_loot(data):
-    try:
-        sid = request.sid
-        if sid not in online_players: return
-        p = online_players[sid]
+    sid = request.sid
+    if sid not in online_players or not isinstance(data, dict): return
+    _coletar_loot(sid, online_players[sid], str(data.get('loot_id', '')))
 
+# Collect Bags (Tab): todas as bags do player num 5x5 em volta dele.
+COLETA_AREA_SQM = 2
+
+@socketio.on('collect_loot_area')
+def handle_collect_loot_area(data):
+    sid = request.sid
+    p = online_players.get(sid)
+    if not p or p.get('is_dead'): return
+    tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+    nome = p.get('name')
+    for loot_id, loot in list(ground_loot.items()):
+        if nome not in loot.get('owners', ()) or 'pos' not in loot: continue
+        tb = tile_de(loot['pos'][0], loot['pos'][1])
+        if max(abs(tp[0] - tb[0]), abs(tp[1] - tb[1])) > COLETA_AREA_SQM: continue
+        _coletar_loot(sid, p, loot_id)
+
+def _coletar_loot(sid, p, loot_id):
+    try:
         if p.get('is_dead'): return
-        loot_id = str(data.get('loot_id', ''))
         loot = ground_loot.get(loot_id)
 
         if loot is None or p.get('name') not in loot.get('owners', ()):

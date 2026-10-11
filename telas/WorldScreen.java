@@ -5430,13 +5430,8 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Collect Bags: todas as minhas bags num 5x5 (2 SQMs pra cada lado). */
     private void coletarBagsPerto() {
-        if (!socket.isConnected()) return;
-        int jx = tileX(local.x), jy = tileY(local.y);
-        for (BagChao bag : bags.values()) {
-            if (Math.max(Math.abs(tileX(bag.x) - jx), Math.abs(tileY(bag.y) - jy)) > 2) continue;
-            String id = bag.id;
-            socket.emitRaw("collect_loot", GameSocket.obj(jw -> jw.set("loot_id", id)));
-        }
+        // O servidor acha as bags pela posicao dele (servidor.py::collect_loot_area).
+        if (socket.isConnected() && !bags.isEmpty()) socket.emitRaw("collect_loot_area", "{}");
     }
 
     private void removerBag(String lootId) {
