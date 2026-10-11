@@ -2133,7 +2133,13 @@ public final class BookMenuUI {
         escalarFonte(rotulo, 0.8f * FONTE_STATS);
         // Moeda: nome na cor dela (Copper laranja etc).
         for (String tipo : MOEDAS_TRADE) if (titulo.equals(tipo + " Coins")) rotulo.setColor(corMoeda(tipo));
-        Label limite = new Label("You can choose up to " + max, skin, "hud");
+        // Pedidos do proximo popup (loja): confirmar 2x e mostrar as moedas embaixo.
+        final boolean pedeCerteza = proximoPopupPedeCerteza;
+        final Table rodapeExtra = proximoPopupRodape;
+        proximoPopupPedeCerteza = false;
+        proximoPopupRodape = null;
+        final boolean[] perguntou = {false};
+        Label limite = new Label("", skin, "hud");
         escalarFonte(limite, 0.6f * FONTE_STATS);
         limite.setColor(Color.LIGHT_GRAY);
         final BarraQuantidade[] barraQtd = new BarraQuantidade[1];
@@ -2180,6 +2186,7 @@ public final class BookMenuUI {
         TextButton confirmar = new TextButton("Confirm", estiloOk);
         revalidar[0] = () -> {
             boolean ok = cabe == null || cabe.test(valorDoCampo(campo, max));
+            perguntou[0] = false; // mudou a quantia: pergunta de novo
             confirmar.setStyle(ok ? estiloOk : estiloSemCap);
             confirmar.setText(ok ? "Confirm" : "No Cap");
         };
@@ -2188,6 +2195,12 @@ public final class BookMenuUI {
         });
         confirmar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                if (pedeCerteza && !perguntou[0]) {
+                    if (cabe != null && !cabe.test(valorDoCampo(campo, max))) return;
+                    perguntou[0] = true;
+                    confirmar.setText("Are you sure?");
+                    return;
+                }
                 confirmarPopup(campo, max, cabe, aoConfirmar);
             }
         });
@@ -2201,15 +2214,14 @@ public final class BookMenuUI {
             cabecalho.add(moldura).size(44).padRight(10);
         }
         Table textos = new Table();
-        textos.add(rotulo).left().row();
-        textos.add(limite).left();
+        textos.add(rotulo).left();
         cabecalho.add(textos).left();
         Table linhaCampo = new Table();
         linhaCampo.add(campo).width(140).height(40).padRight(6);
         linhaCampo.add(botaoMax).width(64).height(40);
         Table linhaBotoes = new Table();
         linhaBotoes.add(cancelar).width(110).height(44).padRight(10);
-        linhaBotoes.add(confirmar).width(110).height(44);
+        linhaBotoes.add(confirmar).width(pedeCerteza ? 150 : 110).height(44);
         caixa.add(cabecalho).left().padBottom(12).row();
         caixa.add(linhaCampo).padBottom(10).row();
         if (max > 1) {
@@ -2220,6 +2232,8 @@ public final class BookMenuUI {
             caixa.add(linhaBarra).padBottom(14).row();
         }
         caixa.add(linhaBotoes);
+        if (rodapeExtra != null) caixa.row().padTop(12);
+        if (rodapeExtra != null) caixa.add(rodapeExtra);
         revalidar[0].run();
 
         popupQuantidade = new Table();
@@ -2231,6 +2245,33 @@ public final class BookMenuUI {
         stage.addActor(popupQuantidade);
         stage.setKeyboardFocus(campo);
         campo.selectAll();
+    }
+
+    private boolean proximoPopupPedeCerteza = false;
+    private Table proximoPopupRodape = null;
+
+    /** "Your coins:" com as moedas que o player tem (maior primeiro). */
+    private Table linhaMinhasMoedas() {
+        Table t = new Table();
+        Label rot = new Label("Your coins:", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.75f), Color.LIGHT_GRAY));
+        t.add(rot).padRight(8);
+        boolean algum = false;
+        for (int i = MOEDAS_TRADE.length - 1; i >= 0; i--) {
+            long q = moedasTidas(i);
+            if (q <= 0) continue;
+            algum = true;
+            TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[i]);
+            if (r != null) {
+                Image img = new Image(new TextureRegionDrawable(r));
+                img.setScaling(Scaling.fit);
+                t.add(img).size(20).padRight(3);
+            }
+            Label n = new Label(String.valueOf(q), new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.8f), Color.WHITE));
+            n.setColor(corMoeda(MOEDAS_TRADE[i]));
+            t.add(n).padRight(10);
+        }
+        if (!algum) t.add(new Label("0", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.8f), Color.WHITE)));
+        return t;
     }
 
     private static final Color COR_POPUP_FUNDO = Color.valueOf("1c1c1c");
@@ -2620,6 +2661,16 @@ public final class BookMenuUI {
         return estiloPlano(cor, ativa ? Color.WHITE : new Color(0.7f, 0.7f, 0.7f, 1f));
     }
 
+    /** Mostra/esconde o icone de um botaoComIcone (sem deixar o espaco vazio). */
+    private static void iconeDoBotao(TextButton b, boolean mostrar) {
+        if (b.getChildren().size == 0 || !(b.getChildren().first() instanceof Image)) return;
+        com.badlogic.gdx.scenes.scene2d.ui.Cell<?> c = b.getCell(b.getChildren().first());
+        if (c == null) return;
+        c.size(mostrar ? 24 : 0).padRight(mostrar ? 4 : 0);
+        b.getChildren().first().setVisible(mostrar);
+        b.invalidate();
+    }
+
     /** Botao com icone (16px do atlas em 2x) antes do texto. */
     private TextButton botaoComIcone(String texto, String regiao, TextButton.TextButtonStyle estilo) {
         TextButton b = new TextButton(texto, estilo);
@@ -2997,7 +3048,10 @@ public final class BookMenuUI {
     private BarraUso barraCapLoja;
     private Image iconeTotalLoja;
 
-    private static final Color COR_ABA_BUY = new Color(0.62f, 0.48f, 0.06f, 1f), COR_ABA_BUY_OFF = new Color(0.28f, 0.22f, 0.04f, 1f);
+    // Buy: marrom claro (cor de pele).
+    private static final Color COR_ABA_BUY = Color.valueOf("b9825a"), COR_ABA_BUY_OFF = Color.valueOf("4f3726");
+    private static final String ICONE_COMPRAR = "sheet/r64_c5"; // 64,688 no atlas
+    private boolean compraArmada = false; // 1o clique no Buy (1 unidade): "Are you sure?"
     private static final Color COR_ABA_SELL = Color.valueOf("2e7d32"), COR_ABA_SELL_OFF = Color.valueOf("173d19");
 
     public boolean emLoja() { return modoLoja; }
@@ -3013,7 +3067,7 @@ public final class BookMenuUI {
         lojaGridVendendo.top().left();
         lojaGridMeus.top().left();
 
-        lojaAcao = botaoComIcone("Buy", ICONE_FULLNESS, estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
+        lojaAcao = botaoComIcone("Buy", ICONE_COMPRAR, estiloPlano(COR_ABA_BUY, Color.WHITE));
         lojaAcao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { comprarFoco(); }
         });
@@ -3027,7 +3081,7 @@ public final class BookMenuUI {
         esquerda.add(lojaDetalhes).width(COLUNA_BAG - 16f).growY().top().left().pad(8).row();
         esquerda.add(lojaRodapeAcao).width(COLUNA_BAG - 14f).pad(6, 7, 7, 7);
 
-        abaBuy = botaoComIcone("Buy", ICONE_FULLNESS, estiloAbaLoja(false, true));
+        abaBuy = botaoComIcone("Buy", ICONE_COMPRAR, estiloAbaLoja(false, true));
         abaSell = botaoComIcone("Sell", "ui/currency/Gold", estiloAbaLoja(true, false));
         abaBuy.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaLoja(false); }
@@ -3310,7 +3364,9 @@ public final class BookMenuUI {
             int max = maxCompra(it);
             boolean semDinheiro = currencyTotal < it.preco;
             boolean bloqueado = max <= 0;
-            lojaAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
+            compraArmada = false;
+            iconeDoBotao(lojaAcao, true);
+            lojaAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloPlano(COR_ABA_BUY, Color.WHITE));
             lojaAcao.setText(!bloqueado ? "Buy" : semDinheiro ? "No Money" : "No Cap");
         } else {
             InventoryItem item = itemPorId(lojaFoco);
@@ -3333,8 +3389,23 @@ public final class BookMenuUI {
             w.set("item", it.item);
             w.set("qty", v);
         }));
-        if (max == 1) comprar.accept(1);
-        else abrirPopupQuantidade(nomeExibicao(it.item), iconeDoItem(it.item), max, null, comprar);
+        if (max == 1) {
+            // Sem janelinha: o proprio botao pede confirmacao.
+            if (!compraArmada) {
+                compraArmada = true;
+                iconeDoBotao(lojaAcao, false); // "Are you sure?" nao cabe com o icone
+                lojaAcao.setText("Are you sure?");
+                return;
+            }
+            compraArmada = false;
+            iconeDoBotao(lojaAcao, true);
+            lojaAcao.setText("Buy");
+            comprar.accept(1);
+            return;
+        }
+        proximoPopupPedeCerteza = true;
+        proximoPopupRodape = linhaMinhasMoedas();
+        abrirPopupQuantidade(nomeExibicao(it.item), iconeDoItem(it.item), max, null, comprar);
     }
 
     private void venderSelecao() {
