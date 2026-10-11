@@ -4025,7 +4025,7 @@ def handle_collect_loot(data):
     if sid not in online_players or not isinstance(data, dict): return
     _coletar_loot(sid, online_players[sid], str(data.get('loot_id', '')))
 
-# Collect Bags (Tab): todas as bags do player num 5x5 em volta dele.
+# Collect Bags (Tab): pega UMA bag do player (a mais perto) num 5x5 em volta dele.
 COLETA_AREA_SQM = 2
 
 @socketio.on('collect_loot_area')
@@ -4033,13 +4033,19 @@ def handle_collect_loot_area(data):
     sid = request.sid
     p = online_players.get(sid)
     if not p or p.get('is_dead'): return
+    # UMA bag por aperto: a mais perto dentro do 5x5 (empate: a mais antiga).
     tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
     nome = p.get('name')
+    melhor, melhor_dist = None, None
     for loot_id, loot in list(ground_loot.items()):
         if nome not in loot.get('owners', ()) or 'pos' not in loot: continue
         tb = tile_de(loot['pos'][0], loot['pos'][1])
-        if max(abs(tp[0] - tb[0]), abs(tp[1] - tb[1])) > COLETA_AREA_SQM: continue
-        _coletar_loot(sid, p, loot_id)
+        d = max(abs(tp[0] - tb[0]), abs(tp[1] - tb[1]))
+        if d > COLETA_AREA_SQM: continue
+        chave = (d, loot.get('criado_em', 0))
+        if melhor_dist is None or chave < melhor_dist:
+            melhor, melhor_dist = loot_id, chave
+    if melhor is not None: _coletar_loot(sid, p, melhor)
 
 def _coletar_loot(sid, p, loot_id):
     try:

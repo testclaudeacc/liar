@@ -5428,9 +5428,9 @@ public class WorldScreen extends ScreenAdapter {
         return false;
     }
 
-    /** Collect Bags: todas as minhas bags num 5x5 (2 SQMs pra cada lado). */
+    /** Collect Bags: pega a minha bag mais perto num 5x5 (2 SQMs pra cada lado). */
     private void coletarBagsPerto() {
-        // O servidor acha as bags pela posicao dele (servidor.py::collect_loot_area).
+        // UMA bag por aperto (a mais perto, no 5x5) - servidor.py::collect_loot_area.
         if (socket.isConnected() && !bags.isEmpty()) socket.emitRaw("collect_loot_area", "{}");
     }
 
