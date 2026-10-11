@@ -297,6 +297,8 @@ public class ChatUI {
         });
         campoTexto.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
             @Override public boolean keyDown(InputEvent event, int keycode) {
+                if (keycode == com.badlogic.gdx.Input.Keys.UP) return navegarHistorico(-1);
+                if (keycode == com.badlogic.gdx.Input.Keys.DOWN) return navegarHistorico(1);
                 return keycode == com.badlogic.gdx.Input.Keys.TAB && completarComando();
             }
         });
@@ -649,6 +651,7 @@ public class ChatUI {
         if (texto == null || texto.trim().isEmpty()) return;
         fecharTecladoCelular();
         texto = texto.trim();
+        guardarNoHistorico(texto);
         if (texto.length() > MAX_CARACTERES) texto = texto.substring(0, MAX_CARACTERES);
         if (ouvinteCanais != null) {
             boolean foiProServidor = abaAtual.equals(ABA_LOCAL)
@@ -910,6 +913,36 @@ public class ChatUI {
     // ---- Sugestoes de comando (so' admin) ----
     private Table sugestoes;
     private final List<String[]> comandosAdmin = new java.util.ArrayList<>(); // {cmd, uso, descricao}
+
+    // Admin: setinha pra cima/baixo no campo volta pro que ja' foi digitado.
+    private static final int HISTORICO_MAX = 50;
+    private final List<String> historicoEnviado = new java.util.ArrayList<>();
+    private int indiceHistorico = -1; // -1 = digitando algo novo
+
+    private void guardarNoHistorico(String texto) {
+        indiceHistorico = -1;
+        if (comandosAdmin.isEmpty()) return; // so' admin
+        if (!historicoEnviado.isEmpty() && historicoEnviado.get(historicoEnviado.size() - 1).equals(texto)) return;
+        historicoEnviado.add(texto);
+        if (historicoEnviado.size() > HISTORICO_MAX) historicoEnviado.remove(0);
+    }
+
+    /** passo -1 = mais antigo (cima), +1 = mais novo (baixo). */
+    private boolean navegarHistorico(int passo) {
+        if (comandosAdmin.isEmpty() || historicoEnviado.isEmpty()) return false;
+        int n = historicoEnviado.size();
+        int i = indiceHistorico < 0 ? (passo < 0 ? n - 1 : -1) : indiceHistorico + passo;
+        if (i >= n || (indiceHistorico < 0 && passo > 0)) {
+            indiceHistorico = -1;
+            campoTexto.setText("");
+        } else {
+            indiceHistorico = Math.max(0, i);
+            campoTexto.setText(historicoEnviado.get(indiceHistorico));
+        }
+        campoTexto.setCursorPosition(campoTexto.getText().length());
+        atualizarSugestoes();
+        return true;
+    }
     private final List<String> sugeridos = new java.util.ArrayList<>();
 
     /** Lista de comandos que o servidor manda so' pra admin (sync_local_player

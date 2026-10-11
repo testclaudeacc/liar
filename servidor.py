@@ -591,9 +591,7 @@ def mult_velocidade_level(p):
     except (TypeError, ValueError): level = 1
     base = 1.0 + max(0, level - 1) * SPEED_PCT_POR_LEVEL
     # /speed do admin (salvo em skills['admin_speed']).
-    try: extra = float((p.get('skills') or {}).get('admin_speed', 1.0))
-    except (TypeError, ValueError): extra = 1.0
-    return base * max(0.1, min(10.0, extra))
+    return base * admin_mult(p, 'admin_speed', 10.0)
 
 def calc_level_bonuses(level, player_class):
     niveis_ganhos = max(0, level - 1)
@@ -648,7 +646,7 @@ def _montar_payload_sync_stats(p):
         new_dmg = max(1, int(new_dmg * FOME_MULT_DANO))
 
     # Sem o bestiary (vai so' no evento proprio): nao viaja em todo sync_stats.
-    skills = {k: v for k, v in skills.items() if k != 'bestiary'} if isinstance(skills, dict) else skills
+    skills = {k: v for k, v in skills.items() if k != 'bestiary' and not str(k).startswith('admin_')} if isinstance(skills, dict) else skills
     return {
         'skills': skills, 'base_damage': new_dmg, 'defense_value': new_def,
         'level': level, 'exp': p.get('exp', 0), 'kills': p.get('kills', 0),
@@ -1236,9 +1234,19 @@ def _mob_emitir_estado(mob_id, m, step=0.0):
     if m.get('room'):
         emit_area('mob_pos', payload_mob_pos(mob_id, m, step), m['room'])
 
+def admin_ghost(p):
+    """/ghost do admin: mobs nao miram nele (nem se ele atacar)."""
+    return bool((p.get('skills') or {}).get('admin_ghost'))
+
+def admin_mult(p, chave, maximo):
+    """Multiplicador salvo do admin (/speed, /dmg) - 1.0 = normal."""
+    try: v = float((p.get('skills') or {}).get(chave, 1.0))
+    except (TypeError, ValueError): return 1.0
+    return max(0.1, min(maximo, v))
+
 def _player_alvo_valido(sid, m):
     p = online_players.get(sid)
-    if p is None or p.get('is_dead'): return None
+    if p is None or p.get('is_dead') or admin_ghost(p): return None
     try:
         if float(p.get('current_hp', -1)) == 0: return None
     except (TypeError, ValueError): pass
@@ -1254,7 +1262,7 @@ def _player_alvo_valido(sid, m):
 # ainda tenta ir até a escada/transição em vez de travar na hora.
 def _player_pursuit_valido(sid):
     p = online_players.get(sid)
-    if p is None or p.get('is_dead'): return None
+    if p is None or p.get('is_dead') or admin_ghost(p): return None
     try:
         if float(p.get('current_hp', -1)) == 0: return None
     except (TypeError, ValueError): pass
@@ -2889,6 +2897,8 @@ ADMIN_COMANDOS = [
     ("mobs", "/mobs", "lista os mobs (nomes pro /summons)"),
     ("summons", "/summons <mob>", "cria um mob num SQM do seu lado (nao renasce)"),
     ("speed", "/speed <valor>|reset", "multiplica sua velocidade (fica salvo); reset volta ao normal"),
+    ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
+    ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
     ("money", "/money add <quantia><c|s|g|p>", "da' moedas (ex: /money add 5g, /money add 1p)"),
     ("quests", "/quests", "quests e se voce ja fez"),
     ("quest", "/quest <nome> complete|reset", "completa ou reseta uma quest"),
@@ -2999,6 +3009,40 @@ def comando_admin(sid, p, texto):
         _queue_save(p)
         socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
         chat_sistema(sid, msg)
+        return
+    if cmd == 'dmg':
+        if not isinstance(p.get('skills'), dict): p['skills'] = {}
+        if len(partes) < 2:
+            chat_sistema(sid, f"Damage: x{admin_mult(p, 'admin_dmg', 1000.0)}. Usage: /dmg <value>|reset  (ex: /dmg 10)")
+            return
+        if partes[1].lower() == 'reset':
+            p['skills'].pop('admin_dmg', None)
+            msg = "Damage reset."
+        else:
+            try: v = float(partes[1].lower().lstrip('x'))
+            except ValueError:
+                chat_sistema(sid, "Usage: /dmg <value>|reset  (ex: /dmg 10)", 'red')
+                return
+            v = max(0.1, min(1000.0, v))
+            p['skills']['admin_dmg'] = v
+            msg = f"Damage x{v}."
+        _queue_save(p)
+        chat_sistema(sid, msg)
+        return
+    if cmd == 'ghost':
+        if not isinstance(p.get('skills'), dict): p['skills'] = {}
+        if len(partes) < 2 or partes[1].lower() not in ('on', 'off'):
+            chat_sistema(sid, f"Ghost: {'on' if admin_ghost(p) else 'off'}. Usage: /ghost on|off")
+            return
+        if partes[1].lower() == 'on':
+            p['skills']['admin_ghost'] = True
+            # Quem ja' estava me mirando larga na hora.
+            for m in active_mobs.values():
+                if m.get('target_sid') == sid: m['target_sid'] = None
+        else:
+            p['skills'].pop('admin_ghost', None)
+        _queue_save(p)
+        chat_sistema(sid, f"Ghost {partes[1].lower()}: mobs {'ignore' if admin_ghost(p) else 'see'} you.")
         return
     if cmd == 'money':
         # /money add 5g  (c copper, s silver, g gold, p platinum; sem letra = copper)
@@ -3554,6 +3598,9 @@ def handle_hit_mob(data):
         if bestiario_ouro(p, mob_data.get('type_id', mob_type_id)):
             extra = dano_final * BESTIARIO_BONUS_OURO
             dano_final += int(extra) + (1 if random.random() < extra - int(extra) else 0)
+        # /dmg do admin (salvo em skills['admin_dmg']).
+        mult_admin = admin_mult(p, 'admin_dmg', 1000.0)
+        if mult_admin != 1.0: dano_final = max(1, int(round(dano_final * mult_admin)))
         # Miss: o golpe sai (gasta mana/flecha, puxa aggro), mas não tira vida.
         is_miss = random.random() < MISS_CHANCE_PLAYER
         if is_miss: dano_final, is_crit, reduzido = 0, False, False
