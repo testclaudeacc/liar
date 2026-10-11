@@ -339,7 +339,7 @@ ITEM_DB = {
     "res://sprites/items/Potions/MediumHealthPot.tres": {"name": "Medium Health Pot", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_hp": 250, "price": 250, "icon": "sheet/r40_c5", "stackable": True, "max_stack": 9999, "cap": 2.5},
     "res://sprites/items/Potions/MediumManaPot.tres": {"name": "Medium Mana Pot", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 250, "price": 250, "icon": "sheet/r40_c11", "stackable": True, "max_stack": 9999, "cap": 2.5},
     # Scroll: "teleport" = usar leva pro spawn da cidade (fora de battle).
-    "res://sprites/items/Scrolls/PortusNovaScroll.tres": {"name": "Portus Nova Scroll", "type": "Scroll", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "teleport": True, "usable": True, "price": 500, "icon": "sheet/r53_c2", "stackable": True, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Scrolls/PortusNovaScroll.tres": {"name": "Portus Nova Scroll", "type": "Scroll", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "teleport": True, "usable": True, "price": 1000, "icon": "sheet/r53_c2", "stackable": True, "max_stack": 9999, "cap": 0.1},
 }
 # Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
 # que aparece na descricao.
