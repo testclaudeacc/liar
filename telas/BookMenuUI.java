@@ -3342,7 +3342,15 @@ public final class BookMenuUI {
         conteudoCompra.add(lojaAviso).right().padTop(2).row();
         moedasLoja = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
         moedasLoja.left();
-        conteudoCompra.add(moedasLoja).left().padTop(2).row();
+        // Linha das moedas: na loja de magia o botao Learn fica aqui, na direita.
+        botaoAprenderRodape = botaoComIcone("Learn", ICONE_APRENDER, estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
+        botaoAprenderRodape.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aprenderMagiaFoco(); }
+        });
+        Table linhaMoedas = new Table();
+        linhaMoedas.add(moedasLoja).left().expandX();
+        linhaMoedas.add(botaoAprenderRodape).height(40).minWidth(130).right();
+        conteudoCompra.add(linhaMoedas).growX().padTop(2).row();
         conteudoCompra.add(new Stack(barraCapLoja, textoBarra)).growX().height(24).padTop(4);
 
         // ---- Sell: em cima o que vai vender, embaixo os meus itens ----
@@ -3444,6 +3452,7 @@ public final class BookMenuUI {
         lojaAviso.setText("");
         lojaConteudo.setActor(venda ? conteudoVenda : conteudoCompra);
         atualizarTelaLoja();
+        atualizarBotaoAprender();
     }
 
     /** shop_result: dinheiro novo e o que houve (no_money/no_cap/bought/sold). */
@@ -3558,13 +3567,19 @@ public final class BookMenuUI {
 
     private void atualizarGradeCompra() {
         lojaGridCompra.clearChildren();
+        if (lojaFoco != null && ehMagia(lojaFoco) && conheceMagia(lojaFoco)) lojaFoco = null; // aprendeu: escolhe outra
         int n = 0;
         for (ItemLoja it : itensLoja) {
             if (ehMagia(it.item) && conheceMagia(it.item)) continue; // aprendida: sai da loja
             if (ehMagia(it.item)) {
                 // Magia: gaveta (nome, mana, descricao, dano e preco) em vez do slot.
-                lojaGridCompra.add(gavetaMagia(it.item, false, null, it.preco))
-                    .growX().padBottom(6).colspan(COLUNAS_INVENTARIO).row();
+                if (lojaFoco == null) lojaFoco = it.item; // ja' vem uma selecionada
+                lojaGridCompra.add(gavetaMagia(it.item, it.item.equals(lojaFoco), () -> {
+                    if (!it.item.equals(lojaFoco)) magiaArmada = null;
+                    lojaFoco = it.item;
+                    lojaAviso.setText("");
+                    atualizarTelaLoja();
+                }, it.preco)).growX().padBottom(6).colspan(COLUNAS_INVENTARIO).row();
                 n = 0;
                 continue;
             }
@@ -3576,6 +3591,7 @@ public final class BookMenuUI {
             lojaGridCompra.add(slot).size(SLOT_EQUIP).pad(1.5f);
             if (++n % COLUNAS_INVENTARIO == 0) lojaGridCompra.row();
         }
+        atualizarBotaoAprender();
     }
 
     private void atualizarGradesVenda() {
@@ -5096,8 +5112,39 @@ public final class BookMenuUI {
     /** Linha clicavel da aba Spells: slot da magia + nome, custo de mana,
      * descricao e % de dano. Borda clara = ja' esta' nesse slot. */
     private static final float TAM_ICONE_GAVETA = 64f;
-    /** Magia com o Learn da gaveta no "Are you sure?" (null = nenhuma). */
+    /** Magia com o Learn no "Are you sure?" (null = nenhuma). */
     private String magiaArmada;
+    private TextButton botaoAprenderRodape;
+
+    /** Botao Learn de baixo (loja de magia): segue a gaveta selecionada. */
+    private void atualizarBotaoAprender() {
+        if (botaoAprenderRodape == null) return;
+        boolean magia = lojaDeMagia() && !abaLojaVenda;
+        botaoAprenderRodape.setVisible(magia);
+        if (!magia) return;
+        ItemLoja it = lojaFoco == null ? null : itemLoja(lojaFoco);
+        boolean ok = it != null && ehMagia(it.item) && !conheceMagia(it.item);
+        boolean semDinheiro = ok && currencyTotal < it.preco;
+        boolean armado = ok && it.item.equals(magiaArmada);
+        botaoAprenderRodape.setStyle(!ok || semDinheiro ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
+        botaoAprenderRodape.setText(semDinheiro ? "No Money" : armado ? "Are you sure?" : "Learn");
+        iconeDoBotao(botaoAprenderRodape, !armado && !semDinheiro);
+    }
+
+    /** 1o clique: "Are you sure?"; 2o: aprende a magia selecionada. */
+    private void aprenderMagiaFoco() {
+        ItemLoja it = lojaFoco == null ? null : itemLoja(lojaFoco);
+        if (it == null || !ehMagia(it.item) || conheceMagia(it.item) || currencyTotal < it.preco || !socket.isConnected()) return;
+        if (!it.item.equals(magiaArmada)) { magiaArmada = it.item; atualizarBotaoAprender(); return; }
+        magiaArmada = null;
+        String npc = lojaNpc, item = it.item;
+        socket.emitRaw("shop_buy", GameSocket.obj(w -> {
+            w.set("npc_id", npc);
+            w.set("item", item);
+            w.set("qty", 1);
+        }));
+        atualizarBotaoAprender();
+    }
     private static final Color COR_ALVO_MAGIA = Color.valueOf("ffb366"); // "Single Target"/"Area Damage"
     /** Lista de magias aberta na aba Spells (a janela alarga pro texto caber numa linha). */
     private Table conteudoMagias;
@@ -5151,31 +5198,6 @@ public final class BookMenuUI {
             texto.add(linhaPreco).left().padTop(2).row();
         }
         gaveta.add(texto).growX().center().left();
-        if (preco > 0) {
-            // Loja (Nyla): o botao Learn fica na propria gaveta (a coluna da
-            // esquerda some nessa loja). 1o clique: "Are you sure?".
-            boolean armado = caminho.equals(magiaArmada);
-            boolean semDinheiro = currencyTotal < preco;
-            TextButton aprender = botaoComIcone(semDinheiro ? "No Money" : armado ? "Are you sure?" : "Learn", ICONE_APRENDER,
-                semDinheiro ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
-            if (armado || semDinheiro) iconeDoBotao(aprender, false);
-            aprender.addListener(new ChangeListener() {
-                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                    event.stop();
-                    if (semDinheiro || !socket.isConnected()) return;
-                    if (!caminho.equals(magiaArmada)) { magiaArmada = caminho; atualizarGradeCompra(); return; }
-                    magiaArmada = null;
-                    String npc = lojaNpc;
-                    socket.emitRaw("shop_buy", GameSocket.obj(w -> {
-                        w.set("npc_id", npc);
-                        w.set("item", caminho);
-                        w.set("qty", 1);
-                    }));
-                }
-            });
-            gaveta.add(aprender).height(44).minWidth(120).center().padLeft(8);
-            return gaveta;
-        }
         gaveta.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
         });
