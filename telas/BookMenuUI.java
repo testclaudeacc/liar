@@ -3418,7 +3418,6 @@ public final class BookMenuUI {
             ItemLoja preco = item == null ? null : itemLoja(item.itemPath);
             if (preco == null) return;
             preencherBlocoStats(lojaDetalhes, item.itemPath, null);
-            lojaDetalhes.add(linhaStat("Sells for " + textoMoedas(preco.venda) + " each", Color.LIGHT_GRAY)).left().row();
         }
     }
 
