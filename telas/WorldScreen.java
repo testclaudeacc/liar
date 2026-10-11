@@ -2977,6 +2977,7 @@ public class WorldScreen extends ScreenAdapter {
                 // Sugestoes de comando no chat (so' admin recebe a lista).
                 if (chat != null) chat.definirComandosAdmin(adminLocal ? data.get("admin_commands") : null);
                 definirAlmaLocal(data.getBoolean("soul", false));
+                definirFantasma(local.nome, data.getBoolean("ghost", false));
                 if (socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
                 if (socket.isConnected()) socket.emitRaw("get_party_status", "{}");
                 definirSkins(local.nome, data.get("skins"));
@@ -3502,6 +3503,7 @@ public class WorldScreen extends ScreenAdapter {
         // HP dos outros players (servidor.py::broadcast_hp) - so' pra cor do nome.
         socket.on("player_status_updated", (nomeEvt, data) -> {
             if (data == null) return;
+            if (data.has("ghost")) definirFantasma(data.getString("name", ""), data.getBoolean("ghost", false));
             // Balaozinho em cima da cabeca: abriu/fechou chat, menu ou settings.
             for (String chave : CHAVES_BALAO) {
                 if (data.has(chave)) definirBalaoRemoto(data.getString("name", ""), chave, data.getBoolean(chave, false));
@@ -4057,6 +4059,7 @@ public class WorldScreen extends ScreenAdapter {
     private void adicionarRemotoSeNovo(JsonValue p) {
         if (p == null) return;
         String nome = p.getString("name", "");
+        if (p.has("ghost")) definirFantasma(nome, p.getBoolean("ghost", false));
         if (nome.isEmpty() || nome.equals(local.nome) || remotos.containsKey(nome) || remotosForaDeVisao.containsKey(nome)) return;
         String classe = p.has("class_name") ? p.getString("class_name") : "Knight";
         float rawX = p.getFloat("pos_x", -1f);
@@ -4702,6 +4705,7 @@ public class WorldScreen extends ScreenAdapter {
     /** Mob vivo no SQM (onde esta ou pra onde esta indo) bloqueia o passo -
      * o servidor tambem recusa (servidor.py::handle_m). */
     private boolean mobOcupaTile(float mundoX, float mundoY) {
+        if (fantasmas.contains(local.nome)) return false; // /ghost: atravessa mob
         int tileX = (int) Math.floor(mundoX / Jogador.TILE);
         int tileY = (int) Math.floor((mundoY - 1f) / Jogador.TILE);
         for (MobVisual mob : mobs.values()) {
@@ -4874,6 +4878,14 @@ public class WorldScreen extends ScreenAdapter {
     // Godot (player.gd::snap_to_tile_center ancora Y no fundo do tile, nao no
     // centro) - por isso o sprite cresce PRA CIMA a partir daqui, nunca
     // centralizado, senao ele fica visualmente "no meio de 2 SQMs".
+    /** Players com /ghost ligado (admin): meio transparentes. */
+    private final java.util.Set<String> fantasmas = new java.util.HashSet<>();
+
+    private void definirFantasma(String nome, boolean ligado) {
+        if (nome == null || nome.isEmpty()) return;
+        if (ligado) fantasmas.add(nome); else fantasmas.remove(nome);
+    }
+
     private void desenharJogador(Jogador j) {
         TextureRegion quadroBase = quadroAtual(animacaoBase, j);
         float largura = FRAME_LARGURA * ESCALA_SPRITE;
@@ -4903,9 +4915,13 @@ public class WorldScreen extends ScreenAdapter {
         if (j != local && j.nome.equals(amigoMarcado) && regiaoAlvoAmigo != null) {
             batch.draw(regiaoAlvoAmigo, ancoraX - regiaoAlvoAmigo.getRegionWidth() / 2f, ancoraY - 1f);
         }
+        // /ghost do admin: o boneco inteiro meio transparente.
+        float alfaFantasma = fantasmas.contains(j.nome) ? 0.5f : 1f;
         List<CamadaSkin> camadas = skinsJogadores.get(j.nome);
         if (camadas == null || camadas.isEmpty()) {
+            batch.setColor(1f, 1f, 1f, alfaFantasma);
             batch.draw(quadroBase, x, ancoraY, largura, altura);
+            batch.setColor(Color.WHITE);
             return;
         }
         // Camadas de skin (base, roupa, cabeca, acessorio) uma por cima da
@@ -4913,7 +4929,7 @@ public class WorldScreen extends ScreenAdapter {
         for (CamadaSkin camada : camadas) {
             TextureRegion quadro = quadroAtual(camada.animacao, j);
             if (quadro == null) continue; // camada sem quadro de morte
-            batch.setColor(camada.cor);
+            batch.setColor(camada.cor.r, camada.cor.g, camada.cor.b, camada.cor.a * alfaFantasma);
             batch.draw(quadro, x, ancoraY, largura, quadro.getRegionHeight() * ESCALA_SPRITE);
         }
         batch.setColor(Color.WHITE);

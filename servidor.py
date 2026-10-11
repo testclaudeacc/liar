@@ -902,6 +902,7 @@ def resumo_player_area(p):
         "is_typing": bool(p.get('is_typing', False)),
         "is_in_settings": bool(p.get('is_in_settings', False)),
         "is_in_skins": bool(p.get('is_in_skins', False)),
+        "ghost": admin_ghost(p),
     }
 
 # Replica o HP do player pros outros clientes da área (a barra do "remote").
@@ -1463,7 +1464,7 @@ def _tiles_ocupados(excluir_mob=None, excluir_sid=None, sala=None):
     sids = _sids_perto(sala) if sala else online_players.keys()
     for o_sid in sids:
         p = online_players.get(o_sid)
-        if p is None or o_sid == excluir_sid or p.get('is_dead'): continue
+        if p is None or o_sid == excluir_sid or p.get('is_dead') or admin_ghost(p): continue
         if int(p.get('floor', 1) or 1) != MOB_FLOOR: continue
         ocupados.add(tile_de(p.get('pos_x', 0), p.get('pos_y', 0)))
     return ocupados
@@ -2639,6 +2640,7 @@ def handle_join_game(data):
         max_hp_join, max_mp_join = calcular_max_vitais(data)
         extra_admin = {'admin_commands': [{'cmd': c, 'usage': u, 'desc': d} for c, u, d in ADMIN_COMANDOS]} if eh_admin(data) else {}
         emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(), 'soul': eh_alma(data), 'admin': eh_admin(data),
+                                   'ghost': admin_ghost(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
         emit('bestiary', montar_bestiario(data), room=sid)
@@ -2895,7 +2897,7 @@ ADMIN_COMANDOS = [
     ("soul", "/soul on|off", "vira alma de novo / desperta"),
     ("npcs", "/npcs", "NPCs lidos do mapa e se estao ativos"),
     ("mobs", "/mobs", "lista os mobs (nomes pro /summons)"),
-    ("summons", "/summons <mob>", "cria um mob num SQM do seu lado (nao renasce)"),
+    ("summons", "/summons <mob> [quantidade]", "cria mobs nos SQMs livres em volta (nao renascem)"),
     ("speed", "/speed <valor>|reset", "multiplica sua velocidade (fica salvo); reset volta ao normal"),
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
     ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
@@ -2981,13 +2983,23 @@ def comando_admin(sid, p, texto):
                      + "  (use /summons <mob>)")
         return
     if cmd == 'summons':
-        tipo = _tipo_do_mob_pelo_nome(' '.join(partes[1:])) if len(partes) > 1 else None
+        # /summons <mob> [quantidade]
+        args = partes[1:]
+        qtd = 1
+        if len(args) > 1 and args[-1].isdigit():
+            qtd = max(1, min(SUMMON_MAX, int(args[-1])))
+            args = args[:-1]
+        tipo = _tipo_do_mob_pelo_nome(' '.join(args)) if args else None
         if tipo is None:
-            chat_sistema(sid, "Usage: /summons <mob>. Mobs: " + ", ".join(i.get('name', t.capitalize()) for t, i in MOB_DB.items()), 'red')
+            chat_sistema(sid, "Usage: /summons <mob> [amount]. Mobs: " + ", ".join(i.get('name', t.capitalize()) for t, i in MOB_DB.items()), 'red')
             return
-        m_id = _invocar_mob(p, tipo)
-        if m_id is None: chat_sistema(sid, "No free tile next to you.", 'red')
-        else: chat_sistema(sid, f"Summoned {MOB_DB[tipo].get('name', tipo.capitalize())}.")
+        feitos = 0
+        for _ in range(qtd):
+            if _invocar_mob(p, tipo) is None: break
+            feitos += 1
+        nome_mob = MOB_DB[tipo].get('name', tipo.capitalize())
+        if feitos == 0: chat_sistema(sid, "No free tile near you.", 'red')
+        else: chat_sistema(sid, f"Summoned {feitos}x {nome_mob}." + ("" if feitos == qtd else " (no more free tiles)"))
         return
     if cmd == 'speed':
         if len(partes) < 2:
@@ -3042,6 +3054,8 @@ def comando_admin(sid, p, texto):
         else:
             p['skills'].pop('admin_ghost', None)
         _queue_save(p)
+        # Todo mundo perto (e eu) ve o fantasma meio transparente.
+        emit_area('player_status_updated', {'name': p.get('name', ''), 'ghost': admin_ghost(p)}, p.get('room'))
         chat_sistema(sid, f"Ghost {partes[1].lower()}: mobs {'ignore' if admin_ghost(p) else 'see'} you.")
         return
     if cmd == 'money':
@@ -3506,6 +3520,10 @@ def handle_hit_mob(data):
         p = online_players[sid]
         mob_id = str(data.get('mob_id', ''))
         mob_type_id = str(data.get('mob_type_id', '')).lower()
+        # O tipo de verdade e' o do servidor (mob do /summons tem id "summonN":
+        # o client mandava o tipo errado e o mob nao dava loot/XP).
+        if mob_id in active_mobs and active_mobs[mob_id].get('type_id'):
+            mob_type_id = active_mobs[mob_id]['type_id']
         hit_type = str(data.get('hit_type', 'physical_hit'))
         
         # hit_type pode ser um nome de animação ou o caminho de um recurso
@@ -4339,7 +4357,7 @@ def handle_m(data):
                              and tile_de(npc.get('pos_x', 0), npc.get('pos_y', 0)) == destino_tile
                              for npc in active_npcs.values())
         # Mob vivo tambem bloqueia o SQM (nao da pra atravessar).
-        mob_no_caminho = andar_p == MOB_FLOOR and any(
+        mob_no_caminho = andar_p == MOB_FLOOR and not admin_ghost(p) and any(
             o.get('hp', 1) > 0 and 'pos_x' in o and tile_do_mob(o) == destino_tile
             for _, o in (_mobs_perto(p['room']) if p.get('room') else active_mobs.items()))
         # Outro player vivo no mesmo andar tambem bloqueia (pra passar por quem
@@ -6132,6 +6150,8 @@ MOB_AVISO_SPAWN_SEG = 6.0  # SpawnWarning no client antes do mob renascer
 
 # ---- /summons (admin): mob avulso, sem ponto no Tiled e sem renascer ----
 _contador_invocados = 0
+SUMMON_MAX = 50       # por comando
+SUMMON_RAIO_MAX = 6   # SQMs em volta do admin
 INVOCADO_CORPO_SEG = 60.0  # morto: sai da memoria depois disso
 
 def _invocar_mob(p, tipo):
@@ -6140,9 +6160,17 @@ def _invocar_mob(p, tipo):
     grade = mapas_colisao.get(mapa)
     tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
     ocupados = _tiles_ocupados(sala=p.get('room'))
-    vizinhos = [(tp[0] + dx, tp[1] + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if (dx, dy) != (0, 0)]
-    random.shuffle(vizinhos)
-    livre = next((t for t in vizinhos if t not in ocupados and (grade is None or not eh_parede(grade, t))), None)
+    ocupados.add(tp)
+    # Anel por anel a partir de mim: sem SQM livre colado, pega os vizinhos
+    # dos mobs que ja' estao em volta, e assim por diante.
+    livre = None
+    for raio in range(1, SUMMON_RAIO_MAX + 1):
+        anel = [(tp[0] + dx, tp[1] + dy) for dx in range(-raio, raio + 1) for dy in range(-raio, raio + 1)
+                if max(abs(dx), abs(dy)) == raio]
+        random.shuffle(anel)
+        livre = next((t for t in anel if t not in ocupados and (grade is None or not eh_parede(grade, t))
+                      and not bloqueado_por_quest(p, t)), None)
+        if livre is not None: break
     if livre is None: return None
     _contador_invocados += 1
     m_id = f"summon{_contador_invocados}"
