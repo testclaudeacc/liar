@@ -500,6 +500,13 @@ public final class BookMenuUI {
             }
             if (pagina.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, extra);
         }
+        // Aba Spells (lista de magias): a janela alarga ate' a descricao caber numa linha.
+        if (conteudoMagias != null && spellsPage.getParent() == mainWindow && conteudoMagias.getStage() != null) {
+            float esquerda = TAM_SLOT_ATALHO * 3f + 6f * 3f + 22f + 6f;
+            float disponivel = JANELA_LARGURA - 16f - esquerda - 20f - 14f; // pads do painel + barra de rolagem
+            extraVisivel = Math.max(extraVisivel,
+                Math.min(EXTRA_JANELA_MAX, Math.max(0f, conteudoMagias.getPrefWidth() - disponivel)));
+        }
         if (Math.abs(extraVisivel - extraJanela) > 0.5f) {
             extraJanela = extraVisivel;
             celulaJanela.width(JANELA_LARGURA + extraJanela);
@@ -4968,6 +4975,7 @@ public final class BookMenuUI {
     }
 
     private void construirPaginaSpells() {
+        conteudoMagias = null;
         spellsPage.clearChildren();
         spellsPage.top().left();
         int visiveis = slotsVisiveis();
@@ -5012,6 +5020,7 @@ public final class BookMenuUI {
 
             Table conteudo = new Table();
             conteudo.top().left();
+            conteudoMagias = escolhendoMagias ? conteudo : null;
             if (escolhendoMagias) {
                 // Uma "gaveta" por magia: icone, nome, mana, descricao e dano.
                 for (String magia : magiasConhecidas) {
@@ -5033,6 +5042,7 @@ public final class BookMenuUI {
             ScrollPane rolagem = new ScrollPane(conteudo, skin);
             rolagem.setFadeScrollBars(false);
             rolagem.setScrollingDisabled(true, false);
+            rolagemComRodinha(rolagem);
             direita.add(rolagem).grow().left().top().row();
             if (atalhos[slot] != null && !atalhos[slot].isEmpty()) {
                 direita.add(botaoSpells("Clear slot", "vermelho", () -> escolherAtalho(slot, ""))).size(130, 34).left().padTop(8);
@@ -5051,7 +5061,9 @@ public final class BookMenuUI {
 
     /** Linha clicavel da aba Spells: slot da magia + nome, custo de mana,
      * descricao e % de dano. Borda clara = ja' esta' nesse slot. */
-    private static final float TAM_ICONE_GAVETA = 84f;
+    private static final float TAM_ICONE_GAVETA = 64f;
+    /** Lista de magias aberta na aba Spells (a janela alarga pro texto caber numa linha). */
+    private Table conteudoMagias;
 
     private Button gavetaMagia(String caminho, boolean noSlot, Runnable aoClicar) {
         EquipStats dados = ITEM_STATS.get(caminho);
@@ -5070,9 +5082,8 @@ public final class BookMenuUI {
         if (dados != null) {
             texto.add(linhaComIcone("ui/MPIcon", dados.magiaMana + " Mana", COR_MANA)).left().row();
             if (dados.magiaDescricao != null && !dados.magiaDescricao.isEmpty()) {
-                Label desc = linhaStat(dados.magiaDescricao, Color.LIGHT_GRAY);
-                desc.setWrap(true);
-                texto.add(desc).growX().left().row();
+                // Numa linha so': a janela alarga pra caber (ajustarLarguraDetalhes).
+                texto.add(linhaStat(dados.magiaDescricao, Color.LIGHT_GRAY)).left().row();
             }
             texto.add(linhaStat(dados.magiaDano + "% Damage", COR_SET)).left().row();
         }
@@ -5081,6 +5092,16 @@ public final class BookMenuUI {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
         });
         return gaveta;
+    }
+
+    /** Rodinha do mouse rola a lista quando o mouse esta' em cima dela. */
+    private static void rolagemComRodinha(ScrollPane rolagem) {
+        rolagem.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y, int pointer,
+                                        com.badlogic.gdx.scenes.scene2d.Actor de) {
+                if (rolagem.getStage() != null) rolagem.getStage().setScrollFocus(rolagem);
+            }
+        });
     }
 
     private void escolherAtalho(int slot, String caminho) {
