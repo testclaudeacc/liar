@@ -3377,11 +3377,8 @@ public class WorldScreen extends ScreenAdapter {
             String id = data.getString("mob_id", "");
             String tipoMob = data.getString("type", "");
             if (id.isEmpty() || tipoMob.isEmpty() || mobs.containsKey(id)) return;
-            TextureRegion sprite = spriteDoMob(tipoMob);
-            if (sprite == null) return;
-            String nomeMob = Character.toUpperCase(tipoMob.charAt(0)) + tipoMob.substring(1);
-            MobVisual mob = new MobVisual(id, nomeMob, 0f, 0f, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
-            mobs.put(id, mob);
+            MobVisual mob = criarMobAvulso(id, tipoMob);
+            if (mob == null) return;
             moverMob(mob, data.getFloat("pos_x", 0f), data.getFloat("pos_y", 0f), "down", 0f, true);
             efeitos.add(new Efeito(quadrosFumaca(), mob.x, mob.y));
         });
@@ -3452,6 +3449,9 @@ public class WorldScreen extends ScreenAdapter {
             if (lista == null) return;
             for (JsonValue info = lista.child; info != null; info = info.next) {
                 MobVisual mob = mobs.get(info.getString("mob_id", ""));
+                // Mob do /summons que este client ainda nao conhecia (entrou
+                // depois, relogou...): cria o visual pelo tipo.
+                if (mob == null && info.has("summon_type")) mob = criarMobAvulso(info.getString("mob_id", ""), info.getString("summon_type", ""));
                 if (mob == null) continue;
                 mob.maxHp = Math.max(1f, info.getFloat("max_hp", mob.maxHp));
                 mob.hp = info.getFloat("hp", mob.hp);
@@ -4878,6 +4878,19 @@ public class WorldScreen extends ScreenAdapter {
     // Godot (player.gd::snap_to_tile_center ancora Y no fundo do tile, nao no
     // centro) - por isso o sprite cresce PRA CIMA a partir daqui, nunca
     // centralizado, senao ele fica visualmente "no meio de 2 SQMs".
+    /** Visual de um mob sem ponto no mapa (/summons). null se nao tiver sprite. */
+    private MobVisual criarMobAvulso(String id, String tipoMob) {
+        if (id.isEmpty() || tipoMob == null || tipoMob.isEmpty()) return null;
+        MobVisual existente = mobs.get(id);
+        if (existente != null) return existente;
+        TextureRegion sprite = spriteDoMob(tipoMob);
+        if (sprite == null) return null;
+        String nomeMob = Character.toUpperCase(tipoMob.charAt(0)) + tipoMob.substring(1);
+        MobVisual mob = new MobVisual(id, nomeMob, 0f, 0f, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+        mobs.put(id, mob);
+        return mob;
+    }
+
     /** Players com /ghost ligado (admin): meio transparentes. */
     private final java.util.Set<String> fantasmas = new java.util.HashSet<>();
 

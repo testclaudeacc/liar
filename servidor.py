@@ -1787,6 +1787,8 @@ def montar_sync_area(sid, room):
             "is_dead": morto,
             "returning": bool(m_data.get('returning', False)),
         }
+        # Mob do /summons nao tem ponto no mapa: o client cria o visual pelo tipo.
+        if m_data.get('summon'): mob_payload["summon_type"] = m_data.get('type_id', '')
         if morto:
             # Há quantos segundos morreu: o client só mostra o cadáver pelo
             # tempo que falta dos 60s (antes todo relog recriava o corpo).
