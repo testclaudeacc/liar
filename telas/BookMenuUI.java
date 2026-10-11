@@ -3046,10 +3046,12 @@ public final class BookMenuUI {
     private com.badlogic.gdx.scenes.scene2d.ui.Container<Table> lojaConteudo;
     private Label lojaAviso, lojaInfo, lojaTotal;
     private BarraUso barraCapLoja;
+    private com.badlogic.gdx.scenes.scene2d.ui.Container<Table> moedasLoja;
     private Image iconeTotalLoja;
 
     // Buy: marrom claro (cor de pele).
-    private static final Color COR_ABA_BUY = Color.valueOf("b9825a"), COR_ABA_BUY_OFF = Color.valueOf("4f3726");
+    private static final Color COR_ABA_BUY = new Color(0.62f, 0.48f, 0.06f, 1f), COR_ABA_BUY_OFF = new Color(0.28f, 0.22f, 0.04f, 1f);
+    private static final Color COR_BOTAO_COMPRAR = Color.valueOf("b9825a"); // botao Buy de baixo: cor de pele
     private static final String ICONE_COMPRAR = "sheet/r64_c5"; // 64,688 no atlas
     private boolean compraArmada = false; // 1o clique no Buy (1 unidade): "Are you sure?"
     private static final Color COR_ABA_SELL = Color.valueOf("2e7d32"), COR_ABA_SELL_OFF = Color.valueOf("173d19");
@@ -3067,7 +3069,7 @@ public final class BookMenuUI {
         lojaGridVendendo.top().left();
         lojaGridMeus.top().left();
 
-        lojaAcao = botaoComIcone("Buy", ICONE_COMPRAR, estiloPlano(COR_ABA_BUY, Color.WHITE));
+        lojaAcao = botaoComIcone("Buy", ICONE_COMPRAR, estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
         lojaAcao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { comprarFoco(); }
         });
@@ -3081,7 +3083,7 @@ public final class BookMenuUI {
         esquerda.add(lojaDetalhes).width(COLUNA_BAG - 16f).growY().top().left().pad(8).row();
         esquerda.add(lojaRodapeAcao).width(COLUNA_BAG - 14f).pad(6, 7, 7, 7);
 
-        abaBuy = botaoComIcone("Buy", ICONE_COMPRAR, estiloAbaLoja(false, true));
+        abaBuy = botaoComIcone("Buy", ICONE_FULLNESS, estiloAbaLoja(false, true));
         abaSell = botaoComIcone("Sell", "ui/currency/Gold", estiloAbaLoja(true, false));
         abaBuy.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaLoja(false); }
@@ -3112,6 +3114,9 @@ public final class BookMenuUI {
         conteudoCompra.top();
         conteudoCompra.add(rolagem(lojaGridCompra)).grow().row();
         conteudoCompra.add(lojaAviso).right().padTop(2).row();
+        moedasLoja = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
+        moedasLoja.left();
+        conteudoCompra.add(moedasLoja).left().padTop(2).row();
         conteudoCompra.add(new Stack(barraCapLoja, textoBarra)).growX().height(24).padTop(4);
 
         // ---- Sell: em cima o que vai vender, embaixo os meus itens ----
@@ -3226,6 +3231,7 @@ public final class BookMenuUI {
         if (abaLojaVenda) atualizarGradesVenda(); else atualizarGradeCompra();
         atualizarDetalhesLoja();
         lojaInfo.setText(formatarPeso(capacityUsed) + "/" + formatarPeso(capacityMaximum));
+        if (moedasLoja != null) moedasLoja.setActor(linhaMinhasMoedas());
         barraCapLoja.fracao = capacityMaximum > 0f ? capacityUsed / capacityMaximum : 0f;
     }
 
@@ -3366,7 +3372,7 @@ public final class BookMenuUI {
             boolean bloqueado = max <= 0;
             compraArmada = false;
             iconeDoBotao(lojaAcao, true);
-            lojaAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloPlano(COR_ABA_BUY, Color.WHITE));
+            lojaAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
             lojaAcao.setText(!bloqueado ? "Buy" : semDinheiro ? "No Money" : "No Cap");
         } else {
             InventoryItem item = itemPorId(lojaFoco);
