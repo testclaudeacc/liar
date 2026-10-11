@@ -5690,6 +5690,7 @@ def handle_shop_open(data):
     if not p: return
     itens = [{'item': it, 'price': int(ITEM_DB.get(it, {}).get('price', 0)), 'sell': preco_venda_npc(it)}
              for it in loja if it in ITEM_DB]
+    itens.sort(key=lambda e: e['price'])  # do mais barato ao mais caro
     emit('shop_opened', {'npc_id': npc_id, 'name': NPC_DB[npc_id].get('name', npc_id), 'items': itens}, room=sid)
 
 @socketio.on('shop_buy')
@@ -6008,6 +6009,8 @@ def _usar_item(sid, p, inst):
     elif dados.get('heal_hp') or dados.get('heal_mp'): _beber_pocao(sid, p, inst, dados)
     else: _comer(sid, p, inst)
 
+SCROLL_COOLDOWN_SEG = 20.0  # entre um scroll de teleporte e outro
+
 def _usar_scroll_teleporte(sid, p, inst):
     # Portus Nova Scroll: volta pro spawn da cidade (o mesmo de quem desperta).
     if p.get('is_dead'): return
@@ -6015,6 +6018,11 @@ def _usar_scroll_teleporte(sid, p, inst):
         emit('food_result', {'ok': False, 'reason': 'battle'}, room=sid)
         chat_sistema(sid, "You can't use this while in battle.", 'red')
         return
+    falta = SCROLL_COOLDOWN_SEG - (time.time() - p.get('_ultimo_scroll', 0))
+    if falta > 0:
+        chat_sistema(sid, f"Wait {int(math.ceil(falta))}s to use another scroll.", 'red')
+        return
+    p['_ultimo_scroll'] = time.time()
     ox, oy = p.get('pos_x', 0), p.get('pos_y', 0)
     sala_antiga = p.get('room')
     alvo = _spawn_do_player({**p, 'npc_dialogue_state': {**(p.get('npc_dialogue_state') or {}), 'spawn': SPAWN_DEPOIS_DE_DESPERTAR}})
