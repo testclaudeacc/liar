@@ -341,6 +341,7 @@ public class WorldScreen extends ScreenAdapter {
     // Hit fisico (mobs, ex: worm) e de flecha: um pouco mais rapido que os outros.
     private static final float DURACAO_QUADRO_HIT_RAPIDO = 0.07f;
     private static final float DURACAO_QUADRO_HIT_FLECHA = 0.05f;
+    private static final float DURACAO_QUADRO_HIT_FOGO = 0.08f; // ui/FireAnimation (Igniculus)
     private final List<Efeito> efeitos = new ArrayList<>();
     private final Map<String, TextureRegion[]> cacheEfeitos = new HashMap<>();
 
@@ -1231,7 +1232,24 @@ public class WorldScreen extends ScreenAdapter {
         // Barra de atalhos (9 slots livres, teclas 1-9) - o conteudo vem da aba Spells.
         hotbar = new HotbarUI(uiStage, skin, bookMenu, indice -> {
             if (localMorto || !socket.isConnected()) return;
-            socket.emitRaw("use_hotbar", GameSocket.obj(jw -> jw.set("index", indice)));
+            String caminho = bookMenu.atalhos()[indice];
+            // Magia: precisa de um mob mirado (vai no "target"); cooldown avisa aqui mesmo.
+            if (bookMenu.ehMagia(caminho)) {
+                if (CooldownPocao.restanteMagia(caminho) > 0f) {
+                    hud.notificar(bookMenu.nomeExibicao(caminho) + " is not ready yet.", COR_NOTIF_AVISO, null);
+                    return;
+                }
+                MobVisual alvo = alvoMob == null ? null : mobs.get(alvoMob);
+                if (alvo == null || alvo.morto || !alvo.visivel) {
+                    hud.notificar("Select a target first.", COR_NOTIF_AVISO, null);
+                    return;
+                }
+            }
+            final String alvoId = alvoMob == null ? "" : alvoMob;
+            socket.emitRaw("use_hotbar", GameSocket.obj(jw -> {
+                jw.set("index", indice);
+                jw.set("target", alvoId);
+            }));
         });
         bookMenu.definirAoMudarAtalhos(hotbar::atualizar);
         hotbar.definirJoystick(joystick); // editor de controles: joystick + botoes juntos
@@ -3428,6 +3446,27 @@ public class WorldScreen extends ScreenAdapter {
             if (mob.id.equals(alvoMob)) alvoMob = null;
             avisarMobTravado(mob);
         });
+        // Magia lancada (so' eu): comeca o cooldown dela nos slots.
+        socket.on("spell_used", (nomeEvt, data) -> {
+            if (data == null) return;
+            CooldownPocao.iniciarMagia(data.getString("item", ""), data.getFloat("cooldown", 0f));
+        });
+        socket.on("spell_result", (nomeEvt, data) -> {
+            if (data == null) return;
+            String motivo = data.getString("reason", "");
+            String nome = bookMenu.nomeExibicao(data.getString("item", ""));
+            String msg;
+            switch (motivo) {
+                case "level": msg = "Your level is too low to use " + nome + "."; break;
+                case "cooldown": msg = nome + " is not ready yet."; break;
+                case "no_target": msg = "Select a target first."; break;
+                case "range": msg = "Your target is out of reach."; break;
+                case "pz": msg = "You can't attack in a protection zone."; break;
+                case "unknown": msg = "You don't know this spell."; break;
+                default: return;
+            }
+            hud.notificar(msg, COR_NOTIF_AVISO, null);
+        });
         socket.on("scroll_used", (nomeEvt, data) -> {
             if (data != null) CooldownPocao.iniciarScroll(data.getFloat("cooldown", 20f));
         });
@@ -3995,7 +4034,7 @@ public class WorldScreen extends ScreenAdapter {
     /** NPC da loja aberta agora (idem). */
     private NPCVisual npcLoja;
     /** Funcoes de NPC que abrem a loja (os outros vendedores entram aqui quando tiverem "shop"). */
-    private static final java.util.Set<String> PAPEIS_COM_LOJA = new java.util.HashSet<>(java.util.Arrays.asList("food", "pot", "weapon"));
+    private static final java.util.Set<String> PAPEIS_COM_LOJA = new java.util.HashSet<>(java.util.Arrays.asList("food", "pot", "weapon", "spell"));
 
     private void abrirDialogoNPC(NPCVisual npc) {
         if (chat.isVisivel()) chat.setVisivel(false);
@@ -5187,6 +5226,7 @@ public class WorldScreen extends ScreenAdapter {
             case "Mana": tira = atlas.findRegion("ui/Mana"); break;
             case "Music1": tira = atlas.findRegion("ui/items/Music1"); break;
             case "Arrow": tira = atlas.findRegion("ui/items/Arrow"); break;
+            case "Fire": tira = atlas.findRegion("ui/FireAnimation"); break;   // Igniculus
             case "PhysATK": tira = atlas.findRegion("sprites/spawn/PhysATK"); break;   // mob fisico no player
             default: tira = atlas.findRegion("ui/items/Physical"); break;
         }
@@ -5214,7 +5254,8 @@ public class WorldScreen extends ScreenAdapter {
         if (quadros == null) return null;
         Efeito e = new Efeito(quadros, x, y);
         boolean rapido = !"Sword".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome); // Arrow ou Physical
-        e.duracaoQuadro = "Arrow".equals(nome) ? DURACAO_QUADRO_HIT_FLECHA
+        e.duracaoQuadro = "Fire".equals(nome) ? DURACAO_QUADRO_HIT_FOGO
+            : "Arrow".equals(nome) ? DURACAO_QUADRO_HIT_FLECHA
             : rapido ? DURACAO_QUADRO_HIT_RAPIDO : DURACAO_QUADRO_HIT;
         efeitos.add(e);
         return e;

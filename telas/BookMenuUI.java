@@ -407,12 +407,18 @@ public final class BookMenuUI {
         final int regenHp, regenMp, regenSeg, preco; // comida com buff de regen; preco em copper
         final boolean usavel; // scroll etc: botao Use na Bag
         final boolean empilhavel;
+        final String magia;    // id da magia (servidor.py "spell"); null = item normal
+        final int magiaMana, magiaCd, magiaDano; // custo, cooldown (s), % do dano base
         final boolean treino;  // arma de treino (servidor.py::dano_arma_treino)
         final int economiaFlecha; // % de chance de nao gastar flecha
         final String conjunto; // set (ex: "Outlander"); null = nenhum
         final int conjuntoXp;  // % de XP extra com o set completo
 
         EquipStats(JsonValue d) {
+            this.magia = d.getString("spell", null);
+            this.magiaMana = d.getInt("spell_mana", 0);
+            this.magiaCd = d.getInt("spell_cd", 0);
+            this.magiaDano = d.getInt("spell_dmg", 0);
             this.treino = d.getBoolean("training", false);
             this.economiaFlecha = d.getInt("ammo_save", 0);
             this.conjunto = d.getString("set", null);
@@ -808,6 +814,16 @@ public final class BookMenuUI {
             if (dados.regenHp > 0 || dados.regenMp > 0)
                 bloco.add(linhaStat("for " + dados.regenSeg + " seconds", new Color(0.6f, 0.6f, 0.6f, 1f))).left().row();
             adicionarLinhaCap(bloco, dados);
+            return;
+        }
+        if (dados.magia != null && !dados.magia.isEmpty()) {
+            // Magia: requisito, custo, cooldown e o dano.
+            bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
+            bloco.add(linhaStat("Spell", Color.LIGHT_GRAY)).left().row();
+            bloco.add(linhaStat(dados.magiaMana + " Mana", COR_MANA)).left().row();
+            bloco.add(linhaStat(dados.magiaCd + "s Cooldown", Color.LIGHT_GRAY)).left().row();
+            bloco.add(linhaStat(dados.magiaDano + "% of your damage", COR_SET)).left().padTop(6).row();
+            if (conheceMagia(itemPath)) bloco.add(linhaStat("Learned", Color.valueOf("5cff6a"))).left().row();
             return;
         }
         if (dados.usavel) {
@@ -1285,6 +1301,17 @@ public final class BookMenuUI {
      */
     public void atualizarSkills(JsonValue skills, int level, int exp, int kills) {
         this.ultimasSkills = skills;
+        // Magias aprendidas (servidor.py: skills["spells_known"]).
+        JsonValue conhecidas = skills != null ? skills.get("spells_known") : null;
+        java.util.Set<String> novas = new java.util.LinkedHashSet<>();
+        if (conhecidas != null && conhecidas.isArray())
+            for (JsonValue v = conhecidas.child; v != null; v = v.next) if (v.isString()) novas.add(v.asString());
+        if (!novas.equals(magiasConhecidas)) {
+            magiasConhecidas.clear();
+            magiasConhecidas.addAll(novas);
+            aoMudarBagOuAtalhos();
+            if (modoLoja) atualizarTelaLoja();
+        }
         this.nivelAtual = level;
         this.expAtual = exp;
         this.killsAtual = kills;
@@ -3202,18 +3229,21 @@ public final class BookMenuUI {
     private static final Color COR_ABA_BUY_POT = Color.valueOf("a82828"), COR_ABA_BUY_POT_OFF = Color.valueOf("4a1414");
 
     private static final Color COR_ABA_BUY_ARMA = Color.valueOf("3f5f8a"), COR_ABA_BUY_ARMA_OFF = Color.valueOf("1c2a3d");
+    private static final Color COR_ABA_BUY_MAGIA = Color.valueOf("7a3fa8"), COR_ABA_BUY_MAGIA_OFF = Color.valueOf("33194a");
 
     private String iconeAbaBuy() {
         if ("pot".equals(lojaPapel)) return "sheet/r44_c2";
         if ("weapon".equals(lojaPapel)) return "sheet/r23_c5"; // Outlander Helm
+        if ("spell".equals(lojaPapel)) return "sheet/r72_c4";  // Igniculus
         return ICONE_FULLNESS;
     }
 
     private TextButton.TextButtonStyle estiloAbaLoja(boolean venda, boolean ativa) {
-        boolean pot = "pot".equals(lojaPapel), arma = "weapon".equals(lojaPapel);
+        boolean pot = "pot".equals(lojaPapel), arma = "weapon".equals(lojaPapel), magia = "spell".equals(lojaPapel);
         Color cor = venda ? (ativa ? COR_ABA_SELL : COR_ABA_SELL_OFF)
             : pot ? (ativa ? COR_ABA_BUY_POT : COR_ABA_BUY_POT_OFF)
-            : arma ? (ativa ? COR_ABA_BUY_ARMA : COR_ABA_BUY_ARMA_OFF) : (ativa ? COR_ABA_BUY : COR_ABA_BUY_OFF);
+            : arma ? (ativa ? COR_ABA_BUY_ARMA : COR_ABA_BUY_ARMA_OFF)
+            : magia ? (ativa ? COR_ABA_BUY_MAGIA : COR_ABA_BUY_MAGIA_OFF) : (ativa ? COR_ABA_BUY : COR_ABA_BUY_OFF);
         return estiloPlano(cor, ativa ? Color.WHITE : new Color(0.7f, 0.7f, 0.7f, 1f));
     }
 
@@ -3374,7 +3404,8 @@ public final class BookMenuUI {
         String r = dados.getString("result", "");
         if (!modoLoja) return;
         if ("sold".equals(r)) vendaSelecao.clear();
-        lojaAviso.setText("no_money".equals(r) ? "Not enough money." : "no_cap".equals(r) ? "Not enough capacity." : "");
+        lojaAviso.setText("no_money".equals(r) ? "Not enough money." : "no_cap".equals(r) ? "Not enough capacity."
+            : "learned".equals(r) ? "Spell learned! Put it in your hotbar (Spells)." : "known".equals(r) ? "You already know this spell." : "");
         atualizarTelaLoja();
     }
 
@@ -3559,6 +3590,8 @@ public final class BookMenuUI {
     /** Quantos desse item da' pra comprar: dinheiro e capacidade. */
     private int maxCompra(ItemLoja it) {
         if (it.preco <= 0) return 0;
+        // Magia: aprende 1 vez (nao ocupa cap).
+        if (ehMagia(it.item)) return conheceMagia(it.item) || currencyTotal < it.preco ? 0 : 1;
         long porDinheiro = currencyTotal / it.preco;
         float unit = capUnitario(it.item);
         long porCap = unit > 0f ? (long) Math.floor((capLivre() + 0.0001f) / unit) : Long.MAX_VALUE;
@@ -3581,7 +3614,8 @@ public final class BookMenuUI {
             compraArmada = false;
             iconeDoBotao(lojaAcao, true);
             lojaAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
-            lojaAcao.setText(!bloqueado ? "Buy" : semDinheiro ? "No Money" : "No Cap");
+            lojaAcao.setText(!bloqueado ? "Buy" : ehMagia(it.item) && conheceMagia(it.item) ? "Learned"
+                : semDinheiro ? "No Money" : "No Cap");
         } else {
             InventoryItem item = itemPorId(lojaFoco);
             if (item == null || precoVenda(item.itemPath) <= 0) return;
@@ -4200,7 +4234,7 @@ public final class BookMenuUI {
         return selectedItem >= 0 && selectedItem < inventoryItems.size() ? inventoryItems.get(selectedItem) : null;
     }
 
-    private String nomeExibicao(String caminho) {
+    public String nomeExibicao(String caminho) {
         if (caminho == null || caminho.isEmpty()) return "Unknown item";
         EquipStats dados = ITEM_STATS.get(caminho);
         if (dados != null && !dados.nome.isEmpty()) return dados.nome;
@@ -4302,21 +4336,37 @@ public final class BookMenuUI {
         return usavelNoAtalho(caminho);
     }
 
+    private final java.util.Set<String> magiasConhecidas = new java.util.LinkedHashSet<>();
+
+    /** Magia (Igniculus...) - vai na hotbar sem estar na bag. */
+    public boolean ehMagia(String caminho) {
+        EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        return dados != null && dados.magia != null && !dados.magia.isEmpty();
+    }
+
+    public boolean conheceMagia(String caminho) { return magiasConhecidas.contains(caminho); }
+
+    /** Slot da hotbar com algo usavel agora: magia aprendida ou item na bag. */
+    public boolean disponivelNoAtalho(String caminho) {
+        return ehMagia(caminho) ? conheceMagia(caminho) : quantidadeNaBag(caminho) > 0;
+    }
+
     /** Pocao (cura HP/MP): tem o cooldown compartilhado (CooldownPocao). */
     public boolean ehPocao(String caminho) {
         EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
         return dados != null && dados.ehPocao();
     }
 
-    /** Item com cooldown: pocao (todas juntas) ou scroll (os scrolls juntos). */
+    /** Item com cooldown: pocao (todas juntas), scroll (os scrolls juntos) ou magia (cada uma o seu). */
     public boolean temCooldown(String caminho) {
         EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
-        return dados != null && (dados.ehPocao() || dados.usavel);
+        return dados != null && (dados.ehPocao() || dados.usavel || ehMagia(caminho));
     }
 
     /** Cinza escuro + segundos por cima do slot de uma pocao/scroll em cooldown. */
     public CooldownPocao.Sobreposicao sobreposicaoCooldown(String caminho) {
         EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        if (ehMagia(caminho)) return new CooldownPocao.Sobreposicao(skin.getFont("cooldown-font"), caminho);
         boolean scroll = dados != null && dados.usavel && !dados.ehPocao();
         return new CooldownPocao.Sobreposicao(skin.getFont("cooldown-font"), scroll);
     }
@@ -4324,7 +4374,7 @@ public final class BookMenuUI {
     /** Item que pode ir num slot da barra: comida e pocao. */
     private boolean usavelNoAtalho(String caminho) {
         EquipStats dados = ITEM_STATS.get(caminho);
-        return dados != null && (dados.fullness > 0 || dados.ehPocao() || dados.usavel);
+        return dados != null && (dados.fullness > 0 || dados.ehPocao() || dados.usavel || ehMagia(caminho));
     }
 
     /** Aba da direita na pagina Spells: itens da bag ou magias. */
@@ -4927,7 +4977,13 @@ public final class BookMenuUI {
             Table conteudo = new Table();
             conteudo.top().left();
             if (escolhendoMagias) {
-                conteudo.add(linhaStat("You don't know any spells yet.", Color.GRAY)).left();
+                int n = 0;
+                for (String magia : magiasConhecidas) {
+                    conteudo.add(slotAtalho(magia, magia.equals(atalhos[slot]), null, () -> escolherAtalho(slot, magia)))
+                        .size(TAM_SLOT_ATALHO).pad(3);
+                    if (++n % 4 == 0) conteudo.row();
+                }
+                if (magiasConhecidas.isEmpty()) conteudo.add(linhaStat("You don't know any spells yet.", Color.GRAY)).left();
             } else {
                 java.util.LinkedHashSet<String> caminhos = new java.util.LinkedHashSet<>();
                 for (InventoryItem it : inventoryItems) if (podeIrNoSlot(it.itemPath, slot)) caminhos.add(it.itemPath);
@@ -4974,13 +5030,13 @@ public final class BookMenuUI {
         Button botao = new Button(estilo);
         Stack pilha = new Stack();
         if (caminho != null && !caminho.isEmpty()) {
-            int qtd = quantidadeNaBag(caminho);
+            int qtd = ehMagia(caminho) ? 0 : quantidadeNaBag(caminho);
             Table centro = new Table();
             TextureAtlas.AtlasRegion icone = iconeDoItem(caminho);
             if (icone != null) {
                 Image img = new Image(icone);
                 img.setScaling(Scaling.fit);
-                if (qtd <= 0) img.setColor(1f, 1f, 1f, 0.3f);
+                if (!disponivelNoAtalho(caminho)) img.setColor(1f, 1f, 1f, 0.3f);
                 centro.add(img).size(TAM_SLOT_ATALHO * 0.86f);
             }
             pilha.add(centro);

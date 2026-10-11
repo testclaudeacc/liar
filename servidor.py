@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.30"
+SERVER_VERSION = "v0.31"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -159,7 +159,8 @@ NPC_DB = {
         "res://sprites/items/Food/Peach.tres", "res://sprites/items/Food/Banana.tres",
         "res://sprites/items/Food/Blueberries.tres", "res://sprites/items/Food/VegetableSoup.tres",
         "res://sprites/items/Food/Pepper.tres", "res://sprites/items/Food/Beetroot.tres"], "falas": ["Hungry, traveler? Fresh food, right here."]},
-    "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
+    "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "shop": [
+        "res://sprites/spells/Igniculus.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
         "res://sprites/items/Bard/Weapons/RawFlute.tres", "res://sprites/items/Ranger/Weapons/RawBow.tres",
@@ -344,6 +345,10 @@ ITEM_DB = {
     "res://sprites/items/Potions/MediumManaPot.tres": {"name": "Medium Mana Pot", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 250, "price": 250, "icon": "sheet/r40_c11", "stackable": True, "max_stack": 9999, "cap": 2.5},
     # Scroll: "teleport" = usar leva pro spawn da cidade (fora de battle).
     "res://sprites/items/Scrolls/PortusNovaScroll.tres": {"name": "Portus Nova Scroll", "type": "Scroll", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "teleport": True, "usable": True, "price": 1000, "icon": "sheet/r53_c2", "stackable": True, "max_stack": 9999, "cap": 0.1},
+    # Magias (loja da Nyla): "spell" = id da magia. Comprar ensina (nao vai
+    # pra bag); usar e' pela hotbar (use_hotbar -> _lancar_magia).
+    # spell_mana: custo; spell_cd: cooldown (s); spell_dmg: % do dano base.
+    "res://sprites/spells/Igniculus.tres": {"name": "Igniculus", "type": "Spell", "spell": "igniculus", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 50, "spell_cd": 12, "spell_dmg": 75, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r72_c4", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
@@ -378,7 +383,8 @@ ALCANCE_RANGED_SQM = 5
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
                        "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap", "usable",
-                       "regen_hp", "regen_mp", "regen_seg", "price", "set", "set_xp", "training", "ammo_save")
+                       "regen_hp", "regen_mp", "regen_seg", "price", "set", "set_xp", "training", "ammo_save",
+                       "spell", "spell_mana", "spell_cd", "spell_dmg")
 
 def montar_item_db_cliente():
     db = {}
@@ -3670,6 +3676,152 @@ def _calcular_xp_por_participante(mob_data, xp_total):
 
     return resultado
 
+def _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano_final, now, extra_evt):
+    """Tira vida do mob, avisa a area (mob_damaged + extra_evt: efeito,
+    projetil, crit...) e, se morreu, da' XP/loot/bestiario. Golpe normal
+    (hit_mob) e magia (_lancar_magia) passam por aqui."""
+    dano_efetivo = min(dano_final, mob_data['hp'])
+    if 'dmg_tracker' not in mob_data: mob_data['dmg_tracker'] = {}
+    mob_data['dmg_tracker'][sid] = mob_data['dmg_tracker'].get(sid, 0) + dano_efetivo
+
+    mob_data['hp'] -= dano_final
+    is_dead = mob_data['hp'] <= 0
+    
+    room = p.get('room')
+    atacante_id = p.get('name', '')
+    
+    evt_dano = {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'attacker_id': atacante_id, 'owner': ''}
+    evt_dano.update(extra_evt)
+    emit_area('mob_damaged', evt_dano, room)
+    
+    if is_dead:
+        xp_total = MOB_DB.get(mob_type_id, {}).get("xp", 40)
+        xp_por_participante = _calcular_xp_por_participante(mob_data, xp_total)
+
+        for participant_sid, xp_gained in xp_por_participante.items():
+            if participant_sid not in online_players: continue
+
+            part_p = online_players[participant_sid]
+            # Set completo equipado (ex: Outlander): XP extra.
+            pct_set = bonus_xp_set(part_p)
+            if pct_set > 0: xp_gained = int(xp_gained * (1.0 + pct_set / 100.0) + 0.5)
+            bestiario_registrar_kill(participant_sid, part_p, mob_data.get('type_id', mob_type_id))
+
+            current_exp = part_p.get('exp', 0) + xp_gained
+            current_level = part_p.get('level', 1)
+            part_p['kills'] = part_p.get('kills', 0) + 1
+            char_leveled_up = False
+            
+            while current_exp >= get_exp_for_level(current_level + 1):
+                current_level += 1
+                char_leveled_up = True
+                
+            part_p['exp'] = current_exp
+            part_p['level'] = current_level
+            
+            if char_leveled_up and not part_p.get('is_dead'):
+                max_hp_novo, max_mp_novo = calcular_max_vitais(part_p)
+                part_p['current_hp'] = max_hp_novo
+                part_p['current_mp'] = max_mp_novo
+                emit('sync_vitals', {'current_hp': part_p['current_hp'], 'current_mp': part_p['current_mp']}, room=participant_sid)
+                broadcast_hp(participant_sid, part_p)
+            
+            _queue_save(part_p) 
+            emit('xp_gained', {'amount': xp_gained}, room=participant_sid)
+            
+            stats_payload = _montar_payload_sync_stats(part_p)
+            stats_payload['leveled_up'] = False
+            stats_payload['char_leveled_up'] = char_leveled_up
+            stats_payload['new_char_level'] = current_level
+            emit('sync_stats', stats_payload, room=participant_sid)
+            
+            if char_leveled_up:
+                # Área toda (chunks vizinhos) de quem upou; antes ia só pro
+                # chunk de quem bateu e os outros não viam o "Level X".
+                # Vai pro próprio player também: todo mundo perto (ele
+                # incluso) recebe o aviso "X has reached Level N!" no chat.
+                emit_area('player_leveled_up', {'name': part_p.get('name', ''), 'level': current_level}, part_p.get('room') or room)
+        
+        owner_sids = []
+        for participant_sid in mob_data['dmg_tracker']:
+            if participant_sid not in online_players: continue
+            part_name = online_players[participant_sid].get('name', '')
+            itens_rolados = rolar_loot(mob_type_id)
+            currency_rolada = rolar_currency(mob_type_id)
+            loot_id = f"loot_{mob_id}_{int(now * 1000)}_{len(owner_sids)}"
+            # has_items só reflete itens de verdade (pra sprite dourada da bag);
+            # bag só com currency usa a sprite comum mesmo assim.
+            has_items = len(itens_rolados) > 0
+            # pos/has_items guardados pra recriar a bag de quem relogar.
+            ground_loot[loot_id] = {"items": itens_rolados, "currency": currency_rolada, "room": room, "criado_em": now, "owners": {part_name},
+                                    "pos": [mob_data.get('pos_x', 0), mob_data.get('pos_y', 0)], "has_items": has_items}
+            emit('mob_died', {'mob_id': mob_id, 'loot_id': loot_id, 'has_items': has_items,
+                              'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room=participant_sid)
+            owner_sids.append(participant_sid)
+        emit_area('mob_died', {'mob_id': mob_id, 'loot_id': '', 'has_items': False,
+                               'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room, skip_sid=owner_sids)
+        mob_data['died_at'] = now
+        mob_data['target_sid'] = None
+        mob_data['returning'] = False
+        mob_data['path'] = None
+
+def _lancar_magia(sid, p, caminho, mob_id):
+    """Magia de dano num mob (ex: Igniculus): valida tudo, gasta mana, poe o
+    cooldown e usa _aplicar_dano_mob (XP/loot iguais ao golpe normal)."""
+    dados = ITEM_DB.get(caminho, {})
+    nome = dados.get('name', 'Spell')
+    def falha(motivo):
+        emit('spell_result', {'item': caminho, 'reason': motivo}, room=sid)
+    if caminho not in magias_conhecidas(p): return falha('unknown')
+    if int(p.get('level', 1) or 1) < int(dados.get('req_level', 0) or 0): return falha('level')
+    if na_pz(p): return falha('pz')
+    now = time.time()
+    cds = p.setdefault('_spell_cd', {})
+    if cds.get(caminho, 0) > now: return falha('cooldown')
+    mob_data = active_mobs.get(mob_id) if mob_id else None
+    if mob_data is None or mob_data.get('hp', 1) <= 0 or 'pos_x' not in mob_data or na_pz(mob_data): return falha('no_target')
+    if int(p.get('floor', 1) or 1) != MOB_FLOOR: return falha('no_target')
+    if _dist_px(mob_data, p) > (ALCANCE_RANGED_SQM + 1) * TILE: return falha('range')
+    if int(p.get('floor', 1) or 1) == 1 and not linha_de_visao(
+            mapas_colisao.get(p.get('mapa')), tile_de(p.get('pos_x', 0), p.get('pos_y', 0)), tile_do_mob(mob_data)):
+        return falha('range')
+    trava = mob_data.get('treino_trava')
+    if trava and trava.get('sid') != sid and trava.get('ate', 0) > now and trava.get('sid') in online_players:
+        emit('mob_locked', {'mob_id': mob_id, 'owner': trava.get('nome', ''), 'secs': round(trava['ate'] - now, 1)}, room=sid)
+        return
+    custo = int(dados.get('spell_mana', 0) or 0)
+    max_hp_m, max_mp_m = calcular_max_vitais(p)
+    try: mp_atual = float(p.get('current_mp', -1))
+    except (TypeError, ValueError): mp_atual = -1.0
+    if mp_atual < 0: mp_atual = max_mp_m
+    if mp_atual < custo:
+        emit('sync_vitals', {'current_mp': mp_atual, 'max_mp': max_mp_m, 'no_mana': True}, room=sid)
+        return
+    p['current_mp'] = mp_atual - custo
+    emit('sync_vitals', {'current_mp': p['current_mp'], 'max_mp': max_mp_m}, room=sid)
+    cd = float(dados.get('spell_cd', 0) or 0)
+    cds[caminho] = now + cd
+    emit('spell_used', {'item': caminho, 'cooldown': cd}, room=sid)
+    texto_de_acao(p, nome, dados.get('spell_color', 'ff7500'))
+
+    mob_data['last_activity'] = now
+    mob_data.setdefault('hits_recentes', {})[sid] = now
+    marcar_batalha(sid, p, now)
+    mob_focar_agressor(mob_id, mob_data, sid)
+    # Dano: % do dano base do player (mesma base do golpe normal), sem crit/miss.
+    if len(_slots_com_classe_invalida(p)) > 0:
+        base_dmg = PUNICAO_CLASSE_DANO
+    else:
+        bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}))
+        base_dmg, _ = calc_player_stats(p.get('class_name', 'Knight'), p.get('level', 1), p.get('skills', {}), bonus_dmg=bonus_itens['bonus_damage'])
+    if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
+    base = base_dmg * float(dados.get('spell_dmg', 100) or 100) / 100.0
+    dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
+    mob_type_id = mob_data.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
+    _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano, now,
+                      {'hit_type': dados.get('spell_hit', 'Physical'), 'is_crit': False, 'reduced': False, 'is_miss': False,
+                       'w_type': 'Ranged', 'proj': dados.get('spell_proj', '')})
+
 @socketio.on('hit_mob')
 def handle_hit_mob(data):
     try:
@@ -3815,91 +3967,10 @@ def handle_hit_mob(data):
             else:
                 emit('sync_vitals', {'ammo_qty': restante_municao, 'cap_atual': calcular_cap_usado(p), 'cap_maximo': calcular_cap_maximo(p.get('level', 1))}, room=sid)
         
-        dano_efetivo = min(dano_final, mob_data['hp'])
-        if 'dmg_tracker' not in mob_data: mob_data['dmg_tracker'] = {}
-        mob_data['dmg_tracker'][sid] = mob_data['dmg_tracker'].get(sid, 0) + dano_efetivo
-
-        mob_data['hp'] -= dano_final
-        is_dead = mob_data['hp'] <= 0
-        
-        room = p.get('room')
-        atacante_id = p.get('name', '')
-        
-        evt_dano = {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'hit_type': hit_type, 'is_crit': is_crit, 'reduced': reduzido, 'is_miss': is_miss, 'attacker_id': atacante_id, 'w_type': w_type, 'proj': proj, 'owner': ''}
+        extra = {'hit_type': hit_type, 'is_crit': is_crit, 'reduced': reduzido, 'is_miss': is_miss, 'w_type': w_type, 'proj': proj}
         # Trava de treino nova: todo mundo perto fica sabendo (auto target pula).
-        if trava_nova: evt_dano.update({'training_lock': trava_nova['nome'], 'lock_secs': TREINO_TRAVA_SEG})
-        emit_area('mob_damaged', evt_dano, room)
-        
-        if is_dead:
-            xp_total = MOB_DB.get(mob_type_id, {}).get("xp", 40)
-            xp_por_participante = _calcular_xp_por_participante(mob_data, xp_total)
-
-            for participant_sid, xp_gained in xp_por_participante.items():
-                if participant_sid not in online_players: continue
-
-                part_p = online_players[participant_sid]
-                # Set completo equipado (ex: Outlander): XP extra.
-                pct_set = bonus_xp_set(part_p)
-                if pct_set > 0: xp_gained = int(xp_gained * (1.0 + pct_set / 100.0) + 0.5)
-                bestiario_registrar_kill(participant_sid, part_p, mob_data.get('type_id', mob_type_id))
-
-                current_exp = part_p.get('exp', 0) + xp_gained
-                current_level = part_p.get('level', 1)
-                part_p['kills'] = part_p.get('kills', 0) + 1
-                char_leveled_up = False
-                
-                while current_exp >= get_exp_for_level(current_level + 1):
-                    current_level += 1
-                    char_leveled_up = True
-                    
-                part_p['exp'] = current_exp
-                part_p['level'] = current_level
-                
-                if char_leveled_up and not part_p.get('is_dead'):
-                    max_hp_novo, max_mp_novo = calcular_max_vitais(part_p)
-                    part_p['current_hp'] = max_hp_novo
-                    part_p['current_mp'] = max_mp_novo
-                    emit('sync_vitals', {'current_hp': part_p['current_hp'], 'current_mp': part_p['current_mp']}, room=participant_sid)
-                    broadcast_hp(participant_sid, part_p)
-                
-                _queue_save(part_p) 
-                emit('xp_gained', {'amount': xp_gained}, room=participant_sid)
-                
-                stats_payload = _montar_payload_sync_stats(part_p)
-                stats_payload['leveled_up'] = False
-                stats_payload['char_leveled_up'] = char_leveled_up
-                stats_payload['new_char_level'] = current_level
-                emit('sync_stats', stats_payload, room=participant_sid)
-                
-                if char_leveled_up:
-                    # Área toda (chunks vizinhos) de quem upou; antes ia só pro
-                    # chunk de quem bateu e os outros não viam o "Level X".
-                    # Vai pro próprio player também: todo mundo perto (ele
-                    # incluso) recebe o aviso "X has reached Level N!" no chat.
-                    emit_area('player_leveled_up', {'name': part_p.get('name', ''), 'level': current_level}, part_p.get('room') or room)
-            
-            owner_sids = []
-            for participant_sid in mob_data['dmg_tracker']:
-                if participant_sid not in online_players: continue
-                part_name = online_players[participant_sid].get('name', '')
-                itens_rolados = rolar_loot(mob_type_id)
-                currency_rolada = rolar_currency(mob_type_id)
-                loot_id = f"loot_{mob_id}_{int(now * 1000)}_{len(owner_sids)}"
-                # has_items só reflete itens de verdade (pra sprite dourada da bag);
-                # bag só com currency usa a sprite comum mesmo assim.
-                has_items = len(itens_rolados) > 0
-                # pos/has_items guardados pra recriar a bag de quem relogar.
-                ground_loot[loot_id] = {"items": itens_rolados, "currency": currency_rolada, "room": room, "criado_em": now, "owners": {part_name},
-                                        "pos": [mob_data.get('pos_x', 0), mob_data.get('pos_y', 0)], "has_items": has_items}
-                emit('mob_died', {'mob_id': mob_id, 'loot_id': loot_id, 'has_items': has_items,
-                                  'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room=participant_sid)
-                owner_sids.append(participant_sid)
-            emit_area('mob_died', {'mob_id': mob_id, 'loot_id': '', 'has_items': False,
-                                   'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room, skip_sid=owner_sids)
-            mob_data['died_at'] = now
-            mob_data['target_sid'] = None
-            mob_data['returning'] = False
-            mob_data['path'] = None
+        if trava_nova: extra.update({'training_lock': trava_nova['nome'], 'lock_secs': TREINO_TRAVA_SEG})
+        _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano_final, now, extra)
     except Exception: traceback.print_exc()
 
 # Clients antigos ainda mandam mob_pos/mob_attack (IA no client). Agora a IA
@@ -5790,6 +5861,15 @@ def handle_shop_buy(data):
     if not p: return
     item = str(data.get('item', ''))
     if item not in loja or item not in ITEM_DB: return
+    if eh_magia(item):
+        # Magia: compra 1 vez so' e vai pra lista de magias conhecidas.
+        if item in magias_conhecidas(p): return _depois_da_loja(sid, p, 'known')
+        preco = int(ITEM_DB[item].get('price', 0))
+        if preco > int(p.get('currency', 0)): return _depois_da_loja(sid, p, 'no_money')
+        p['currency'] = int(p.get('currency', 0)) - preco
+        if not isinstance(p.get('skills'), dict): p['skills'] = {}
+        p['skills']['spells_known'] = magias_conhecidas(p) + [item]
+        return _depois_da_loja(sid, p, 'learned')
     try: qtd = int(data.get('qty', 1))
     except (TypeError, ValueError): return
     if qtd < 1 or qtd > SHOP_QTD_MAX: return
@@ -6201,9 +6281,18 @@ def _comer(sid, p, inst):
 # No celular: 1-6 nos 3 dragkeys (2 cada), 7-9 fixos no canto (comida/poção).
 HOTBAR_SLOTS = 9
 
+def eh_magia(item_path):
+    return bool(ITEM_DB.get(item_path, {}).get('spell'))
+
+def magias_conhecidas(p):
+    s = p.get('skills') if isinstance(p.get('skills'), dict) else {}
+    lista = s.get('spells_known')
+    return lista if isinstance(lista, list) else []
+
 def item_usavel_no_atalho(item_path):
-    # Comida e pocao (magia entra aqui quando existir).
+    # Comida, pocao, scroll e magia.
     dados = ITEM_DB.get(item_path, {})
+    if dados.get('spell'): return True
     try: return int(dados.get('fullness', 0)) > 0 or bool(dados.get('heal_hp') or dados.get('heal_mp') or dados.get('usable'))
     except (TypeError, ValueError): return False
 
@@ -6232,6 +6321,7 @@ def handle_set_hotbar(data):
         i = _indice_hotbar(data)
         if i is None: return
         valor = data.get('value') if isinstance(data.get('value'), str) else ''
+        if eh_magia(valor) and valor not in magias_conhecidas(p): return
         hb = normalizar_hotbar(p.get('hotbar'))
         hb['slots'][i] = valor
         p['hotbar'] = normalizar_hotbar(hb)  # descarta o que não pode ir ali
@@ -6249,6 +6339,9 @@ def handle_use_hotbar(data):
         if i is None: return
         caminho = normalizar_hotbar(p.get('hotbar'))['slots'][i]
         if not caminho: return
+        if eh_magia(caminho):
+            _lancar_magia(sid, p, caminho, str(data.get('target', '') or ''))
+            return
         inst = next((it for it in p.get('inventory', []) if it.get('item') == caminho), None)
         if inst is None:
             emit('food_result', {'ok': False, 'reason': 'none'}, room=sid)

@@ -67,6 +67,9 @@ public final class HotbarUI {
     private final Button[] slots = new Button[BookMenuUI.SLOTS_ATALHO];
     private final Stack[] conteudos = new Stack[BookMenuUI.SLOTS_ATALHO];
     private Button.ButtonStyle estiloSlot, estiloSlotEscolhido;
+    /** Celular: slot com magia e' quadrado (o icone da magia e' quadrado). */
+    private Button.ButtonStyle estiloQuadrado, estiloQuadradoEscolhido;
+    private final boolean[] slotMagia = new boolean[BookMenuUI.SLOTS_ATALHO];
     /** Celular: botoes (1 a 9; botao i = slot i), salvo no aparelho. */
     private List<Controles.BotaoMobile> layout = new ArrayList<>();
 
@@ -80,6 +83,10 @@ public final class HotbarUI {
             estiloSlot.up = circulo(new Color(0.15f, 0.15f, 0.15f, 0.92f), new Color(0.32f, 0.32f, 0.32f, 1f));
             estiloSlotEscolhido = new Button.ButtonStyle();
             estiloSlotEscolhido.up = circulo(new Color(0.22f, 0.22f, 0.22f, 0.96f), COR_EDICAO);
+            estiloQuadrado = new Button.ButtonStyle();
+            estiloQuadrado.up = UiSkin.retangulo(new Color(0.15f, 0.15f, 0.15f, 0.92f), new Color(0.32f, 0.32f, 0.32f, 1f), 3);
+            estiloQuadradoEscolhido = new Button.ButtonStyle();
+            estiloQuadradoEscolhido.up = UiSkin.retangulo(new Color(0.22f, 0.22f, 0.22f, 0.96f), COR_EDICAO, 3);
         } else {
             // Um pouco mais escuro que os slots da bag (a pedido do usuario).
             estiloSlot.up = UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 0.92f), new Color(0.17f, 0.17f, 0.17f, 1f), 2);
@@ -136,7 +143,9 @@ public final class HotbarUI {
         for (int i = 0; i < layout.size() && i < slots.length; i++) {
             Controles.BotaoMobile b = layout.get(i);
             slots[i].setBounds(w - b.x - b.tamanho / 2f, b.y - b.tamanho / 2f, b.tamanho, b.tamanho);
-            slots[i].setStyle(editando && i == selecionado ? estiloSlotEscolhido : estiloSlot);
+            boolean escolhido = editando && i == selecionado;
+            slots[i].setStyle(slotMagia[i] ? (escolhido ? estiloQuadradoEscolhido : estiloQuadrado)
+                : (escolhido ? estiloSlotEscolhido : estiloSlot));
         }
     }
 
@@ -347,16 +356,19 @@ public final class HotbarUI {
             Stack pilha = conteudos[i];
             pilha.clearChildren();
             String caminho = i < atalhos.length ? atalhos[i] : "";
+            slotMagia[i] = caminho != null && !caminho.isEmpty() && livro.ehMagia(caminho);
             if (caminho != null && !caminho.isEmpty()) {
-                int qtd = livro.quantidadeNaBag(caminho);
+                // Magia: sem numero (nao e' item da bag).
+                int qtd = slotMagia[i] ? 0 : livro.quantidadeNaBag(caminho);
                 TextureRegion icone = livro.iconeDoItem(caminho);
                 Table centro = new Table();
                 if (icone != null) {
                     Image img = new Image(icone);
                     img.setScaling(Scaling.fit);
-                    if (qtd <= 0) img.setColor(1f, 1f, 1f, 0.3f); // acabou: so' transparente, sem numero
+                    if (!livro.disponivelNoAtalho(caminho)) img.setColor(1f, 1f, 1f, 0.3f); // acabou: so' transparente, sem numero
                     // Icone maior (o sprite do item ja' tem sobra transparente em volta).
-                    centro.add(img).size(tamanhoSlot(i) * (MOBILE ? 0.74f : 0.86f));
+                    // Magia no celular: slot quadrado, o icone ocupa quase tudo.
+                    centro.add(img).size(tamanhoSlot(i) * (MOBILE && !slotMagia[i] ? 0.74f : 0.86f));
                 }
                 pilha.add(centro);
                 if (qtd > 0) {

@@ -42,6 +42,18 @@ public final class CooldownPocao {
         return Math.max(0f, (fimScrollNanos - System.nanoTime()) / 1_000_000_000f);
     }
 
+    // Magias: cada uma tem o seu cooldown (servidor.py::_lancar_magia "spell_cd").
+    private static final java.util.Map<String, Long> fimMagias = new java.util.HashMap<>();
+
+    public static void iniciarMagia(String magia, float segundos) {
+        fimMagias.put(magia, System.nanoTime() + (long) (segundos * 1_000_000_000L));
+    }
+
+    public static float restanteMagia(String magia) {
+        Long fim = magia == null ? null : fimMagias.get(magia);
+        return fim == null ? 0f : Math.max(0f, (fim - System.nanoTime()) / 1_000_000_000f);
+    }
+
     private static Texture pixel() {
         if (pixel == null) {
             Pixmap pm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
@@ -60,6 +72,7 @@ public final class CooldownPocao {
         private final BitmapFont fonte;
         private final GlyphLayout layout = new GlyphLayout();
         private final boolean scroll;
+        private final String magia; // != null: cooldown dessa magia
 
         public Sobreposicao(BitmapFont fonte) { this(fonte, false); }
 
@@ -67,11 +80,20 @@ public final class CooldownPocao {
         public Sobreposicao(BitmapFont fonte, boolean scroll) {
             this.fonte = fonte;
             this.scroll = scroll;
+            this.magia = null;
+            setTouchable(Touchable.disabled);
+        }
+
+        /** Cooldown de uma magia (caminho dela no item_db). */
+        public Sobreposicao(BitmapFont fonte, String magia) {
+            this.fonte = fonte;
+            this.scroll = false;
+            this.magia = magia;
             setTouchable(Touchable.disabled);
         }
 
         @Override public void draw(Batch batch, float parentAlpha) {
-            float falta = scroll ? restanteScroll() : restante();
+            float falta = magia != null ? restanteMagia(magia) : scroll ? restanteScroll() : restante();
             if (falta <= 0f) return;
             Color antes = new Color(batch.getColor());
             batch.setColor(FUNDO.r, FUNDO.g, FUNDO.b, FUNDO.a * parentAlpha);
