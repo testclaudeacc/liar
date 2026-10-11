@@ -86,7 +86,7 @@ public final class BookMenuUI {
     // --- Equip ---
     // Grade 3x3 da coluna esquerda (null = celula vazia), igual prints/tela desejada.png.
     private static final String[][] SLOTS_EQUIP = {
-        {"Cape", "Helm", "Necklace"}, {"MainHand", "Chest", "Hand"}, {"Gloves", "Boots", "Ring"}
+        {null, "Helm", "Necklace"}, {"MainHand", "Chest", "Hand"}, {"Gloves", "Boots", "Ring"}
     };
     private static final float SLOT_EQUIP = 54f;
     private static final float COLUNA_EQUIP = 180f;
@@ -946,16 +946,9 @@ public final class BookMenuUI {
             botao.clearChildren();
             String caminho = equippedItemPaths.get(entrada.getKey());
             TextureAtlas.AtlasRegion textura = caminho == null ? null : iconeDoItem(caminho);
-            boolean capaVazia = false;
-            if (textura == null && "Cape".equals(entrada.getKey())) {
-                // Nao tem sprite de slot de capa: a capa do Outlander apagada.
-                textura = atlas.findRegion("sheet/r3_c11");
-                capaVazia = true;
-            }
             if (textura == null) textura = atlas.findRegion(regiaoSlotVazio(entrada.getKey()));
             if (textura == null) continue;
             Image icone = new Image(new TextureRegionDrawable(textura));
-            if (capaVazia) icone.setColor(0.25f, 0.25f, 0.25f, 0.6f);
             icone.setScaling(Scaling.fit);
             int qtd = equippedQuantidades.getOrDefault(entrada.getKey(), 1);
             if (caminho == null || qtd <= 1) {

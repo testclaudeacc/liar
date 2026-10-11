@@ -306,7 +306,7 @@ def validate_item(item_path):
         return item_path
     return None
 
-SLOTS_VALIDOS = {"Helm", "Cape", "Gloves", "Chest", "Boots", "Necklace", "Ring", "MainHand", "Hand"}
+SLOTS_VALIDOS = {"Helm", "Gloves", "Chest", "Boots", "Necklace", "Ring", "MainHand", "Hand"}
 
 ITEM_DB = {
     "res://sprites/items/Sword.tres": {"name": "Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 100, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "cap": 5.0},
@@ -345,7 +345,7 @@ ITEM_DB = {
     # Set Outlander (loja do Luke): todas as classes, level 5. "set" junta as
     # pecas; com todas equipadas da' "set_xp"% de XP extra (bonus_xp_set).
     "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 2.0},
-    "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Cape", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 1.5},
+    "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Chest", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 1.5},
     "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 1.0},
     "res://sprites/items/Outlander/OutlanderBoots.tres": {"name": "Outlander Boots", "type": "Boots", "slot": "Boots", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 2, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r10_c7", "set": "Outlander", "set_xp": 5, "cap": 2.0},
 }
