@@ -469,17 +469,25 @@ public final class BookMenuUI {
     private void ajustarLarguraDetalhes() {
         if (celulaJanela == null) return;
         float extraVisivel = 0f;
-        for (Table d : new Table[]{bagDetalhes, tradeDetalhes, bancoDetalhes, lojaDetalhes}) {
+        for (Table d : new Table[]{bagDetalhes, tradeDetalhes, bancoDetalhes, lojaDetalhes, equipDetalhesEsquerda}) {
+            boolean equip = d == equipDetalhesEsquerda;
+            float base = equip ? COLUNA_EQUIP : COLUNA_BAG;
+            // Equip: os detalhes saem da coluna quando nao tem item - ela volta ao normal.
+            if (equip && equipColunaEsquerda != null && d.getParent() != equipColunaEsquerda) {
+                com.badlogic.gdx.scenes.scene2d.ui.Cell<?> c = equipPage.getCell(equipColunaEsquerda);
+                if (c != null && Math.abs(c.getMinWidth() - base) > 0.5f) { c.width(base); equipPage.invalidateHierarchy(); }
+                continue;
+            }
             if (!(d.getParent() instanceof Table) || !(d.getParent().getParent() instanceof Table)) continue;
             Table coluna = (Table) d.getParent();
             Table pagina = (Table) coluna.getParent();
             com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cDet = coluna.getCell(d), cCol = pagina.getCell(coluna);
             if (cDet == null || cCol == null) continue;
             float pad = cDet.getPadLeft() + cDet.getPadRight();
-            float extra = Math.min(EXTRA_JANELA_MAX, Math.max(0f, d.getPrefWidth() + pad + 2f - COLUNA_BAG));
-            if (Math.abs(cCol.getMinWidth() - (COLUNA_BAG + extra)) > 0.5f) {
-                cCol.width(COLUNA_BAG + extra);
-                cDet.width(COLUNA_BAG - pad + extra);
+            float extra = Math.min(EXTRA_JANELA_MAX, Math.max(0f, d.getPrefWidth() + pad + 2f - base));
+            if (Math.abs(cCol.getMinWidth() - (base + extra)) > 0.5f) {
+                cCol.width(base + extra);
+                cDet.width(base - pad + extra);
                 coluna.invalidateHierarchy();
             }
             if (pagina.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, extra);
@@ -784,7 +792,8 @@ public final class BookMenuUI {
         // caber numa linha; maior que isso quebra a linha.
         float larguraNome = Math.min(COLUNA_BAG - 16f + EXTRA_JANELA_MAX,
             new com.badlogic.gdx.graphics.g2d.GlyphLayout(nome.getStyle().font, nome.getText()).width + 2f);
-        boolean colunaCresce = bloco == bagDetalhes || bloco == tradeDetalhes || bloco == bancoDetalhes || bloco == lojaDetalhes;
+        boolean colunaCresce = bloco == bagDetalhes || bloco == tradeDetalhes || bloco == bancoDetalhes || bloco == lojaDetalhes
+            || bloco == equipDetalhesEsquerda;
         bloco.add(nome).growX().minWidth(colunaCresce ? larguraNome : 0f).left().padBottom(1).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
         if (dados == null) return;
@@ -846,7 +855,7 @@ public final class BookMenuUI {
                 "Locks the creature for 5s"));
             if (dados.economiaFlecha > 0) topicos.add(dados.economiaFlecha + "% chance to save arrows");
             bloco.add(linhaStat("Training Weapon", COR_SET)).left().padTop(6).row();
-            for (String t : topicos) bloco.add(linhaStat("- " + t, COR_SET)).left().row();
+            for (String t : topicos) bloco.add(linhaStat(t, COR_SET)).left().padLeft(10).row();
         } else if (dados.economiaFlecha > 0) {
             bloco.add(linhaStat(dados.economiaFlecha + "% chance to save arrows", COR_SET)).left().padTop(6).row();
         }
