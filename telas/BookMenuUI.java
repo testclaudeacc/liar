@@ -724,8 +724,8 @@ public final class BookMenuUI {
         bloco.top().left();
         // Fonte fina ("hud", sem contorno) reduzida; linhas na altura natural
         // da fonte (sem sobrepor) e sem espaco extra entre elas.
-        Label nome = new LabelPixel(nomeExibicao(itemPath), skin.get("hud", Label.LabelStyle.class));
-        escalarFonte(nome, 0.74f * FONTE_STATS);
+        // Mesma fonte das notificacoes da HUD (nitida): ver UiSkin.fonteDescricao.
+        Label nome = new LabelPixel(nomeExibicao(itemPath), new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE));
         nome.setWrap(true);
         bloco.add(nome).growX().left().padBottom(1).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
@@ -835,8 +835,7 @@ public final class BookMenuUI {
 
     private Label linhaStat(String texto, Color cor) {
         // LabelPixel: origem presa no pixel de tela (senao a letra caia entre 2 pixels e embacava).
-        Label label = new LabelPixel(texto, skin.get("hud", Label.LabelStyle.class));
-        escalarFonte(label, 0.62f * FONTE_STATS);
+        Label label = new LabelPixel(texto, new Label.LabelStyle(UiSkin.fonteDescricao(skin, 13), Color.WHITE));
         label.setColor(cor);
         return label;
     }

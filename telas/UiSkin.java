@@ -91,6 +91,28 @@ public class UiSkin {
         return fonte;
     }
 
+    /** Fonte das descricoes (itens, lojas, trade...): a mesma das
+     * notificacoes da HUD - Tahoma Bold com contorno preto de 1px, gerada no
+     * tamanho da tela. tamanho = px no PC (13 = notificacao). */
+    public static BitmapFont fonteDescricao(Skin skin, int tamanho) {
+        int px = Math.max(6, Math.round(tamanho * escalaAtual));
+        String nome = "desc-px-" + px;
+        if (skin.has(nome, BitmapFont.class)) return skin.getFont(nome);
+        FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal("fonts/TAHOMAB0.TTF"));
+        FreeTypeFontParameter p = new FreeTypeFontParameter();
+        p.size = px;
+        p.borderWidth = 1;
+        p.borderColor = Color.BLACK;
+        p.minFilter = TextureFilter.Linear;
+        p.magFilter = TextureFilter.Linear;
+        BitmapFont fonte = gerador.generateFont(p);
+        gerador.dispose();
+        fonte.getData().setScale(1f / escalaAtual);
+        fonte.setUseIntegerPositions(false);
+        skin.add(nome, fonte);
+        return fonte;
+    }
+
     public static Skin criar(float escala) {
         escalaAtual = escala;
         Skin skin = new Skin();
