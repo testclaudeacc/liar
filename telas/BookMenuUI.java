@@ -1775,7 +1775,7 @@ public final class BookMenuUI {
     private Label passoTrade, resumoTrade, passoConfirm;
     private static final Color COR_PASSO = new Color(0.62f, 0.62f, 0.62f, 1f);
 
-    private static final Color COR_TRADE_SELECIONADO = new Color(0.25f, 0.85f, 0.3f, 1f);
+    private static final Color COR_TRADE_SELECIONADO = new Color(0f, 1f, 0f, 1f); // verde puro
     private static final boolean MOBILE_LIVRO = FONTE_STATS < 1f;
     // Moedas no trade: slot de cada uma (chave "$Nome" em tradeSelecao, valor
     // = quantas daquela moeda). Aparecem as que valem ate' a maior que o
