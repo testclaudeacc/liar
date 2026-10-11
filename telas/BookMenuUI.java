@@ -702,7 +702,8 @@ public final class BookMenuUI {
         equipColunaEsquerda.clearChildren();
         equipColunaEsquerda.add(equipSlotsTabela).top().left().pad(4).row();
         if (equipadoPath != null && candidatoPath == null) {
-            preencherBlocoStats(equipDetalhesEsquerda, equipadoPath, null);
+            preencherBlocoStats(equipDetalhesEsquerda, equipadoPath, null,
+                equippedQuantidades.getOrDefault(slotDoItem(equipadoPath), 1));
             equipColunaEsquerda.add(separadorEquip()).growX().height(1).padTop(4).row();
             equipColunaEsquerda.add(equipDetalhesEsquerda).growX().top().left().pad(10, 12, 10, 12).row();
         }
@@ -764,6 +765,14 @@ public final class BookMenuUI {
      * pro item equipado no mesmo slot ("" = slot vazio), ex: "Mana 10 (+10)".
      */
     private void preencherBlocoStats(Table bloco, String itemPath, String compararCom) {
+        preencherBlocoStats(bloco, itemPath, compararCom, 1);
+    }
+
+    /** quantidade: tamanho da pilha - a linha de cap mostra o total dela. */
+    private int quantidadeBloco = 1;
+
+    private void preencherBlocoStats(Table bloco, String itemPath, String compararCom, int quantidade) {
+        quantidadeBloco = Math.max(1, quantidade);
         bloco.clearChildren();
         bloco.top().left();
         // Fonte fina ("hud", sem contorno) reduzida; linhas na altura natural
@@ -825,7 +834,7 @@ public final class BookMenuUI {
                 corQuartoStat(dados.fourthStatType));
         }
         // Mana gasta por ataque (varinha). Sem "(+n)": nao e' bonus, e' custo.
-        if (dados.manaCost > 0) bloco.add(linhaStat("Mana per hit " + dados.manaCost, COR_MANA)).left().row();
+        if (dados.manaCost > 0) bloco.add(linhaStat(dados.manaCost + " Mana per hit", COR_MANA)).left().row();
         // Cap: sempre o ultimo stat (antes das descricoes em azul).
         adicionarLinhaCap(bloco, dados);
         if (dados.treino) {
@@ -847,8 +856,9 @@ public final class BookMenuUI {
     /** "(bolsinha) 15": quanto de cap 1 unidade do item ocupa. */
     private void adicionarLinhaCap(Table bloco, EquipStats dados) {
         if (dados == null || dados.cap <= 0f) return;
-        String valor = dados.cap == Math.floor(dados.cap) ? String.valueOf((int) dados.cap)
-            : String.format(java.util.Locale.US, "%.1f", dados.cap);
+        float total = dados.cap * quantidadeBloco; // pilha: cap total
+        String valor = Math.abs(total - Math.round(total)) < 0.001f ? String.valueOf(Math.round(total))
+            : String.format(java.util.Locale.US, "%.1f", total);
         bloco.add(linhaComIcone("ui/currency/BagIcon", valor, Color.LIGHT_GRAY)).left().row();
     }
 
@@ -886,7 +896,7 @@ public final class BookMenuUI {
 
     private void adicionarLinhaStat(Table bloco, String nome, int valor, int anterior, boolean comparar, Color cor) {
         if (valor == 0 && (!comparar || anterior == 0)) return;
-        String texto = nome + " " + valor;
+        String texto = valor + " " + nome;
         if (comparar) {
             int diferenca = valor - anterior;
             texto += " (" + (diferenca >= 0 ? "+" : "") + diferenca + ")";
@@ -1838,7 +1848,7 @@ public final class BookMenuUI {
         String slot = slotDoItem(item.itemPath);
         String equipado = slot == null ? null : equippedItemPaths.get(slot);
         preencherBlocoStats(bagDetalhes, item.itemPath,
-            ITEM_STATS.containsKey(item.itemPath) ? (equipado == null ? "" : equipado) : null);
+            ITEM_STATS.containsKey(item.itemPath) ? (equipado == null ? "" : equipado) : null, item.quantity);
         EquipStats comida = ITEM_STATS.get(item.itemPath);
         // Comida/pocao nao mostram "Quantity" (a quantidade ja' aparece no icone).
         boolean ehPocao = comida != null && comida.ehPocao();
@@ -2591,7 +2601,7 @@ public final class BookMenuUI {
             tradeDetalhes.clearChildren();
             return;
         }
-        preencherBlocoStats(tradeDetalhes, item.itemPath, null);
+        preencherBlocoStats(tradeDetalhes, item.itemPath, null, item.quantity);
         if (tradeLimiteAviso) tradeDetalhes.add(linhaStat("Max " + TRADE_MAX_ITENS + " items", Color.valueOf("ff6a6a"))).left().row();
         if (item.quantity > 1) tradeDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
         if (tradeSelecao.containsKey(item.instanceId) && item.quantity > 1) {
@@ -2694,7 +2704,7 @@ public final class BookMenuUI {
                 String chave = (grade == gradeMinhaOferta ? "eu:" : "ele:") + e.getString("instance_id", "" + n);
                 Button slot = slotBanco(iconeDoItem(caminho), qtd, false, Color.WHITE, chave.equals(tradeFoco), () -> {
                     tradeFoco = chave;
-                    preencherBlocoStats(confirmDetalhes, caminho, null);
+                    preencherBlocoStats(confirmDetalhes, caminho, null, qtd);
                     if (qtd > 1) confirmDetalhes.add(linhaStat("Quantity " + qtd, Color.LIGHT_GRAY)).left().row();
                     montarGradeOferta(gradeMinhaOferta, minhaOferta, vazioTexto);
                     montarGradeOferta(gradeOfertaOutro, ofertaOutro, vazioTexto);
@@ -3088,7 +3098,7 @@ public final class BookMenuUI {
             nome.setColor(corMoeda(tipo));
             bancoDetalhes.add(nome).left().padBottom(1).row();
         } else {
-            preencherBlocoStats(bancoDetalhes, item.itemPath, null);
+            preencherBlocoStats(bancoDetalhes, item.itemPath, null, item.quantity);
             if (item.quantity > 1) bancoDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
             if (abaBancoBank) {
                 bloqueado = !cabeNaMochila(item.itemPath, 1);
@@ -3566,7 +3576,7 @@ public final class BookMenuUI {
         } else {
             InventoryItem item = itemPorId(lojaFoco);
             if (item == null || precoVenda(item.itemPath) <= 0) return;
-            preencherBlocoStats(lojaDetalhes, item.itemPath, null);
+            preencherBlocoStats(lojaDetalhes, item.itemPath, null, item.quantity);
         }
     }
 
