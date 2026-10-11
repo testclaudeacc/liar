@@ -24,6 +24,17 @@ public final class Controles {
 
     private static final String ARQUIVO = "inverted_realms_controles";
 
+    /** Botao do mouse vira "tecla" MOUSE_BASE + botao (so' meio, voltar e
+     * avancar: esquerdo/direito ja' sao do jogo). */
+    public static final int MOUSE_BASE = 1000;
+
+    public static int codigoMouse(int botao) { return MOUSE_BASE + botao; }
+
+    /** Esse botao do mouse pode ser usado como tecla? */
+    public static boolean mouseAceito(int botao) {
+        return botao == Input.Buttons.MIDDLE || botao == Input.Buttons.BACK || botao == Input.Buttons.FORWARD;
+    }
+
     /** Acoes configuraveis, na ordem em que aparecem na tela de Settings. */
     public static final Map<String, String> NOMES = new LinkedHashMap<>();
     private static final Map<String, Integer> PADRAO = new LinkedHashMap<>();
@@ -42,9 +53,10 @@ public final class Controles {
         PADRAO.put("mapa", Input.Keys.M);
         NOMES.put("write", "Write");
         PADRAO.put("write", Input.Keys.ENTER);
-        // Alem do botao do meio do mouse (fixo).
         NOMES.put("autotarget", "Auto Target");
-        PADRAO.put("autotarget", Input.Keys.TAB);
+        PADRAO.put("autotarget", MOUSE_BASE + Input.Buttons.MIDDLE);
+        NOMES.put("loot", "Collect Bags");
+        PADRAO.put("loot", Input.Keys.TAB);
     }
 
     private static final int[] RESERVADAS = {
@@ -75,6 +87,9 @@ public final class Controles {
         for (Map.Entry<String, Integer> e : PADRAO.entrySet()) {
             teclas.put(e.getKey(), p.getInteger("tecla_" + e.getKey(), e.getValue()));
         }
+        // Versao anterior salvava o Auto Target no Tab (agora o Tab e' do Collect Bags).
+        Integer auto = teclas.get("autotarget"), loot = teclas.get("loot");
+        if (auto != null && auto.equals(loot)) teclas.put("autotarget", PADRAO.get("autotarget"));
         // Arquivo velho/editado com tecla repetida ou reservada: volta pro padrao.
         java.util.Set<Integer> vistas = new java.util.HashSet<>();
         for (Map.Entry<String, Integer> e : teclas.entrySet()) {
@@ -149,6 +164,11 @@ public final class Controles {
     /** Nome curto da tecla pra mostrar (hotbar e Settings). */
     public static String nomeTecla(int keycode) {
         if (keycode < 0) return "-";
+        if (keycode >= MOUSE_BASE) {
+            int b = keycode - MOUSE_BASE;
+            return b == Input.Buttons.MIDDLE ? "Mouse 3" : b == Input.Buttons.BACK ? "Mouse 4"
+                : b == Input.Buttons.FORWARD ? "Mouse 5" : "Mouse " + (b + 1);
+        }
         if (keycode >= Input.Keys.NUM_0 && keycode <= Input.Keys.NUM_9) return String.valueOf(keycode - Input.Keys.NUM_0);
         if (keycode >= Input.Keys.NUMPAD_0 && keycode <= Input.Keys.NUMPAD_9) return "N" + (keycode - Input.Keys.NUMPAD_0);
         String nome = Input.Keys.toString(keycode);

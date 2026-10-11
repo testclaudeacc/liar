@@ -678,6 +678,8 @@ def _montar_payload_sync_stats(p):
         'hp_bonus': hp_bonus, 'mana_bonus': mp_bonus, 'speed_multiplier': speed_multiplier,
         # Velocidade de andar pelo level (o client multiplica no passo).
         'move_speed': mult_velocidade_level(p),
+        # Velocidade de ataque (1 = normal; /atkspd do admin).
+        'atk_speed': admin_mult(p, 'admin_atkspd', 10.0),
         'classe_penalizada': punido,
         'cap_atual': calcular_cap_usado(p), 'cap_maximo': calcular_cap_maximo(level),
         # Vitais pra barra de HP/MP do client.
@@ -2692,7 +2694,8 @@ def handle_join_game(data):
 
         # item_db vai so' no payload (nao fica guardado em online_players).
         max_hp_join, max_mp_join = calcular_max_vitais(data)
-        extra_admin = {'admin_commands': [{'cmd': c, 'usage': u, 'desc': d} for c, u, d in ADMIN_COMANDOS]} if eh_admin(data) else {}
+        extra_admin = {'admin_commands': [{'cmd': c, 'usage': u, 'desc': d} for c, u, d in ADMIN_COMANDOS],
+                       'admin_args': argumentos_admin()} if eh_admin(data) else {}
         emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(), 'soul': eh_alma(data), 'admin': eh_admin(data),
                                    'ghost': admin_ghost(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
@@ -2954,12 +2957,24 @@ ADMIN_COMANDOS = [
     ("summons", "/summons <mob> [quantidade]", "cria mobs nos SQMs livres em volta (nao renascem)"),
     ("speed", "/speed <valor>|reset", "multiplica sua velocidade (fica salvo); reset volta ao normal"),
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
+    ("atkspd", "/atkspd <1-10>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
     ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
     ("money", "/money add <quantia><c|s|g|p>", "da' moedas (ex: /money add 5g, /money add 1p)"),
     ("quests", "/quests", "quests e se voce ja fez"),
     ("quest", "/quest <nome> complete|reset", "completa ou reseta uma quest"),
     ("bestiary", "/bestiary <mob> <0-3|clear>", "bestiario: 0 descoberto, 1 cobre, 2 prata, 3 ouro"),
 ]
+
+def argumentos_admin():
+    """O que o Tab do chat completa depois de cada comando (client: ChatUI)."""
+    mobs = [str(i.get('name', t.capitalize())) for t, i in MOB_DB.items()]
+    return {
+        'summons': mobs, 'bestiary': mobs + ['clear'],
+        'soul': ['on', 'off'], 'ghost': ['on', 'off'],
+        'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'],
+        'time': list(FASES_DO_DIA.keys()), 'money': ['add'],
+        'quest': list(_todas_as_quests()) + ['complete', 'reset'],
+    }
 
 def comando_admin(sid, p, texto):
     partes = texto[1:].split()
@@ -3093,6 +3108,26 @@ def comando_admin(sid, p, texto):
             p['skills']['admin_dmg'] = v
             msg = f"Damage x{v}."
         _queue_save(p)
+        chat_sistema(sid, msg)
+        return
+    if cmd == 'atkspd':
+        if not isinstance(p.get('skills'), dict): p['skills'] = {}
+        if len(partes) < 2:
+            chat_sistema(sid, f"Attack speed: x{admin_mult(p, 'admin_atkspd', 10.0)}. Usage: /atkspd <1-10>|reset")
+            return
+        if partes[1].lower() == 'reset':
+            p['skills'].pop('admin_atkspd', None)
+            msg = "Attack speed reset."
+        else:
+            try: v = float(partes[1].lower().lstrip('x'))
+            except ValueError:
+                chat_sistema(sid, "Usage: /atkspd <1-10>|reset", 'red')
+                return
+            v = max(1.0, min(10.0, v))
+            p['skills']['admin_atkspd'] = v
+            msg = f"Attack speed x{v}."
+        _queue_save(p)
+        socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
         chat_sistema(sid, msg)
         return
     if cmd == 'ghost':
@@ -3595,7 +3630,9 @@ def handle_hit_mob(data):
         if na_pz(p): return
         now = time.time()
         # Pequena folga (0.1s) pra latencia: o client manda a cada ~2.4s.
-        if now - p.get('last_attack_time', 0) < ATAQUE_COOLDOWN_SEG - 0.1: return
+        # /atkspd do admin divide o intervalo entre golpes.
+        cd = ATAQUE_COOLDOWN_SEG / admin_mult(p, 'admin_atkspd', 10.0)
+        if now - p.get('last_attack_time', 0) < cd - min(0.1, cd * 0.3): return
         p['last_attack_time'] = now
         
         precisa_municao = p.get('class_name') == "Ranger"

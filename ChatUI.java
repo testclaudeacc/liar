@@ -292,6 +292,8 @@ public class ChatUI {
         stage.addActor(sugestoes);
         // Tab nao pula pro proximo campo: aqui ele completa o comando.
         campoTexto.setFocusTraversal(false);
+        // O Tab nunca vira caractere no texto (no admin ele completa o comando).
+        campoTexto.setTextFieldFilter((campo, c) -> c != '\t');
         campoTexto.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { atualizarSugestoes(); }
         });
@@ -995,11 +997,62 @@ public class ChatUI {
     }
 
     /** Tab: completa com o 1o comando sugerido (so' enquanto ainda nao tem espaco). */
+    /** Tab (admin), igual terminal: completa o comando e depois os argumentos
+     * (ex: "/summ" -> "/summons ", "rot" -> "Rotworm "). Com mais de uma
+     * opcao, completa ate' onde todas concordam. Sempre engole o Tab. */
     private boolean completarComando() {
-        if (sugestoes == null || !sugestoes.isVisible() || sugeridos.isEmpty()) return false;
-        if (campoTexto.getText().indexOf(' ') >= 0) return true;   // ja' completo: so' engole o Tab
-        completarCom(sugeridos.get(0));
+        if (comandosAdmin.isEmpty()) return false;
+        String t = campoTexto.getText();
+        if (!t.startsWith("/")) return true;
+        int espaco = t.indexOf(' ');
+        java.util.List<String> opcoes = new java.util.ArrayList<>();
+        String prefixo, base;
+        if (espaco < 0) {
+            prefixo = t.substring(1);
+            base = "/";
+            for (String[] c : comandosAdmin) opcoes.add(c[0]);
+        } else {
+            String cmd = t.substring(1, espaco).toLowerCase();
+            int ultimo = t.lastIndexOf(' ');
+            prefixo = t.substring(ultimo + 1);
+            base = t.substring(0, ultimo + 1);
+            List<String> args = argumentosAdmin.get(cmd);
+            if (args != null) opcoes.addAll(args);
+        }
+        java.util.List<String> casam = new java.util.ArrayList<>();
+        for (String o : opcoes) if (o.toLowerCase().startsWith(prefixo.toLowerCase())) casam.add(o);
+        if (casam.isEmpty()) return true;
+        String novo;
+        if (casam.size() == 1) {
+            novo = base + casam.get(0) + " ";
+        } else {
+            // Parte em comum entre todas as opcoes.
+            String comum = casam.get(0);
+            for (String o : casam) {
+                int i = 0;
+                while (i < comum.length() && i < o.length() && Character.toLowerCase(comum.charAt(i)) == Character.toLowerCase(o.charAt(i))) i++;
+                comum = comum.substring(0, i);
+            }
+            if (comum.length() <= prefixo.length()) return true;
+            novo = base + comum;
+        }
+        campoTexto.setText(novo);
+        campoTexto.setCursorPosition(novo.length());
+        atualizarSugestoes();
         return true;
+    }
+
+    // Admin: o que o Tab completa depois de cada comando (servidor.py::argumentos_admin).
+    private final Map<String, List<String>> argumentosAdmin = new java.util.HashMap<>();
+
+    public void definirArgumentosAdmin(com.badlogic.gdx.utils.JsonValue dados) {
+        argumentosAdmin.clear();
+        if (dados == null || !dados.isObject()) return;
+        for (com.badlogic.gdx.utils.JsonValue e = dados.child; e != null; e = e.next) {
+            List<String> lista = new java.util.ArrayList<>();
+            for (com.badlogic.gdx.utils.JsonValue v = e.child; v != null; v = v.next) lista.add(v.asString());
+            argumentosAdmin.put(e.name.toLowerCase(), lista);
+        }
     }
 
     private void completarCom(String cmd) {

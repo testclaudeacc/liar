@@ -308,6 +308,8 @@ public class WorldScreen extends ScreenAdapter {
     private String amigoMarcado = null;
     private TextureRegion regiaoAlvoAmigo;
     private float esperaAtaque = 0f;
+    /** Velocidade de ataque (servidor: sync_stats "atk_speed"; /atkspd do admin). */
+    private float multAtaque = 1f;
     // Cadencia de ataque (servidor.py::ATAQUE_COOLDOWN_SEG = 2.385s, mesmo valor
     // pro player e pros mobs) + uma folga pra latencia.
     private static final float INTERVALO_ATAQUE = 2.4f;
@@ -941,9 +943,9 @@ public class WorldScreen extends ScreenAdapter {
             @Override
             public boolean touchDown(int screenX, int screenY, int pointer, int button) {
                 if (chat.isVisivel() || settingsAberta() || bookMenu.isVisible() || dialogoNPC.isVisible()) return false;
-                // Botao do meio do mouse: auto target (mob mais perto, ver modoAutoTarget).
-                if (button == Input.Buttons.MIDDLE) {
-                    if (!localMorto) autoTarget();
+                // Botao do mouse ligado a uma acao (Settings > Controls): igual apertar a tecla.
+                if (Controles.mouseAceito(button) && Controles.acaoDaTecla(Controles.codigoMouse(button)) != null) {
+                    keyDown(Controles.codigoMouse(button));
                     return true;
                 }
                 
@@ -1004,7 +1006,13 @@ public class WorldScreen extends ScreenAdapter {
                     mostrarColisao = !mostrarColisao;
                     return true;
                 }
-                // Auto Target (padrao Tab; o botao do meio do mouse tambem faz).
+                // Collect Bags (padrao Tab): pega as bags num 5x5 em volta.
+                if (keycode == Controles.tecla("loot")) {
+                    if (chat.estaDigitando() || localMorto || settingsAberta() || bookMenu.isVisible()) return false;
+                    coletarBagsPerto();
+                    return true;
+                }
+                // Auto Target (padrao botao do meio do mouse).
                 if (keycode == Controles.tecla("autotarget")) {
                     if (chat.estaDigitando() || localMorto || settingsAberta() || bookMenu.isVisible()) return false;
                     autoTarget();
@@ -2759,6 +2767,13 @@ public class WorldScreen extends ScreenAdapter {
             // Captura a proxima tecla (no uiStage: vem antes do jogo, entao a
             // tecla escolhida nao dispara a acao dela nesse mesmo aperto).
             uiStage.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+                // Botao do mouse (meio/voltar/avancar) tambem pode ser escolhido.
+                @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y, int pointer, int botao) {
+                    if (acaoCapturando == null || !Controles.mouseAceito(botao)) return false;
+                    keyDown(event, Controles.codigoMouse(botao));
+                    event.stop();
+                    return true;
+                }
                 @Override public boolean keyDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, int keycode) {
                     if (acaoCapturando == null) return false;
                     String acao = acaoCapturando;
@@ -2994,6 +3009,7 @@ public class WorldScreen extends ScreenAdapter {
                 if (adminLocal) ligarPerfAdmin(); // medidor de desempenho embaixo do fps
                 // Sugestoes de comando no chat (so' admin recebe a lista).
                 if (chat != null) chat.definirComandosAdmin(adminLocal ? data.get("admin_commands") : null);
+                if (chat != null) chat.definirArgumentosAdmin(adminLocal ? data.get("admin_args") : null);
                 definirAlmaLocal(data.getBoolean("soul", false));
                 definirFantasma(local.nome, data.getBoolean("ghost", false));
                 if (socket.isConnected()) socket.emitRaw("get_friends_list", "{}");
@@ -3745,6 +3761,7 @@ public class WorldScreen extends ScreenAdapter {
             hud.definirFome(comFome);
             multFome = comFome ? FOME_MULT_VELOCIDADE : 1f;
             if (data.has("move_speed")) multLevel = Math.max(0.1f, data.getFloat("move_speed", 1f));
+            if (data.has("atk_speed")) multAtaque = Math.max(0.1f, data.getFloat("atk_speed", 1f));
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
@@ -5411,6 +5428,17 @@ public class WorldScreen extends ScreenAdapter {
         return false;
     }
 
+    /** Collect Bags: todas as minhas bags num 5x5 (2 SQMs pra cada lado). */
+    private void coletarBagsPerto() {
+        if (!socket.isConnected()) return;
+        int jx = tileX(local.x), jy = tileY(local.y);
+        for (BagChao bag : bags.values()) {
+            if (Math.max(Math.abs(tileX(bag.x) - jx), Math.abs(tileY(bag.y) - jy)) > 2) continue;
+            String id = bag.id;
+            socket.emitRaw("collect_loot", GameSocket.obj(jw -> jw.set("loot_id", id)));
+        }
+    }
+
     private void removerBag(String lootId) {
         bags.remove(lootId);
     }
@@ -5582,7 +5610,7 @@ public class WorldScreen extends ScreenAdapter {
             jw.set("w_type", ranged ? "Ranged" : "Melee");
             jw.set("proj", projetil);
         }));
-        esperaAtaque = INTERVALO_ATAQUE;
+        esperaAtaque = INTERVALO_ATAQUE / multAtaque;
         // Progresso da skill principal da classe (o servidor conta e avisa o level up).
         String skill = skillDaClasse();
         socket.emitRaw("register_skill_hit", GameSocket.obj(jw -> jw.set("skill", skill)));
