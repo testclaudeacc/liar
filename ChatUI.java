@@ -150,7 +150,21 @@ public class ChatUI {
         this.corJogadorLocal = corDaClasse(classeJogadorLocal);
         mensagensPorAba.put(ABA_LOCAL, new Array<>());
 
-        campoTexto = new TextField("", skin);
+        campoTexto = new TextField("", skin) {
+            // Admin: resto do comando/argumento sugerido em cinza logo depois
+            // do texto (estilo Minecraft) - o Tab escreve ele.
+            @Override protected void drawText(com.badlogic.gdx.graphics.g2d.Batch batch,
+                                              com.badlogic.gdx.graphics.g2d.BitmapFont font, float x, float y) {
+                super.drawText(batch, font, x, y);
+                String f = sugestaoFantasma();
+                if (f == null || getCursorPosition() != getText().length() || visibleTextEnd != displayText.length()) return;
+                float dx = glyphPositions.get(visibleTextEnd) - glyphPositions.get(visibleTextStart);
+                Color antes = new Color(font.getColor());
+                font.setColor(0.55f, 0.55f, 0.55f, antes.a);
+                font.draw(batch, f, x + textOffset + dx, y);
+                font.setColor(antes);
+            }
+        };
         campoTexto.setMessageText("");
         campoTexto.setMaxLength(MAX_CARACTERES);
 
@@ -996,14 +1010,55 @@ public class ChatUI {
         sugestoes.toFront();
     }
 
-    /** Tab: completa com o 1o comando sugerido (so' enquanto ainda nao tem espaco). */
-    /** Tab (admin), igual terminal: completa o comando e depois os argumentos
-     * (ex: "/summ" -> "/summons ", "rot" -> "Rotworm "). Com mais de uma
-     * opcao, completa ate' onde todas concordam. Sempre engole o Tab. */
+    /** Admin: 1a opcao (comando ou argumento) que comeca com o que esta' sendo
+     * digitado agora - {texto antes da palavra, opcao inteira}; null = nenhuma. */
+    private String[] opcaoSugerida() {
+        if (comandosAdmin.isEmpty() || !janela.isVisible()) return null;
+        String t = campoTexto.getText();
+        if (!t.startsWith("/")) return null;
+        int espaco = t.indexOf(' ');
+        String prefixo, base;
+        List<String> opcoes = new java.util.ArrayList<>();
+        if (espaco < 0) {
+            prefixo = t.substring(1);
+            base = "/";
+            for (String[] c : comandosAdmin) opcoes.add(c[0]);
+        } else {
+            int ultimo = t.lastIndexOf(' ');
+            prefixo = t.substring(ultimo + 1);
+            base = t.substring(0, ultimo + 1);
+            List<String> args = argumentosAdmin.get(t.substring(1, espaco).toLowerCase());
+            if (args != null) opcoes.addAll(args);
+        }
+        for (String o : opcoes) {
+            if (o.length() > prefixo.length() && o.toLowerCase().startsWith(prefixo.toLowerCase())) return new String[]{base, o};
+        }
+        return null;
+    }
+
+    /** O pedaco cinza mostrado depois do texto (resto da opcao sugerida). */
+    private String sugestaoFantasma() {
+        String[] o = opcaoSugerida();
+        if (o == null) return null;
+        String t = campoTexto.getText();
+        return o[1].substring(t.length() - o[0].length());
+    }
+
+    /** Tab (admin), igual Minecraft: escreve a opcao mostrada em cinza
+     * (ex: "/su" -> "/summons ", "rot" -> "Rotworm "). Sem sugestao, cai no
+     * jeito de terminal (completa ate' onde as opcoes concordam). Sempre engole o Tab. */
     private boolean completarComando() {
         if (comandosAdmin.isEmpty()) return false;
         String t = campoTexto.getText();
         if (!t.startsWith("/")) return true;
+        String[] sugerida = opcaoSugerida();
+        if (sugerida != null) {
+            String novo = sugerida[0] + sugerida[1] + " ";
+            campoTexto.setText(novo);
+            campoTexto.setCursorPosition(novo.length());
+            atualizarSugestoes();
+            return true;
+        }
         int espaco = t.indexOf(' ');
         java.util.List<String> opcoes = new java.util.ArrayList<>();
         String prefixo, base;
