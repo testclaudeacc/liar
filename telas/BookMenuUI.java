@@ -827,15 +827,16 @@ public final class BookMenuUI {
             // Arma de treino: o que ela faz (azul, igual o scroll).
             for (String t : new String[]{
                     "Training weapon",
-                    "Deals 1% of the target's max HP, ignoring defense (max 100 on creatures).",
-                    "Creatures you hit can't be attacked by other players for 5s (not in party or if someone else is already fighting it)."}) {
+                    "Hits 1% of target HP (max 100)",
+                    "+5% skill gain, no regen",
+                    "Locks the creature for 5s"}) {
                 Label l = linhaStat(t, COR_SET);
                 l.setWrap(true);
                 bloco.add(l).growX().left().padTop(t.startsWith("Training") ? 6 : 0).row();
             }
         }
         if (dados.economiaFlecha > 0) {
-            Label l = linhaStat(dados.economiaFlecha + "% chance to not use an arrow", COR_SET);
+            Label l = linhaStat(dados.economiaFlecha + "% chance to save arrows", COR_SET);
             l.setWrap(true);
             bloco.add(l).growX().left().row();
         }

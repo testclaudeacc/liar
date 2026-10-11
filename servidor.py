@@ -348,10 +348,10 @@ ITEM_DB = {
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
     # "ammo_save": % de chance de nao gastar a flecha.
-    "res://sprites/items/Mage/Weapons/DisabledRod.tres": {"name": "Disabled Rod", "type": "Rod", "slot": "MainHand", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 1, "training": True, "price": 1000, "icon": "sheet/r104_c6", "cap": 5.0},
-    "res://sprites/items/Knight/Weapons/RawSword.tres": {"name": "Raw Sword", "type": "Sword", "slot": "MainHand", "req_level": 0, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "training": True, "price": 1000, "icon": "sheet/r107_c8", "cap": 5.0},
-    "res://sprites/items/Bard/Weapons/RawFlute.tres": {"name": "Raw Flute", "type": "Flute", "slot": "MainHand", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 1, "training": True, "price": 1000, "icon": "sheet/r110_c1", "cap": 5.0},
-    "res://sprites/items/Ranger/Weapons/RawBow.tres": {"name": "Raw Bow", "type": "Bow", "slot": "MainHand", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "training": True, "ammo_save": 30, "price": 1000, "icon": "sheet/r93_c10", "cap": 5.0},
+    "res://sprites/items/Mage/Weapons/DisabledRod.tres": {"name": "Disabled Rod", "type": "Rod", "slot": "MainHand", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 1, "training": True, "price": 1000, "icon": "sheet/r104_c6", "cap": 5.0},
+    "res://sprites/items/Knight/Weapons/RawSword.tres": {"name": "Raw Sword", "type": "Sword", "slot": "MainHand", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "training": True, "price": 1000, "icon": "sheet/r107_c8", "cap": 5.0},
+    "res://sprites/items/Bard/Weapons/RawFlute.tres": {"name": "Raw Flute", "type": "Flute", "slot": "MainHand", "req_level": 0, "req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 1, "training": True, "price": 1000, "icon": "sheet/r110_c1", "cap": 5.0},
+    "res://sprites/items/Ranger/Weapons/RawBow.tres": {"name": "Raw Bow", "type": "Bow", "slot": "MainHand", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "training": True, "ammo_save": 30, "price": 1000, "icon": "sheet/r93_c10", "cap": 5.0},
     # Set Outlander (loja do Luke): todas as classes, level 10. "set" junta as
     # pecas; com todas equipadas da' "set_xp"% de XP extra (bonus_xp_set).
     "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 2.0},
@@ -565,6 +565,9 @@ TREINO_DANO_MAX_MOB = 100
 # batendo nele (TREINO_OUTRO_BATENDO_SEG), pra ninguem travar mob dos outros.
 TREINO_TRAVA_SEG = 5.0
 TREINO_OUTRO_BATENDO_SEG = 6.0
+# Com arma de treino equipada: sem regen de HP/MP e a skill principal/def
+# sobe 5% mais rapido (5% de chance de cada golpe contar dobrado).
+TREINO_BONUS_SKILL = 0.05
 
 def dano_arma_treino(max_hp_alvo, eh_mob):
     """Dano fixo da arma de treino (pro player tambem, quando tiver PvP)."""
@@ -4264,6 +4267,8 @@ def handle_skill_hit(data):
         current_lvl = skills.get(skill_name, 10)
         hits_key = f"{skill_name}_hits"
         current_hits = skills.get(hits_key, 0) + 1
+        # Arma de treino equipada: +5% de velocidade na skill (em media).
+        if arma_principal(p).get('training') and random.random() < TREINO_BONUS_SKILL: current_hits += 1
         
         hits_needed = get_hits_to_level(current_lvl + 1, mult)
         leveled_up = False
@@ -6342,8 +6347,8 @@ def regen_loop():
                         if not p.get('corpo_ausente'):
                             socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
 
-                # Com fome: sem regen de HP/MP.
-                if esta_com_fome(p): continue
+                # Com fome ou com arma de treino equipada: sem regen de HP/MP.
+                if esta_com_fome(p) or arma_principal(p).get('training'): continue
                 curou = False
 
                 # Buff de comida: soma no regen natural (enquanto durar).
