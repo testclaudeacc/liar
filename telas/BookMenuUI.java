@@ -410,6 +410,8 @@ public final class BookMenuUI {
         final String magia;    // id da magia (servidor.py "spell"); null = item normal
         final int magiaMana, magiaCd, magiaDano; // custo, cooldown (s), % do dano base
         final String magiaDescricao;
+        final boolean magiaArea; // true = dano em area; false = um alvo so'
+
         final boolean treino;  // arma de treino (servidor.py::dano_arma_treino)
         final int economiaFlecha; // % de chance de nao gastar flecha
         final String conjunto; // set (ex: "Outlander"); null = nenhum
@@ -421,6 +423,7 @@ public final class BookMenuUI {
             this.magiaCd = d.getInt("spell_cd", 0);
             this.magiaDano = d.getInt("spell_dmg", 0);
             this.magiaDescricao = d.getString("spell_desc", "");
+            this.magiaArea = d.getBoolean("spell_area", false);
             this.treino = d.getBoolean("training", false);
             this.economiaFlecha = d.getInt("ammo_save", 0);
             this.conjunto = d.getString("set", null);
@@ -492,7 +495,19 @@ public final class BookMenuUI {
             com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cDet = coluna.getCell(d), cCol = pagina.getCell(coluna);
             if (cDet == null || cCol == null) continue;
             float pad = cDet.getPadLeft() + cDet.getPadRight();
-            float extra = Math.min(EXTRA_JANELA_MAX, Math.max(0f, d.getPrefWidth() + pad + 2f - base));
+            float precisa = d.getPrefWidth() + pad + 2f;
+            // Loja: o botao de baixo ("Are you sure?" e' comprido) tambem tem que caber.
+            if (d == lojaDetalhes && lojaAcao != null) precisa = Math.max(precisa, lojaAcao.getPrefWidth() + 14f);
+            float extra = Math.min(EXTRA_JANELA_MAX, Math.max(0f, precisa - base));
+            if (d == lojaDetalhes && lojaRodapeAcao != null) {
+                com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cBotao = lojaRodapeAcao.getCell(lojaAcao);
+                com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cRodape = coluna.getCell(lojaRodapeAcao);
+                if (cBotao != null && Math.abs(cBotao.getMinWidth() - (base - 14f + extra)) > 0.5f) {
+                    cBotao.width(base - 14f + extra);
+                    if (cRodape != null) cRodape.width(base - 14f + extra);
+                    lojaRodapeAcao.invalidateHierarchy();
+                }
+            }
             if (Math.abs(cCol.getMinWidth() - (base + extra)) > 0.5f) {
                 cCol.width(base + extra);
                 cDet.width(base - pad + extra);
@@ -832,6 +847,7 @@ public final class BookMenuUI {
             bloco.add(linhaStat(dados.magiaMana + " Mana", COR_MANA)).left().row();
             bloco.add(linhaStat(dados.magiaCd + "s Cooldown", Color.LIGHT_GRAY)).left().row();
             bloco.add(linhaStat(dados.magiaDano + "% Damage", COR_SET)).left().padTop(6).row();
+            bloco.add(linhaStat(dados.magiaArea ? "Area Damage" : "Single Target", COR_ALVO_MAGIA)).left().row();
             return;
         }
         if (dados.usavel) {
@@ -5062,6 +5078,7 @@ public final class BookMenuUI {
     /** Linha clicavel da aba Spells: slot da magia + nome, custo de mana,
      * descricao e % de dano. Borda clara = ja' esta' nesse slot. */
     private static final float TAM_ICONE_GAVETA = 64f;
+    private static final Color COR_ALVO_MAGIA = Color.valueOf("ffb366"); // "Single Target"/"Area Damage"
     /** Lista de magias aberta na aba Spells (a janela alarga pro texto caber numa linha). */
     private Table conteudoMagias;
 
@@ -5085,7 +5102,10 @@ public final class BookMenuUI {
                 // Numa linha so': a janela alarga pra caber (ajustarLarguraDetalhes).
                 texto.add(linhaStat(dados.magiaDescricao, Color.LIGHT_GRAY)).left().row();
             }
-            texto.add(linhaStat(dados.magiaDano + "% Damage", COR_SET)).left().row();
+            Table linhaDano = new Table();
+            linhaDano.add(linhaStat(dados.magiaDano + "% Damage", COR_SET));
+            linhaDano.add(linhaStat(dados.magiaArea ? "Area Damage" : "Single Target", COR_ALVO_MAGIA)).padLeft(10);
+            texto.add(linhaDano).left().row();
         }
         gaveta.add(texto).growX().center().left();
         gaveta.addListener(new ChangeListener() {
