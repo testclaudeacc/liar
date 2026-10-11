@@ -341,7 +341,7 @@ SLOT_MUNICAO = "Hand"
 CLASSES_RANGED = ("Ranger", "Mage", "Bard")
 ALCANCE_LOOT_SQM = 4
 # Arma a distancia alcanca o mesmo raio em que o mob detecta o player
-# (DETECCAO_SQM, distancia em linha reta - circulo, nao quadrado).
+# (DETECCAO_SQM, mas aqui em linha reta - circulo; a deteccao do mob e' quadrada).
 ALCANCE_RANGED_SQM = 5
 
 # Campos do ITEM_DB que o client usa pra exibir os itens (nome, tipo, level,
@@ -960,7 +960,7 @@ def broadcast_hp(sid, p):
 # rebalancear esses numeros e' decisao separada, nao mexi neles aqui.
 TILE = 16
 MOB_FLOOR = 1
-DETECCAO_SQM = 5
+DETECCAO_SQM = 3  # SQMs pra cada lado (quadrado: 3 = area 7x7)
 # +4 SQMs de folga: dá tempo do mob perseguir até a escada/transição em vez de
 # desistir na hora só porque o alvo mudou de andar no meio da perseguição.
 PERSISTE_SQM = 8
@@ -1298,6 +1298,13 @@ def _dist_spawn_sqm(m):
     if m.get('spawn') is None: return 0.0
     sx, sy = centro_tile(m['spawn'])
     return math.hypot(m.get('pos_x', 0) - sx, m.get('pos_y', 0) - sy) / TILE
+
+def _dist_sqm(m, p):
+    """Distancia em SQMs contando diagonal como 1 (quadrado, nao circulo):
+    raio 3 = area 7x7 inteira, cantos inclusos."""
+    tm = tile_de(m.get('pos_x', 0), m.get('pos_y', 0))
+    tp = tile_de(float(p.get('pos_x', 0)), float(p.get('pos_y', 0)))
+    return max(abs(tm[0] - tp[0]), abs(tm[1] - tp[1]))
 
 def _dist_px(m, p):
     return math.hypot(float(p.get('pos_x', 0)) - m.get('pos_x', 0), float(p.get('pos_y', 0)) - m.get('pos_y', 0))
@@ -1667,7 +1674,7 @@ def _mob_tick(mob_id, m, now):
         if alvo is None or na_pz(alvo):  # morreu, saiu, desconectou, entrou na PZ
             _mob_voltar_pra_casa(mob_id, m)
             return
-        if _dist_px(m, alvo) > (DETECCAO_SQM + PERSISTE_SQM) * TILE:
+        if _dist_sqm(m, alvo) > DETECCAO_SQM + PERSISTE_SQM:
             _mob_voltar_pra_casa(mob_id, m)
             return
         if _dist_spawn_sqm(m) > LEASH_SQM:
@@ -1703,10 +1710,13 @@ def _mob_tick(mob_id, m, now):
     # _player_alvo_valido já filtra andar: um mob parado ignora quem já está
     # num andar diferente (só continua perseguindo quem virou alvo ANTES de
     # trocar de andar, no bloco acima).
-    melhor, melhor_dist = None, DETECCAO_SQM * TILE
+    # Area quadrada (DETECCAO_SQM pra cada lado, cantos inclusos); entre os
+    # que estao dentro, o mais perto em linha reta.
+    melhor, melhor_dist = None, float('inf')
     for sid in list(_sids_perto(m['room'])) if m.get('room') else list(online_players.keys()):
         p = _player_alvo_valido(sid, m)
         if p is None: continue
+        if _dist_sqm(m, p) > DETECCAO_SQM: continue
         d = _dist_px(m, p)
         if d > melhor_dist: continue
         t_p = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
@@ -1771,7 +1781,7 @@ def mob_focar_agressor(mob_id, m, sid):
     if atual == sid: return
     if atual is not None and not m.get('returning') and not _mob_preso_sem_bater(m, now): return
     p = _player_alvo_valido(sid, m)
-    if p is None or _dist_px(m, p) > (DETECCAO_SQM + PERSISTE_SQM) * TILE: return
+    if p is None or _dist_sqm(m, p) > DETECCAO_SQM + PERSISTE_SQM: return
     _mob_definir_alvo(m, sid, now)
     m['sem_caminho'] = 0.0
     if m.get('returning'):
