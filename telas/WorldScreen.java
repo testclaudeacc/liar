@@ -3370,6 +3370,20 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             removerBag(data.getString("loot_id", ""));
         });
+        // /summons do admin: mob avulso (sem ponto no mapa) - cria o visual dele.
+        socket.on("mob_summoned", (nomeEvt, data) -> {
+            if (data == null) return;
+            String id = data.getString("mob_id", "");
+            String tipoMob = data.getString("type", "");
+            if (id.isEmpty() || tipoMob.isEmpty() || mobs.containsKey(id)) return;
+            TextureRegion sprite = spriteDoMob(tipoMob);
+            if (sprite == null) return;
+            String nomeMob = Character.toUpperCase(tipoMob.charAt(0)) + tipoMob.substring(1);
+            MobVisual mob = new MobVisual(id, nomeMob, 0f, 0f, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+            mobs.put(id, mob);
+            moverMob(mob, data.getFloat("pos_x", 0f), data.getFloat("pos_y", 0f), "down", 0f, true);
+            efeitos.add(new Efeito(quadrosFumaca(), mob.x, mob.y));
+        });
         socket.on("mob_died", (nomeEvt, data) -> {
             if (data == null) return;
             MobVisual mob = mobs.get(data.getString("mob_id", ""));

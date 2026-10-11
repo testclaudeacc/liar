@@ -589,7 +589,11 @@ SPEED_PCT_POR_LEVEL = 0.01
 def mult_velocidade_level(p):
     try: level = int(p.get('level', 1) or 1)
     except (TypeError, ValueError): level = 1
-    return 1.0 + max(0, level - 1) * SPEED_PCT_POR_LEVEL
+    base = 1.0 + max(0, level - 1) * SPEED_PCT_POR_LEVEL
+    # /speed do admin (salvo em skills['admin_speed']).
+    try: extra = float((p.get('skills') or {}).get('admin_speed', 1.0))
+    except (TypeError, ValueError): extra = 1.0
+    return base * max(0.1, min(10.0, extra))
 
 def calc_level_bonuses(level, player_class):
     niveis_ganhos = max(0, level - 1)
@@ -2882,7 +2886,10 @@ ADMIN_COMANDOS = [
     ("time", "/time day|afternoon|night|<seg>s|<min>m", "muda a hora do mundo (ciclo de 20 min)"),
     ("soul", "/soul on|off", "vira alma de novo / desperta"),
     ("npcs", "/npcs", "NPCs lidos do mapa e se estao ativos"),
-    ("mobs", "/mobs", "lista os mobs"),
+    ("mobs", "/mobs", "lista os mobs (nomes pro /summons)"),
+    ("summons", "/summons <mob>", "cria um mob num SQM do seu lado (nao renasce)"),
+    ("speed", "/speed <valor>|reset", "multiplica sua velocidade (fica salvo); reset volta ao normal"),
+    ("money", "/money add <quantia><c|s|g|p>", "da' moedas (ex: /money add 5g, /money add 1p)"),
     ("quests", "/quests", "quests e se voce ja fez"),
     ("quest", "/quest <nome> complete|reset", "completa ou reseta uma quest"),
     ("bestiary", "/bestiary <mob> <0-3|clear>", "bestiario: 0 descoberto, 1 cobre, 2 prata, 3 ouro"),
@@ -2960,7 +2967,53 @@ def comando_admin(sid, p, texto):
         if faltando: chat_sistema(sid, "No NPC_DB mas fora do mapa: " + ", ".join(faltando))
         return
     if cmd == 'mobs':
-        chat_sistema(sid, "Mobs: " + (", ".join(f"{t} ({i.get('name', t.capitalize())})" for t, i in MOB_DB.items()) or "none"))
+        chat_sistema(sid, "Mobs: " + (", ".join(i.get('name', t.capitalize()) for t, i in MOB_DB.items()) or "none")
+                     + "  (use /summons <mob>)")
+        return
+    if cmd == 'summons':
+        tipo = _tipo_do_mob_pelo_nome(' '.join(partes[1:])) if len(partes) > 1 else None
+        if tipo is None:
+            chat_sistema(sid, "Usage: /summons <mob>. Mobs: " + ", ".join(i.get('name', t.capitalize()) for t, i in MOB_DB.items()), 'red')
+            return
+        m_id = _invocar_mob(p, tipo)
+        if m_id is None: chat_sistema(sid, "No free tile next to you.", 'red')
+        else: chat_sistema(sid, f"Summoned {MOB_DB[tipo].get('name', tipo.capitalize())}.")
+        return
+    if cmd == 'speed':
+        if len(partes) < 2:
+            atual = (p.get('skills') or {}).get('admin_speed', 1.0)
+            chat_sistema(sid, f"Speed: x{atual}. Usage: /speed <value>|reset  (ex: /speed 2 = double)")
+            return
+        if not isinstance(p.get('skills'), dict): p['skills'] = {}
+        if partes[1].lower() == 'reset':
+            p['skills'].pop('admin_speed', None)
+            msg = "Speed reset."
+        else:
+            try: v = float(partes[1].lower().lstrip('x'))
+            except ValueError:
+                chat_sistema(sid, "Usage: /speed <value>|reset  (ex: /speed 2)", 'red')
+                return
+            v = max(0.1, min(10.0, v))
+            p['skills']['admin_speed'] = v
+            msg = f"Speed x{v}."
+        _queue_save(p)
+        socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+        chat_sistema(sid, msg)
+        return
+    if cmd == 'money':
+        # /money add 5g  (c copper, s silver, g gold, p platinum; sem letra = copper)
+        if len(partes) < 3 or partes[1].lower() != 'add':
+            chat_sistema(sid, "Usage: /money add <amount><c|s|g|p>  (ex: /money add 5g)", 'red')
+            return
+        m = re.fullmatch(r'(\d+)([csgp]?)', partes[2].lower())
+        if not m:
+            chat_sistema(sid, "Usage: /money add <amount><c|s|g|p>  (ex: /money add 5g)", 'red')
+            return
+        valor = int(m.group(1)) * {'': 1, 'c': 1, 's': 100, 'g': 10_000, 'p': 1_000_000}[m.group(2)]
+        p['currency'] = min(2_000_000_000, int(p.get('currency', 0)) + valor)
+        _queue_save(p)
+        socketio.emit('bank_currency', {'currency': int(p['currency'])}, room=sid)
+        chat_sistema(sid, f"+{partes[2]} ({valor} copper). Total: {p['currency']} copper.")
         return
     if cmd == 'quests':
         feitas = set(quests_feitas(p))
@@ -6030,6 +6083,33 @@ def trade_invite_cleanup_loop():
 
 MOB_AVISO_SPAWN_SEG = 6.0  # SpawnWarning no client antes do mob renascer
 
+# ---- /summons (admin): mob avulso, sem ponto no Tiled e sem renascer ----
+_contador_invocados = 0
+INVOCADO_CORPO_SEG = 60.0  # morto: sai da memoria depois disso
+
+def _invocar_mob(p, tipo):
+    global _contador_invocados
+    mapa = p.get('mapa') or MAPA_ID_SERVIDOR
+    grade = mapas_colisao.get(mapa)
+    tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+    ocupados = _tiles_ocupados(sala=p.get('room'))
+    vizinhos = [(tp[0] + dx, tp[1] + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if (dx, dy) != (0, 0)]
+    random.shuffle(vizinhos)
+    livre = next((t for t in vizinhos if t not in ocupados and (grade is None or not eh_parede(grade, t))), None)
+    if livre is None: return None
+    _contador_invocados += 1
+    m_id = f"summon{_contador_invocados}"
+    m = obter_ou_criar_mob(m_id, tipo, room=p.get('room'))
+    m['mapa'] = mapa
+    m['summon'] = True
+    m['spawn'] = livre
+    m['spawn_range'] = 0
+    m['pos_x'], m['pos_y'] = centro_tile(livre)
+    m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
+    _reindexar_areas()
+    socketio.emit('mob_summoned', {'mob_id': m_id, 'type': tipo, 'pos_x': m['pos_x'], 'pos_y': m['pos_y']})
+    return m_id
+
 def mob_cleanup_loop():
     while True:
         # Tick curto: com 60s o respawn de 120s acontecia entre 120 e 180s.
@@ -6039,6 +6119,10 @@ def mob_cleanup_loop():
             if m_data.get('hp', 1) > 0: continue
             if 'died_at' not in m_data:
                 m_data['died_at'] = now
+            if m_data.get('summon'):
+                # Invocado pelo admin: nao renasce, some depois do corpo.
+                if now - m_data['died_at'] >= INVOCADO_CORPO_SEG: active_mobs.pop(m_id, None)
+                continue
             falta = m_data.get('respawn_seg', MOB_RESPAWN_SEG) - (now - m_data['died_at'])
             # Aviso de spawn: ~6s antes, ja' sorteia o SQM onde ele vai nascer e
             # avisa a area (o client toca o SpawnWarning nesse SQM).
