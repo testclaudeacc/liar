@@ -3037,6 +3037,7 @@ ADMIN_COMANDOS = [
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
     ("atkspd", "/atkspd <1-50>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
     ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
+    ("spells", "/spells reset", "esquece todas as magias aprendidas (da' pra comprar de novo)"),
     ("money", "/money add <quantia><c|s|g|p>", "da' moedas (ex: /money add 5g, /money add 1p)"),
     ("quests", "/quests", "quests e se voce ja fez"),
     ("quest", "/quest <nome> complete|reset", "completa ou reseta uma quest"),
@@ -3049,7 +3050,7 @@ def argumentos_admin():
     return {
         'summons': mobs, 'bestiary': mobs + ['clear'],
         'soul': ['on', 'off'], 'ghost': ['on', 'off'],
-        'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'],
+        'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'], 'spells': ['reset'],
         'time': list(FASES_DO_DIA.keys()), 'money': ['add'],
         'quest': list(_todas_as_quests()) + ['complete', 'reset'],
     }
@@ -3187,6 +3188,23 @@ def comando_admin(sid, p, texto):
             msg = f"Damage x{v}."
         _queue_save(p)
         chat_sistema(sid, msg)
+        return
+    if cmd == 'spells':
+        if len(partes) < 2 or partes[1].lower() != 'reset':
+            nomes = [ITEM_DB.get(m, {}).get('name', m) for m in magias_conhecidas(p)]
+            chat_sistema(sid, "Spells: " + (", ".join(nomes) if nomes else "none") + ". Usage: /spells reset")
+            return
+        if not isinstance(p.get('skills'), dict): p['skills'] = {}
+        p['skills'].pop('spells_known', None)
+        p.pop('_spell_cd', None)
+        # Tira as magias da hotbar tambem (normalizar_hotbar so' olha o caminho).
+        hb = normalizar_hotbar(p.get('hotbar'))
+        hb['slots'] = ['' if eh_magia(v) else v for v in hb['slots']]
+        p['hotbar'] = hb
+        _queue_save(p)
+        socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+        socketio.emit('hotbar_synced', {'hotbar': p['hotbar']}, room=sid)
+        chat_sistema(sid, "All spells forgotten. You can learn them again.")
         return
     if cmd == 'atkspd':
         if not isinstance(p.get('skills'), dict): p['skills'] = {}
