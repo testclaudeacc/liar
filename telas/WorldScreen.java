@@ -1004,6 +1004,12 @@ public class WorldScreen extends ScreenAdapter {
                     mostrarColisao = !mostrarColisao;
                     return true;
                 }
+                // Auto Target (padrao Tab; o botao do meio do mouse tambem faz).
+                if (keycode == Controles.tecla("autotarget")) {
+                    if (chat.estaDigitando() || localMorto || settingsAberta() || bookMenu.isVisible()) return false;
+                    autoTarget();
+                    return true;
+                }
                 // Open Bag (padrao B): abre o livro direto na Bag (fecha se ja' esta aberto).
                 if (keycode == Controles.tecla("bag")) {
                     if (chat.estaDigitando()) return false;

@@ -42,6 +42,9 @@ public final class Controles {
         PADRAO.put("mapa", Input.Keys.M);
         NOMES.put("write", "Write");
         PADRAO.put("write", Input.Keys.ENTER);
+        // Alem do botao do meio do mouse (fixo).
+        NOMES.put("autotarget", "Auto Target");
+        PADRAO.put("autotarget", Input.Keys.TAB);
     }
 
     private static final int[] RESERVADAS = {
