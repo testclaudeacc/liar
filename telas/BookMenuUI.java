@@ -3231,7 +3231,7 @@ public final class BookMenuUI {
     private static final Color COR_ABA_BUY_ARMA = Color.valueOf("3f5f8a"), COR_ABA_BUY_ARMA_OFF = Color.valueOf("1c2a3d");
     private static final Color COR_ABA_BUY_MAGIA = Color.valueOf("7a3fa8"), COR_ABA_BUY_MAGIA_OFF = Color.valueOf("33194a");
 
-    private static final String ICONE_APRENDER = "sheet/r87_c7"; // 368,800: botao Learn da Nyla
+    private static final String ICONE_APRENDER = "sheet/r51_c10"; // 64,624: botao Learn da Nyla
 
     private boolean lojaDeMagia() { return "spell".equals(lojaPapel); }
 
@@ -3240,7 +3240,7 @@ public final class BookMenuUI {
     private String iconeAbaBuy() {
         if ("pot".equals(lojaPapel)) return "sheet/r44_c2";
         if ("weapon".equals(lojaPapel)) return "sheet/r23_c5"; // Outlander Helm
-        if ("spell".equals(lojaPapel)) return "sheet/r60_c15"; // 16,672
+        if ("spell".equals(lojaPapel)) return "sheet/r61_c0";  // 160,672
         return ICONE_FULLNESS;
     }
 
