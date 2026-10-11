@@ -867,6 +867,7 @@ public final class BookMenuUI {
                 "Hits 1% of target HP (max 100)",
                 "+5% skill gain",
                 "No HP/MP regen",
+                "No spells",
                 "Locks the creature for 5s"));
             if (dados.economiaFlecha > 0) topicos.add(dados.economiaFlecha + "% chance to save arrows");
             bloco.add(linhaStat("Training Weapon", COR_SET)).left().padTop(6).row();
