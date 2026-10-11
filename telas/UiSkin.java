@@ -67,10 +67,11 @@ public class UiSkin {
         // Hinting Full: em tamanho pequeno o FreeType encaixa os tracos das
         // letras na grade de pixels (sem isso as hastes caiam entre 2 pixels
         // e o texto ficava com cara de borrado).
-        FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal("fonts/dejavu-sans.condensed.ttf"));
+        FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal(FONTE_NITIDA));
         FreeTypeFontParameter parametros = new FreeTypeFontParameter();
-        parametros.size = px;
-        parametros.hinting = FreeTypeFontGenerator.Hinting.Full;
+        parametros.size = Math.max(6, Math.round(px * ESCALA_FONTE_NITIDA));
+        parametros.borderWidth = 1;
+        parametros.borderColor = Color.BLACK;
         parametros.minFilter = TextureFilter.Linear;
         parametros.magFilter = TextureFilter.Linear;
         BitmapFont fonte = gerador.generateFont(parametros);
@@ -402,6 +403,15 @@ public class UiSkin {
 
     /** caracteresSo != null: gera SO' esses (em vez do conjunto padrao). */
     static BitmapFont gerarFonte(String caminho, int tamanho, int borda, float escala, String caracteresExtras, String caracteresSo) {
+        // Todo texto do jogo (a pedido do usuario): a fonte das notificacoes
+        // da HUD - Tahoma Bold com contorno preto de 1px fixo. So' a Martel
+        // (logo/banners) continua como era. A Tahoma Bold e' mais larga que a
+        // DejaVu condensada: o tamanho cai um pouco pra caber no mesmo lugar.
+        boolean nitida = !caminho.contains("martel");
+        if (nitida) {
+            caminho = FONTE_NITIDA;
+            tamanho = Math.max(6, Math.round(tamanho * ESCALA_FONTE_NITIDA));
+        }
         FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal(caminho));
         FreeTypeFontParameter parametros = new FreeTypeFontParameter();
         if (caracteresSo != null) parametros.characters = caracteresSo;
@@ -411,7 +421,7 @@ public class UiSkin {
         parametros.magFilter = TextureFilter.Linear;
         // Borda tambem escalada - senao ela fica proporcionalmente mais fina
         // que o glifo (que cresceu com o size acima) e o contorno preto some.
-        parametros.borderWidth = borda > 0 ? Math.max(1, Math.round(borda * escala)) : 0;
+        parametros.borderWidth = nitida ? 1 : borda > 0 ? Math.max(1, Math.round(borda * escala)) : 0;
         parametros.borderColor = Color.BLACK;
         BitmapFont fonte = gerador.generateFont(parametros);
         // Volta o tamanho renderizado pra escala de stage original (a
@@ -421,6 +431,10 @@ public class UiSkin {
         gerador.dispose();
         return fonte;
     }
+
+    /** Fonte de todo texto (exceto a Martel do logo) - ver gerarFonte. */
+    static final String FONTE_NITIDA = "fonts/TAHOMAB0.TTF";
+    static final float ESCALA_FONTE_NITIDA = 0.85f;
 
     /** Retangulo de cantos retos (StyleBoxFlat do Godot nao arredonda nada nas
      * telas de login/char-select - so 1px de borda solida). */
