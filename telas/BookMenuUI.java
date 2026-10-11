@@ -722,7 +722,7 @@ public final class BookMenuUI {
         bloco.top().left();
         // Fonte fina ("hud", sem contorno) reduzida; linhas na altura natural
         // da fonte (sem sobrepor) e sem espaco extra entre elas.
-        Label nome = new Label(nomeExibicao(itemPath), skin, "hud");
+        Label nome = new LabelPixel(nomeExibicao(itemPath), skin.get("hud", Label.LabelStyle.class));
         escalarFonte(nome, 0.74f * FONTE_STATS);
         nome.setWrap(true);
         bloco.add(nome).growX().left().padBottom(1).row();
@@ -824,7 +824,8 @@ public final class BookMenuUI {
     private final java.util.Set<com.badlogic.gdx.graphics.g2d.BitmapFont> fontesHud = new java.util.HashSet<>();
 
     private Label linhaStat(String texto, Color cor) {
-        Label label = new Label(texto, skin, "hud");
+        // LabelPixel: origem presa no pixel de tela (senao a letra caia entre 2 pixels e embacava).
+        Label label = new LabelPixel(texto, skin.get("hud", Label.LabelStyle.class));
         escalarFonte(label, 0.62f * FONTE_STATS);
         label.setColor(cor);
         return label;
@@ -1730,7 +1731,7 @@ public final class BookMenuUI {
         if (ehComida && !item.instanceId.isEmpty()) {
             TextButton.TextButtonStyle estiloComer = new TextButton.TextButtonStyle(
                 skin.get("verde", TextButton.TextButtonStyle.class));
-            estiloComer.font = skin.getFont("botao-pequeno-font");
+            estiloComer.font = skin.get("chat-log", Label.LabelStyle.class).font; // sem contorno
             // Pocao: "Use" (o servidor decide: eat_food usa comida ou pocao).
             TextButton comer = new TextButton(ehPocao ? "Use" : "Eat", estiloComer);
             String id = item.instanceId;
@@ -3136,7 +3137,7 @@ public final class BookMenuUI {
         totalLoja = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
         totalLoja.left();
         rodapeVenda.add(totalLoja).left().expandX();
-        rodapeVenda.add(botaoVender).width(120).height(40);
+        rodapeVenda.add(botaoVender).width(150).height(40);
         conteudoVenda = new Table();
         conteudoVenda.top();
         conteudoVenda.add(tituloVendendo).left().row();
@@ -3378,6 +3379,11 @@ public final class BookMenuUI {
         if (!algum) linhaTotal.add(new Label("0", new Label.LabelStyle(fonteBanco(), Color.WHITE)));
         totalLoja.setActor(linhaTotal);
         botaoVender.setDisabled(total <= 0);
+        if (vendaArmada) {
+            vendaArmada = false;
+            iconeDoBotao(botaoVender, true);
+            botaoVender.setText("Sell");
+        }
         botaoVender.setColor(total > 0 ? Color.WHITE : new Color(1f, 1f, 1f, 0.45f));
     }
 
@@ -3447,8 +3453,19 @@ public final class BookMenuUI {
         abrirPopupQuantidade(nomeExibicao(it.item), iconeDoItem(it.item), max, null, comprar);
     }
 
+    private boolean vendaArmada = false; // 1o clique no Sell: "Are you sure?"
+
     private void venderSelecao() {
         if (!modoLoja || vendaSelecao.isEmpty() || !socket.isConnected()) return;
+        if (!vendaArmada) {
+            vendaArmada = true;
+            iconeDoBotao(botaoVender, false);
+            botaoVender.setText("Are you sure?");
+            return;
+        }
+        vendaArmada = false;
+        iconeDoBotao(botaoVender, true);
+        botaoVender.setText("Sell");
         String npc = lojaNpc;
         String payload = GameSocket.obj(w -> {
             w.set("npc_id", npc);
