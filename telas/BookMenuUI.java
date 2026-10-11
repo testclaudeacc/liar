@@ -531,15 +531,15 @@ public final class BookMenuUI {
 
         TextButton.TextButtonStyle estiloEquipar = new TextButton.TextButtonStyle(
             skin.get("verde", TextButton.TextButtonStyle.class));
-        estiloEquipar.font = skin.getFont("botao-pequeno-font");
+        estiloEquipar.font = skin.get("chat-log", Label.LabelStyle.class).font;
         TextButton.TextButtonStyle estiloDesequipar = new TextButton.TextButtonStyle(
             skin.get("default", TextButton.TextButtonStyle.class));
-        estiloDesequipar.font = skin.getFont("botao-pequeno-font");
+        estiloDesequipar.font = skin.get("chat-log", Label.LabelStyle.class).font;
         this.estiloEquipar = estiloEquipar;
         // Item de outra classe (ou level baixo): botao cinza e travado.
         estiloEquiparBloqueado = new TextButton.TextButtonStyle(
             skin.get("default", TextButton.TextButtonStyle.class));
-        estiloEquiparBloqueado.font = skin.getFont("botao-pequeno-font");
+        estiloEquiparBloqueado.font = skin.get("chat-log", Label.LabelStyle.class).font;
         estiloEquiparBloqueado.fontColor = new Color(0.55f, 0.55f, 0.55f, 1f);
         estiloEquiparBloqueado.disabledFontColor = estiloEquiparBloqueado.fontColor;
         equipButton = new TextButton("Equip", estiloEquipar);
@@ -1279,11 +1279,11 @@ public final class BookMenuUI {
 
         TextButton.TextButtonStyle estiloBotao = new TextButton.TextButtonStyle(
             skin.get("default", TextButton.TextButtonStyle.class));
-        estiloBotao.font = skin.getFont("botao-pequeno-font");
+        estiloBotao.font = skin.get("chat-log", Label.LabelStyle.class).font;
         // Cinza sem alteracoes; verde quando o rascunho difere do que esta equipado.
         estiloAplicarNormal = estiloBotao;
         estiloAplicarAlterado = new TextButton.TextButtonStyle(skin.get("verde", TextButton.TextButtonStyle.class));
-        estiloAplicarAlterado.font = skin.getFont("botao-pequeno-font");
+        estiloAplicarAlterado.font = skin.get("chat-log", Label.LabelStyle.class).font;
         TextButton equipar = new TextButton("Apply", estiloBotao);
         botaoAplicarSkins = equipar;
         equipar.addListener(new ChangeListener() {
@@ -3528,7 +3528,7 @@ public final class BookMenuUI {
 
         // Botao rosa do mock.
         TextButton.TextButtonStyle estiloCriar = new TextButton.TextButtonStyle(skin.get("vermelho", TextButton.TextButtonStyle.class));
-        estiloCriar.font = skin.getFont("botao-pequeno-font");
+        estiloCriar.font = skin.get("chat-log", Label.LabelStyle.class).font;
         Color rosa = Color.valueOf("ee1f5f"), rosaBorda = Color.valueOf("9c0f3a");
         estiloCriar.up = UiSkin.retangulo(rosa, rosaBorda, 2);
         estiloCriar.over = UiSkin.retangulo(rosa.cpy().lerp(Color.WHITE, 0.15f), rosaBorda, 2);
@@ -3748,9 +3748,9 @@ public final class BookMenuUI {
         caixa.add(scroll).grow().pad(4);
 
         TextButton.TextButtonStyle estiloRemover = new TextButton.TextButtonStyle(skin.get("vermelho", TextButton.TextButtonStyle.class));
-        estiloRemover.font = skin.getFont("botao-pequeno-font");
+        estiloRemover.font = skin.get("chat-log", Label.LabelStyle.class).font;
         TextButton.TextButtonStyle estiloAdicionar = new TextButton.TextButtonStyle(skin.get("verde", TextButton.TextButtonStyle.class));
-        estiloAdicionar.font = skin.getFont("botao-pequeno-font");
+        estiloAdicionar.font = skin.get("chat-log", Label.LabelStyle.class).font;
         TextButton remover = new TextButton("Remove", estiloRemover);
         TextButton adicionar = new TextButton("Add Friend", estiloAdicionar);
         remover.addListener(new ChangeListener() {
@@ -4176,7 +4176,7 @@ public final class BookMenuUI {
 
     private TextButton botaoSpells(String texto, String estiloBase, Runnable acao) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(skin.get(estiloBase, TextButton.TextButtonStyle.class));
-        e.font = skin.getFont("botao-pequeno-font");
+        e.font = skin.get("chat-log", Label.LabelStyle.class).font;
         TextButton b = new TextButton(texto, e);
         b.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { acao.run(); }
