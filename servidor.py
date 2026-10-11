@@ -347,8 +347,10 @@ ITEM_DB = {
     "res://sprites/items/Scrolls/PortusNovaScroll.tres": {"name": "Portus Nova Scroll", "type": "Scroll", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "teleport": True, "usable": True, "price": 1000, "icon": "sheet/r53_c2", "stackable": True, "max_stack": 9999, "cap": 0.1},
     # Magias (loja da Nyla): "spell" = id da magia. Comprar ensina (nao vai
     # pra bag); usar e' pela hotbar (use_hotbar -> _lancar_magia).
-    # spell_mana: custo; spell_cd: cooldown (s); spell_dmg: % do dano base.
-    "res://sprites/spells/Igniculus.tres": {"name": "Igniculus", "type": "Spell", "spell": "igniculus", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 50, "spell_cd": 12, "spell_dmg": 75, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r72_c4", "cap": 0.0},
+    # spell_mana: custo; spell_cd: cooldown (s); spell_dmg: % do dano base;
+    # spell_words: o que aparece em laranja na cabeca de quem lanca.
+    # A Nyla so' mostra a magia pra quem tem o level e a classe dela.
+    "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 50, "spell_cd": 12, "spell_dmg": 75, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r72_c4", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
@@ -3774,6 +3776,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
         emit('spell_result', {'item': caminho, 'reason': motivo}, room=sid)
     if caminho not in magias_conhecidas(p): return falha('unknown')
     if int(p.get('level', 1) or 1) < int(dados.get('req_level', 0) or 0): return falha('level')
+    if dados.get('req_class', 'All') not in ('All', p.get('class_name')): return falha('class')
     if na_pz(p): return falha('pz')
     now = time.time()
     cds = p.setdefault('_spell_cd', {})
@@ -3802,7 +3805,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
     cd = float(dados.get('spell_cd', 0) or 0)
     cds[caminho] = now + cd
     emit('spell_used', {'item': caminho, 'cooldown': cd}, room=sid)
-    texto_de_acao(p, nome, dados.get('spell_color', 'ff7500'))
+    texto_de_acao(p, dados.get('spell_words') or nome, dados.get('spell_color', 'ff7500'))
 
     mob_data['last_activity'] = now
     mob_data.setdefault('hits_recentes', {})[sid] = now
@@ -5850,7 +5853,7 @@ def handle_shop_open(data):
     p, npc_id, loja = _loja_do_evento(sid, data)
     if not p: return
     itens = [{'item': it, 'price': int(ITEM_DB.get(it, {}).get('price', 0)), 'sell': preco_venda_npc(it)}
-             for it in loja if it in ITEM_DB]
+             for it in loja if it in ITEM_DB and (not eh_magia(it) or magia_disponivel_na_loja(p, it))]
     itens.sort(key=lambda e: e['price'])  # do mais barato ao mais caro
     emit('shop_opened', {'npc_id': npc_id, 'name': NPC_DB[npc_id].get('name', npc_id), 'items': itens}, room=sid)
 
@@ -5864,6 +5867,7 @@ def handle_shop_buy(data):
     if eh_magia(item):
         # Magia: compra 1 vez so' e vai pra lista de magias conhecidas.
         if item in magias_conhecidas(p): return _depois_da_loja(sid, p, 'known')
+        if not magia_disponivel_na_loja(p, item): return
         preco = int(ITEM_DB[item].get('price', 0))
         if preco > int(p.get('currency', 0)): return _depois_da_loja(sid, p, 'no_money')
         p['currency'] = int(p.get('currency', 0)) - preco
@@ -6283,6 +6287,13 @@ HOTBAR_SLOTS = 9
 
 def eh_magia(item_path):
     return bool(ITEM_DB.get(item_path, {}).get('spell'))
+
+def magia_disponivel_na_loja(p, item_path):
+    """Nyla so' oferece magia que o player ainda nao sabe e pode usar (level e classe)."""
+    dados = ITEM_DB.get(item_path, {})
+    if item_path in magias_conhecidas(p): return False
+    if int(p.get('level', 1) or 1) < int(dados.get('req_level', 0) or 0): return False
+    return dados.get('req_class', 'All') in ('All', p.get('class_name'))
 
 def magias_conhecidas(p):
     s = p.get('skills') if isinstance(p.get('skills'), dict) else {}

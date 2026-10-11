@@ -70,6 +70,11 @@ public final class HotbarUI {
     /** Celular: slot com magia e' quadrado (o icone da magia e' quadrado). */
     private Button.ButtonStyle estiloQuadrado, estiloQuadradoEscolhido;
     private final boolean[] slotMagia = new boolean[BookMenuUI.SLOTS_ATALHO];
+    // Slot com magia: laranja (fundo bem escuro, borda laranja media) no lugar dos cinzas.
+    private static final Color COR_MAGIA_FUNDO = new Color(0.22f, 0.09f, 0.01f, 0.94f);
+    private static final Color COR_MAGIA_BORDA = new Color(0.72f, 0.33f, 0.06f, 1f);
+    private static final Color COR_MAGIA_FUNDO_OVER = new Color(0.28f, 0.12f, 0.02f, 0.96f);
+    private static final Color COR_MAGIA_BORDA_OVER = new Color(0.85f, 0.42f, 0.1f, 1f);
     /** Celular: botoes (1 a 9; botao i = slot i), salvo no aparelho. */
     private List<Controles.BotaoMobile> layout = new ArrayList<>();
 
@@ -84,13 +89,16 @@ public final class HotbarUI {
             estiloSlotEscolhido = new Button.ButtonStyle();
             estiloSlotEscolhido.up = circulo(new Color(0.22f, 0.22f, 0.22f, 0.96f), COR_EDICAO);
             estiloQuadrado = new Button.ButtonStyle();
-            estiloQuadrado.up = UiSkin.retangulo(new Color(0.15f, 0.15f, 0.15f, 0.92f), new Color(0.32f, 0.32f, 0.32f, 1f), 3);
+            estiloQuadrado.up = UiSkin.retangulo(COR_MAGIA_FUNDO, COR_MAGIA_BORDA, 3);
             estiloQuadradoEscolhido = new Button.ButtonStyle();
-            estiloQuadradoEscolhido.up = UiSkin.retangulo(new Color(0.22f, 0.22f, 0.22f, 0.96f), COR_EDICAO, 3);
+            estiloQuadradoEscolhido.up = UiSkin.retangulo(COR_MAGIA_FUNDO, COR_EDICAO, 3);
         } else {
             // Um pouco mais escuro que os slots da bag (a pedido do usuario).
             estiloSlot.up = UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 0.92f), new Color(0.17f, 0.17f, 0.17f, 1f), 2);
             estiloSlot.over = UiSkin.retangulo(new Color(0.12f, 0.12f, 0.12f, 0.95f), new Color(0.27f, 0.27f, 0.27f, 1f), 2);
+            estiloQuadrado = new Button.ButtonStyle();
+            estiloQuadrado.up = UiSkin.retangulo(COR_MAGIA_FUNDO, COR_MAGIA_BORDA, 2);
+            estiloQuadrado.over = UiSkin.retangulo(COR_MAGIA_FUNDO_OVER, COR_MAGIA_BORDA_OVER, 2);
         }
         for (int i = 0; i < slots.length; i++) {
             final int indice = i;
@@ -357,6 +365,7 @@ public final class HotbarUI {
             pilha.clearChildren();
             String caminho = i < atalhos.length ? atalhos[i] : "";
             slotMagia[i] = caminho != null && !caminho.isEmpty() && livro.ehMagia(caminho);
+            if (!MOBILE) slots[i].setStyle(slotMagia[i] ? estiloQuadrado : estiloSlot);
             if (caminho != null && !caminho.isEmpty()) {
                 // Magia: sem numero (nao e' item da bag).
                 int qtd = slotMagia[i] ? 0 : livro.quantidadeNaBag(caminho);
@@ -381,6 +390,14 @@ public final class HotbarUI {
                     // Colado no canto (no celular, so' o bastante pra nao sair do circulo).
                     canto.add(numero).pad(0, 0, dentro + numero.getStyle().font.getDescent(), dentro);
                     pilha.add(canto);
+                }
+                // Magia: custo de mana (icone + numero azul) no canto de baixo a esquerda.
+                if (slotMagia[i]) {
+                    Table cantoMana = new Table();
+                    cantoMana.bottom().left();
+                    float dentro = MOBILE ? tamanhoSlot(i) * 0.06f : 0f;
+                    cantoMana.add(livro.rotuloManaMagia(caminho, tamanhoSlot(i) * 0.24f)).pad(0, 2 + dentro, 1 + dentro, 0);
+                    pilha.add(cantoMana);
                 }
                 // Pocao em cooldown: cinza escuro + segundos por cima.
                 if (livro.temCooldown(caminho)) pilha.add(livro.sobreposicaoCooldown(caminho));

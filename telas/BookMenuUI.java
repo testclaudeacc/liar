@@ -823,7 +823,6 @@ public final class BookMenuUI {
             bloco.add(linhaStat(dados.magiaMana + " Mana", COR_MANA)).left().row();
             bloco.add(linhaStat(dados.magiaCd + "s Cooldown", Color.LIGHT_GRAY)).left().row();
             bloco.add(linhaStat(dados.magiaDano + "% of your damage", COR_SET)).left().padTop(6).row();
-            if (conheceMagia(itemPath)) bloco.add(linhaStat("Learned", Color.valueOf("5cff6a"))).left().row();
             return;
         }
         if (dados.usavel) {
@@ -1310,6 +1309,7 @@ public final class BookMenuUI {
             magiasConhecidas.clear();
             magiasConhecidas.addAll(novas);
             aoMudarBagOuAtalhos();
+            if (lojaFoco != null && magiasConhecidas.contains(lojaFoco)) lojaFoco = null;
             if (modoLoja) atualizarTelaLoja();
         }
         this.nivelAtual = level;
@@ -3231,10 +3231,16 @@ public final class BookMenuUI {
     private static final Color COR_ABA_BUY_ARMA = Color.valueOf("3f5f8a"), COR_ABA_BUY_ARMA_OFF = Color.valueOf("1c2a3d");
     private static final Color COR_ABA_BUY_MAGIA = Color.valueOf("7a3fa8"), COR_ABA_BUY_MAGIA_OFF = Color.valueOf("33194a");
 
+    private static final String ICONE_APRENDER = "sheet/r87_c7"; // 368,800: botao Learn da Nyla
+
+    private boolean lojaDeMagia() { return "spell".equals(lojaPapel); }
+
+    private String textoComprar() { return lojaDeMagia() ? "Learn" : "Buy"; }
+
     private String iconeAbaBuy() {
         if ("pot".equals(lojaPapel)) return "sheet/r44_c2";
         if ("weapon".equals(lojaPapel)) return "sheet/r23_c5"; // Outlander Helm
-        if ("spell".equals(lojaPapel)) return "sheet/r72_c4";  // Igniculus
+        if ("spell".equals(lojaPapel)) return "sheet/r60_c15"; // 16,672
         return ICONE_FULLNESS;
     }
 
@@ -3353,6 +3359,12 @@ public final class BookMenuUI {
             TextureAtlas.AtlasRegion r = atlas.findRegion(iconeAbaBuy());
             if (r != null) ((Image) abaBuy.getChildren().first()).setDrawable(new TextureRegionDrawable(r));
         }
+        // Loja de magia: "Learn" em cima e embaixo, com icones proprios.
+        abaBuy.setText(textoComprar());
+        if (lojaAcao.getChildren().size > 0 && lojaAcao.getChildren().first() instanceof Image) {
+            TextureAtlas.AtlasRegion r = atlas.findRegion(lojaDeMagia() ? ICONE_APRENDER : ICONE_COMPRAR);
+            if (r != null) ((Image) lojaAcao.getChildren().first()).setDrawable(new TextureRegionDrawable(r));
+        }
         if (modoBanco) fecharBanco();
         lojaNpc = dados.getString("npc_id", "");
         itensLoja.clear();
@@ -3405,7 +3417,7 @@ public final class BookMenuUI {
         if (!modoLoja) return;
         if ("sold".equals(r)) vendaSelecao.clear();
         lojaAviso.setText("no_money".equals(r) ? "Not enough money." : "no_cap".equals(r) ? "Not enough capacity."
-            : "learned".equals(r) ? "Spell learned! Put it in your hotbar (Spells)." : "known".equals(r) ? "You already know this spell." : "");
+            : "");
         atualizarTelaLoja();
     }
 
@@ -3511,6 +3523,7 @@ public final class BookMenuUI {
         lojaGridCompra.clearChildren();
         int n = 0;
         for (ItemLoja it : itensLoja) {
+            if (ehMagia(it.item) && conheceMagia(it.item)) continue; // aprendida: sai da loja
             Button slot = slotComPreco(it.item, it.preco, 0, it.item.equals(lojaFoco), false, () -> {
                 lojaFoco = it.item;
                 lojaAviso.setText("");
@@ -3614,8 +3627,7 @@ public final class BookMenuUI {
             compraArmada = false;
             iconeDoBotao(lojaAcao, true);
             lojaAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
-            lojaAcao.setText(!bloqueado ? "Buy" : ehMagia(it.item) && conheceMagia(it.item) ? "Learned"
-                : semDinheiro ? "No Money" : "No Cap");
+            lojaAcao.setText(!bloqueado ? textoComprar() : semDinheiro ? "No Money" : "No Cap");
         } else {
             InventoryItem item = itemPorId(lojaFoco);
             if (item == null || precoVenda(item.itemPath) <= 0) return;
@@ -3645,7 +3657,7 @@ public final class BookMenuUI {
             }
             compraArmada = false;
             iconeDoBotao(lojaAcao, true);
-            lojaAcao.setText("Buy");
+            lojaAcao.setText(textoComprar());
             comprar.accept(1);
             return;
         }
@@ -4345,6 +4357,27 @@ public final class BookMenuUI {
     }
 
     public boolean conheceMagia(String caminho) { return magiasConhecidas.contains(caminho); }
+
+    /** Mana gasta pela magia (0 = nao e' magia). */
+    public int manaDaMagia(String caminho) {
+        EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        return dados == null ? 0 : dados.magiaMana;
+    }
+
+    /** "(icone de MP) 50" em azul, pro canto do slot de uma magia. */
+    public Table rotuloManaMagia(String caminho, float tamIcone) {
+        Table t = new Table();
+        TextureAtlas.AtlasRegion r = atlas.findRegion("ui/MPIcon");
+        if (r != null) {
+            Image img = new Image(new TextureRegionDrawable(r));
+            img.setScaling(Scaling.fit);
+            t.add(img).size(tamIcone).padRight(1);
+        }
+        Label valor = new LabelPixel(String.valueOf(manaDaMagia(caminho)), skin.get("quantidade", Label.LabelStyle.class));
+        valor.setColor(COR_MANA);
+        t.add(valor);
+        return t;
+    }
 
     /** Slot da hotbar com algo usavel agora: magia aprendida ou item na bag. */
     public boolean disponivelNoAtalho(String caminho) {

@@ -3463,6 +3463,7 @@ public class WorldScreen extends ScreenAdapter {
                 case "range": msg = "Your target is out of reach."; break;
                 case "pz": msg = "You can't attack in a protection zone."; break;
                 case "unknown": msg = "You don't know this spell."; break;
+                case "class": msg = "Your class can't use " + nome + "."; break;
                 default: return;
             }
             hud.notificar(msg, COR_NOTIF_AVISO, null);
