@@ -5759,7 +5759,9 @@ def handle_shop_sell(data):
         iid = str(e.get('instance_id', ''))
         if not iid or iid in vistos: return
         inst = encontrar_instancia(inventario, iid)
-        if inst is None or inst.get('item') not in loja: return
+        # Qualquer NPC de loja compra qualquer item da bag que tenha preco
+        # (nao precisa andar ate' o vendedor certo); sem preco nao vende.
+        if inst is None or int(ITEM_DB.get(inst.get('item'), {}).get('price', 0) or 0) <= 0: return
         maximo = int(inst.get('qty', 1)) if eh_empilhavel(inst.get('item')) else 1
         try: qtd = int(e.get('qty', 1))
         except (TypeError, ValueError): return

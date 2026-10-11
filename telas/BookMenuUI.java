@@ -3329,6 +3329,15 @@ public final class BookMenuUI {
         atualizarTelaLoja();
     }
 
+    /** Quanto o NPC paga por 1 unidade (igual servidor.py::preco_venda_npc);
+     * qualquer loja compra qualquer item com preco. 0 = nao vende. */
+    private int precoVenda(String caminho) {
+        ItemLoja daLoja = itemLoja(caminho);
+        if (daLoja != null) return daLoja.venda;
+        EquipStats dados = ITEM_STATS.get(caminho);
+        return dados == null || dados.preco <= 0 ? 0 : Math.max(1, dados.preco / 2);
+    }
+
     private ItemLoja itemLoja(String caminho) {
         for (ItemLoja i : itensLoja) if (i.item.equals(caminho)) return i;
         return null;
@@ -3438,12 +3447,12 @@ public final class BookMenuUI {
         int nCima = 0, nBaixo = 0;
         long total = 0;
         for (InventoryItem item : inventoryItems) {
-            ItemLoja preco = itemLoja(item.itemPath);
-            if (preco == null) continue; // esse NPC nao compra
+            int venda = precoVenda(item.itemPath);
+            if (venda <= 0) continue; // item sem preco: nenhum NPC compra
             int escolhido = vendaSelecao.getOrDefault(item.instanceId, 0);
             if (escolhido > 0) {
-                total += (long) preco.venda * escolhido;
-                Button cima = slotComPreco(item.itemPath, (long) preco.venda * escolhido, escolhido, item.instanceId.equals(lojaFoco), true, () -> {
+                total += (long) venda * escolhido;
+                Button cima = slotComPreco(item.itemPath, (long) venda * escolhido, escolhido, item.instanceId.equals(lojaFoco), true, () -> {
                     vendaSelecao.remove(item.instanceId); // clicar em cima volta pra baixo
                     lojaFoco = item.instanceId;
                     atualizarTelaLoja();
@@ -3453,7 +3462,7 @@ public final class BookMenuUI {
             }
             int resta = item.quantity - escolhido;
             if (resta <= 0) continue;
-            Button baixo = slotComPreco(item.itemPath, preco.venda, resta, item.instanceId.equals(lojaFoco), false, () -> {
+            Button baixo = slotComPreco(item.itemPath, venda, resta, item.instanceId.equals(lojaFoco), false, () -> {
                 lojaFoco = item.instanceId;
                 if (resta > 1) {
                     abrirPopupQuantidade(nomeExibicao(item.itemPath), iconeDoItem(item.itemPath), resta, null, v -> {
@@ -3526,8 +3535,7 @@ public final class BookMenuUI {
             lojaAcao.setText(!bloqueado ? "Buy" : semDinheiro ? "No Money" : "No Cap");
         } else {
             InventoryItem item = itemPorId(lojaFoco);
-            ItemLoja preco = item == null ? null : itemLoja(item.itemPath);
-            if (preco == null) return;
+            if (item == null || precoVenda(item.itemPath) <= 0) return;
             preencherBlocoStats(lojaDetalhes, item.itemPath, null);
         }
     }
