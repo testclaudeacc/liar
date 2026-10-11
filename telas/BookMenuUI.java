@@ -211,6 +211,8 @@ public final class BookMenuUI {
         construirPaginaParty(skin);
         construirPaginasTrade(skin);
         construirPaginaBanco(skin);
+        construirPaginaLoja();
+        construirPaginaLoja();
         colunaEsquerdaAbas = leftTab;
         colunaDireitaAbas = rightTab;
         mainWindow.add(bagPage).grow();
@@ -399,10 +401,15 @@ public final class BookMenuUI {
         final int healHp, healMp; // pocao: quanto cura (o que aparece)
         final String fourthStatType, icone;
         final float cap; // peso de 1 unidade (servidor.py::ITEM_DB "cap")
+        final int regenHp, regenMp, regenSeg, preco; // comida com buff de regen; preco em copper
         final boolean empilhavel;
 
         EquipStats(JsonValue d) {
             this.cap = d.getFloat("cap", 0f);
+            this.regenHp = d.getInt("regen_hp", 0);
+            this.regenMp = d.getInt("regen_mp", 0);
+            this.regenSeg = d.getInt("regen_seg", 0);
+            this.preco = d.getInt("price", 0);
             this.empilhavel = d.getBoolean("stackable", false) || d.getBoolean("ammo", false);
             this.nome = d.getString("name", "");
             this.tipo = d.getString("type", "");
@@ -725,9 +732,12 @@ public final class BookMenuUI {
         EquipStats base = compararCom == null ? null : ITEM_STATS.get(compararCom);
         boolean comparar = compararCom != null;
         if (dados.fullness > 0) {
-            // Comida: so' "Food" e quanto cada um enche a barra de Fullness.
-            bloco.add(linhaStat("Food", COR_FOME)).left().row();
-            bloco.add(linhaStat("Fullness " + dados.fullness, COR_FOME)).left().row();
+            // Comida: coxinha + Fullness; HP/MP com o regen extra (buff).
+            bloco.add(linhaComIcone("sheet/r24_c5", "Fullness " + dados.fullness, COR_FOME)).left().row();
+            if (dados.regenHp > 0) bloco.add(linhaComIcone("ui/HPIcon",
+                "+" + dados.regenHp + " HP/s for " + dados.regenSeg + "s", COR_POCAO_HP)).left().row();
+            if (dados.regenMp > 0) bloco.add(linhaComIcone("ui/MPIcon",
+                "+" + dados.regenMp + " MP/s for " + dados.regenSeg + "s", COR_POCAO_MP)).left().row();
             return;
         }
         if (dados.ehPocao()) {
@@ -764,6 +774,19 @@ public final class BookMenuUI {
             texto += " (" + (diferenca >= 0 ? "+" : "") + diferenca + ")";
         }
         bloco.add(linhaStat(texto, cor)).left().row();
+    }
+
+    /** Icone pequeno do atlas + texto (detalhes de comida). */
+    private Table linhaComIcone(String icone, String texto, Color cor) {
+        Table linha = new Table();
+        TextureAtlas.AtlasRegion regiao = atlas.findRegion(icone);
+        if (regiao != null) {
+            Image img = new Image(new TextureRegionDrawable(regiao));
+            img.setScaling(Scaling.fit);
+            linha.add(img).size(18f).padRight(4);
+        }
+        linha.add(linhaStat(texto, cor));
+        return linha;
     }
 
     private Table linhaCura(String icone, int valor, Color cor) {
@@ -1948,6 +1971,7 @@ public final class BookMenuUI {
     /** trade_started: abre a tela 1 no lugar do livro. */
     public void abrirTrade(String outro) {
         if (modoBanco) fecharBanco();
+        if (modoLoja) fecharLoja();
         modoTrade = true;
         tradeOutro = outro;
         tradeSelecao.clear();
@@ -2727,7 +2751,7 @@ public final class BookMenuUI {
         abaBank.setStyle(estiloAba(true, bank));
         bancoFoco = null;
         bancoAviso.setText("");
-        atualizarTelaBanco();
+        atualizarTelaBanco(); atualizarTelaLoja();
     }
 
     /** bank_synced: conteudo do bank (e aviso "full"/"no_cap", se teve). */
@@ -2746,7 +2770,7 @@ public final class BookMenuUI {
         slotsBanco = Math.max(1, dados.getInt("slots_max", 100));
         String msg = dados.getString("msg", "");
         bancoAviso.setText("full".equals(msg) ? "The bank is full." : "no_cap".equals(msg) ? "Not enough capacity." : "");
-        atualizarTelaBanco();
+        atualizarTelaBanco(); atualizarTelaLoja();
     }
 
     private void atualizarTelaBanco() {
@@ -2832,7 +2856,7 @@ public final class BookMenuUI {
                 corMoeda(tipo), chave.equals(bancoFoco), () -> {
                     bancoFoco = chave;
                     bancoAviso.setText("");
-                    atualizarTelaBanco();
+                    atualizarTelaBanco(); atualizarTelaLoja();
                 });
             bancoGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
             if (++n % COLUNAS_INVENTARIO == 0) bancoGrid.row();
@@ -2842,7 +2866,7 @@ public final class BookMenuUI {
                 item.instanceId.equals(bancoFoco), () -> {
                     bancoFoco = item.instanceId;
                     bancoAviso.setText("");
-                    atualizarTelaBanco();
+                    atualizarTelaBanco(); atualizarTelaLoja();
                 });
             bancoGrid.add(slot).size(SLOT_EQUIP).pad(1.5f);
             if (++n % COLUNAS_INVENTARIO == 0) bancoGrid.row();
@@ -2937,6 +2961,392 @@ public final class BookMenuUI {
         } else {
             socket.emitRaw(evento, GameSocket.obj(w -> { w.set(chaveId, item.instanceId); w.set("qty", 1); }));
         }
+    }
+
+    // ===================== LOJA DOS NPCS (Syron...) =====================
+    // Abre no lugar do livro (igual o bank). Aba Buy: os itens do NPC com o
+    // preco no slot; clicar mostra os detalhes e o botao Buy (quantidade:
+    // o maximo que da' pra pagar e que cabe na mochila). Aba Sell: embaixo os
+    // meus itens que o NPC compra, em cima o que vou vender; clicar embaixo
+    // sobe (com quantidade se for pilha), clicar em cima volta. Tudo validado
+    // no servidor (servidor.py, LOJA DOS NPCS).
+
+    private static final class ItemLoja {
+        final String item;
+        final int preco, venda;
+        ItemLoja(String item, int preco, int venda) { this.item = item; this.preco = preco; this.venda = venda; }
+    }
+
+    private boolean modoLoja = false, abaLojaVenda = false;
+    private String lojaNpc = "", secaoAntesDaLoja = "Bag";
+    private final List<ItemLoja> itensLoja = new ArrayList<>();
+    private final Table lojaPage = new Table();
+    private final Table lojaDetalhes = new Table();
+    private final Table lojaGridCompra = new Table();
+    private final Table lojaGridVendendo = new Table();
+    private final Table lojaGridMeus = new Table();
+    private final Map<String, Integer> vendaSelecao = new LinkedHashMap<>(); // instanceId -> qty
+    private String lojaFoco = null; // caminho (Buy) ou instanceId (Sell)
+    private TextButton lojaAcao, abaBuy, abaSell, botaoVender;
+    private Table lojaRodapeAcao, conteudoCompra, conteudoVenda;
+    private com.badlogic.gdx.scenes.scene2d.ui.Container<Table> lojaConteudo;
+    private Label lojaAviso, lojaInfo, lojaTotal;
+    private BarraUso barraCapLoja;
+    private Image iconeTotalLoja;
+
+    private static final Color COR_ABA_BUY = new Color(0.62f, 0.48f, 0.06f, 1f), COR_ABA_BUY_OFF = new Color(0.28f, 0.22f, 0.04f, 1f);
+    private static final Color COR_ABA_SELL = Color.valueOf("2e7d32"), COR_ABA_SELL_OFF = Color.valueOf("173d19");
+
+    public boolean emLoja() { return modoLoja; }
+
+    private TextButton.TextButtonStyle estiloAbaLoja(boolean venda, boolean ativa) {
+        Color cor = venda ? (ativa ? COR_ABA_SELL : COR_ABA_SELL_OFF) : (ativa ? COR_ABA_BUY : COR_ABA_BUY_OFF);
+        return estiloPlano(cor, ativa ? Color.WHITE : new Color(0.7f, 0.7f, 0.7f, 1f));
+    }
+
+    private void construirPaginaLoja() {
+        lojaDetalhes.top().left();
+        lojaGridCompra.top().left();
+        lojaGridVendendo.top().left();
+        lojaGridMeus.top().left();
+
+        lojaAcao = botaoComIcone("Buy", "ui/currency/Gold", estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
+        lojaAcao.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { comprarFoco(); }
+        });
+        lojaRodapeAcao = new Table();
+        lojaRodapeAcao.add(lojaAcao).width(COLUNA_BAG - 14f).height(44);
+        Table esquerda = new Table();
+        esquerda.top().left();
+        esquerda.setBackground(UiSkin.retangulo(
+            new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        esquerda.add(lojaDetalhes).grow().top().left().pad(8).row();
+        esquerda.add(lojaRodapeAcao).growX().pad(6);
+
+        abaBuy = botaoComIcone("Buy", "ui/currency/Gold", estiloAbaLoja(false, true));
+        abaSell = botaoComIcone("Sell", "ui/SellerIcon", estiloAbaLoja(true, false));
+        abaBuy.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaLoja(false); }
+        });
+        abaSell.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaLoja(true); }
+        });
+        TextButton fechar = new TextButton("X", estiloPlano(COR_BLOQUEADO, Color.WHITE));
+        fechar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { setVisible(false); }
+        });
+        Table abas = new Table();
+        abas.add(abaBuy).width(112).height(42).padRight(4);
+        abas.add(abaSell).width(112).height(42);
+        abas.add().expandX();
+        abas.add(fechar).size(42);
+
+        Label.LabelStyle estiloTexto = new Label.LabelStyle(fonteBanco(), Color.WHITE);
+        lojaAviso = new Label("", new Label.LabelStyle(fonteBanco(), Color.valueOf("ff6a6a")));
+        lojaAviso.setFontScale(0.8f);
+
+        // ---- Buy: grade + barra de capacidade ----
+        lojaInfo = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
+        barraCapLoja = new BarraUso();
+        Table textoBarra = new Table();
+        textoBarra.add(lojaInfo).center();
+        conteudoCompra = new Table();
+        conteudoCompra.top();
+        conteudoCompra.add(rolagem(lojaGridCompra)).grow().row();
+        conteudoCompra.add(lojaAviso).right().padTop(2).row();
+        conteudoCompra.add(new Stack(barraCapLoja, textoBarra)).growX().height(24).padTop(4);
+
+        // ---- Sell: em cima o que vai vender, embaixo os meus itens ----
+        Label tituloVendendo = new Label("Selling", estiloTexto);
+        Label tituloMeus = new Label("Your items", estiloTexto);
+        tituloVendendo.setColor(Color.LIGHT_GRAY);
+        tituloMeus.setColor(Color.LIGHT_GRAY);
+        lojaTotal = new Label("0", new Label.LabelStyle(fonteBanco(), Color.WHITE));
+        iconeTotalLoja = new Image();
+        iconeTotalLoja.setScaling(Scaling.fit);
+        botaoVender = botaoComIcone("Sell", "ui/SellerIcon", estiloPlano(COR_ABA_SELL, Color.WHITE));
+        botaoVender.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { venderSelecao(); }
+        });
+        Table rodapeVenda = new Table();
+        rodapeVenda.add(iconeTotalLoja).size(22).padRight(6);
+        rodapeVenda.add(lojaTotal).left().expandX();
+        rodapeVenda.add(botaoVender).width(120).height(40);
+        conteudoVenda = new Table();
+        conteudoVenda.top();
+        conteudoVenda.add(tituloVendendo).left().row();
+        conteudoVenda.add(rolagem(lojaGridVendendo)).growX().height(SLOT_EQUIP * 2 + 8).row();
+        conteudoVenda.add(separadorEquip()).growX().height(1).pad(4, 0, 4, 0).row();
+        conteudoVenda.add(tituloMeus).left().row();
+        conteudoVenda.add(rolagem(lojaGridMeus)).grow().row();
+        conteudoVenda.add(rodapeVenda).growX().padTop(6);
+
+        lojaConteudo = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
+        lojaConteudo.fill();
+        Table direita = new Table();
+        direita.top().left();
+        direita.setBackground(UiSkin.retangulo(
+            new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
+        direita.add(abas).growX().pad(10, 12, 0, 12).row();
+        direita.add(lojaConteudo).grow().pad(8, 12, 10, 12);
+
+        lojaPage.add(esquerda).width(COLUNA_BAG).growY();
+        lojaPage.add(direita).grow();
+    }
+
+    /** shop_opened: {npc_id, name, items: [{item, price, sell}]}. */
+    public void abrirLoja(JsonValue dados) {
+        if (modoTrade || dados == null) return;
+        if (modoBanco) fecharBanco();
+        lojaNpc = dados.getString("npc_id", "");
+        itensLoja.clear();
+        JsonValue itens = dados.get("items");
+        if (itens != null) for (JsonValue e = itens.child; e != null; e = e.next) {
+            itensLoja.add(new ItemLoja(e.getString("item", ""), e.getInt("price", 0), e.getInt("sell", 0)));
+        }
+        if (!modoLoja) secaoAntesDaLoja = secaoAtual;
+        modoLoja = true;
+        vendaSelecao.clear();
+        cancelarExclusao();
+        if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(false);
+        if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(false);
+        mainWindow.clearChildren();
+        mainWindow.pad(1);
+        mainWindow.add(lojaPage).grow();
+        actionBar.setVisible(false);
+        trocarAbaLoja(false);
+        root.setVisible(true);
+    }
+
+    public String npcDaLoja() { return modoLoja ? lojaNpc : null; }
+
+    public void fecharLoja() {
+        fecharPopupQuantidade();
+        if (!modoLoja) return;
+        modoLoja = false;
+        vendaSelecao.clear();
+        if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(true);
+        if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(true);
+        root.setVisible(false);
+        selecionarSecao(secaoAntesDaLoja);
+    }
+
+    private void trocarAbaLoja(boolean venda) {
+        abaLojaVenda = venda;
+        abaBuy.setStyle(estiloAbaLoja(false, !venda));
+        abaSell.setStyle(estiloAbaLoja(true, venda));
+        lojaFoco = null;
+        lojaAviso.setText("");
+        lojaConteudo.setActor(venda ? conteudoVenda : conteudoCompra);
+        atualizarTelaLoja();
+    }
+
+    /** shop_result: dinheiro novo e o que houve (no_money/no_cap/bought/sold). */
+    public void resultadoLoja(JsonValue dados) {
+        if (dados == null) return;
+        atualizarMoedas(dados.getLong("currency", currencyTotal));
+        String r = dados.getString("result", "");
+        if (!modoLoja) return;
+        if ("sold".equals(r)) vendaSelecao.clear();
+        lojaAviso.setText("no_money".equals(r) ? "Not enough money." : "no_cap".equals(r) ? "Not enough capacity." : "");
+        atualizarTelaLoja();
+    }
+
+    private ItemLoja itemLoja(String caminho) {
+        for (ItemLoja i : itensLoja) if (i.item.equals(caminho)) return i;
+        return null;
+    }
+
+    private void atualizarTelaLoja() {
+        if (!modoLoja || lojaGridCompra == null) return;
+        // Selecao de venda: tira o que sumiu da bag e corta o que passou da quantia.
+        vendaSelecao.entrySet().removeIf(e -> itemPorId(e.getKey()) == null);
+        for (Map.Entry<String, Integer> e : vendaSelecao.entrySet()) {
+            InventoryItem it = itemPorId(e.getKey());
+            if (it != null && e.getValue() > it.quantity) e.setValue(it.quantity);
+        }
+        if (abaLojaVenda) atualizarGradesVenda(); else atualizarGradeCompra();
+        atualizarDetalhesLoja();
+        lojaInfo.setText(formatarPeso(capacityUsed) + "/" + formatarPeso(capacityMaximum));
+        barraCapLoja.fracao = capacityMaximum > 0f ? capacityUsed / capacityMaximum : 0f;
+    }
+
+    /** Moeda pra mostrar um preco: a maior que divide certinho (100 = 1 Silver). */
+    private int moedaDoPreco(long preco) {
+        for (int i = VALOR_MOEDA.length - 1; i > 0; i--) if (preco >= VALOR_MOEDA[i] && preco % VALOR_MOEDA[i] == 0) return i;
+        return 0;
+    }
+
+    /** Slot com o icone do item e, embaixo, a moedinha + o preco. */
+    private Button slotComPreco(String caminho, long preco, int qtd, boolean foco, boolean marcado, Runnable aoClicar) {
+        Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estilo.up = skinDrawable(marcado ? "trade-slot-selected" : foco ? "bag-slot-selected" : "bag-slot");
+        estilo.over = foco || marcado ? estilo.up : skinDrawable("bag-slot-hover");
+        estilo.down = skinDrawable("bag-slot-selected");
+        Button slot = new Button(estilo);
+        Stack conteudo = new Stack();
+        TextureAtlas.AtlasRegion icone = iconeDoItem(caminho);
+        if (icone != null) {
+            Image img = new Image(new TextureRegionDrawable(icone));
+            img.setScaling(Scaling.fit);
+            Table moldura = new Table();
+            moldura.top();
+            moldura.add(img).size(34).padTop(2);
+            conteudo.add(moldura);
+        }
+        if (preco > 0) {
+            int m = moedaDoPreco(preco);
+            Table linhaPreco = new Table();
+            linhaPreco.bottom().left();
+            TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[m]);
+            if (r != null) {
+                Image moeda = new Image(new TextureRegionDrawable(r));
+                moeda.setScaling(Scaling.fit);
+                linhaPreco.add(moeda).size(12).padLeft(2).padRight(1);
+            }
+            Label numero = rotuloQuantidade((int) (preco / VALOR_MOEDA[m]));
+            numero.setColor(corMoeda(MOEDAS_TRADE[m]));
+            linhaPreco.add(numero).padBottom(numero.getStyle().font.getDescent());
+            conteudo.add(linhaPreco);
+        }
+        if (qtd > 1) {
+            Table marcadores = new Table();
+            marcadores.top().right();
+            Label n = rotuloQuantidade(qtd);
+            if (marcado) n.setColor(COR_TRADE_SELECIONADO);
+            marcadores.add(n).padRight(2);
+            conteudo.add(marcadores);
+        }
+        slot.add(conteudo).grow().pad(1);
+        slot.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
+        });
+        return slot;
+    }
+
+    private void atualizarGradeCompra() {
+        lojaGridCompra.clearChildren();
+        int n = 0;
+        for (ItemLoja it : itensLoja) {
+            Button slot = slotComPreco(it.item, it.preco, 0, it.item.equals(lojaFoco), false, () -> {
+                lojaFoco = it.item;
+                lojaAviso.setText("");
+                atualizarTelaLoja();
+            });
+            lojaGridCompra.add(slot).size(SLOT_EQUIP).pad(1.5f);
+            if (++n % COLUNAS_INVENTARIO == 0) lojaGridCompra.row();
+        }
+    }
+
+    private void atualizarGradesVenda() {
+        lojaGridVendendo.clearChildren();
+        lojaGridMeus.clearChildren();
+        int nCima = 0, nBaixo = 0;
+        long total = 0;
+        for (InventoryItem item : inventoryItems) {
+            ItemLoja preco = itemLoja(item.itemPath);
+            if (preco == null) continue; // esse NPC nao compra
+            int escolhido = vendaSelecao.getOrDefault(item.instanceId, 0);
+            if (escolhido > 0) {
+                total += (long) preco.venda * escolhido;
+                Button cima = slotComPreco(item.itemPath, (long) preco.venda * escolhido, escolhido, item.instanceId.equals(lojaFoco), true, () -> {
+                    vendaSelecao.remove(item.instanceId); // clicar em cima volta pra baixo
+                    lojaFoco = item.instanceId;
+                    atualizarTelaLoja();
+                });
+                lojaGridVendendo.add(cima).size(SLOT_EQUIP).pad(1.5f);
+                if (++nCima % COLUNAS_INVENTARIO == 0) lojaGridVendendo.row();
+            }
+            int resta = item.quantity - escolhido;
+            if (resta <= 0) continue;
+            Button baixo = slotComPreco(item.itemPath, preco.venda, resta, item.instanceId.equals(lojaFoco), false, () -> {
+                lojaFoco = item.instanceId;
+                if (resta > 1) {
+                    abrirPopupQuantidade(nomeExibicao(item.itemPath), iconeDoItem(item.itemPath), resta, null, v -> {
+                        vendaSelecao.merge(item.instanceId, v, Integer::sum);
+                        atualizarTelaLoja();
+                    });
+                } else {
+                    vendaSelecao.merge(item.instanceId, 1, Integer::sum);
+                }
+                atualizarTelaLoja();
+            });
+            lojaGridMeus.add(baixo).size(SLOT_EQUIP).pad(1.5f);
+            if (++nBaixo % COLUNAS_INVENTARIO == 0) lojaGridMeus.row();
+        }
+        int m = moedaDoPreco(total);
+        TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[m]);
+        iconeTotalLoja.setDrawable(r != null ? new TextureRegionDrawable(r) : null);
+        lojaTotal.setText(String.valueOf(total / VALOR_MOEDA[m]));
+        lojaTotal.setColor(corMoeda(MOEDAS_TRADE[m]));
+        botaoVender.setDisabled(total <= 0);
+        botaoVender.setColor(total > 0 ? Color.WHITE : new Color(1f, 1f, 1f, 0.45f));
+    }
+
+    /** Quantos desse item da' pra comprar: dinheiro e capacidade. */
+    private int maxCompra(ItemLoja it) {
+        if (it.preco <= 0) return 0;
+        long porDinheiro = currencyTotal / it.preco;
+        float unit = capUnitario(it.item);
+        long porCap = unit > 0f ? (long) Math.floor((capLivre() + 0.0001f) / unit) : Long.MAX_VALUE;
+        return (int) Math.max(0, Math.min(1000, Math.min(porDinheiro, porCap)));
+    }
+
+    private void atualizarDetalhesLoja() {
+        lojaDetalhes.clearChildren();
+        lojaDetalhes.top().left();
+        lojaRodapeAcao.setVisible(false);
+        if (lojaFoco == null) return;
+        if (!abaLojaVenda) {
+            ItemLoja it = itemLoja(lojaFoco);
+            if (it == null) return;
+            preencherBlocoStats(lojaDetalhes, it.item, null);
+            lojaRodapeAcao.setVisible(true);
+            int max = maxCompra(it);
+            boolean semDinheiro = currencyTotal < it.preco;
+            boolean bloqueado = max <= 0;
+            lojaAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
+            lojaAcao.setText(!bloqueado ? "Buy" : semDinheiro ? "No Money" : "No Cap");
+        } else {
+            InventoryItem item = itemPorId(lojaFoco);
+            ItemLoja preco = item == null ? null : itemLoja(item.itemPath);
+            if (preco == null) return;
+            preencherBlocoStats(lojaDetalhes, item.itemPath, null);
+            lojaDetalhes.add(linhaStat("Sells for " + textoMoedas(preco.venda) + " each", Color.LIGHT_GRAY)).left().row();
+        }
+    }
+
+    private void comprarFoco() {
+        if (!modoLoja || abaLojaVenda || !socket.isConnected()) return;
+        ItemLoja it = itemLoja(lojaFoco);
+        if (it == null) return;
+        int max = maxCompra(it);
+        if (max <= 0) return;
+        String npc = lojaNpc;
+        java.util.function.IntConsumer comprar = v -> socket.emitRaw("shop_buy", GameSocket.obj(w -> {
+            w.set("npc_id", npc);
+            w.set("item", it.item);
+            w.set("qty", v);
+        }));
+        if (max == 1) comprar.accept(1);
+        else abrirPopupQuantidade(nomeExibicao(it.item), iconeDoItem(it.item), max, null, comprar);
+    }
+
+    private void venderSelecao() {
+        if (!modoLoja || vendaSelecao.isEmpty() || !socket.isConnected()) return;
+        String npc = lojaNpc;
+        String payload = GameSocket.obj(w -> {
+            w.set("npc_id", npc);
+            w.array("items");
+            for (Map.Entry<String, Integer> e : vendaSelecao.entrySet()) {
+                w.object();
+                w.set("instance_id", e.getKey());
+                w.set("qty", e.getValue());
+                w.pop();
+            }
+            w.pop();
+        });
+        socket.emitRaw("shop_sell", payload);
     }
 
     // ===================== PARTY =====================
@@ -3533,7 +3943,7 @@ public final class BookMenuUI {
         atualizarGradeEquip();
         atualizarDetalhesEquip();
         aoMudarBagOuAtalhos();
-        atualizarTelaBanco();
+        atualizarTelaBanco(); atualizarTelaLoja();
     }
 
     public void adicionarItens(JsonValue dados) {
@@ -3547,7 +3957,7 @@ public final class BookMenuUI {
         atualizarGrade();
         atualizarGradeEquip();
         aoMudarBagOuAtalhos();
-        atualizarTelaBanco();
+        atualizarTelaBanco(); atualizarTelaLoja();
     }
 
     // ===================== SPELLS (atalhos) =====================
@@ -4314,7 +4724,7 @@ public final class BookMenuUI {
             atualizarGradeTrade();
             atualizarDetalhesTrade();
         }
-        atualizarTelaBanco();
+        atualizarTelaBanco(); atualizarTelaLoja();
     }
 
     private static String formatarPeso(float valor) {
@@ -4328,7 +4738,7 @@ public final class BookMenuUI {
         capacityLabel.setText(formatarPeso(usada) + "/" + formatarPeso(maxima));
         if (barraCapBag != null) barraCapBag.fracao = maxima > 0f ? usada / maxima : 0f;
         atualizarTextoCapacidade();
-        atualizarTelaBanco();
+        atualizarTelaBanco(); atualizarTelaLoja();
     }
 
     private static final class InventoryItem {
@@ -4441,7 +4851,7 @@ public final class BookMenuUI {
         stage.addCaptureListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
             @Override
             public boolean keyDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, int keycode) {
-                if (!isVisible() || modoTrade || modoBanco || digitandoEmCampo(stage)) return false;
+                if (!isVisible() || modoTrade || modoBanco || modoLoja || digitandoEmCampo(stage)) return false;
                 for (int i = 0; i < ORDEM_ATALHOS.length; i++) {
                     for (int tecla : TECLAS_ATALHOS[i]) {
                         if (tecla == keycode) {
@@ -4507,6 +4917,11 @@ public final class BookMenuUI {
             fecharBanco();
             return;
         }
+        if (!visible && modoLoja) {
+            fecharLoja();
+            return;
+        }
+        if (visible && modoLoja && !root.isVisible()) fecharLoja();
         if (visible && modoBanco && !root.isVisible()) {
             fecharBanco(); // abrir o livro normal (tecla) sai do bank
         }

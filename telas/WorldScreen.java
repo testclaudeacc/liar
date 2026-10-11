@@ -3654,6 +3654,19 @@ public class WorldScreen extends ScreenAdapter {
             if (data != null && painelJogador != null) painelJogador.definirStatus(data.getString("name", ""),
                 data.getBoolean("online", false), data.getLong("last_seen_ago", -1L));
         });
+        socket.on("food_buff", (nomeEvt, data) -> {
+            if (data != null) hud.definirBuffComida(data.getInt("hp", 0), data.getInt("mp", 0), data.getFloat("seconds", 0f));
+        });
+        socket.on("shop_opened", (nomeEvt, data) -> {
+            if (bookMenu.emTrade()) return;
+            if (painelJogador.isVisivel()) painelJogador.fechar();
+            if (settingsAberta()) fecharSettings();
+            if (chat.isVisivel()) chat.setVisivel(false);
+            if (dialogoNPC.isVisible()) dialogoNPC.fechar();
+            bookMenu.abrirLoja(data);
+            atualizarVisibilidadeJoystick();
+        });
+        socket.on("shop_result", (nomeEvt, data) -> bookMenu.resultadoLoja(data));
         socket.on("bank_synced", (nomeEvt, data) -> bookMenu.atualizarBanco(data));
         socket.on("bank_currency", (nomeEvt, data) -> {
             if (data != null) bookMenu.atualizarMoedas(data.getLong("currency", 0L));
@@ -3901,6 +3914,10 @@ public class WorldScreen extends ScreenAdapter {
 
     /** NPC do bank aberto agora (pra fechar ao se afastar). */
     private NPCVisual npcBanco;
+    /** NPC da loja aberta agora (idem). */
+    private NPCVisual npcLoja;
+    /** Funcoes de NPC que abrem a loja (os outros vendedores entram aqui quando tiverem "shop"). */
+    private static final java.util.Set<String> PAPEIS_COM_LOJA = new java.util.HashSet<>(java.util.Arrays.asList("food"));
 
     private void abrirDialogoNPC(NPCVisual npc) {
         if (chat.isVisivel()) chat.setVisivel(false);
@@ -3911,6 +3928,13 @@ public class WorldScreen extends ScreenAdapter {
         if ("bank".equals(npc.papel)) {
             npcBanco = npc;
             if (socket.isConnected()) socket.emitRaw("bank_open", "{}");
+            return;
+        }
+        // NPC com loja (servidor.py::NPC_DB "shop"): abre direto a tela Buy/Sell.
+        if (PAPEIS_COM_LOJA.contains(npc.papel)) {
+            npcLoja = npc;
+            String tipoNpc = npc.tipo.toLowerCase();
+            if (socket.isConnected()) socket.emitRaw("shop_open", GameSocket.obj(w -> w.set("npc_id", tipoNpc)));
             return;
         }
         npcEmDialogo = npc;
@@ -3972,6 +3996,12 @@ public class WorldScreen extends ScreenAdapter {
      * e mexer em outras GUIs com o dialogo aberto agora e' permitido, mas
      * sair dos SQMs do NPC encerra a conversa). Chamado todo frame. */
     private void fecharDialogoNPCSeForaDeAlcance() {
+        // Loja aberta: sair de perto do vendedor fecha.
+        if (bookMenu.emLoja() && npcLoja != null && distanciaQuadradaAteNPC(npcLoja) > ALCANCE_NPC_AO_QUADRADO) {
+            bookMenu.setVisible(false);
+            npcLoja = null;
+            atualizarVisibilidadeJoystick();
+        }
         // Bank aberto: sair de perto do Jack fecha.
         if (bookMenu.emBanco() && npcBanco != null && distanciaQuadradaAteNPC(npcBanco) > ALCANCE_NPC_AO_QUADRADO) {
             bookMenu.setVisible(false);

@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.27"
+SERVER_VERSION = "v0.28"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -154,7 +154,11 @@ NPC_DB = {
     # property "direction" do objeto). Tirar o "fixo" faz andar igual o
     # Kharon. "falas" = paginas do dialogo (o client mostra no lugar do texto
     # do Kharon). A loja em si vem depois.
-    "syron": {"name": "Syron", "fixo": True, "role": "food", "falas": ["Hungry, traveler? Fresh food, right here."]},
+    "syron": {"name": "Syron", "fixo": True, "role": "food", "shop": [
+        "res://sprites/items/Food/ChickenLeg.tres", "res://sprites/items/Food/Sandwich.tres",
+        "res://sprites/items/Food/Peach.tres", "res://sprites/items/Food/Banana.tres",
+        "res://sprites/items/Food/Blueberries.tres", "res://sprites/items/Food/VegetableSoup.tres",
+        "res://sprites/items/Food/Pepper.tres", "res://sprites/items/Food/Beetroot.tres"], "falas": ["Hungry, traveler? Fresh food, right here."]},
     "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "falas": ["Looking for a blade? Finest steel in town."]},
     "jack":  {"name": "Jack",  "fixo": True, "role": "bank", "falas": ["Welcome to your private vault. Your belongings are safe with me."]},
@@ -310,6 +314,17 @@ ITEM_DB = {
     "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "max_stack": 9999, "cap": 0.1},
     # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
     "res://sprites/items/Food/Cookie.tres": {"name": "Cookie", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "stackable": True, "max_stack": 100, "cap": 0.1},
+    # Comidas do Syron (loja). "regen_hp"/"regen_mp" = cura EXTRA por segundo
+    # durante "regen_seg" segundos depois de comer (buff de comida, ver
+    # BUFF COMIDA); "price" = preco de compra em copper (a venda e' metade).
+    "res://sprites/items/Food/ChickenLeg.tres": {"name": "Chicken Leg", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 5, "regen_mp": 0, "regen_seg": 10, "price": 50, "icon": "sheet/r24_c5", "stackable": True, "max_stack": 100, "cap": 0.2},
+    "res://sprites/items/Food/Sandwich.tres": {"name": "Sandwich", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "regen_hp": 5, "regen_mp": 0, "regen_seg": 15, "price": 75, "icon": "sheet/r18_c14", "stackable": True, "max_stack": 100, "cap": 0.3},
+    "res://sprites/items/Food/Peach.tres": {"name": "Peach", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 2, "regen_hp": 2, "regen_mp": 2, "regen_seg": 10, "price": 20, "icon": "sheet/r16_c4", "stackable": True, "max_stack": 100, "cap": 0.1},
+    "res://sprites/items/Food/Banana.tres": {"name": "Banana", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 3, "regen_seg": 10, "price": 25, "icon": "sheet/r16_c14", "stackable": True, "max_stack": 100, "cap": 0.1},
+    "res://sprites/items/Food/Blueberries.tres": {"name": "Blueberries", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 5, "regen_seg": 10, "price": 50, "icon": "sheet/r19_c5", "stackable": True, "max_stack": 100, "cap": 0.1},
+    "res://sprites/items/Food/VegetableSoup.tres": {"name": "Vegetable Soup", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 6, "regen_hp": 5, "regen_mp": 5, "regen_seg": 15, "price": 100, "icon": "sheet/r19_c12", "stackable": True, "max_stack": 100, "cap": 0.4},
+    "res://sprites/items/Food/Pepper.tres": {"name": "Pepper", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 1, "regen_hp": 10, "regen_mp": 0, "regen_seg": 10, "price": 100, "icon": "sheet/r19_c2", "stackable": True, "max_stack": 100, "cap": 0.1},
+    "res://sprites/items/Food/Beetroot.tres": {"name": "Beetroot", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 4, "regen_seg": 10, "price": 40, "icon": "sheet/r20_c4", "stackable": True, "max_stack": 100, "cap": 0.1},
     # Pocoes: "heal_hp"/"heal_mp" = o que aparece pro player ("Heals 50");
     # a cura de verdade e' um dos valores de CURA_POCAO (perto disso).
     # "icon" = regiao do atlas.
@@ -334,7 +349,8 @@ ALCANCE_RANGED_SQM = 5
 # de uma copia propria e o que aparece na tela e' sempre o valor real.
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
-                       "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap")
+                       "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap",
+                       "regen_hp", "regen_mp", "regen_seg", "price")
 
 def montar_item_db_cliente():
     db = {}
@@ -5380,6 +5396,137 @@ def handle_bank_currency_move(data):
         p['currency'] = int(p.get('currency', 0)) + valor
     _depois_do_banco(sid, p, banco)
 
+# ==================== BUFF COMIDA ====================
+# Comida com "regen_hp"/"regen_mp": cura extra por segundo durante
+# "regen_seg" segundos. Comer outra SUBSTITUI o buff (nao soma).
+def _aplicar_buff_comida(sid, p, dados):
+    try:
+        rh, rm, seg = int(dados.get('regen_hp', 0)), int(dados.get('regen_mp', 0)), float(dados.get('regen_seg', 0))
+    except (TypeError, ValueError):
+        return
+    if (rh <= 0 and rm <= 0) or seg <= 0: return
+    p['buff_comida'] = {'hp': rh, 'mp': rm, 'ate': time.time() + seg}
+    emit('food_buff', {'hp': rh, 'mp': rm, 'seconds': seg}, room=sid)
+
+def food_buff_loop():
+    while True:
+        socketio.sleep(1.0)
+        agora = time.time()
+        for sid, p in list(online_players.items()):
+            try:
+                buff = p.get('buff_comida')
+                if not buff: continue
+                if agora >= buff.get('ate', 0) or p.get('is_dead'):
+                    p.pop('buff_comida', None)
+                    continue
+                max_hp, max_mp = calcular_max_vitais(p)
+                hp, mp = float(p.get('current_hp', -1)), float(p.get('current_mp', -1))
+                if hp < 0: hp = max_hp
+                if mp < 0: mp = max_mp
+                if hp <= 0: continue
+                novo_hp = min(max_hp, hp + buff.get('hp', 0))
+                novo_mp = min(max_mp, mp + buff.get('mp', 0))
+                if novo_hp == hp and novo_mp == mp: continue
+                p['current_hp'], p['current_mp'] = novo_hp, novo_mp
+                socketio.emit('sync_vitals', {'current_hp': novo_hp, 'current_mp': novo_mp,
+                                              'max_hp': max_hp, 'max_mp': max_mp}, room=sid)
+                if novo_hp != hp: broadcast_hp(sid, p)
+            except Exception:
+                traceback.print_exc()
+
+# ==================== LOJA DOS NPCS ====================
+# NPC com "shop" no NPC_DB vende esses itens (preco = ITEM_DB "price", em
+# copper) e compra de volta os mesmos pela metade (aba Sell).
+SHOP_DISTANCIA_SQM = NPC_PAY_DISTANCIA_SQM
+SHOP_QTD_MAX = 1000
+
+def preco_venda_npc(item_path):
+    return max(1, int(ITEM_DB.get(item_path, {}).get('price', 0)) // 2)
+
+def _perto_do_npc(p, npc_id):
+    tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+    for n in active_npcs.values():
+        if str(n.get('npc_id', '')).lower() != npc_id: continue
+        tn = tile_de(n.get('pos_x', 0), n.get('pos_y', 0))
+        if max(abs(tn[0] - tp[0]), abs(tn[1] - tp[1])) <= SHOP_DISTANCIA_SQM: return True
+    return False
+
+def _loja_do_evento(sid, data):
+    """(p, npc_id, lista do shop) se pode usar a loja agora; senao (None, None, None)."""
+    p = online_players.get(sid)
+    if not p or not isinstance(data, dict) or p.get('is_dead') or p.get('trade_id'): return None, None, None
+    npc_id = str(data.get('npc_id', '')).strip().lower()[:64]
+    loja = NPC_DB.get(npc_id, {}).get('shop')
+    if not loja or not _perto_do_npc(p, npc_id): return None, None, None
+    return p, npc_id, loja
+
+def _depois_da_loja(sid, p, resultado=''):
+    _queue_save(p)
+    emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(p.get('inventory', [])),
+                              'equipped_items': p.get('equipped_items', {})}, room=sid)
+    emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+    emit('shop_result', {'currency': int(p.get('currency', 0)), 'result': resultado}, room=sid)
+
+@socketio.on('shop_open')
+def handle_shop_open(data):
+    sid = request.sid
+    p, npc_id, loja = _loja_do_evento(sid, data)
+    if not p: return
+    itens = [{'item': it, 'price': int(ITEM_DB.get(it, {}).get('price', 0)), 'sell': preco_venda_npc(it)}
+             for it in loja if it in ITEM_DB]
+    emit('shop_opened', {'npc_id': npc_id, 'name': NPC_DB[npc_id].get('name', npc_id), 'items': itens}, room=sid)
+
+@socketio.on('shop_buy')
+def handle_shop_buy(data):
+    sid = request.sid
+    p, npc_id, loja = _loja_do_evento(sid, data)
+    if not p: return
+    item = str(data.get('item', ''))
+    if item not in loja or item not in ITEM_DB: return
+    try: qtd = int(data.get('qty', 1))
+    except (TypeError, ValueError): return
+    if qtd < 1 or qtd > SHOP_QTD_MAX: return
+    total = int(ITEM_DB[item].get('price', 0)) * qtd
+    if total <= 0: return
+    if total > int(p.get('currency', 0)): return _depois_da_loja(sid, p, 'no_money')
+    if calcular_cap_usado(p) + obter_cap_unitario_item(item) * qtd > calcular_cap_maximo(p.get('level', 1)) + 1e-6:
+        return _depois_da_loja(sid, p, 'no_cap')
+    p['currency'] = int(p.get('currency', 0)) - total
+    if eh_empilhavel(item):
+        adicionar_municao_ao_jogador(p, item, qtd)
+    else:
+        for _ in range(qtd): p.setdefault('inventory', []).append(criar_instancia_item(item))
+    _depois_da_loja(sid, p, 'bought')
+
+@socketio.on('shop_sell')
+def handle_shop_sell(data):
+    sid = request.sid
+    p, npc_id, loja = _loja_do_evento(sid, data)
+    if not p: return
+    entradas = data.get('items')
+    if not isinstance(entradas, list) or not entradas or len(entradas) > 60: return
+    inventario = p.setdefault('inventory', [])
+    # Valida tudo antes de mexer em qualquer coisa.
+    plano, vistos, total = [], set(), 0
+    for e in entradas:
+        if not isinstance(e, dict): return
+        iid = str(e.get('instance_id', ''))
+        if not iid or iid in vistos: return
+        inst = encontrar_instancia(inventario, iid)
+        if inst is None or inst.get('item') not in loja: return
+        maximo = int(inst.get('qty', 1)) if eh_empilhavel(inst.get('item')) else 1
+        try: qtd = int(e.get('qty', 1))
+        except (TypeError, ValueError): return
+        if qtd < 1 or qtd > maximo: return
+        vistos.add(iid)
+        plano.append((inst, qtd))
+        total += preco_venda_npc(inst.get('item')) * qtd
+    for inst, qtd in plano:
+        if eh_empilhavel(inst.get('item')) and qtd < int(inst.get('qty', 1)): inst['qty'] = int(inst.get('qty', 1)) - qtd
+        else: inventario.remove(inst)
+    p['currency'] = int(p.get('currency', 0)) + total
+    _depois_da_loja(sid, p, 'sold')
+
 ICONES_AMIZADE_VALIDOS = {'pk': 'icon_pk', 'guild': 'icon_guild', 'seller': 'icon_seller'}
 
 @socketio.on('toggle_friend')
@@ -5701,6 +5848,7 @@ def _comer(sid, p, inst):
     p['_fullness_acc'] = 0.0  # acabou de comer: o proximo "tique" de fome recomeça
     _queue_save(p)
     emit('food_result', {'ok': True, 'fullness': obter_fullness(p)}, room=sid)
+    _aplicar_buff_comida(sid, p, ITEM_DB.get(inst.get('item'), {}))
     texto_de_acao(p, "*Om Noom*")  # barulhos entre asteriscos
     emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(inventario), 'equipped_items': p.get('equipped_items', {})}, room=sid)
     emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
@@ -6004,6 +6152,7 @@ carregar_mapa_do_servidor()
 VERSAO_SERVIDOR = "2026-10-09 alma + portal do despertar"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
+socketio.start_background_task(food_buff_loop)
 socketio.start_background_task(battle_loop)
 socketio.start_background_task(autosave_loop)
 socketio.start_background_task(loot_cleanup_loop)

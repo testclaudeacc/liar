@@ -130,6 +130,14 @@ public final class HudVitais {
     private static final Color TITULO_ZONA_SEGURA = Color.valueOf("6f9bff");
     private final Table iconesStatus = new Table();
     private Table quadradoFome, quadradoBatalha, quadradoZonaSegura;
+    // Buff de comida (regen extra de HP/MP por alguns segundos).
+    private Table quadradoRegenHp, quadradoRegenMp;
+    private float buffRestante = 0f;
+    private TextureAtlas atlasHud;
+    private static final Color COR_REGEN_HP = new Color(0.45f, 0.07f, 0.07f, 1f); // fundo vermelho
+    private static final Color COR_REGEN_MP = new Color(0.08f, 0.16f, 0.48f, 1f); // fundo azul
+    private static final Color TITULO_REGEN_HP = Color.valueOf("ff5a5a");
+    private static final Color TITULO_REGEN_MP = Color.valueOf("6f9bff");
     private boolean comFome = false, emBatalha = false, naZonaSegura = false;
     // Tempo ate' sair do battle: travado em 30 enquanto luta; o servidor avisa
     // quando o player parou (counting) e daí desce sozinho aqui.
@@ -140,6 +148,14 @@ public final class HudVitais {
         @Override public void act(float delta) {
             super.act(delta);
             if (batalhaContando && batalhaRestante > 0f) batalhaRestante = Math.max(0f, batalhaRestante - delta);
+            if (buffRestante > 0f) {
+                buffRestante -= delta;
+                if (buffRestante <= 0f) {
+                    buffRestante = 0f;
+                    quadradoRegenHp = quadradoRegenMp = null;
+                    reorganizarStatus();
+                }
+            }
             // Segundos do battle no canto do icone (nao mais no popup).
             if (contadorBatalha != null) {
                 String seg = String.valueOf((int) Math.ceil(batalhaRestante));
@@ -187,6 +203,7 @@ public final class HudVitais {
     /** escala: a mesma usada pra gerar as fontes do skin (pixels reais / unidade do stage). */
     public HudVitais(Stage stage, TextureAtlas atlas, float escala) {
         this.escala = escala;
+        this.atlasHud = atlas;
         Pixmap pm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pm.setColor(Color.WHITE);
         pm.fill();
@@ -634,6 +651,8 @@ public final class HudVitais {
         if (naZonaSegura) ativos.add(quadradoZonaSegura);
         if (comFome) ativos.add(quadradoFome);
         if (emBatalha) ativos.add(quadradoBatalha);
+        if (quadradoRegenHp != null) ativos.add(quadradoRegenHp);
+        if (quadradoRegenMp != null) ativos.add(quadradoRegenMp);
         for (int i = 0; i < ativos.size(); i++) {
             iconesStatus.add(ativos.get(i)).pad(px(3));
             if (i % 3 == 2) iconesStatus.row();
@@ -683,6 +702,22 @@ public final class HudVitais {
     public void definirZonaSegura(boolean naZonaSegura) {
         if (this.naZonaSegura == naZonaSegura) return;
         this.naZonaSegura = naZonaSegura;
+        reorganizarStatus();
+    }
+
+    /** Comeu comida com regen (servidor: food_buff): icone de HP (fundo
+     * vermelho) e/ou de MP (fundo azul) com o valor no canto, enquanto durar.
+     * Comer outra substitui (nao soma). */
+    public void definirBuffComida(int hp, int mp, float segundos) {
+        int seg = Math.round(segundos);
+        Label.LabelStyle estilo = contadorBatalha != null ? contadorBatalha.getStyle() : null;
+        quadradoRegenHp = hp > 0 && estilo != null ? quadradoStatus(atlasHud, "ui/HPIcon", COR_REGEN_HP,
+            "Health Regen\nExtra Health Regen for " + seg + " Seconds", new Label(String.valueOf(hp), estilo)) : null;
+        quadradoRegenMp = mp > 0 && estilo != null ? quadradoStatus(atlasHud, "ui/MPIcon", COR_REGEN_MP,
+            "Mana Regen\nExtra Mana Regen for " + seg + " Seconds", new Label(String.valueOf(mp), estilo)) : null;
+        if (quadradoRegenHp != null) quadradoRegenHp.setUserObject(TITULO_REGEN_HP);
+        if (quadradoRegenMp != null) quadradoRegenMp.setUserObject(TITULO_REGEN_MP);
+        buffRestante = segundos;
         reorganizarStatus();
     }
 
