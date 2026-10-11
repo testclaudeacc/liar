@@ -409,6 +409,7 @@ public final class BookMenuUI {
         final boolean empilhavel;
         final String magia;    // id da magia (servidor.py "spell"); null = item normal
         final int magiaMana, magiaCd, magiaDano; // custo, cooldown (s), % do dano base
+        final String magiaDescricao;
         final boolean treino;  // arma de treino (servidor.py::dano_arma_treino)
         final int economiaFlecha; // % de chance de nao gastar flecha
         final String conjunto; // set (ex: "Outlander"); null = nenhum
@@ -419,6 +420,7 @@ public final class BookMenuUI {
             this.magiaMana = d.getInt("spell_mana", 0);
             this.magiaCd = d.getInt("spell_cd", 0);
             this.magiaDano = d.getInt("spell_dmg", 0);
+            this.magiaDescricao = d.getString("spell_desc", "");
             this.treino = d.getBoolean("training", false);
             this.economiaFlecha = d.getInt("ammo_save", 0);
             this.conjunto = d.getString("set", null);
@@ -5011,11 +5013,10 @@ public final class BookMenuUI {
             Table conteudo = new Table();
             conteudo.top().left();
             if (escolhendoMagias) {
-                int n = 0;
+                // Uma "gaveta" por magia: icone, nome, mana, descricao e dano.
                 for (String magia : magiasConhecidas) {
-                    conteudo.add(slotAtalho(magia, magia.equals(atalhos[slot]), null, () -> escolherAtalho(slot, magia)))
-                        .size(TAM_SLOT_ATALHO).pad(3);
-                    if (++n % 4 == 0) conteudo.row();
+                    conteudo.add(gavetaMagia(magia, magia.equals(atalhos[slot]), () -> escolherAtalho(slot, magia)))
+                        .growX().padBottom(6).row();
                 }
                 if (magiasConhecidas.isEmpty()) conteudo.add(linhaStat("You don't know any spells yet.", Color.GRAY)).left();
             } else {
@@ -5042,6 +5043,44 @@ public final class BookMenuUI {
         spellsPage.add(direita).grow();
     }
 
+    private static final Color COR_MAGIA_FUNDO = new Color(0.22f, 0.09f, 0.01f, 0.94f);
+    private static final Color COR_MAGIA_BORDA = new Color(0.72f, 0.33f, 0.06f, 1f);
+    private static final Color COR_MAGIA_FUNDO_OVER = new Color(0.28f, 0.12f, 0.02f, 0.96f);
+    private static final Color COR_MAGIA_BORDA_OVER = new Color(0.85f, 0.42f, 0.1f, 1f);
+    private static final Color COR_MAGIA_SELECIONADA = new Color(1f, 0.78f, 0.3f, 1f);
+
+    /** Linha clicavel da aba Spells: slot da magia + nome, custo de mana,
+     * descricao e % de dano. Borda clara = ja' esta' nesse slot. */
+    private Button gavetaMagia(String caminho, boolean noSlot, Runnable aoClicar) {
+        EquipStats dados = ITEM_STATS.get(caminho);
+        Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estilo.up = UiSkin.retangulo(new Color(0.11f, 0.06f, 0.03f, 1f), noSlot ? COR_MAGIA_SELECIONADA : new Color(0.35f, 0.2f, 0.08f, 1f), 1);
+        estilo.over = UiSkin.retangulo(new Color(0.16f, 0.08f, 0.03f, 1f), noSlot ? COR_MAGIA_SELECIONADA : COR_MAGIA_BORDA, 1);
+        Button gaveta = new Button(estilo);
+        gaveta.left().pad(6);
+        Button icone = slotAtalho(caminho, noSlot, null, null);
+        icone.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); // o clique vai pra gaveta
+        gaveta.add(icone).size(TAM_SLOT_ATALHO).top().padRight(10);
+        Table texto = new Table();
+        texto.top().left();
+        Label nome = new LabelPixel(nomeExibicao(caminho), new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE));
+        texto.add(nome).left().row();
+        if (dados != null) {
+            texto.add(linhaComIcone("ui/MPIcon", dados.magiaMana + " Mana", COR_MANA)).left().row();
+            if (dados.magiaDescricao != null && !dados.magiaDescricao.isEmpty()) {
+                Label desc = linhaStat(dados.magiaDescricao, Color.LIGHT_GRAY);
+                desc.setWrap(true);
+                texto.add(desc).growX().left().row();
+            }
+            texto.add(linhaStat(dados.magiaDano + "% of your damage", COR_SET)).left().row();
+        }
+        gaveta.add(texto).growX().top().left();
+        gaveta.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
+        });
+        return gaveta;
+    }
+
     private void escolherAtalho(int slot, String caminho) {
         // Continua com o slot selecionado (da' pra ver o item entrando nele).
         if (socket.isConnected()) {
@@ -5059,8 +5098,14 @@ public final class BookMenuUI {
      * vazio; sem nenhum na bag = icone transparente e sem numero). */
     private Button slotAtalho(String caminho, boolean selecionado, String tecla, Runnable aoClicar) {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
-        estilo.up = skinDrawable(selecionado ? "bag-slot-selected" : "bag-slot");
-        estilo.over = aoClicar != null && !selecionado ? skinDrawable("bag-slot-hover") : estilo.up;
+        if (caminho != null && ehMagia(caminho)) {
+            // Magia: laranja no lugar dos cinzas (igual o slot da hotbar).
+            estilo.up = UiSkin.retangulo(COR_MAGIA_FUNDO, selecionado ? COR_MAGIA_SELECIONADA : COR_MAGIA_BORDA, 2);
+            estilo.over = aoClicar != null && !selecionado ? UiSkin.retangulo(COR_MAGIA_FUNDO_OVER, COR_MAGIA_BORDA_OVER, 2) : estilo.up;
+        } else {
+            estilo.up = skinDrawable(selecionado ? "bag-slot-selected" : "bag-slot");
+            estilo.over = aoClicar != null && !selecionado ? skinDrawable("bag-slot-hover") : estilo.up;
+        }
         Button botao = new Button(estilo);
         Stack pilha = new Stack();
         if (caminho != null && !caminho.isEmpty()) {
@@ -5080,6 +5125,12 @@ public final class BookMenuUI {
                 canto.bottom().right();
                 canto.add(numero).padBottom(numero.getStyle().font.getDescent());
                 pilha.add(canto);
+            }
+            if (ehMagia(caminho)) {
+                Table cantoMana = new Table();
+                cantoMana.bottom().left();
+                cantoMana.add(rotuloManaMagia(caminho, TAM_SLOT_ATALHO * 0.24f)).pad(0, 2, 1, 0);
+                pilha.add(cantoMana);
             }
             if (temCooldown(caminho)) pilha.add(sobreposicaoCooldown(caminho));
         }
