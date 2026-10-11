@@ -313,23 +313,23 @@ ITEM_DB = {
     "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 5.0},
     "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "max_stack": 9999, "cap": 0.1},
     # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
-    "res://sprites/items/Food/Cookie.tres": {"name": "Cookie", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "regen_hp": 1, "regen_mp": 1, "regen_seg": 10, "sound": "*Crunch*", "stackable": True, "max_stack": 100, "cap": 0.1},
+    "res://sprites/items/Food/Cookie.tres": {"name": "Cookie", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "regen_hp": 1, "regen_mp": 1, "regen_seg": 10, "sound": "*Crunch*", "stackable": True, "max_stack": 9999, "cap": 0.1},
     # Comidas do Syron (loja). "regen_hp"/"regen_mp" = quanto a mais o regen
     # natural cura em cada tique, durante "regen_seg" segundos (buff de comida, ver
     # BUFF COMIDA); "price" = preco de compra em copper (a venda e' metade).
-    "res://sprites/items/Food/ChickenLeg.tres": {"name": "Chicken Leg", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 5, "regen_mp": 0, "regen_seg": 10, "sound": "*Chomp*", "price": 50, "icon": "sheet/r18_c5", "stackable": True, "max_stack": 100, "cap": 0.2},
-    "res://sprites/items/Food/Sandwich.tres": {"name": "Sandwich", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "regen_hp": 5, "regen_mp": 0, "regen_seg": 15, "sound": "*Munch*", "price": 75, "icon": "sheet/r18_c14", "stackable": True, "max_stack": 100, "cap": 0.3},
-    "res://sprites/items/Food/Peach.tres": {"name": "Peach", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 2, "regen_hp": 2, "regen_mp": 2, "regen_seg": 10, "sound": "*Juicy*", "price": 20, "icon": "sheet/r16_c4", "stackable": True, "max_stack": 100, "cap": 0.1},
-    "res://sprites/items/Food/Banana.tres": {"name": "Banana", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 3, "regen_seg": 10, "sound": "*Mmm*", "price": 25, "icon": "sheet/r16_c14", "stackable": True, "max_stack": 100, "cap": 0.1},
-    "res://sprites/items/Food/Blueberries.tres": {"name": "Blueberries", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 5, "regen_seg": 10, "sound": "*Pop pop*", "price": 50, "icon": "sheet/r19_c5", "stackable": True, "max_stack": 100, "cap": 0.1},
-    "res://sprites/items/Food/VegetableSoup.tres": {"name": "Vegetable Soup", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 6, "regen_hp": 5, "regen_mp": 5, "regen_seg": 15, "sound": "*Slurp*", "price": 100, "icon": "sheet/r19_c12", "stackable": True, "max_stack": 100, "cap": 0.4},
-    "res://sprites/items/Food/Pepper.tres": {"name": "Pepper", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 1, "regen_hp": 10, "regen_mp": 0, "regen_seg": 10, "sound": "*Hot hot!*", "price": 100, "icon": "sheet/r19_c2", "stackable": True, "max_stack": 100, "cap": 0.1},
-    "res://sprites/items/Food/Beetroot.tres": {"name": "Beetroot", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 4, "regen_seg": 10, "sound": "*Crunch crunch*", "price": 40, "icon": "sheet/r20_c4", "stackable": True, "max_stack": 100, "cap": 0.1},
+    "res://sprites/items/Food/ChickenLeg.tres": {"name": "Chicken Leg", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 5, "regen_mp": 0, "regen_seg": 10, "sound": "*Chomp*", "price": 50, "icon": "sheet/r18_c5", "stackable": True, "max_stack": 9999, "cap": 0.2},
+    "res://sprites/items/Food/Sandwich.tres": {"name": "Sandwich", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "regen_hp": 5, "regen_mp": 0, "regen_seg": 15, "sound": "*Munch*", "price": 75, "icon": "sheet/r18_c14", "stackable": True, "max_stack": 9999, "cap": 0.3},
+    "res://sprites/items/Food/Peach.tres": {"name": "Peach", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 2, "regen_hp": 2, "regen_mp": 2, "regen_seg": 10, "sound": "*Juicy*", "price": 20, "icon": "sheet/r16_c4", "stackable": True, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Food/Banana.tres": {"name": "Banana", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 3, "regen_seg": 10, "sound": "*Mmm*", "price": 25, "icon": "sheet/r16_c14", "stackable": True, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Food/Blueberries.tres": {"name": "Blueberries", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 5, "regen_seg": 10, "sound": "*Pop pop*", "price": 50, "icon": "sheet/r19_c5", "stackable": True, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Food/VegetableSoup.tres": {"name": "Vegetable Soup", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 6, "regen_hp": 5, "regen_mp": 5, "regen_seg": 15, "sound": "*Slurp*", "price": 100, "icon": "sheet/r19_c12", "stackable": True, "max_stack": 9999, "cap": 0.4},
+    "res://sprites/items/Food/Pepper.tres": {"name": "Pepper", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 1, "regen_hp": 10, "regen_mp": 0, "regen_seg": 10, "sound": "*Hot hot!*", "price": 100, "icon": "sheet/r19_c2", "stackable": True, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Food/Beetroot.tres": {"name": "Beetroot", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 4, "regen_seg": 10, "sound": "*Crunch crunch*", "price": 40, "icon": "sheet/r20_c4", "stackable": True, "max_stack": 9999, "cap": 0.1},
     # Pocoes: "heal_hp"/"heal_mp" = o que aparece pro player ("Heals 50");
     # a cura de verdade e' um dos valores de CURA_POCAO (perto disso).
     # "icon" = regiao do atlas.
-    "res://sprites/items/Potions/SmallHealthPotion.tres": {"name": "Small Health Potion", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_hp": 50, "icon": "sheet/r44_c2", "stackable": True, "max_stack": 100, "cap": 0.2},
-    "res://sprites/items/Potions/SmallManaPotion.tres": {"name": "Small Mana Potion", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 50, "icon": "sheet/r44_c9", "stackable": True, "max_stack": 100, "cap": 0.2},
+    "res://sprites/items/Potions/SmallHealthPotion.tres": {"name": "Small Health Potion", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_hp": 50, "icon": "sheet/r44_c2", "stackable": True, "max_stack": 9999, "cap": 0.2},
+    "res://sprites/items/Potions/SmallManaPotion.tres": {"name": "Small Mana Potion", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 50, "icon": "sheet/r44_c9", "stackable": True, "max_stack": 9999, "cap": 0.2},
 }
 # Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
 # que aparece na descricao.
@@ -539,6 +539,31 @@ def normalizar_instancia(entrada):
             inst["qty"] = max(1, min(qty, obter_max_stack(item_path)))
         return inst
     return None
+
+def juntar_pilhas(inventory):
+    """Junta pilhas do mesmo item empilhavel (ex: comidas que vinham em packs
+    de 100 antes do max_stack subir) ate' o max_stack dele."""
+    if not isinstance(inventory, list): return inventory
+    resultado, pilha_aberta = [], {}
+    for inst in inventory:
+        caminho = inst.get('item')
+        if not eh_empilhavel(caminho):
+            resultado.append(inst)
+            continue
+        alvo = pilha_aberta.get(caminho)
+        maximo = obter_max_stack(caminho)
+        qtd = int(inst.get('qty', 1))
+        if alvo is not None:
+            cabe = maximo - int(alvo.get('qty', 1))
+            mover = min(cabe, qtd)
+            alvo['qty'] = int(alvo.get('qty', 1)) + mover
+            if inst.get('favorite'): alvo['favorite'] = True
+            qtd -= mover
+            if qtd <= 0: continue
+            inst['qty'] = qtd
+        resultado.append(inst)
+        pilha_aberta[caminho] = inst
+    return resultado
 
 def ordenar_favoritos_primeiro(inventory):
     if not isinstance(inventory, list): return inventory
@@ -2529,7 +2554,7 @@ def handle_join_game(data):
         if not row: return
 
         real_skins = json.loads(row[6]) if row[6] else {}
-        real_inventory = normalizar_inventario(json.loads(row[8]) if row[8] else [])
+        real_inventory = juntar_pilhas(normalizar_inventario(json.loads(row[8]) if row[8] else []))
         real_equipped = normalizar_equipados(json.loads(row[9]) if row[9] else {})
         real_skills = json.loads(row[10]) if row[10] else {}
         if not isinstance(real_skills, dict): real_skills = {}
