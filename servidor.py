@@ -348,9 +348,11 @@ ITEM_DB = {
     # Magias (loja da Nyla): "spell" = id da magia. Comprar ensina (nao vai
     # pra bag); usar e' pela hotbar (use_hotbar -> _lancar_magia).
     # spell_mana: custo; spell_cd: cooldown (s); spell_dmg: % do dano base;
-    # spell_words: o que aparece em laranja na cabeca de quem lanca.
+    # spell_words: o que aparece em laranja na cabeca de quem lanca;
+    # spell_skill/_hits: cada uso conta como N golpes na skill (no maximo 1
+    # vez por cooldown da magia - nao da' pra abusar com atk speed).
     # A Nyla so' mostra a magia pra quem tem o level e a classe dela.
-    "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 75, "spell_area": False, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r73_c11", "cap": 0.0},
+    "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 75, "spell_area": False, "spell_skill": "magic", "spell_skill_hits": 5, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r73_c11", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
@@ -3840,6 +3842,13 @@ def _lancar_magia(sid, p, caminho, mob_id):
     if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
     base = base_dmg * float(dados.get('spell_dmg', 100) or 100) / 100.0
     dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
+    # Skill da magia (ex: +5 golpes de Magic): no maximo 1 vez por cooldown dela.
+    skill_magia = dados.get('spell_skill')
+    if skill_magia:
+        ultimas = p.setdefault('_spell_skill_t', {})
+        if now - ultimas.get(caminho, 0) >= max(1.0, cd - 0.5):
+            ultimas[caminho] = now
+            _dar_hits_skill(sid, p, skill_magia, int(dados.get('spell_skill_hits', 0) or 0))
     mob_type_id = mob_data.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
     _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano, now,
                       {'hit_type': dados.get('spell_hit', 'Physical'), 'is_crit': False, 'reduced': False, 'is_miss': False,
@@ -4324,6 +4333,24 @@ def _coletar_loot(sid, p, loot_id):
 
 SKILL_DA_CLASSE = {'Knight': 'melee', 'Ranger': 'distance', 'Mage': 'magic', 'Bard': 'musicality'}
 SKILL_JANELA_ACAO_SEG = 4.0
+
+def _dar_hits_skill(sid, p, skill_name, n):
+    """Soma n golpes de treino numa skill (sobe quantos levels der) e avisa
+    igual ao register_skill_hit."""
+    skills = p.get('skills') if isinstance(p.get('skills'), dict) else {}
+    mult = get_skill_multiplier(p.get('class_name', 'Knight'), skill_name == 'defense')
+    nivel = skills.get(skill_name, 10)
+    hits_key = f"{skill_name}_hits"
+    hits = skills.get(hits_key, 0) + max(0, int(n))
+    subiu = False
+    while hits >= get_hits_to_level(nivel + 1, mult):
+        hits -= get_hits_to_level(nivel + 1, mult); nivel += 1; subiu = True
+    skills[skill_name] = nivel; skills[hits_key] = hits; p['skills'] = skills
+    payload = _montar_payload_sync_stats(p)
+    payload['leveled_up'] = subiu; payload['skill_name'] = skill_name; payload['new_level'] = nivel
+    emit('sync_stats', payload, room=sid)
+    if subiu and p.get('room') and p.get('name'):
+        emit_area('player_skill_leveled_up', {'name': p.get('name'), 'skill_name': skill_name, 'new_level': nivel}, p.get('room'))
 
 @socketio.on('register_skill_hit')
 def handle_skill_hit(data):
