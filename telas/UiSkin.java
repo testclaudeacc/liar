@@ -66,6 +66,10 @@ public class UiSkin {
         if (skin.has(nome, BitmapFont.class)) return skin.getFont(nome);
         BitmapFont fonte = gerarFonte("fonts/dejavu-sans.condensed.ttf", px, 0, 1f);
         fonte.getData().setScale(1f / escalaAtual);
+        // Nearest: a fonte ja' e' do tamanho exato da tela - com Linear, meio
+        // pixel de diferenca na posicao ja' borrava a letra inteira.
+        for (com.badlogic.gdx.graphics.g2d.TextureRegion r : fonte.getRegions())
+            r.getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
         fonte.setUseIntegerPositions(false);
         skin.add(nome, fonte);
         return fonte;

@@ -3070,8 +3070,17 @@ public final class BookMenuUI {
 
     public boolean emLoja() { return modoLoja; }
 
+    // Aba Buy de cada vendedor (cor e icone): comida amarela com a coxinha,
+    // pocoes vermelha com a Basic Health Pot.
+    private String lojaPapel = "";
+    private static final Color COR_ABA_BUY_POT = Color.valueOf("a82828"), COR_ABA_BUY_POT_OFF = Color.valueOf("4a1414");
+
+    private String iconeAbaBuy() { return "pot".equals(lojaPapel) ? "sheet/r44_c2" : ICONE_FULLNESS; }
+
     private TextButton.TextButtonStyle estiloAbaLoja(boolean venda, boolean ativa) {
-        Color cor = venda ? (ativa ? COR_ABA_SELL : COR_ABA_SELL_OFF) : (ativa ? COR_ABA_BUY : COR_ABA_BUY_OFF);
+        boolean pot = "pot".equals(lojaPapel);
+        Color cor = venda ? (ativa ? COR_ABA_SELL : COR_ABA_SELL_OFF)
+            : pot ? (ativa ? COR_ABA_BUY_POT : COR_ABA_BUY_POT_OFF) : (ativa ? COR_ABA_BUY : COR_ABA_BUY_OFF);
         return estiloPlano(cor, ativa ? Color.WHITE : new Color(0.7f, 0.7f, 0.7f, 1f));
     }
 
@@ -3171,8 +3180,16 @@ public final class BookMenuUI {
     }
 
     /** shop_opened: {npc_id, name, items: [{item, price, sell}]}. */
-    public void abrirLoja(JsonValue dados) {
+    public void abrirLoja(JsonValue dados) { abrirLoja(dados, ""); }
+
+    /** papel: funcao do NPC (food, pot...) - muda a cor/icone da aba Buy. */
+    public void abrirLoja(JsonValue dados, String papel) {
         if (modoTrade || dados == null) return;
+        lojaPapel = papel == null ? "" : papel;
+        if (abaBuy.getChildren().size > 0 && abaBuy.getChildren().first() instanceof Image) {
+            TextureAtlas.AtlasRegion r = atlas.findRegion(iconeAbaBuy());
+            if (r != null) ((Image) abaBuy.getChildren().first()).setDrawable(new TextureRegionDrawable(r));
+        }
         if (modoBanco) fecharBanco();
         lojaNpc = dados.getString("npc_id", "");
         itensLoja.clear();

@@ -3725,7 +3725,7 @@ public class WorldScreen extends ScreenAdapter {
             if (settingsAberta()) fecharSettings();
             if (chat.isVisivel()) chat.setVisivel(false);
             if (dialogoNPC.isVisible()) dialogoNPC.fechar();
-            bookMenu.abrirLoja(data);
+            bookMenu.abrirLoja(data, npcLoja != null ? npcLoja.papel : "");
             atualizarVisibilidadeJoystick();
         });
         socket.on("shop_result", (nomeEvt, data) -> bookMenu.resultadoLoja(data));
