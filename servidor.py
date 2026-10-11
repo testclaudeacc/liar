@@ -689,7 +689,7 @@ def _montar_payload_sync_stats(p):
         # Velocidade de andar pelo level (o client multiplica no passo).
         'move_speed': mult_velocidade_level(p),
         # Velocidade de ataque (1 = normal; /atkspd do admin).
-        'atk_speed': admin_mult(p, 'admin_atkspd', 10.0),
+        'atk_speed': admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX),
         'classe_penalizada': punido,
         'cap_atual': calcular_cap_usado(p), 'cap_maximo': calcular_cap_maximo(level),
         # Vitais pra barra de HP/MP do client.
@@ -1001,6 +1001,8 @@ ASTAR_LIMITE_NOS = 4000
 MOB_SPEED_PADRAO = 1.0
 # Intervalo entre golpes (player e mob): uma "cadencia" de ataque.
 ATAQUE_COOLDOWN_SEG = 2.385
+# Maximo do /atkspd do admin (x50 = ~20 golpes/s).
+ADMIN_ATKSPD_MAX = 50.0
 MOB_COOLDOWN_PADRAO = ATAQUE_COOLDOWN_SEG
 MAPAS_ARQUIVO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mapas_colisao.json')
 mapas_colisao = {}  # map_id -> {'fp', 'x0', 'y0', 'w', 'h', 'bits': bytes}
@@ -2967,7 +2969,7 @@ ADMIN_COMANDOS = [
     ("summons", "/summons <mob> [quantidade]", "cria mobs nos SQMs livres em volta (nao renascem)"),
     ("speed", "/speed <valor>|reset", "multiplica sua velocidade (fica salvo); reset volta ao normal"),
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
-    ("atkspd", "/atkspd <1-10>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
+    ("atkspd", "/atkspd <1-50>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
     ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
     ("money", "/money add <quantia><c|s|g|p>", "da' moedas (ex: /money add 5g, /money add 1p)"),
     ("quests", "/quests", "quests e se voce ja fez"),
@@ -3123,7 +3125,7 @@ def comando_admin(sid, p, texto):
     if cmd == 'atkspd':
         if not isinstance(p.get('skills'), dict): p['skills'] = {}
         if len(partes) < 2:
-            chat_sistema(sid, f"Attack speed: x{admin_mult(p, 'admin_atkspd', 10.0)}. Usage: /atkspd <1-10>|reset")
+            chat_sistema(sid, f"Attack speed: x{admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)}. Usage: /atkspd <1-50>|reset")
             return
         if partes[1].lower() == 'reset':
             p['skills'].pop('admin_atkspd', None)
@@ -3131,9 +3133,9 @@ def comando_admin(sid, p, texto):
         else:
             try: v = float(partes[1].lower().lstrip('x'))
             except ValueError:
-                chat_sistema(sid, "Usage: /atkspd <1-10>|reset", 'red')
+                chat_sistema(sid, "Usage: /atkspd <1-50>|reset", 'red')
                 return
-            v = max(1.0, min(10.0, v))
+            v = max(1.0, min(ADMIN_ATKSPD_MAX, v))
             p['skills']['admin_atkspd'] = v
             msg = f"Attack speed x{v}."
         _queue_save(p)
@@ -3641,7 +3643,7 @@ def handle_hit_mob(data):
         now = time.time()
         # Pequena folga (0.1s) pra latencia: o client manda a cada ~2.4s.
         # /atkspd do admin divide o intervalo entre golpes.
-        cd = ATAQUE_COOLDOWN_SEG / admin_mult(p, 'admin_atkspd', 10.0)
+        cd = ATAQUE_COOLDOWN_SEG / admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
         if now - p.get('last_attack_time', 0) < cd - min(0.1, cd * 0.3): return
         p['last_attack_time'] = now
         
