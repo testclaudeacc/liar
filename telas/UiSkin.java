@@ -71,6 +71,16 @@ public class UiSkin {
         return fonte;
     }
 
+    /** Numero do preco nos slots da loja: um pouco menor que o da quantidade
+     * e com contorno mais fino (1px). */
+    public static BitmapFont fontePreco(Skin skin) {
+        if (skin.has("preco-font", BitmapFont.class)) return skin.getFont("preco-font");
+        BitmapFont fonte = gerarFonte("fonts/dejavu-sans.condensed.ttf", 14, 1, escalaAtual);
+        fonte.setUseIntegerPositions(false);
+        skin.add("preco-font", fonte);
+        return fonte;
+    }
+
     public static Skin criar(float escala) {
         escalaAtual = escala;
         Skin skin = new Skin();

@@ -732,11 +732,12 @@ public final class BookMenuUI {
         boolean comparar = compararCom != null;
         if (dados.fullness > 0) {
             // Comida: coxinha + Fullness; HP/MP com o regen extra (buff).
-            bloco.add(linhaComIcone("sheet/r24_c5", "Fullness " + dados.fullness, COR_FOME)).left().row();
-            if (dados.regenHp > 0) bloco.add(linhaComIcone("ui/HPIcon",
-                "+" + dados.regenHp + " HP/s for " + dados.regenSeg + "s", COR_POCAO_HP)).left().row();
-            if (dados.regenMp > 0) bloco.add(linhaComIcone("ui/MPIcon",
-                "+" + dados.regenMp + " MP/s for " + dados.regenSeg + "s", COR_POCAO_MP)).left().row();
+            bloco.add(linhaComIcone(ICONE_FULLNESS, "Fullness " + dados.fullness, COR_FOME)).left().row();
+            // Regen extra: soma no regen natural enquanto o buff durar.
+            if (dados.regenHp > 0) bloco.add(linhaComIcone("ui/HPIcon", "+" + dados.regenHp + " Regen", COR_POCAO_HP)).left().row();
+            if (dados.regenMp > 0) bloco.add(linhaComIcone("ui/MPIcon", "+" + dados.regenMp + " Regen", COR_POCAO_MP)).left().row();
+            if (dados.regenHp > 0 || dados.regenMp > 0)
+                bloco.add(linhaStat("for " + dados.regenSeg + " seconds", new Color(0.6f, 0.6f, 0.6f, 1f))).left().row();
             return;
         }
         if (dados.ehPocao()) {
@@ -774,6 +775,9 @@ public final class BookMenuUI {
         }
         bloco.add(linhaStat(texto, cor)).left().row();
     }
+
+    /** Coxinha de frango (448,448 no atlas): icone de Fullness e da aba Buy. */
+    private static final String ICONE_FULLNESS = "sheet/r18_c5";
 
     /** Icone pequeno do atlas + texto (detalhes de comida). */
     private Table linhaComIcone(String icone, String texto, Color cor) {
@@ -3009,7 +3013,7 @@ public final class BookMenuUI {
         lojaGridVendendo.top().left();
         lojaGridMeus.top().left();
 
-        lojaAcao = botaoComIcone("Buy", "ui/currency/Gold", estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
+        lojaAcao = botaoComIcone("Buy", ICONE_FULLNESS, estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
         lojaAcao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { comprarFoco(); }
         });
@@ -3019,11 +3023,12 @@ public final class BookMenuUI {
         esquerda.top().left();
         esquerda.setBackground(UiSkin.retangulo(
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
-        esquerda.add(lojaDetalhes).grow().top().left().pad(8).row();
-        esquerda.add(lojaRodapeAcao).growX().pad(6);
+        // Largura fixa: texto comprido nos detalhes nao empurra o botao pra fora.
+        esquerda.add(lojaDetalhes).width(COLUNA_BAG - 16f).growY().top().left().pad(8).row();
+        esquerda.add(lojaRodapeAcao).width(COLUNA_BAG - 14f).pad(6, 7, 7, 7);
 
-        abaBuy = botaoComIcone("Buy", "ui/currency/Gold", estiloAbaLoja(false, true));
-        abaSell = botaoComIcone("Sell", "ui/SellerIcon", estiloAbaLoja(true, false));
+        abaBuy = botaoComIcone("Buy", ICONE_FULLNESS, estiloAbaLoja(false, true));
+        abaSell = botaoComIcone("Sell", "ui/currency/Gold", estiloAbaLoja(true, false));
         abaBuy.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaLoja(false); }
         });
@@ -3063,7 +3068,7 @@ public final class BookMenuUI {
         lojaTotal = new Label("0", new Label.LabelStyle(fonteBanco(), Color.WHITE));
         iconeTotalLoja = new Image();
         iconeTotalLoja.setScaling(Scaling.fit);
-        botaoVender = botaoComIcone("Sell", "ui/SellerIcon", estiloPlano(COR_ABA_SELL, Color.WHITE));
+        botaoVender = botaoComIcone("Sell", "ui/currency/Gold", estiloPlano(COR_ABA_SELL, Color.WHITE));
         botaoVender.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { venderSelecao(); }
         });
@@ -3201,9 +3206,10 @@ public final class BookMenuUI {
             if (r != null) {
                 Image moeda = new Image(new TextureRegionDrawable(r));
                 moeda.setScaling(Scaling.fit);
-                linhaPreco.add(moeda).size(12).padLeft(2).padRight(1);
+                linhaPreco.add(moeda).size(17).padLeft(2).padRight(2);
             }
-            Label numero = rotuloQuantidade((int) (preco / VALOR_MOEDA[m]));
+            Label numero = new LabelPixel(String.valueOf(preco / VALOR_MOEDA[m]),
+                new Label.LabelStyle(UiSkin.fontePreco(skin), Color.WHITE));
             numero.setColor(corMoeda(MOEDAS_TRADE[m]));
             linhaPreco.add(numero).padBottom(numero.getStyle().font.getDescent());
             conteudo.add(linhaPreco);

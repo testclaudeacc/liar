@@ -314,10 +314,10 @@ ITEM_DB = {
     "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "max_stack": 9999, "cap": 0.1},
     # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
     "res://sprites/items/Food/Cookie.tres": {"name": "Cookie", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "stackable": True, "max_stack": 100, "cap": 0.1},
-    # Comidas do Syron (loja). "regen_hp"/"regen_mp" = cura EXTRA por segundo
-    # durante "regen_seg" segundos depois de comer (buff de comida, ver
+    # Comidas do Syron (loja). "regen_hp"/"regen_mp" = quanto a mais o regen
+    # natural cura em cada tique, durante "regen_seg" segundos (buff de comida, ver
     # BUFF COMIDA); "price" = preco de compra em copper (a venda e' metade).
-    "res://sprites/items/Food/ChickenLeg.tres": {"name": "Chicken Leg", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 5, "regen_mp": 0, "regen_seg": 10, "price": 50, "icon": "sheet/r24_c5", "stackable": True, "max_stack": 100, "cap": 0.2},
+    "res://sprites/items/Food/ChickenLeg.tres": {"name": "Chicken Leg", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 5, "regen_mp": 0, "regen_seg": 10, "price": 50, "icon": "sheet/r18_c5", "stackable": True, "max_stack": 100, "cap": 0.2},
     "res://sprites/items/Food/Sandwich.tres": {"name": "Sandwich", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "regen_hp": 5, "regen_mp": 0, "regen_seg": 15, "price": 75, "icon": "sheet/r18_c14", "stackable": True, "max_stack": 100, "cap": 0.3},
     "res://sprites/items/Food/Peach.tres": {"name": "Peach", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 2, "regen_hp": 2, "regen_mp": 2, "regen_seg": 10, "price": 20, "icon": "sheet/r16_c4", "stackable": True, "max_stack": 100, "cap": 0.1},
     "res://sprites/items/Food/Banana.tres": {"name": "Banana", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 3, "regen_hp": 0, "regen_mp": 3, "regen_seg": 10, "price": 25, "icon": "sheet/r16_c14", "stackable": True, "max_stack": 100, "cap": 0.1},
@@ -5397,8 +5397,9 @@ def handle_bank_currency_move(data):
     _depois_do_banco(sid, p, banco)
 
 # ==================== BUFF COMIDA ====================
-# Comida com "regen_hp"/"regen_mp": cura extra por segundo durante
-# "regen_seg" segundos. Comer outra SUBSTITUI o buff (nao soma).
+# Comida com "regen_hp"/"regen_mp": soma esse tanto no regen NATURAL (cada
+# tique do regen_loop) durante "regen_seg" segundos. Comer outra SUBSTITUI o
+# buff (nao soma).
 def _aplicar_buff_comida(sid, p, dados):
     try:
         rh, rm, seg = int(dados.get('regen_hp', 0)), int(dados.get('regen_mp', 0)), float(dados.get('regen_seg', 0))
@@ -5407,32 +5408,6 @@ def _aplicar_buff_comida(sid, p, dados):
     if (rh <= 0 and rm <= 0) or seg <= 0: return
     p['buff_comida'] = {'hp': rh, 'mp': rm, 'ate': time.time() + seg}
     emit('food_buff', {'hp': rh, 'mp': rm, 'seconds': seg}, room=sid)
-
-def food_buff_loop():
-    while True:
-        socketio.sleep(1.0)
-        agora = time.time()
-        for sid, p in list(online_players.items()):
-            try:
-                buff = p.get('buff_comida')
-                if not buff: continue
-                if agora >= buff.get('ate', 0) or p.get('is_dead'):
-                    p.pop('buff_comida', None)
-                    continue
-                max_hp, max_mp = calcular_max_vitais(p)
-                hp, mp = float(p.get('current_hp', -1)), float(p.get('current_mp', -1))
-                if hp < 0: hp = max_hp
-                if mp < 0: mp = max_mp
-                if hp <= 0: continue
-                novo_hp = min(max_hp, hp + buff.get('hp', 0))
-                novo_mp = min(max_mp, mp + buff.get('mp', 0))
-                if novo_hp == hp and novo_mp == mp: continue
-                p['current_hp'], p['current_mp'] = novo_hp, novo_mp
-                socketio.emit('sync_vitals', {'current_hp': novo_hp, 'current_mp': novo_mp,
-                                              'max_hp': max_hp, 'max_mp': max_mp}, room=sid)
-                if novo_hp != hp: broadcast_hp(sid, p)
-            except Exception:
-                traceback.print_exc()
 
 # ==================== LOJA DOS NPCS ====================
 # NPC com "shop" no NPC_DB vende esses itens (preco = ITEM_DB "price", em
@@ -6010,8 +5985,15 @@ def regen_loop():
                 if esta_com_fome(p): continue
                 curou = False
 
-                if current_hp < max_hp: current_hp = min(max_hp, current_hp + get_regen_amount(max_hp)); p['current_hp'] = current_hp; curou = True
-                if current_mp < max_mp: current_mp = min(max_mp, current_mp + get_regen_amount(max_mp)); p['current_mp'] = current_mp; curou = True
+                # Buff de comida: soma no regen natural (enquanto durar).
+                buff = p.get('buff_comida')
+                if buff and time.time() >= buff.get('ate', 0):
+                    p.pop('buff_comida', None)
+                    buff = None
+                extra_hp = int(buff.get('hp', 0)) if buff else 0
+                extra_mp = int(buff.get('mp', 0)) if buff else 0
+                if current_hp < max_hp: current_hp = min(max_hp, current_hp + get_regen_amount(max_hp) + extra_hp); p['current_hp'] = current_hp; curou = True
+                if current_mp < max_mp: current_mp = min(max_mp, current_mp + get_regen_amount(max_mp) + extra_mp); p['current_mp'] = current_mp; curou = True
 
                 if curou:
                     socketio.emit('sync_vitals', {'current_hp': current_hp, 'current_mp': current_mp,
@@ -6152,7 +6134,6 @@ carregar_mapa_do_servidor()
 VERSAO_SERVIDOR = "2026-10-09 alma + portal do despertar"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
-socketio.start_background_task(food_buff_loop)
 socketio.start_background_task(battle_loop)
 socketio.start_background_task(autosave_loop)
 socketio.start_background_task(loot_cleanup_loop)
