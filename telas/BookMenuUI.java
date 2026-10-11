@@ -824,7 +824,7 @@ public final class BookMenuUI {
             bloco.add(linhaStat("Spell", Color.LIGHT_GRAY)).left().row();
             bloco.add(linhaStat(dados.magiaMana + " Mana", COR_MANA)).left().row();
             bloco.add(linhaStat(dados.magiaCd + "s Cooldown", Color.LIGHT_GRAY)).left().row();
-            bloco.add(linhaStat(dados.magiaDano + "% of your damage", COR_SET)).left().padTop(6).row();
+            bloco.add(linhaStat(dados.magiaDano + "% Damage", COR_SET)).left().padTop(6).row();
             return;
         }
         if (dados.usavel) {
@@ -5051,6 +5051,8 @@ public final class BookMenuUI {
 
     /** Linha clicavel da aba Spells: slot da magia + nome, custo de mana,
      * descricao e % de dano. Borda clara = ja' esta' nesse slot. */
+    private static final float TAM_ICONE_GAVETA = 84f;
+
     private Button gavetaMagia(String caminho, boolean noSlot, Runnable aoClicar) {
         EquipStats dados = ITEM_STATS.get(caminho);
         Button.ButtonStyle estilo = new Button.ButtonStyle();
@@ -5058,9 +5060,9 @@ public final class BookMenuUI {
         estilo.over = UiSkin.retangulo(new Color(0.16f, 0.08f, 0.03f, 1f), noSlot ? COR_MAGIA_SELECIONADA : COR_MAGIA_BORDA, 1);
         Button gaveta = new Button(estilo);
         gaveta.left().pad(6);
-        Button icone = slotAtalho(caminho, noSlot, null, null);
+        Button icone = slotAtalho(caminho, noSlot, null, null, false, TAM_ICONE_GAVETA);
         icone.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); // o clique vai pra gaveta
-        gaveta.add(icone).size(TAM_SLOT_ATALHO).top().padRight(10);
+        gaveta.add(icone).size(TAM_ICONE_GAVETA).center().padRight(10);
         Table texto = new Table();
         texto.top().left();
         Label nome = new LabelPixel(nomeExibicao(caminho), new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE));
@@ -5072,9 +5074,9 @@ public final class BookMenuUI {
                 desc.setWrap(true);
                 texto.add(desc).growX().left().row();
             }
-            texto.add(linhaStat(dados.magiaDano + "% of your damage", COR_SET)).left().row();
+            texto.add(linhaStat(dados.magiaDano + "% Damage", COR_SET)).left().row();
         }
-        gaveta.add(texto).growX().top().left();
+        gaveta.add(texto).growX().center().left();
         gaveta.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
         });
@@ -5097,6 +5099,12 @@ public final class BookMenuUI {
     /** Slot quadrado com o icone do item e a quantidade (caminho null/"" =
      * vazio; sem nenhum na bag = icone transparente e sem numero). */
     private Button slotAtalho(String caminho, boolean selecionado, String tecla, Runnable aoClicar) {
+        return slotAtalho(caminho, selecionado, tecla, aoClicar, true, TAM_SLOT_ATALHO);
+    }
+
+    /** mostrarMana: custo da magia no canto (a gaveta da aba Spells ja' mostra no texto). */
+    private Button slotAtalho(String caminho, boolean selecionado, String tecla, Runnable aoClicar,
+                              boolean mostrarMana, float tamanho) {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
         if (caminho != null && ehMagia(caminho)) {
             // Magia: laranja no lugar dos cinzas (igual o slot da hotbar).
@@ -5116,7 +5124,7 @@ public final class BookMenuUI {
                 Image img = new Image(icone);
                 img.setScaling(Scaling.fit);
                 if (!disponivelNoAtalho(caminho)) img.setColor(1f, 1f, 1f, 0.3f);
-                centro.add(img).size(TAM_SLOT_ATALHO * 0.86f);
+                centro.add(img).size(tamanho * 0.86f);
             }
             pilha.add(centro);
             if (qtd > 0) {
@@ -5126,7 +5134,7 @@ public final class BookMenuUI {
                 canto.add(numero).padBottom(numero.getStyle().font.getDescent());
                 pilha.add(canto);
             }
-            if (ehMagia(caminho)) {
+            if (ehMagia(caminho) && mostrarMana) {
                 Table cantoMana = new Table();
                 cantoMana.bottom().left();
                 cantoMana.add(rotuloManaMagia(caminho, TAM_SLOT_ATALHO * 0.24f)).pad(0, 2, 1, 0);
