@@ -3048,6 +3048,7 @@ public final class BookMenuUI {
     private BarraUso barraCapLoja;
     private com.badlogic.gdx.scenes.scene2d.ui.Container<Table> moedasLoja;
     private Image iconeTotalLoja;
+    private com.badlogic.gdx.scenes.scene2d.ui.Container<Table> totalLoja;
 
     // Buy: marrom claro (cor de pele).
     private static final Color COR_ABA_BUY = new Color(0.62f, 0.48f, 0.06f, 1f), COR_ABA_BUY_OFF = new Color(0.28f, 0.22f, 0.04f, 1f);
@@ -3132,8 +3133,9 @@ public final class BookMenuUI {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { venderSelecao(); }
         });
         Table rodapeVenda = new Table();
-        rodapeVenda.add(iconeTotalLoja).size(22).padRight(6);
-        rodapeVenda.add(lojaTotal).left().expandX();
+        totalLoja = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
+        totalLoja.left();
+        rodapeVenda.add(totalLoja).left().expandX();
         rodapeVenda.add(botaoVender).width(120).height(40);
         conteudoVenda = new Table();
         conteudoVenda.top();
@@ -3235,6 +3237,21 @@ public final class BookMenuUI {
         barraCapLoja.fracao = capacityMaximum > 0f ? capacityUsed / capacityMaximum : 0f;
     }
 
+    /** Maior moeda que cabe no valor (4550c -> Silver). */
+    private static int maiorMoeda(long valor) {
+        for (int i = VALOR_MOEDA.length - 1; i > 0; i--) if (valor >= VALOR_MOEDA[i]) return i;
+        return 0;
+    }
+
+    /** Valor nessa moeda: inteiro se der certinho, senao com 1 casa (4550c em Silver = "45.5"). */
+    private static String valorNaMoeda(long valor, int moeda) {
+        long inteiro = valor / VALOR_MOEDA[moeda];
+        long resto = valor % VALOR_MOEDA[moeda];
+        if (resto == 0) return String.valueOf(inteiro);
+        long decimo = resto * 10 / VALOR_MOEDA[moeda];
+        return inteiro + "." + decimo;
+    }
+
     /** Moeda pra mostrar um preco: a maior que divide certinho (100 = 1 Silver). */
     private int moedaDoPreco(long preco) {
         for (int i = VALOR_MOEDA.length - 1; i > 0; i--) if (preco >= VALOR_MOEDA[i] && preco % VALOR_MOEDA[i] == 0) return i;
@@ -3259,7 +3276,7 @@ public final class BookMenuUI {
             conteudo.add(moldura);
         }
         if (preco > 0) {
-            int m = moedaDoPreco(preco);
+            int m = maiorMoeda(preco);
             Table linhaPreco = new Table();
             linhaPreco.bottom().left();
             TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[m]);
@@ -3268,7 +3285,7 @@ public final class BookMenuUI {
                 moeda.setScaling(Scaling.fit);
                 linhaPreco.add(moeda).size(17).padLeft(2).padRight(2);
             }
-            Label numero = new LabelPixel(String.valueOf(preco / VALOR_MOEDA[m]),
+            Label numero = new LabelPixel(valorNaMoeda(preco, m),
                 new Label.LabelStyle(UiSkin.fontePreco(skin), Color.WHITE));
             numero.setColor(corMoeda(MOEDAS_TRADE[m]));
             linhaPreco.add(numero).padBottom(numero.getStyle().font.getDescent());
@@ -3339,11 +3356,27 @@ public final class BookMenuUI {
             lojaGridMeus.add(baixo).size(SLOT_EQUIP).pad(1.5f);
             if (++nBaixo % COLUNAS_INVENTARIO == 0) lojaGridMeus.row();
         }
-        int m = moedaDoPreco(total);
-        TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[m]);
-        iconeTotalLoja.setDrawable(r != null ? new TextureRegionDrawable(r) : null);
-        lojaTotal.setText(String.valueOf(total / VALOR_MOEDA[m]));
-        lojaTotal.setColor(corMoeda(MOEDAS_TRADE[m]));
+        // Total convertido: 16400c = 1 Gold 64 Silver (cada moeda com o icone).
+        Table linhaTotal = new Table();
+        long resto = total;
+        boolean algum = false;
+        for (int i = VALOR_MOEDA.length - 1; i >= 0; i--) {
+            long q = resto / VALOR_MOEDA[i];
+            resto -= q * VALOR_MOEDA[i];
+            if (q <= 0) continue;
+            algum = true;
+            TextureAtlas.AtlasRegion rm = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[i]);
+            if (rm != null) {
+                Image img = new Image(new TextureRegionDrawable(rm));
+                img.setScaling(Scaling.fit);
+                linhaTotal.add(img).size(22).padRight(4);
+            }
+            Label n = new Label(String.valueOf(q), new Label.LabelStyle(fonteBanco(), Color.WHITE));
+            n.setColor(corMoeda(MOEDAS_TRADE[i]));
+            linhaTotal.add(n).padRight(10);
+        }
+        if (!algum) linhaTotal.add(new Label("0", new Label.LabelStyle(fonteBanco(), Color.WHITE)));
+        totalLoja.setActor(linhaTotal);
         botaoVender.setDisabled(total <= 0);
         botaoVender.setColor(total > 0 ? Color.WHITE : new Color(1f, 1f, 1f, 0.45f));
     }

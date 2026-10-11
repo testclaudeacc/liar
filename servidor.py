@@ -2657,6 +2657,8 @@ def handle_join_game(data):
         data['last_skill_hit'] = {}
         data['is_dead'] = False
         data['_floor_broadcast'] = data.get('floor', 1)
+        # Junta pilhas divididas (tambem quando o estado veio da memoria, relog).
+        data['inventory'] = ordenar_favoritos_primeiro(juntar_pilhas(data.get('inventory') or []))
         online_players[sid] = data
         players_by_name[p_name] = sid
         marcar_movimento(sid)  # aparece pra quem esta perto e ve quem esta perto
