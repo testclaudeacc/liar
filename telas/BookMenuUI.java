@@ -492,6 +492,16 @@ public final class BookMenuUI {
             if (!(d.getParent() instanceof Table) || !(d.getParent().getParent() instanceof Table)) continue;
             Table coluna = (Table) d.getParent();
             Table pagina = (Table) coluna.getParent();
+            // Loja de magia (aba Learn): sem coluna da esquerda - a gaveta tem tudo e o botao.
+            if (d == lojaDetalhes) {
+                boolean esconder = modoLoja && lojaDeMagia() && !abaLojaVenda;
+                coluna.setVisible(!esconder);
+                com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cc = pagina.getCell(coluna);
+                if (esconder) {
+                    if (cc != null && cc.getMinWidth() > 0.5f) { cc.width(0f); pagina.invalidateHierarchy(); }
+                    continue;
+                }
+            }
             com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cDet = coluna.getCell(d), cCol = pagina.getCell(coluna);
             if (cDet == null || cCol == null) continue;
             float pad = cDet.getPadLeft() + cDet.getPadRight();
@@ -3427,6 +3437,7 @@ public final class BookMenuUI {
 
     private void trocarAbaLoja(boolean venda) {
         abaLojaVenda = venda;
+        magiaArmada = null;
         abaBuy.setStyle(estiloAbaLoja(false, !venda));
         abaSell.setStyle(estiloAbaLoja(true, venda));
         lojaFoco = null;
@@ -3552,11 +3563,8 @@ public final class BookMenuUI {
             if (ehMagia(it.item) && conheceMagia(it.item)) continue; // aprendida: sai da loja
             if (ehMagia(it.item)) {
                 // Magia: gaveta (nome, mana, descricao, dano e preco) em vez do slot.
-                lojaGridCompra.add(gavetaMagia(it.item, it.item.equals(lojaFoco), () -> {
-                    lojaFoco = it.item;
-                    lojaAviso.setText("");
-                    atualizarTelaLoja();
-                }, it.preco)).growX().padBottom(6).colspan(COLUNAS_INVENTARIO).row();
+                lojaGridCompra.add(gavetaMagia(it.item, false, null, it.preco))
+                    .growX().padBottom(6).colspan(COLUNAS_INVENTARIO).row();
                 n = 0;
                 continue;
             }
@@ -5088,6 +5096,8 @@ public final class BookMenuUI {
     /** Linha clicavel da aba Spells: slot da magia + nome, custo de mana,
      * descricao e % de dano. Borda clara = ja' esta' nesse slot. */
     private static final float TAM_ICONE_GAVETA = 64f;
+    /** Magia com o Learn da gaveta no "Are you sure?" (null = nenhuma). */
+    private String magiaArmada;
     private static final Color COR_ALVO_MAGIA = Color.valueOf("ffb366"); // "Single Target"/"Area Damage"
     /** Lista de magias aberta na aba Spells (a janela alarga pro texto caber numa linha). */
     private Table conteudoMagias;
@@ -5105,7 +5115,7 @@ public final class BookMenuUI {
         estilo.over = UiSkin.retangulo(new Color(0.16f, 0.08f, 0.03f, 1f), noSlot ? COR_MAGIA_SELECIONADA : COR_MAGIA_BORDA, 1);
         Button gaveta = new Button(estilo);
         gaveta.left().pad(6);
-        Button icone = slotAtalho(caminho, noSlot, null, null, false, TAM_ICONE_GAVETA);
+        Button icone = slotAtalho(caminho, noSlot, null, null, false, TAM_ICONE_GAVETA, preco <= 0);
         icone.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); // o clique vai pra gaveta
         gaveta.add(icone).size(TAM_ICONE_GAVETA).center().padRight(10);
         Table texto = new Table();
@@ -5141,6 +5151,31 @@ public final class BookMenuUI {
             texto.add(linhaPreco).left().padTop(2).row();
         }
         gaveta.add(texto).growX().center().left();
+        if (preco > 0) {
+            // Loja (Nyla): o botao Learn fica na propria gaveta (a coluna da
+            // esquerda some nessa loja). 1o clique: "Are you sure?".
+            boolean armado = caminho.equals(magiaArmada);
+            boolean semDinheiro = currencyTotal < preco;
+            TextButton aprender = botaoComIcone(semDinheiro ? "No Money" : armado ? "Are you sure?" : "Learn", ICONE_APRENDER,
+                semDinheiro ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
+            if (armado || semDinheiro) iconeDoBotao(aprender, false);
+            aprender.addListener(new ChangeListener() {
+                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                    event.stop();
+                    if (semDinheiro || !socket.isConnected()) return;
+                    if (!caminho.equals(magiaArmada)) { magiaArmada = caminho; atualizarGradeCompra(); return; }
+                    magiaArmada = null;
+                    String npc = lojaNpc;
+                    socket.emitRaw("shop_buy", GameSocket.obj(w -> {
+                        w.set("npc_id", npc);
+                        w.set("item", caminho);
+                        w.set("qty", 1);
+                    }));
+                }
+            });
+            gaveta.add(aprender).height(44).minWidth(120).center().padLeft(8);
+            return gaveta;
+        }
         gaveta.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
         });
@@ -5179,6 +5214,13 @@ public final class BookMenuUI {
     /** mostrarMana: custo da magia no canto (a gaveta da aba Spells ja' mostra no texto). */
     private Button slotAtalho(String caminho, boolean selecionado, String tecla, Runnable aoClicar,
                               boolean mostrarMana, float tamanho) {
+        return slotAtalho(caminho, selecionado, tecla, aoClicar, mostrarMana, tamanho, true);
+    }
+
+    /** apagarIndisponivel: icone transparente se nao tem na bag / nao aprendeu
+     * (a loja mostra a magia normal, ela ainda nao foi aprendida). */
+    private Button slotAtalho(String caminho, boolean selecionado, String tecla, Runnable aoClicar,
+                              boolean mostrarMana, float tamanho, boolean apagarIndisponivel) {
         Button.ButtonStyle estilo = new Button.ButtonStyle();
         if (caminho != null && ehMagia(caminho)) {
             // Magia: laranja no lugar dos cinzas (igual o slot da hotbar).
@@ -5197,7 +5239,7 @@ public final class BookMenuUI {
             if (icone != null) {
                 Image img = new Image(icone);
                 img.setScaling(Scaling.fit);
-                if (!disponivelNoAtalho(caminho)) img.setColor(1f, 1f, 1f, 0.3f);
+                if (apagarIndisponivel && !disponivelNoAtalho(caminho)) img.setColor(1f, 1f, 1f, 0.3f);
                 centro.add(img).size(tamanho * 0.86f);
             }
             pilha.add(centro);
