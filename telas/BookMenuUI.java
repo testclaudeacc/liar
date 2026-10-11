@@ -407,10 +407,14 @@ public final class BookMenuUI {
         final int regenHp, regenMp, regenSeg, preco; // comida com buff de regen; preco em copper
         final boolean usavel; // scroll etc: botao Use na Bag
         final boolean empilhavel;
+        final boolean treino;  // arma de treino (servidor.py::dano_arma_treino)
+        final int economiaFlecha; // % de chance de nao gastar flecha
         final String conjunto; // set (ex: "Outlander"); null = nenhum
         final int conjuntoXp;  // % de XP extra com o set completo
 
         EquipStats(JsonValue d) {
+            this.treino = d.getBoolean("training", false);
+            this.economiaFlecha = d.getInt("ammo_save", 0);
             this.conjunto = d.getString("set", null);
             this.conjuntoXp = d.getInt("set_xp", 0);
             this.cap = d.getFloat("cap", 0f);
@@ -819,6 +823,22 @@ public final class BookMenuUI {
         }
         // Mana gasta por ataque (varinha). Sem "(+n)": nao e' bonus, e' custo.
         if (dados.manaCost > 0) bloco.add(linhaStat("Mana per hit " + dados.manaCost, COR_MANA)).left().row();
+        if (dados.treino) {
+            // Arma de treino: o que ela faz (azul, igual o scroll).
+            for (String t : new String[]{
+                    "Training weapon",
+                    "Deals 1% of the target's max HP, ignoring defense (max 100 on creatures).",
+                    "Creatures you hit can't be attacked by other players for 5s (not in party or if someone else is already fighting it)."}) {
+                Label l = linhaStat(t, COR_SET);
+                l.setWrap(true);
+                bloco.add(l).growX().left().padTop(t.startsWith("Training") ? 6 : 0).row();
+            }
+        }
+        if (dados.economiaFlecha > 0) {
+            Label l = linhaStat(dados.economiaFlecha + "% chance to not use an arrow", COR_SET);
+            l.setWrap(true);
+            bloco.add(l).growX().left().row();
+        }
         if (dados.conjunto != null && !dados.conjunto.isEmpty()) adicionarBlocoSet(bloco, dados);
     }
 

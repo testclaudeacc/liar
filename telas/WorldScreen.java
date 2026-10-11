@@ -131,6 +131,8 @@ public class WorldScreen extends ScreenAdapter {
         boolean voltando = false;     // voltando pra casa (flag do servidor)
         float tempoCorpo = 0f;        // segundos restantes do cadaver no chao
         float tempoTargetHit = 0f;    // quadradinho de "atacou" (mob.gd::_exibir_target_hit)
+        String treinoDono = null;     // player treinando nele (arma de treino) - outros nao batem
+        long treinoAteMs = 0L;
 
         // Passo em andamento + fila dos proximos (mob.gd::_fila_passos): cada
         // mob_pos vira um passo animado com a duracao que o SERVIDOR usou, um
@@ -3320,6 +3322,7 @@ public class WorldScreen extends ScreenAdapter {
             if (mob == null) return;
             mob.maxHp = Math.max(1f, data.getFloat("max_hp", mob.maxHp));
             mob.hp = Math.max(0f, data.getFloat("new_hp", mob.hp));
+            if (data.has("training_lock")) travarMobTreino(mob, data.getString("training_lock", ""), data.getFloat("lock_secs", 5f));
             boolean critico = data.getBoolean("is_crit", false);
             boolean errou = data.getBoolean("is_miss", false);
             NumeroDano numero = new NumeroDano(mob.x, mob.y, errou ? "Miss" : data.getInt("damage", 0) + (critico ? "!" : ""), critico);
@@ -3415,6 +3418,15 @@ public class WorldScreen extends ScreenAdapter {
             if (mob == null) return;
             moverMob(mob, data.getFloat("pos_x", 0f), data.getFloat("pos_y", 0f), "down", 0f, true);
             efeitos.add(new Efeito(quadrosFumaca(), mob.x, mob.y));
+        });
+        // Golpe recusado: mob travado por quem esta' treinando nele.
+        socket.on("mob_locked", (nomeEvt, data) -> {
+            if (data == null) return;
+            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            if (mob == null) return;
+            travarMobTreino(mob, data.getString("owner", ""), data.getFloat("secs", 1f));
+            if (mob.id.equals(alvoMob)) alvoMob = null;
+            avisarMobTravado(mob);
         });
         socket.on("scroll_used", (nomeEvt, data) -> {
             if (data != null) CooldownPocao.iniciarScroll(data.getFloat("cooldown", 20f));
@@ -5367,7 +5379,7 @@ public class WorldScreen extends ScreenAdapter {
         java.util.List<MobVisual> candidatos = new java.util.ArrayList<>();
         int jx = tileX(local.x), jy = tileY(local.y);
         for (MobVisual mob : mobs.values()) {
-            if (mob.morto || !mob.visivel) continue;
+            if (mob.morto || !mob.visivel || travadoPraMim(mob)) continue;
             if (Math.max(Math.abs(tileX(mob.x) - jx), Math.abs(tileY(mob.y) - jy)) > ALCANCE_AUTO_TARGET_SQM) continue;
             String alvo = mob.alvoNome == null ? "" : mob.alvoNome;
             boolean meu = alvo.equals(local.nome);
@@ -5391,7 +5403,31 @@ public class WorldScreen extends ScreenAdapter {
         amigoMarcado = null;
     }
 
+    private void travarMobTreino(MobVisual mob, String dono, float segundos) {
+        mob.treinoDono = dono;
+        mob.treinoAteMs = System.currentTimeMillis() + (long) (segundos * 1000f);
+    }
+
+    /** Outro player esta' treinando nesse mob (arma de treino): nao da' pra focar. */
+    private boolean travadoPraMim(MobVisual mob) {
+        return mob.treinoDono != null && !mob.treinoDono.isEmpty() && !mob.treinoDono.equals(local.nome)
+            && System.currentTimeMillis() < mob.treinoAteMs;
+    }
+
+    private long ultimoAvisoTravado = 0L;
+
+    private void avisarMobTravado(MobVisual mob) {
+        long agora = System.currentTimeMillis();
+        if (agora - ultimoAvisoTravado < 1500L) return;
+        ultimoAvisoTravado = agora;
+        hud.notificar(mob.treinoDono + " is training on this creature.", COR_NOTIF_AVISO, null);
+    }
+
     private void mirarMob(MobVisual mob) {
+        if (travadoPraMim(mob) && !mob.id.equals(alvoMob)) {
+            avisarMobTravado(mob);
+            return;
+        }
         alvoMob = mob.id.equals(alvoMob) ? null : mob.id;
         amigoMarcado = null; // um alvo por vez
         // NAO zera a espera: o cooldown e' do player, nao do alvo. Antes,
@@ -5562,6 +5598,12 @@ public class WorldScreen extends ScreenAdapter {
         MobVisual alvo = mobs.get(alvoMob);
         if (alvo == null || alvo.morto || !alvo.visivel) {
             alvoMob = null;
+            return;
+        }
+        // Outro player comecou a treinar nele: perde o alvo.
+        if (travadoPraMim(alvo)) {
+            alvoMob = null;
+            avisarMobTravado(alvo);
             return;
         }
         // Se afastou demais: desfoca. Longe do jeito que o mob perde o player

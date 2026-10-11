@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.29"
+SERVER_VERSION = "v0.30"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -161,6 +161,8 @@ NPC_DB = {
         "res://sprites/items/Food/Pepper.tres", "res://sprites/items/Food/Beetroot.tres"], "falas": ["Hungry, traveler? Fresh food, right here."]},
     "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
+        "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
+        "res://sprites/items/Bard/Weapons/RawFlute.tres", "res://sprites/items/Ranger/Weapons/RawBow.tres",
         "res://sprites/items/Outlander/OutlanderHelm.tres", "res://sprites/items/Outlander/OutlanderCape.tres",
         "res://sprites/items/Outlander/OutlanderGloves.tres", "res://sprites/items/Outlander/OutlanderBoots.tres"], "falas": ["Looking for a blade? Finest steel in town."]},
     "jack":  {"name": "Jack",  "fixo": True, "role": "bank", "falas": ["Welcome to your private vault. Your belongings are safe with me."]},
@@ -342,12 +344,20 @@ ITEM_DB = {
     "res://sprites/items/Potions/MediumManaPot.tres": {"name": "Medium Mana Pot", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 250, "price": 250, "icon": "sheet/r40_c11", "stackable": True, "max_stack": 9999, "cap": 2.5},
     # Scroll: "teleport" = usar leva pro spawn da cidade (fora de battle).
     "res://sprites/items/Scrolls/PortusNovaScroll.tres": {"name": "Portus Nova Scroll", "type": "Scroll", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "teleport": True, "usable": True, "price": 1000, "icon": "sheet/r53_c2", "stackable": True, "max_stack": 9999, "cap": 0.1},
-    # Set Outlander (loja do Luke): todas as classes, level 5. "set" junta as
+    # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
+    # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
+    # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
+    # "ammo_save": % de chance de nao gastar a flecha.
+    "res://sprites/items/Mage/Weapons/DisabledRod.tres": {"name": "Disabled Rod", "type": "Rod", "slot": "MainHand", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 1, "training": True, "price": 1000, "icon": "sheet/r104_c6", "cap": 5.0},
+    "res://sprites/items/Knight/Weapons/RawSword.tres": {"name": "Raw Sword", "type": "Sword", "slot": "MainHand", "req_level": 0, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "training": True, "price": 1000, "icon": "sheet/r107_c8", "cap": 5.0},
+    "res://sprites/items/Bard/Weapons/RawFlute.tres": {"name": "Raw Flute", "type": "Flute", "slot": "MainHand", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "training": True, "price": 1000, "icon": "sheet/r110_c1", "cap": 5.0},
+    "res://sprites/items/Ranger/Weapons/RawBow.tres": {"name": "Raw Bow", "type": "Bow", "slot": "MainHand", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "training": True, "ammo_save": 30, "price": 1000, "icon": "sheet/r93_c10", "cap": 5.0},
+    # Set Outlander (loja do Luke): todas as classes, level 10. "set" junta as
     # pecas; com todas equipadas da' "set_xp"% de XP extra (bonus_xp_set).
-    "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 2.0},
-    "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Chest", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 1.5},
-    "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 1.0},
-    "res://sprites/items/Outlander/OutlanderBoots.tres": {"name": "Outlander Boots", "type": "Boots", "slot": "Boots", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 2, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r10_c7", "set": "Outlander", "set_xp": 5, "cap": 2.0},
+    "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 2.0},
+    "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Chest", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 1.5},
+    "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 1.0},
+    "res://sprites/items/Outlander/OutlanderBoots.tres": {"name": "Outlander Boots", "type": "Boots", "slot": "Boots", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 2, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 400, "icon": "sheet/r10_c7", "set": "Outlander", "set_xp": 5, "cap": 2.0},
 }
 # Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
 # que aparece na descricao.
@@ -368,7 +378,7 @@ ALCANCE_RANGED_SQM = 5
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
                        "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap", "usable",
-                       "regen_hp", "regen_mp", "regen_seg", "price", "set", "set_xp")
+                       "regen_hp", "regen_mp", "regen_seg", "price", "set", "set_xp", "training", "ammo_save")
 
 def montar_item_db_cliente():
     db = {}
@@ -541,6 +551,27 @@ def custo_mana_arma(p):
     if not isinstance(inst, dict): return 0
     try: return max(0, int(ITEM_DB.get(inst.get('item'), {}).get('mana_cost', 0)))
     except (TypeError, ValueError): return 0
+
+def arma_principal(p):
+    inst = p.get('equipped_items', {}).get('MainHand')
+    return ITEM_DB.get(inst.get('item'), {}) if isinstance(inst, dict) else {}
+
+# Arma de treino: 1% do HP maximo do alvo, ignorando defesa; em mob no
+# maximo TREINO_DANO_MAX_MOB (num boss nao bate mais que um set normal).
+TREINO_PCT_HP = 0.01
+TREINO_DANO_MAX_MOB = 100
+# Cada golpe de treino trava o mob pra outros players (anti-KS) por esse
+# tempo - menos se quem bate esta' em party ou se outro player ja' estava
+# batendo nele (TREINO_OUTRO_BATENDO_SEG), pra ninguem travar mob dos outros.
+TREINO_TRAVA_SEG = 5.0
+TREINO_OUTRO_BATENDO_SEG = 6.0
+
+def dano_arma_treino(max_hp_alvo, eh_mob):
+    """Dano fixo da arma de treino (pro player tambem, quando tiver PvP)."""
+    try: dano = int(float(max_hp_alvo) * TREINO_PCT_HP)
+    except (TypeError, ValueError): dano = 1
+    if eh_mob: dano = min(dano, TREINO_DANO_MAX_MOB)
+    return max(1, dano)
 
 def tem_municao_equipada(p):
     inst = p.get('equipped_items', {}).get(SLOT_MUNICAO)
@@ -3681,6 +3712,12 @@ def handle_hit_mob(data):
         mob_data = active_mobs.get(mob_id)
         if mob_data is None or mob_data.get('hp', 1) <= 0: return
         if na_pz(mob_data): return  # mob parado dentro da PZ tambem nao apanha
+        # Mob travado por quem esta' treinando nele (arma de treino): outro
+        # player nao bate (o client tira o alvo e avisa).
+        trava = mob_data.get('treino_trava')
+        if trava and trava.get('sid') != sid and trava.get('ate', 0) > now and trava.get('sid') in online_players:
+            emit('mob_locked', {'mob_id': mob_id, 'owner': trava.get('nome', ''), 'secs': round(trava['ate'] - now, 1)}, room=sid)
+            return
         # Alcance: corpo a corpo so' do SQM do lado (diagonal vale); a
         # distancia ate ALCANCE_RANGED_SQM em linha reta (igual a deteccao do
         # mob). +1 SQM de folga pro passo em andamento. Mob sem posicao
@@ -3713,6 +3750,16 @@ def handle_hit_mob(data):
             p['current_mp'] = mp_atual - custo_mana
             emit('sync_vitals', {'current_mp': p['current_mp'], 'max_mp': max_mp_m}, room=sid)
         mob_data['last_activity'] = now
+        arma_treino = bool(arma_principal(p).get('training'))
+        # Quem bateu por ultimo (anti-KS da arma de treino).
+        batendo = mob_data.setdefault('hits_recentes', {})
+        outro_batendo = any(s2 != sid and s2 in online_players and now - t2 < TREINO_OUTRO_BATENDO_SEG
+                            for s2, t2 in batendo.items())
+        batendo[sid] = now
+        trava_nova = None
+        if arma_treino and not outro_batendo and not (p.get('party_id') and p.get('party_id') in parties):
+            mob_data['treino_trava'] = {'sid': sid, 'nome': p.get('name', ''), 'ate': now + TREINO_TRAVA_SEG}
+            trava_nova = mob_data['treino_trava']
         p['last_successful_hit'] = now  # libera o treino da skill da classe
         marcar_batalha(sid, p, now)
         mob_focar_agressor(mob_id, mob_data, sid)
@@ -3749,7 +3796,13 @@ def handle_hit_mob(data):
         # Miss: o golpe sai (gasta mana/flecha, puxa aggro), mas não tira vida.
         is_miss = random.random() < MISS_CHANCE_PLAYER
         if is_miss: dano_final, is_crit, reduzido = 0, False, False
+        # Arma de treino: dano fixo (1% do HP do mob, max 100), sem crit/miss/defesa.
+        if arma_treino:
+            dano_final, is_crit, is_miss, reduzido = dano_arma_treino(mob_data.get('max_hp', mob_data['hp']), True), False, False, False
         
+        # Arco com "ammo_save" (Raw Bow): chance de nao gastar a flecha.
+        if precisa_municao and random.random() * 100 < float(arma_principal(p).get('ammo_save', 0) or 0):
+            precisa_municao = False
         if precisa_municao:
             restante_municao, esgotou_municao = consumir_municao(p)
             if esgotou_municao:
@@ -3769,7 +3822,10 @@ def handle_hit_mob(data):
         room = p.get('room')
         atacante_id = p.get('name', '')
         
-        emit_area('mob_damaged', {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'hit_type': hit_type, 'is_crit': is_crit, 'reduced': reduzido, 'is_miss': is_miss, 'attacker_id': atacante_id, 'w_type': w_type, 'proj': proj, 'owner': ''}, room)
+        evt_dano = {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'hit_type': hit_type, 'is_crit': is_crit, 'reduced': reduzido, 'is_miss': is_miss, 'attacker_id': atacante_id, 'w_type': w_type, 'proj': proj, 'owner': ''}
+        # Trava de treino nova: todo mundo perto fica sabendo (auto target pula).
+        if trava_nova: evt_dano.update({'training_lock': trava_nova['nome'], 'lock_secs': TREINO_TRAVA_SEG})
+        emit_area('mob_damaged', evt_dano, room)
         
         if is_dead:
             xp_total = MOB_DB.get(mob_type_id, {}).get("xp", 40)
