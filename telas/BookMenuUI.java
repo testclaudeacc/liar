@@ -217,7 +217,7 @@ public final class BookMenuUI {
         mainWindow.add(bagPage).grow();
 
         organizer.add(leftTab).width(COLUNA_LARGURA).height(JANELA_ALTURA);
-        organizer.add(mainWindow).width(JANELA_LARGURA).height(JANELA_ALTURA);
+        celulaJanela = organizer.add(mainWindow).width(JANELA_LARGURA).height(JANELA_ALTURA);
         organizer.add(rightTab).width(COLUNA_LARGURA).height(JANELA_ALTURA);
         organizer.setTransform(true);
         boolean mobile = Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
@@ -226,8 +226,12 @@ public final class BookMenuUI {
 
         root.setFillParent(true);
         root.center();
-        root.add(organizer).width(COLUNA_LARGURA * 2f + JANELA_LARGURA)
+        celulaOrganizer = root.add(organizer).width(COLUNA_LARGURA * 2f + JANELA_LARGURA)
             .height(JANELA_ALTURA);
+        // Descricao comprida (ex: set do item): a coluna da esquerda e a
+        // janela crescem pra caber, em vez de cortar o texto.
+        root.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.forever(
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.run(this::ajustarLarguraDetalhes)));
         stage.addActor(root);
         registrarAtalhos(stage);
         root.setVisible(false);
@@ -450,6 +454,38 @@ public final class BookMenuUI {
         atualizarGradeEquip();
         atualizarDetalhesEquip();
         atualizarDetalhes(itemSelecionado());
+    }
+
+    private com.badlogic.gdx.scenes.scene2d.ui.Cell<?> celulaJanela, celulaOrganizer;
+    private float extraJanela = 0f;
+    private static final float EXTRA_JANELA_MAX = 220f;
+
+    /** Coluna de detalhes (Bag, trade, banco, loja) cresce ate' caber o texto
+     * mais largo; a janela cresce junto quando e' a pagina aberta. */
+    private void ajustarLarguraDetalhes() {
+        if (celulaJanela == null) return;
+        float extraVisivel = 0f;
+        for (Table d : new Table[]{bagDetalhes, tradeDetalhes, bancoDetalhes, lojaDetalhes}) {
+            if (!(d.getParent() instanceof Table) || !(d.getParent().getParent() instanceof Table)) continue;
+            Table coluna = (Table) d.getParent();
+            Table pagina = (Table) coluna.getParent();
+            com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cDet = coluna.getCell(d), cCol = pagina.getCell(coluna);
+            if (cDet == null || cCol == null) continue;
+            float pad = cDet.getPadLeft() + cDet.getPadRight();
+            float extra = Math.min(EXTRA_JANELA_MAX, Math.max(0f, d.getPrefWidth() + pad + 2f - COLUNA_BAG));
+            if (Math.abs(cCol.getMinWidth() - (COLUNA_BAG + extra)) > 0.5f) {
+                cCol.width(COLUNA_BAG + extra);
+                cDet.width(COLUNA_BAG - pad + extra);
+                coluna.invalidateHierarchy();
+            }
+            if (pagina.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, extra);
+        }
+        if (Math.abs(extraVisivel - extraJanela) > 0.5f) {
+            extraJanela = extraVisivel;
+            celulaJanela.width(JANELA_LARGURA + extraJanela);
+            celulaOrganizer.width(COLUNA_LARGURA * 2f + JANELA_LARGURA + extraJanela);
+            root.invalidateHierarchy();
+        }
     }
 
     private static String regiaoSlotVazio(String slot) {
@@ -731,7 +767,12 @@ public final class BookMenuUI {
         // Mesma fonte das notificacoes da HUD (nitida): ver UiSkin.fonteDescricao.
         Label nome = new LabelPixel(nomeExibicao(itemPath), new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE));
         nome.setWrap(true);
-        bloco.add(nome).growX().left().padBottom(1).row();
+        // Largura do nome inteiro (ate' um limite): a coluna cresce pra ele
+        // caber numa linha; maior que isso quebra a linha.
+        float larguraNome = Math.min(COLUNA_BAG - 16f + EXTRA_JANELA_MAX,
+            new com.badlogic.gdx.graphics.g2d.GlyphLayout(nome.getStyle().font, nome.getText()).width + 2f);
+        boolean colunaCresce = bloco == bagDetalhes || bloco == tradeDetalhes || bloco == bancoDetalhes || bloco == lojaDetalhes;
+        bloco.add(nome).growX().minWidth(colunaCresce ? larguraNome : 0f).left().padBottom(1).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
         if (dados == null) return;
         EquipStats base = compararCom == null ? null : ITEM_STATS.get(compararCom);
@@ -765,7 +806,7 @@ public final class BookMenuUI {
         bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
         // Vermelho = classe errada (o servidor pune quem equipa item de outra classe).
         boolean classeCerta = "All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass);
-        bloco.add(linhaStat(dados.reqClass + " " + dados.tipo,
+        bloco.add(linhaStat(("All".equals(dados.reqClass) ? "Universal" : dados.reqClass) + " " + dados.tipo,
             classeCerta ? corClasse(dados.reqClass) : Color.valueOf("ff4a4a"))).left().row();
         adicionarLinhaStat(bloco, "Attack", dados.bonusDamage, base == null ? 0 : base.bonusDamage, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Defense", dados.defense, base == null ? 0 : base.defense, comparar, Color.WHITE);
