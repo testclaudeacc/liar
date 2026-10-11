@@ -24,15 +24,16 @@ public final class Controles {
 
     private static final String ARQUIVO = "inverted_realms_controles";
 
-    /** Botao do mouse vira "tecla" MOUSE_BASE + botao (so' meio, voltar e
-     * avancar: esquerdo/direito ja' sao do jogo). */
+    /** Botao do mouse vira "tecla" MOUSE_BASE + botao (direito, meio, voltar
+     * e avancar: o esquerdo e' do jogo). */
     public static final int MOUSE_BASE = 1000;
 
     public static int codigoMouse(int botao) { return MOUSE_BASE + botao; }
 
     /** Esse botao do mouse pode ser usado como tecla? */
     public static boolean mouseAceito(int botao) {
-        return botao == Input.Buttons.MIDDLE || botao == Input.Buttons.BACK || botao == Input.Buttons.FORWARD;
+        return botao == Input.Buttons.RIGHT || botao == Input.Buttons.MIDDLE
+            || botao == Input.Buttons.BACK || botao == Input.Buttons.FORWARD;
     }
 
     /** Acoes configuraveis, na ordem em que aparecem na tela de Settings. */
@@ -166,7 +167,7 @@ public final class Controles {
         if (keycode < 0) return "-";
         if (keycode >= MOUSE_BASE) {
             int b = keycode - MOUSE_BASE;
-            return b == Input.Buttons.MIDDLE ? "Mouse 3" : b == Input.Buttons.BACK ? "Mouse 4"
+            return b == Input.Buttons.RIGHT ? "Mouse 2" : b == Input.Buttons.MIDDLE ? "Mouse 3" : b == Input.Buttons.BACK ? "Mouse 4"
                 : b == Input.Buttons.FORWARD ? "Mouse 5" : "Mouse " + (b + 1);
         }
         if (keycode >= Input.Keys.NUM_0 && keycode <= Input.Keys.NUM_9) return String.valueOf(keycode - Input.Keys.NUM_0);

@@ -2767,7 +2767,7 @@ public class WorldScreen extends ScreenAdapter {
             // Captura a proxima tecla (no uiStage: vem antes do jogo, entao a
             // tecla escolhida nao dispara a acao dela nesse mesmo aperto).
             uiStage.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
-                // Botao do mouse (meio/voltar/avancar) tambem pode ser escolhido.
+                // Botao do mouse (direito/meio/voltar/avancar) tambem pode ser escolhido.
                 @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y, int pointer, int botao) {
                     if (acaoCapturando == null || !Controles.mouseAceito(botao)) return false;
                     keyDown(event, Controles.codigoMouse(botao));
