@@ -220,9 +220,9 @@ public final class DialogoNPCUI {
         // na ULTIMA pagina da fala; enquanto houver mais pagina, o mesmo
         // botao vira "Next" (cinza, estilo "cinza-popup" ja usado em
         // ChatUI/outros popups) - a pedido do usuario.
-        BitmapFont fonteBotao = skin.get("chat-log", Label.LabelStyle.class).font;   // ja' sem contorno
-        // Nome na mesma fonte dos botoes: cabe na plaquinha (largura do retrato).
-        nomeLabel.setStyle(new Label.LabelStyle(fonteBotao, COR_NOME));
+        BitmapFont fonteBotao = skin.getFont("botao-texto-font");   // contorno de 2px (botoes)
+        // Nome na fonte do chat (mesmo tamanho dos botoes, contorno de 1px).
+        nomeLabel.setStyle(new Label.LabelStyle(skin.get("chat-log", Label.LabelStyle.class).font, COR_NOME));
         // Botoes no estilo do HUD (antes: vermelho vivo / cinza de popup).
         // Close num vinho escuro discreto, Next cinza.
         estiloFechar = estiloBotao(fonteBotao, Color.valueOf("a82828"));   // Close vermelho

@@ -6023,6 +6023,7 @@ def _usar_scroll_teleporte(sid, p, inst):
         chat_sistema(sid, f"Wait {int(math.ceil(falta))}s to use another scroll.", 'red')
         return
     p['_ultimo_scroll'] = time.time()
+    emit('scroll_used', {'cooldown': SCROLL_COOLDOWN_SEG}, room=sid)
     ox, oy = p.get('pos_x', 0), p.get('pos_y', 0)
     sala_antiga = p.get('room')
     alvo = _spawn_do_player({**p, 'npc_dialogue_state': {**(p.get('npc_dialogue_state') or {}), 'spawn': SPAWN_DEPOIS_DE_DESPERTAR}})

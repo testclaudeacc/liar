@@ -356,7 +356,7 @@ public class PainelJogadorUI {
     /** Botao chapado (sem contorno no texto), cor de fundo e do texto. */
     private TextButton.TextButtonStyle estiloTexto(Color fundo, Color texto) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
-        e.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        e.font = skin.getFont("botao-texto-font");
         e.fontColor = texto;
         Color borda = fundo.cpy().lerp(Color.BLACK, 0.35f);
         e.up = UiSkin.retangulo(fundo, borda, 1);

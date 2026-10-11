@@ -3416,6 +3416,9 @@ public class WorldScreen extends ScreenAdapter {
             moverMob(mob, data.getFloat("pos_x", 0f), data.getFloat("pos_y", 0f), "down", 0f, true);
             efeitos.add(new Efeito(quadrosFumaca(), mob.x, mob.y));
         });
+        socket.on("scroll_used", (nomeEvt, data) -> {
+            if (data != null) CooldownPocao.iniciarScroll(data.getFloat("cooldown", 20f));
+        });
         // Scroll de teleporte: fumacinha onde saiu e onde chegou.
         socket.on("tp_smoke", (nomeEvt, data) -> {
             if (data == null) return;

@@ -533,15 +533,15 @@ public final class BookMenuUI {
 
         TextButton.TextButtonStyle estiloEquipar = new TextButton.TextButtonStyle(
             skin.get("verde", TextButton.TextButtonStyle.class));
-        estiloEquipar.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        estiloEquipar.font = skin.getFont("botao-texto-font");
         TextButton.TextButtonStyle estiloDesequipar = new TextButton.TextButtonStyle(
             skin.get("default", TextButton.TextButtonStyle.class));
-        estiloDesequipar.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        estiloDesequipar.font = skin.getFont("botao-texto-font");
         this.estiloEquipar = estiloEquipar;
         // Item de outra classe (ou level baixo): botao cinza e travado.
         estiloEquiparBloqueado = new TextButton.TextButtonStyle(
             skin.get("default", TextButton.TextButtonStyle.class));
-        estiloEquiparBloqueado.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        estiloEquiparBloqueado.font = skin.getFont("botao-texto-font");
         estiloEquiparBloqueado.fontColor = new Color(0.55f, 0.55f, 0.55f, 1f);
         estiloEquiparBloqueado.disabledFontColor = estiloEquiparBloqueado.fontColor;
         equipButton = new TextButton("Equip", estiloEquipar);
@@ -1288,11 +1288,11 @@ public final class BookMenuUI {
 
         TextButton.TextButtonStyle estiloBotao = new TextButton.TextButtonStyle(
             skin.get("default", TextButton.TextButtonStyle.class));
-        estiloBotao.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        estiloBotao.font = skin.getFont("botao-texto-font");
         // Cinza sem alteracoes; verde quando o rascunho difere do que esta equipado.
         estiloAplicarNormal = estiloBotao;
         estiloAplicarAlterado = new TextButton.TextButtonStyle(skin.get("verde", TextButton.TextButtonStyle.class));
-        estiloAplicarAlterado.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        estiloAplicarAlterado.font = skin.getFont("botao-texto-font");
         TextButton equipar = new TextButton("Apply", estiloBotao);
         botaoAplicarSkins = equipar;
         equipar.addListener(new ChangeListener() {
@@ -1656,7 +1656,7 @@ public final class BookMenuUI {
                     else marcadores.add().expandX();
                     conteudo.add(marcadores);
                 }
-                if (ehPocao(item.itemPath)) conteudo.add(sobreposicaoCooldown());
+                if (temCooldown(item.itemPath)) conteudo.add(sobreposicaoCooldown(item.itemPath));
                 slot.add(conteudo).grow().pad(2);
             }
             slot.addListener(new ChangeListener() {
@@ -1740,7 +1740,7 @@ public final class BookMenuUI {
         if (ehComida && !item.instanceId.isEmpty()) {
             TextButton.TextButtonStyle estiloComer = new TextButton.TextButtonStyle(
                 skin.get("verde", TextButton.TextButtonStyle.class));
-            estiloComer.font = skin.get("chat-log", Label.LabelStyle.class).font; // sem contorno
+            estiloComer.font = skin.getFont("botao-texto-font");
             // Pocao: "Use" (o servidor decide: eat_food usa comida ou pocao).
             TextButton comer = new TextButton(ehPocao || comida.usavel ? "Use" : "Eat", estiloComer);
             String id = item.instanceId;
@@ -1849,7 +1849,7 @@ public final class BookMenuUI {
 
     private TextButton.TextButtonStyle estiloBotaoTrade(String base) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(skin.get(base, TextButton.TextButtonStyle.class));
-        e.font = skin.get("chat-log", Label.LabelStyle.class).font; // texto sem contorno
+        e.font = skin.getFont("botao-texto-font");
         return e;
     }
 
@@ -2078,7 +2078,7 @@ public final class BookMenuUI {
             if (escolhida > 0) numero.setColor(COR_TRADE_SELECIONADO);
             conteudo.add(marcadores);
         }
-        if (ehPocao(caminho)) conteudo.add(sobreposicaoCooldown());
+        if (temCooldown(caminho)) conteudo.add(sobreposicaoCooldown(caminho));
         return conteudo;
     }
 
@@ -2653,12 +2653,12 @@ public final class BookMenuUI {
     private Image iconeAcaoBanco;
 
     private com.badlogic.gdx.graphics.g2d.BitmapFont fonteBanco() {
-        return skin.get("chat-log", Label.LabelStyle.class).font; // sem contorno
+        return skin.get("chat-log", Label.LabelStyle.class).font;
     }
 
     private TextButton.TextButtonStyle estiloPlano(Color cor, Color corTexto) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle();
-        e.font = fonteBanco();
+        e.font = skin.getFont("botao-texto-font");
         e.fontColor = corTexto;
         e.up = UiSkin.retangulo(cor, cor.cpy().lerp(Color.BLACK, 0.35f), 1);
         e.over = UiSkin.retangulo(cor.cpy().lerp(Color.WHITE, 0.1f), cor.cpy().lerp(Color.BLACK, 0.35f), 1);
@@ -3553,7 +3553,7 @@ public final class BookMenuUI {
 
         // Botao rosa do mock.
         TextButton.TextButtonStyle estiloCriar = new TextButton.TextButtonStyle(skin.get("vermelho", TextButton.TextButtonStyle.class));
-        estiloCriar.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        estiloCriar.font = skin.getFont("botao-texto-font");
         Color rosa = Color.valueOf("ee1f5f"), rosaBorda = Color.valueOf("9c0f3a");
         estiloCriar.up = UiSkin.retangulo(rosa, rosaBorda, 2);
         estiloCriar.over = UiSkin.retangulo(rosa.cpy().lerp(Color.WHITE, 0.15f), rosaBorda, 2);
@@ -3773,9 +3773,9 @@ public final class BookMenuUI {
         caixa.add(scroll).grow().pad(4);
 
         TextButton.TextButtonStyle estiloRemover = new TextButton.TextButtonStyle(skin.get("vermelho", TextButton.TextButtonStyle.class));
-        estiloRemover.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        estiloRemover.font = skin.getFont("botao-texto-font");
         TextButton.TextButtonStyle estiloAdicionar = new TextButton.TextButtonStyle(skin.get("verde", TextButton.TextButtonStyle.class));
-        estiloAdicionar.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        estiloAdicionar.font = skin.getFont("botao-texto-font");
         TextButton remover = new TextButton("Remove", estiloRemover);
         TextButton adicionar = new TextButton("Add Friend", estiloAdicionar);
         remover.addListener(new ChangeListener() {
@@ -4166,9 +4166,17 @@ public final class BookMenuUI {
         return dados != null && dados.ehPocao();
     }
 
-    /** Cinza escuro + segundos por cima do slot de uma pocao em cooldown. */
-    public CooldownPocao.Sobreposicao sobreposicaoCooldown() {
-        return new CooldownPocao.Sobreposicao(skin.getFont("cooldown-font"));
+    /** Item com cooldown: pocao (todas juntas) ou scroll (os scrolls juntos). */
+    public boolean temCooldown(String caminho) {
+        EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        return dados != null && (dados.ehPocao() || dados.usavel);
+    }
+
+    /** Cinza escuro + segundos por cima do slot de uma pocao/scroll em cooldown. */
+    public CooldownPocao.Sobreposicao sobreposicaoCooldown(String caminho) {
+        EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        boolean scroll = dados != null && dados.usavel && !dados.ehPocao();
+        return new CooldownPocao.Sobreposicao(skin.getFont("cooldown-font"), scroll);
     }
 
     /** Item que pode ir num slot da barra: comida e pocao. */
@@ -4201,7 +4209,7 @@ public final class BookMenuUI {
 
     private TextButton botaoSpells(String texto, String estiloBase, Runnable acao) {
         TextButton.TextButtonStyle e = new TextButton.TextButtonStyle(skin.get(estiloBase, TextButton.TextButtonStyle.class));
-        e.font = skin.get("chat-log", Label.LabelStyle.class).font;
+        e.font = skin.getFont("botao-texto-font");
         TextButton b = new TextButton(texto, e);
         b.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { acao.run(); }
@@ -4841,7 +4849,7 @@ public final class BookMenuUI {
                 canto.add(numero).padBottom(numero.getStyle().font.getDescent());
                 pilha.add(canto);
             }
-            if (ehPocao(caminho)) pilha.add(sobreposicaoCooldown());
+            if (temCooldown(caminho)) pilha.add(sobreposicaoCooldown(caminho));
         }
         if (tecla != null) {
             Label numeroTecla = new Label(tecla, skin, "hud");

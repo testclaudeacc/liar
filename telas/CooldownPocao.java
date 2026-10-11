@@ -31,6 +31,17 @@ public final class CooldownPocao {
 
     public static boolean ativo() { return restante() > 0f; }
 
+    // Scroll de teleporte: cooldown proprio (servidor.py::SCROLL_COOLDOWN_SEG).
+    private static long fimScrollNanos = 0L;
+
+    public static void iniciarScroll(float segundos) {
+        fimScrollNanos = System.nanoTime() + (long) (segundos * 1_000_000_000L);
+    }
+
+    public static float restanteScroll() {
+        return Math.max(0f, (fimScrollNanos - System.nanoTime()) / 1_000_000_000f);
+    }
+
     private static Texture pixel() {
         if (pixel == null) {
             Pixmap pm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
@@ -48,14 +59,19 @@ public final class CooldownPocao {
         private static final Color FUNDO = new Color(0.02f, 0.02f, 0.02f, 0.82f);
         private final BitmapFont fonte;
         private final GlyphLayout layout = new GlyphLayout();
+        private final boolean scroll;
 
-        public Sobreposicao(BitmapFont fonte) {
+        public Sobreposicao(BitmapFont fonte) { this(fonte, false); }
+
+        /** scroll: usa o cooldown do scroll em vez do das pocoes. */
+        public Sobreposicao(BitmapFont fonte, boolean scroll) {
             this.fonte = fonte;
+            this.scroll = scroll;
             setTouchable(Touchable.disabled);
         }
 
         @Override public void draw(Batch batch, float parentAlpha) {
-            float falta = restante();
+            float falta = scroll ? restanteScroll() : restante();
             if (falta <= 0f) return;
             Color antes = new Color(batch.getColor());
             batch.setColor(FUNDO.r, FUNDO.g, FUNDO.b, FUNDO.a * parentAlpha);

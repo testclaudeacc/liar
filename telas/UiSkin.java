@@ -152,7 +152,7 @@ public class UiSkin {
         BitmapFont fonteVersao = gerarFonte("fonts/dejavu-sans.condensed.ttf", 16, 2, escala);
         // Todo botao do jogo real usa martel (mesma fonte do titulo), nao uma
         // fonte generica - ver PlayBtn/BackBtn/CreateBtn etc em main_menu.tscn.
-        BitmapFont fonteBotao = gerarFonte(FONTE_GUI, 26, 2, escala);
+        BitmapFont fonteBotao = gerarFonte(FONTE_GUI, 26, BORDA_BOTAO, escala);
         // Trocada de NicoClean (pixelada, ficava embacada nas stats do
         // char-select) pra dejavu-sans.condensed - mesma familia do "Beta
         // version" - e subida 8px (24 -> 32) a pedido do usuario. Contorno
@@ -180,7 +180,10 @@ public class UiSkin {
         // o martel renderizado aqui pelo FreeType fica mais largo por
         // caractere que no Godot nesse mesmo tamanho nominal - 24 ainda
         // vazava do botao de 200px, 20 coube (achado testando ao vivo).
-        BitmapFont fonteBotaoPequeno = gerarFonte(FONTE_GUI, 18, 2, escala);
+        BitmapFont fonteBotaoPequeno = gerarFonte(FONTE_GUI, 18, BORDA_BOTAO, escala);
+        // Botoes chapados (livro, lojas, janela do player, dialogo): mesmo
+        // tamanho do chat, contorno de 2px.
+        skin.add("botao-texto-font", gerarFonte("fonts/dejavu-sans.condensed.ttf", 20, BORDA_BOTAO, escala, CIRILICO));
         fonteBotaoPequeno.setUseIntegerPositions(false); // idem fonteHud (livro ampliado no celular)
         // FPS/ms do WorldScreen - sem contorno (borda=0) a pedido do usuario,
         // que achava o texto de debug com a borda preta pesada demais pra um
@@ -421,7 +424,7 @@ public class UiSkin {
         parametros.magFilter = TextureFilter.Linear;
         // Borda tambem escalada - senao ela fica proporcionalmente mais fina
         // que o glifo (que cresceu com o size acima) e o contorno preto some.
-        parametros.borderWidth = nitida ? 1 : borda > 0 ? Math.max(1, Math.round(borda * escala)) : 0;
+        parametros.borderWidth = nitida ? (borda == BORDA_BOTAO ? 2 : 1) : borda > 0 ? Math.max(1, Math.round(borda * escala)) : 0;
         parametros.borderColor = Color.BLACK;
         BitmapFont fonte = gerador.generateFont(parametros);
         // Volta o tamanho renderizado pra escala de stage original (a
@@ -435,6 +438,8 @@ public class UiSkin {
     /** Fonte de todo texto (exceto a Martel do logo) - ver gerarFonte. */
     static final String FONTE_NITIDA = "fonts/TAHOMAB0.TTF";
     static final float ESCALA_FONTE_NITIDA = 0.85f;
+    /** borda = BORDA_BOTAO: fonte de botao, contorno de 2px (o resto e' 1px). */
+    static final int BORDA_BOTAO = 99;
 
     /** Retangulo de cantos retos (StyleBoxFlat do Godot nao arredonda nada nas
      * telas de login/char-select - so 1px de borda solida). */
