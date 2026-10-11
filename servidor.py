@@ -390,7 +390,7 @@ def slot_do_item(item_path):
 MAX_STACK_MUNICAO_PADRAO = 100
 
 CAP_INICIAL = 100.0
-CAP_POR_NIVEL = 5.0
+CAP_POR_NIVEL = 10.0
 
 FOURTH_STAT_MULTIPLIERS = {"Magic": 0.5, "Focus": 0.5, "Musicality": 0.5, "Melee": 0.5}
 
