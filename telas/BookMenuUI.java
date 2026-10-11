@@ -789,11 +789,13 @@ public final class BookMenuUI {
             if (dados.regenMp > 0) bloco.add(linhaComIcone("ui/MPIcon", "+" + dados.regenMp + " Regen", COR_POCAO_MP)).left().row();
             if (dados.regenHp > 0 || dados.regenMp > 0)
                 bloco.add(linhaStat("for " + dados.regenSeg + " seconds", new Color(0.6f, 0.6f, 0.6f, 1f))).left().row();
+            adicionarLinhaCap(bloco, dados);
             return;
         }
         if (dados.usavel) {
             // Scroll: o tipo e o que faz.
             bloco.add(linhaStat(dados.tipo.isEmpty() ? "Scroll" : dados.tipo, Color.LIGHT_GRAY)).left().row();
+            adicionarLinhaCap(bloco, dados);
             Label efeito = linhaStat("Teleports you to the city. Can't be used in battle.", new Color(0.7f, 0.85f, 1f, 1f));
             efeito.setWrap(true);
             bloco.add(efeito).growX().left().row();
@@ -805,6 +807,7 @@ public final class BookMenuUI {
             // "+(icone de HP/MP da HUD) 50".
             if (dados.healHp > 0) bloco.add(linhaCura("ui/HPIcon", dados.healHp, COR_POCAO_HP)).left().row();
             if (dados.healMp > 0) bloco.add(linhaCura("ui/MPIcon", dados.healMp, COR_POCAO_MP)).left().row();
+            adicionarLinhaCap(bloco, dados);
             return;
         }
         bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
@@ -823,24 +826,30 @@ public final class BookMenuUI {
         }
         // Mana gasta por ataque (varinha). Sem "(+n)": nao e' bonus, e' custo.
         if (dados.manaCost > 0) bloco.add(linhaStat("Mana per hit " + dados.manaCost, COR_MANA)).left().row();
+        // Cap: sempre o ultimo stat (antes das descricoes em azul).
+        adicionarLinhaCap(bloco, dados);
         if (dados.treino) {
-            // Arma de treino: o que ela faz (azul, igual o scroll).
-            for (String t : new String[]{
-                    "Training weapon",
-                    "Hits 1% of target HP (max 100)",
-                    "+5% skill gain, no regen",
-                    "Locks the creature for 5s"}) {
-                Label l = linhaStat(t, COR_SET);
-                l.setWrap(true);
-                bloco.add(l).growX().left().padTop(t.startsWith("Training") ? 6 : 0).row();
-            }
-        }
-        if (dados.economiaFlecha > 0) {
-            Label l = linhaStat(dados.economiaFlecha + "% chance to save arrows", COR_SET);
-            l.setWrap(true);
-            bloco.add(l).growX().left().row();
+            // Arma de treino: o que ela faz, em topicos (azul, igual o scroll).
+            List<String> topicos = new ArrayList<>(java.util.Arrays.asList(
+                "Hits 1% of target HP (max 100)",
+                "+5% skill gain",
+                "No HP/MP regen",
+                "Locks the creature for 5s"));
+            if (dados.economiaFlecha > 0) topicos.add(dados.economiaFlecha + "% chance to save arrows");
+            bloco.add(linhaStat("Training Weapon", COR_SET)).left().padTop(6).row();
+            for (String t : topicos) bloco.add(linhaStat("- " + t, COR_SET)).left().row();
+        } else if (dados.economiaFlecha > 0) {
+            bloco.add(linhaStat(dados.economiaFlecha + "% chance to save arrows", COR_SET)).left().padTop(6).row();
         }
         if (dados.conjunto != null && !dados.conjunto.isEmpty()) adicionarBlocoSet(bloco, dados);
+    }
+
+    /** "(bolsinha) 15": quanto de cap 1 unidade do item ocupa. */
+    private void adicionarLinhaCap(Table bloco, EquipStats dados) {
+        if (dados == null || dados.cap <= 0f) return;
+        String valor = dados.cap == Math.floor(dados.cap) ? String.valueOf((int) dados.cap)
+            : String.format(java.util.Locale.US, "%.1f", dados.cap);
+        bloco.add(linhaComIcone("ui/currency/BagIcon", valor, Color.LIGHT_GRAY)).left().row();
     }
 
     private static final Color COR_SET = new Color(0.7f, 0.85f, 1f, 1f); // azul do scroll
