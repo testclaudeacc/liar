@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.28"
+SERVER_VERSION = "v0.29"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -160,7 +160,9 @@ NPC_DB = {
         "res://sprites/items/Food/Blueberries.tres", "res://sprites/items/Food/VegetableSoup.tres",
         "res://sprites/items/Food/Pepper.tres", "res://sprites/items/Food/Beetroot.tres"], "falas": ["Hungry, traveler? Fresh food, right here."]},
     "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
-    "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "falas": ["Looking for a blade? Finest steel in town."]},
+    "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
+        "res://sprites/items/Outlander/OutlanderHelm.tres", "res://sprites/items/Outlander/OutlanderCape.tres",
+        "res://sprites/items/Outlander/OutlanderGloves.tres", "res://sprites/items/Outlander/OutlanderBoots.tres"], "falas": ["Looking for a blade? Finest steel in town."]},
     "jack":  {"name": "Jack",  "fixo": True, "role": "bank", "falas": ["Welcome to your private vault. Your belongings are safe with me."]},
     "luna":  {"name": "Luna",  "fixo": True, "role": "market", "falas": ["Welcome to the market! Trade your goods with other adventurers."]},
     "valth": {"name": "Valth", "fixo": True, "role": "pot", "shop": [
@@ -304,7 +306,7 @@ def validate_item(item_path):
         return item_path
     return None
 
-SLOTS_VALIDOS = {"Helm", "Gloves", "Chest", "Boots", "Necklace", "Ring", "MainHand", "Hand"}
+SLOTS_VALIDOS = {"Helm", "Cape", "Gloves", "Chest", "Boots", "Necklace", "Ring", "MainHand", "Hand"}
 
 ITEM_DB = {
     "res://sprites/items/Sword.tres": {"name": "Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 100, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "cap": 5.0},
@@ -340,6 +342,12 @@ ITEM_DB = {
     "res://sprites/items/Potions/MediumManaPot.tres": {"name": "Medium Mana Pot", "type": "Potion", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "heal_mp": 250, "price": 250, "icon": "sheet/r40_c11", "stackable": True, "max_stack": 9999, "cap": 2.5},
     # Scroll: "teleport" = usar leva pro spawn da cidade (fora de battle).
     "res://sprites/items/Scrolls/PortusNovaScroll.tres": {"name": "Portus Nova Scroll", "type": "Scroll", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "teleport": True, "usable": True, "price": 1000, "icon": "sheet/r53_c2", "stackable": True, "max_stack": 9999, "cap": 0.1},
+    # Set Outlander (loja do Luke): todas as classes, level 5. "set" junta as
+    # pecas; com todas equipadas da' "set_xp"% de XP extra (bonus_xp_set).
+    "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 2.0},
+    "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Cape", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 1.5},
+    "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 100, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 1.0},
+    "res://sprites/items/Outlander/OutlanderBoots.tres": {"name": "Outlander Boots", "type": "Boots", "slot": "Boots", "req_level": 5, "req_class": "All", "bonus_damage": 0, "defense": 2, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r10_c7", "set": "Outlander", "set_xp": 5, "cap": 2.0},
 }
 # Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
 # que aparece na descricao.
@@ -360,7 +368,7 @@ ALCANCE_RANGED_SQM = 5
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
                        "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap", "usable",
-                       "regen_hp", "regen_mp", "regen_seg", "price")
+                       "regen_hp", "regen_mp", "regen_seg", "price", "set", "set_xp")
 
 def montar_item_db_cliente():
     db = {}
@@ -434,6 +442,22 @@ def obter_dados_item(item_path):
     }
 
 def obter_req_class_item(item_path): return obter_dados_item(item_path).get("req_class", "All")
+
+def bonus_xp_set(p):
+    """% de XP extra dos sets completos equipados (ex: Outlander 4/4 = 5%)."""
+    equipados = p.get('equipped_items', {})
+    if not isinstance(equipados, dict): return 0.0
+    usados = {}
+    for inst in equipados.values():
+        if not isinstance(inst, dict): continue
+        nome_set = ITEM_DB.get(inst.get('item'), {}).get('set')
+        if nome_set: usados.setdefault(nome_set, set()).add(inst.get('item'))
+    total = 0.0
+    for nome_set, pecas in usados.items():
+        do_set = [k for k, v in ITEM_DB.items() if v.get('set') == nome_set]
+        if len(pecas) >= len(do_set):
+            total += float(ITEM_DB[do_set[0]].get('set_xp', 0))
+    return total
 
 def somar_bonus_combate_equipados(equipped_items):
     total = {"bonus_damage": 0, "bonus_defense": 0.0, "bonus_hp": 0.0, "bonus_mp": 0.0}
@@ -3755,6 +3779,9 @@ def handle_hit_mob(data):
                 if participant_sid not in online_players: continue
 
                 part_p = online_players[participant_sid]
+                # Set completo equipado (ex: Outlander): XP extra.
+                pct_set = bonus_xp_set(part_p)
+                if pct_set > 0: xp_gained = int(xp_gained * (1.0 + pct_set / 100.0) + 0.5)
                 bestiario_registrar_kill(participant_sid, part_p, mob_data.get('type_id', mob_type_id))
 
                 current_exp = part_p.get('exp', 0) + xp_gained
@@ -4697,7 +4724,7 @@ def handle_equip_item(data):
         if req_class != "All" and req_class != p.get('class_name', 'Knight'): return
         # Level minimo do item (antes nao era checado no servidor).
         try:
-            if int(obter_dados_item(alvo.get('item')).get('req_level', 0) or 0) > int(p.get('level', 1) or 1): return
+            if int(ITEM_DB.get(alvo.get('item'), {}).get('req_level', 0) or 0) > int(p.get('level', 1) or 1): return
         except (TypeError, ValueError): return
         equipados = p.get('equipped_items', {})
         anterior = equipados.get(slot)

@@ -3983,7 +3983,7 @@ public class WorldScreen extends ScreenAdapter {
     /** NPC da loja aberta agora (idem). */
     private NPCVisual npcLoja;
     /** Funcoes de NPC que abrem a loja (os outros vendedores entram aqui quando tiverem "shop"). */
-    private static final java.util.Set<String> PAPEIS_COM_LOJA = new java.util.HashSet<>(java.util.Arrays.asList("food", "pot"));
+    private static final java.util.Set<String> PAPEIS_COM_LOJA = new java.util.HashSet<>(java.util.Arrays.asList("food", "pot", "weapon"));
 
     private void abrirDialogoNPC(NPCVisual npc) {
         if (chat.isVisivel()) chat.setVisivel(false);

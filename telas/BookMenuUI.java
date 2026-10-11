@@ -86,7 +86,7 @@ public final class BookMenuUI {
     // --- Equip ---
     // Grade 3x3 da coluna esquerda (null = celula vazia), igual prints/tela desejada.png.
     private static final String[][] SLOTS_EQUIP = {
-        {null, "Helm", "Necklace"}, {"MainHand", "Chest", "Hand"}, {"Gloves", "Boots", "Ring"}
+        {"Cape", "Helm", "Necklace"}, {"MainHand", "Chest", "Hand"}, {"Gloves", "Boots", "Ring"}
     };
     private static final float SLOT_EQUIP = 54f;
     private static final float COLUNA_EQUIP = 180f;
@@ -403,8 +403,12 @@ public final class BookMenuUI {
         final int regenHp, regenMp, regenSeg, preco; // comida com buff de regen; preco em copper
         final boolean usavel; // scroll etc: botao Use na Bag
         final boolean empilhavel;
+        final String conjunto; // set (ex: "Outlander"); null = nenhum
+        final int conjuntoXp;  // % de XP extra com o set completo
 
         EquipStats(JsonValue d) {
+            this.conjunto = d.getString("set", null);
+            this.conjuntoXp = d.getInt("set_xp", 0);
             this.cap = d.getFloat("cap", 0f);
             this.regenHp = d.getInt("regen_hp", 0);
             this.regenMp = d.getInt("regen_mp", 0);
@@ -774,6 +778,39 @@ public final class BookMenuUI {
         }
         // Mana gasta por ataque (varinha). Sem "(+n)": nao e' bonus, e' custo.
         if (dados.manaCost > 0) bloco.add(linhaStat("Mana per hit " + dados.manaCost, COR_MANA)).left().row();
+        if (dados.conjunto != null && !dados.conjunto.isEmpty()) adicionarBlocoSet(bloco, dados);
+    }
+
+    private static final Color COR_SET = new Color(0.7f, 0.85f, 1f, 1f); // azul do scroll
+    private static final Color COR_SET_OFF = new Color(0.5f, 0.5f, 0.5f, 1f);
+
+    /** "Outlander Set (2/4)", as pecas (azul = equipada, cinza = falta) e o
+     * bonus (azul so' com o set completo). */
+    private void adicionarBlocoSet(Table bloco, EquipStats dados) {
+        List<String> pecas = new ArrayList<>();
+        for (Map.Entry<String, EquipStats> e : ITEM_STATS.entrySet()) {
+            if (dados.conjunto.equals(e.getValue().conjunto)) pecas.add(e.getKey());
+        }
+        int equipadas = 0;
+        for (String peca : pecas) if (equippedItemPaths.containsValue(peca)) equipadas++;
+        boolean completo = equipadas >= pecas.size();
+        bloco.add(linhaStat(dados.conjunto + " Set (" + equipadas + "/" + pecas.size() + ")", COR_SET)).left().padTop(6).row();
+        for (String peca : pecas) {
+            bloco.add(linhaStat(nomeExibicao(peca), equippedItemPaths.containsValue(peca) ? COR_SET : COR_SET_OFF)).left().row();
+        }
+        if (dados.conjuntoXp > 0) {
+            Color cor = completo ? COR_SET : COR_SET_OFF;
+            Table linha = new Table();
+            linha.add(linhaStat("Bonus: " + dados.conjuntoXp + "%", cor)).padRight(4);
+            TextureAtlas.AtlasRegion regiao = atlas.findRegion("ui/XPIcon");
+            if (regiao != null) {
+                Image img = new Image(new TextureRegionDrawable(regiao));
+                img.setScaling(Scaling.fit);
+                linha.add(img).size(18f).padRight(4);
+            }
+            linha.add(linhaStat("Extra XP", cor));
+            bloco.add(linha).left().padTop(4).row();
+        }
     }
 
     private void adicionarLinhaStat(Table bloco, String nome, int valor, int anterior, boolean comparar, Color cor) {
@@ -909,9 +946,16 @@ public final class BookMenuUI {
             botao.clearChildren();
             String caminho = equippedItemPaths.get(entrada.getKey());
             TextureAtlas.AtlasRegion textura = caminho == null ? null : iconeDoItem(caminho);
+            boolean capaVazia = false;
+            if (textura == null && "Cape".equals(entrada.getKey())) {
+                // Nao tem sprite de slot de capa: a capa do Outlander apagada.
+                textura = atlas.findRegion("sheet/r3_c11");
+                capaVazia = true;
+            }
             if (textura == null) textura = atlas.findRegion(regiaoSlotVazio(entrada.getKey()));
             if (textura == null) continue;
             Image icone = new Image(new TextureRegionDrawable(textura));
+            if (capaVazia) icone.setColor(0.25f, 0.25f, 0.25f, 0.6f);
             icone.setScaling(Scaling.fit);
             int qtd = equippedQuantidades.getOrDefault(entrada.getKey(), 1);
             if (caminho == null || qtd <= 1) {
@@ -3074,12 +3118,19 @@ public final class BookMenuUI {
     private String lojaPapel = "";
     private static final Color COR_ABA_BUY_POT = Color.valueOf("a82828"), COR_ABA_BUY_POT_OFF = Color.valueOf("4a1414");
 
-    private String iconeAbaBuy() { return "pot".equals(lojaPapel) ? "sheet/r44_c2" : ICONE_FULLNESS; }
+    private static final Color COR_ABA_BUY_ARMA = Color.valueOf("3f5f8a"), COR_ABA_BUY_ARMA_OFF = Color.valueOf("1c2a3d");
+
+    private String iconeAbaBuy() {
+        if ("pot".equals(lojaPapel)) return "sheet/r44_c2";
+        if ("weapon".equals(lojaPapel)) return "sheet/r23_c5"; // Outlander Helm
+        return ICONE_FULLNESS;
+    }
 
     private TextButton.TextButtonStyle estiloAbaLoja(boolean venda, boolean ativa) {
-        boolean pot = "pot".equals(lojaPapel);
+        boolean pot = "pot".equals(lojaPapel), arma = "weapon".equals(lojaPapel);
         Color cor = venda ? (ativa ? COR_ABA_SELL : COR_ABA_SELL_OFF)
-            : pot ? (ativa ? COR_ABA_BUY_POT : COR_ABA_BUY_POT_OFF) : (ativa ? COR_ABA_BUY : COR_ABA_BUY_OFF);
+            : pot ? (ativa ? COR_ABA_BUY_POT : COR_ABA_BUY_POT_OFF)
+            : arma ? (ativa ? COR_ABA_BUY_ARMA : COR_ABA_BUY_ARMA_OFF) : (ativa ? COR_ABA_BUY : COR_ABA_BUY_OFF);
         return estiloPlano(cor, ativa ? Color.WHITE : new Color(0.7f, 0.7f, 0.7f, 1f));
     }
 
