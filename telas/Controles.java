@@ -171,6 +171,17 @@ public final class Controles {
         p.flush();
     }
 
+    /** Auto target (botao do meio do mouse): 0 = qualquer mob, 1 = ignora os
+     * que estao focando outro player, 2 = so' os que me focam, 3 = os que
+     * focam eu ou a minha party. */
+    public static int modoAutoTarget() { return prefs().getInteger("auto_target", 1); }
+
+    public static void definirModoAutoTarget(int modo) {
+        Preferences p = prefs();
+        p.putInteger("auto_target", modo);
+        p.flush();
+    }
+
     /** O que o anel do retrato mostra: "xp", "defense" ou "skill" (a da classe). */
     public static String statRetrato() { return prefs().getString("stat_retrato", "xp"); }
 

@@ -127,6 +127,7 @@ public class WorldScreen extends ScreenAdapter {
         float hp = 1f, maxHp = 1f;
         boolean morto = false;
         boolean visivel = false;      // so' aparece depois da 1a posicao do servidor
+        String alvoNome = "";         // player que esse mob esta focando ("" = ninguem) - servidor: mob_target
         boolean voltando = false;     // voltando pra casa (flag do servidor)
         float tempoCorpo = 0f;        // segundos restantes do cadaver no chao
         float tempoTargetHit = 0f;    // quadradinho de "atacou" (mob.gd::_exibir_target_hit)
@@ -940,6 +941,11 @@ public class WorldScreen extends ScreenAdapter {
             @Override
             public boolean touchDown(int screenX, int screenY, int pointer, int button) {
                 if (chat.isVisivel() || settingsAberta() || bookMenu.isVisible() || dialogoNPC.isVisible()) return false;
+                // Botao do meio do mouse: auto target (mob mais perto, ver modoAutoTarget).
+                if (button == Input.Buttons.MIDDLE) {
+                    if (!localMorto) autoTarget();
+                    return true;
+                }
                 
                 com.badlogic.gdx.math.Vector3 coords = camera.unproject(new com.badlogic.gdx.math.Vector3(screenX, screenY, 0));
                 float wx = coords.x;
@@ -2661,6 +2667,12 @@ public class WorldScreen extends ScreenAdapter {
         int atual = java.util.Arrays.asList(chavesStat).indexOf(Controles.statRetrato());
         secao.add(linhaDeEscolha("Portrait ring", nomesStat, Math.max(0, atual),
             i -> Controles.definirStatRetrato(chavesStat[i]))).left().padTop(6).row();
+        // Auto target (botao do meio do mouse) - so' no PC.
+        if (!mobile) {
+            String[] nomesAuto = {"All", "Not others'", "Only mine", "Mine + party"};
+            secao.add(linhaDeEscolha("Auto target", nomesAuto, Controles.modoAutoTarget(),
+                Controles::definirModoAutoTarget)).left().padTop(6).row();
+        }
         return secao;
     }
 
@@ -3382,6 +3394,11 @@ public class WorldScreen extends ScreenAdapter {
             moverMob(mob, data.getFloat("pos_x", 0f), data.getFloat("pos_y", 0f), "down", 0f, true);
             efeitos.add(new Efeito(quadrosFumaca(), mob.x, mob.y));
         });
+        socket.on("mob_target", (nomeEvt, data) -> {
+            if (data == null) return;
+            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            if (mob != null) mob.alvoNome = data.getString("target", "");
+        });
         socket.on("mob_died", (nomeEvt, data) -> {
             if (data == null) return;
             MobVisual mob = mobs.get(data.getString("mob_id", ""));
@@ -3458,6 +3475,7 @@ public class WorldScreen extends ScreenAdapter {
                 mob.morto = info.getBoolean("is_dead", false);
                 mob.tempoCorpo = mob.morto ? Math.max(0f, TEMPO_CORPO_MOB - info.getFloat("dead_for", 0f)) : 0f;
                 mob.voltando = info.getBoolean("returning", false);
+                mob.alvoNome = info.getString("target", "");
                 if (info.has("pos_x")) {
                     moverMob(mob, info.getFloat("pos_x"), info.getFloat("pos_y"), info.getString("direction", "down"), 0f, true);
                 }
@@ -5303,6 +5321,42 @@ public class WorldScreen extends ScreenAdapter {
             }
         }
         return false;
+    }
+
+    /** Alcance do auto target, em SQMs (quadrado em volta do player). */
+    private static final int ALCANCE_AUTO_TARGET_SQM = 8;
+
+    /** Mira o mob mais perto que o modo deixa (Settings > Auto target). Apertar
+     * de novo com ele ja' mirado passa pro proximo mais perto. */
+    private void autoTarget() {
+        int modo = Controles.modoAutoTarget();
+        java.util.Set<String> party = new java.util.HashSet<>();
+        for (BookMenuUI.MembroParty m : bookMenu.membrosParty()) party.add(m.nome);
+        java.util.List<MobVisual> candidatos = new java.util.ArrayList<>();
+        int jx = tileX(local.x), jy = tileY(local.y);
+        for (MobVisual mob : mobs.values()) {
+            if (mob.morto || !mob.visivel) continue;
+            if (Math.max(Math.abs(tileX(mob.x) - jx), Math.abs(tileY(mob.y) - jy)) > ALCANCE_AUTO_TARGET_SQM) continue;
+            String alvo = mob.alvoNome == null ? "" : mob.alvoNome;
+            boolean meu = alvo.equals(local.nome);
+            boolean daParty = !alvo.isEmpty() && party.contains(alvo);
+            boolean ok;
+            switch (modo) {
+                case 0: ok = true; break;                              // qualquer um
+                case 2: ok = meu; break;                               // so' os que me focam
+                case 3: ok = meu || daParty; break;                    // eu ou a party
+                default: ok = alvo.isEmpty() || meu || daParty; break; // nao rouba de quem e' de fora
+            }
+            if (ok) candidatos.add(mob);
+        }
+        if (candidatos.isEmpty()) return;
+        candidatos.sort((a, b) -> Float.compare(
+            (a.x - local.x) * (a.x - local.x) + (a.y - local.y) * (a.y - local.y),
+            (b.x - local.x) * (b.x - local.x) + (b.y - local.y) * (b.y - local.y)));
+        MobVisual escolhido = candidatos.get(0);
+        if (escolhido.id.equals(alvoMob) && candidatos.size() > 1) escolhido = candidatos.get(1);
+        alvoMob = escolhido.id;
+        amigoMarcado = null;
     }
 
     private void mirarMob(MobVisual mob) {

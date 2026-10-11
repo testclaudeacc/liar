@@ -1802,8 +1802,22 @@ def mob_ai_loop():
                 continue
             try:
                 _mob_tick(mob_id, m, now)
+                _avisar_alvo_do_mob(mob_id, m)
             except Exception:
                 traceback.print_exc()
+
+def _nome_do_alvo(m):
+    if m.get('hp', 1) <= 0: return ''
+    alvo = online_players.get(m.get('target_sid')) if m.get('target_sid') else None
+    return alvo.get('name', '') if alvo else ''
+
+def _avisar_alvo_do_mob(mob_id, m):
+    """Avisa a area quando o mob troca de alvo (o auto target do client usa
+    isso pra nao roubar mob dos outros)."""
+    nome = _nome_do_alvo(m)
+    if m.get('_alvo_avisado', '') == nome: return
+    m['_alvo_avisado'] = nome
+    if m.get('room'): emit_area('mob_target', {'mob_id': mob_id, 'target': nome}, m['room'])
 
 def montar_sync_area(sid, room):
     rooms = set(salas_vizinhas(room))
@@ -1821,6 +1835,7 @@ def montar_sync_area(sid, room):
             "owner": "",
             "is_dead": morto,
             "returning": bool(m_data.get('returning', False)),
+            "target": _nome_do_alvo(m_data),
         }
         # Mob do /summons nao tem ponto no mapa: o client cria o visual pelo tipo.
         if m_data.get('summon'): mob_payload["summon_type"] = m_data.get('type_id', '')
