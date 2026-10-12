@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.33"
+SERVER_VERSION = "v0.34"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -161,7 +161,7 @@ NPC_DB = {
         "res://sprites/items/Food/Pepper.tres", "res://sprites/items/Food/Beetroot.tres"], "falas": ["Hungry, traveler? Fresh food, right here."]},
     "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "shop": [
         "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres",
-        "res://sprites/spells/ArrowBarrage.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
+        "res://sprites/spells/ArrowBarrage.tres", "res://sprites/spells/SmallVines.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Ranger/SecondHand/StarterArrow.tres",
         "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
@@ -364,6 +364,10 @@ ITEM_DB = {
     # entre elas), cada uma com spell_dmg% (3 x 21.5 = 64.5%); cada flecha da'
     # 1 golpe na skill spell_hit_skill. spell_slot aceita cor hex.
     "res://sprites/spells/ArrowBarrage.tres": {"name": "Arrow Barrage", "type": "Spell", "spell": "arrow_barrage", "spell_words": "Sequentia Iaculorum", "spell_desc": "Fires three arrows in quick succession.", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 12, "spell_dmg": 21.5, "spell_hits": 3, "spell_hit_every": 0.3, "spell_hit_skill": "distance", "spell_area": False, "spell_hit": "Arrow", "spell_proj": "res://ui/items/Arrow1.png", "spell_color": "4fd1a5", "spell_slot": "00604b", "price": 4000, "icon": "sheet/r77_c12", "cap": 0.0},
+    # Small Vines (Bard): vinhas prendem o mob (efeito "Vines" no client, ~2s
+    # fechadas): veneno de spell_bleed_ticks ticks (spell_dot "poison") e o mob
+    # fica lento (spell_slow s). Sem golpe inicial (spell_dmg 0).
+    "res://sprites/spells/SmallVines.tres": {"name": "Small Vines", "type": "Spell", "spell": "small_vines", "spell_words": "Vineolae", "spell_desc": "Vines burst from the ground, slowing and poisoning the target.", "req_level": 10, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 12, "spell_dmg": 0, "spell_area": False, "spell_dot": "poison", "spell_bleed_ticks": 3, "spell_bleed_pct": 21.5, "spell_bleed_every": 0.67, "spell_bleed_skill": "musicality", "spell_slow": 2.0, "spell_effect": "Vines", "spell_hit": "", "spell_proj": "", "spell_color": "8cd612", "spell_slot": "376d03", "price": 4000, "icon": "sheet/r75_c8", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
@@ -402,7 +406,7 @@ CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage",
                        "regen_hp", "regen_mp", "regen_seg", "price", "set", "set_xp", "training", "ammo_save",
                        "spell", "spell_mana", "spell_cd", "spell_dmg", "spell_desc", "spell_area",
                        "spell_bleed_ticks", "spell_bleed_pct", "spell_bleed_every", "spell_slot",
-                       "spell_hits", "spell_hit_every")
+                       "spell_hits", "spell_hit_every", "spell_dot", "spell_slow")
 
 def montar_item_db_cliente():
     db = {}
@@ -1640,6 +1644,8 @@ def _mob_desaparece_por_perseguicao(mob_id, m, now):
     if room:
         emit_area('mob_vanish', {'mob_id': mob_id, 'pos_x': m.get('pos_x', 0), 'pos_y': m.get('pos_y', 0)}, room)
 
+MOB_LENTO_MULT = 2.0  # passo 2x mais demorado = metade da velocidade
+
 def _duracao_passo_mob(m, origem, destino):
     # Tempo de 1 passo do mob: speed dele x speed_modifier do SQM de onde sai
     # (mesma tabela dos players, velocidade_tiles). O client recebe essa
@@ -1647,6 +1653,8 @@ def _duracao_passo_mob(m, origem, destino):
     vel = velocidade_tiles.get(m.get('mapa')) or {}
     # Metade do passo na velocidade do SQM de saida, metade na do de chegada.
     fator = 0.5 / max(0.05, vel.get(origem, 1.0)) + 0.5 / max(0.05, vel.get(destino, 1.0))
+    # Preso nas vinhas (Small Vines): anda na metade da velocidade.
+    if m.get('lento_ate', 0) > time.time(): fator *= MOB_LENTO_MULT
     return fator / max(0.1, float(m.get('speed', MOB_SPEED_PADRAO)))
 
 def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
@@ -3998,8 +4006,17 @@ def _lancar_magia(sid, p, caminho, mob_id):
     cada = float(dados.get('spell_bleed_every', 2) or 2)
     extra = {'hit_type': dados.get('spell_hit', 'Physical'), 'is_crit': False, 'reduced': False, 'is_miss': False,
              'w_type': 'Melee' if dados.get('spell_range') == 'melee' else 'Ranged', 'proj': dados.get('spell_proj', '')}
-    if ticks > 0: extra['bleed_secs'] = ticks * cada
-    _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano, now, extra)
+    dot = dados.get('spell_dot', 'bleed')
+    if ticks > 0: extra[dot + '_secs'] = ticks * cada
+    lento = float(dados.get('spell_slow', 0) or 0)
+    if lento > 0: mob_data['lento_ate'] = now + lento
+    if float(dados.get('spell_dmg', 0) or 0) > 0:
+        _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano, now, extra)
+    else:
+        # Sem golpe (Small Vines): so' o efeito no mob, o icone do DoT e a lentidao.
+        evt = {'mob_id': mob_id, 'effect': dados.get('spell_effect', ''), 'hold': lento, 'attacker_id': p.get('name', '')}
+        evt.update({k: v for k, v in extra.items() if k.endswith('_secs')})
+        emit_area('spell_effect', evt, p.get('room'))
     golpes = int(dados.get('spell_hits', 1) or 1)
     skill_golpe = dados.get('spell_hit_skill')
     if skill_golpe: _dar_hits_skill(sid, p, skill_golpe, 1)
@@ -4014,7 +4031,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
         mob_data['sangria'] = token
         dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_bleed_pct', 0) or 0) / 100.0)))
         socketio.start_background_task(_sangrar, sid, mob_id, mob_data, token, ticks, cada, dano_tick,
-                                       dados.get('spell_bleed_skill'), mob_type_id)
+                                       dados.get('spell_bleed_skill'), mob_type_id, dot)
 
 def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, mob_type_id):
     """Flechas seguintes da Arrow Barrage. Param se o mob morrer ou o player sair."""
@@ -4030,7 +4047,7 @@ def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, 
             if skill: _dar_hits_skill(sid, p, skill, 1)
     except Exception: traceback.print_exc()
 
-def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id):
+def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id, dot='bleed'):
     """Ticks do sangramento (Heavy Cut). Para se o mob morrer/renascer, se
     outro sangramento substituir esse ou se quem lancou sair do jogo."""
     try:
@@ -4042,7 +4059,7 @@ def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_typ
             restante = (ticks - i - 1) * cada
             _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano_tick, time.time(),
                               {'hit_type': '', 'is_crit': False, 'reduced': False, 'is_miss': False,
-                               'w_type': 'Melee', 'proj': '', 'is_bleed': True, 'bleed_secs': restante})
+                               'w_type': 'Melee', 'proj': '', 'is_' + dot: True, dot + '_secs': restante})
             if skill: _dar_hits_skill(sid, p, skill, 1)
             if m.get('hp', 0) <= 0: return
         if mob_ref.get('sangria') == token: mob_ref.pop('sangria', None)

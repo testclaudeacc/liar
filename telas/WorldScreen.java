@@ -132,6 +132,7 @@ public class WorldScreen extends ScreenAdapter {
         float tempoCorpo = 0f;        // segundos restantes do cadaver no chao
         float tempoTargetHit = 0f;    // quadradinho de "atacou" (mob.gd::_exibir_target_hit)
         long sangraAteMs = 0L;        // Heavy Cut: icone Bleed em cima ate' esse momento
+        long venenoAteMs = 0L;        // Small Vines: icone de veneno ate' esse momento
         String treinoDono = null;     // player treinando nele (arma de treino) - outros nao batem
         long treinoAteMs = 0L;
 
@@ -2529,7 +2530,7 @@ public class WorldScreen extends ScreenAdapter {
 
     // ---- Coroa/escudo da party: na altura do balao, mas a ESQUERDA do player ----
     private static final float TAM_ICONE_PARTY = 20f;
-    private TextureRegion regiaoBleed;
+    private TextureRegion regiaoBleed, regiaoVeneno;
     private static final float TAM_ICONE_SANGRA = 8f;
     private static final float RECUO_ICONE_SANGRA = 4f; // mais pra esquerda que a coroa
 
@@ -3347,6 +3348,14 @@ public class WorldScreen extends ScreenAdapter {
             if (data.has("training_lock")) travarMobTreino(mob, data.getString("training_lock", ""), data.getFloat("lock_secs", 5f));
             // Sangramento (Heavy Cut): icone Bleed enquanto durar; tick = so' o numero vermelho.
             if (data.has("bleed_secs")) mob.sangraAteMs = System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L;
+            if (data.has("poison_secs")) mob.venenoAteMs = System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L;
+            // Tick de veneno (Small Vines): so' o numero verde (as vinhas ja' estao no mob).
+            if (data.getBoolean("is_poison", false)) {
+                NumeroDano n = new NumeroDano(mob.x, mob.y, String.valueOf(data.getInt("damage", 0)), false);
+                n.cor = new Color(0.42f, 0.71f, 0.09f, 1f);
+                numerosDano.add(n);
+                return;
+            }
             if (data.getBoolean("is_bleed", false)) {
                 NumeroDano n = new NumeroDano(mob.x, mob.y, String.valueOf(data.getInt("damage", 0)), false);
                 n.cor = new Color(0.85f, 0.08f, 0.08f, 1f);
@@ -3450,6 +3459,16 @@ public class WorldScreen extends ScreenAdapter {
             if (mob == null) return;
             moverMob(mob, data.getFloat("pos_x", 0f), data.getFloat("pos_y", 0f), "down", 0f, true);
             efeitos.add(new Efeito(quadrosFumaca(), mob.x, mob.y));
+        });
+        // Magia sem golpe (Small Vines): toca o efeito no mob e liga o icone do DoT.
+        socket.on("spell_effect", (nomeEvt, data) -> {
+            if (data == null) return;
+            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            if (mob == null) return;
+            if (data.has("poison_secs")) mob.venenoAteMs = System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L;
+            if (data.has("bleed_secs")) mob.sangraAteMs = System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L;
+            String efeito = data.getString("effect", "");
+            if ("Vines".equals(efeito)) tocarVinhas(mob, data.getFloat("hold", 2f));
         });
         // Golpe recusado: mob travado por quem esta' treinando nele.
         socket.on("mob_locked", (nomeEvt, data) -> {
@@ -5316,6 +5335,25 @@ public class WorldScreen extends ScreenAdapter {
     private static final Color COR_CURA_HP = Color.valueOf("5cff6a");
     private static final Color COR_CURA_MP = Color.valueOf("8f8bff");
 
+    /** Vinhas (Small Vines): cresce, fica fechada `segurar` segundos e volta
+     * pro chao (os quadros de ida tocados ao contrario). Sheet "Vines" do atlas. */
+    private static final float DURACAO_QUADRO_VINHAS = 0.06f;
+
+    private void tocarVinhas(MobVisual mob, float segurar) {
+        TextureRegion[] ida = quadrosCura("Vines");   // acha a regiao pelo nome do arquivo
+        if (ida == null || ida.length == 0) return;
+        int parado = Math.max(1, Math.round(segurar / DURACAO_QUADRO_VINHAS));
+        TextureRegion[] seq = new TextureRegion[ida.length * 2 + parado];
+        int k = 0;
+        for (TextureRegion q : ida) seq[k++] = q;
+        for (int i = 0; i < parado; i++) seq[k++] = ida[ida.length - 1];
+        for (int i = ida.length - 1; i >= 0; i--) seq[k++] = ida[i];
+        Efeito e = new Efeito(seq, mob.x, mob.y);
+        e.duracaoQuadro = DURACAO_QUADRO_VINHAS;
+        e.mobAlvo = mob;
+        efeitos.add(e);
+    }
+
     /** Hit que acompanha o sprite do mob enquanto ele anda. */
     private void tocarEfeitoNoMob(String nome, MobVisual mob) {
         Efeito e = tocarEfeito(nome, mob.x, mob.y);
@@ -5962,6 +6000,16 @@ public class WorldScreen extends ScreenAdapter {
         // (depois do nome e da barra de vida) pra ficar por cima dos dois.
         if (mob.voltando && regiaoFlag != null) {
             batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 10f, 12f, 12f);
+        }
+        // Envenenado (Small Vines): mesmo lugar; se tambem sangra, vai 1 icone pra esquerda.
+        if (System.currentTimeMillis() < mob.venenoAteMs) {
+            if (regiaoVeneno == null) regiaoVeneno = atlas.findRegion("sheet/r75_c6");   // 640,736
+            if (regiaoVeneno != null) {
+                float desvio = System.currentTimeMillis() < mob.sangraAteMs ? TAM_ICONE_SANGRA + 1f : 0f;
+                float caixaX = ancoraX + 9f - TAM_ICONE_PARTY - RECUO_ICONE_SANGRA - desvio, caixaY = ancoraY + 13.5f - TAM_ICONE_PARTY / 2f;
+                batch.draw(regiaoVeneno, caixaX + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f,
+                    caixaY + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f, TAM_ICONE_SANGRA, TAM_ICONE_SANGRA);
+            }
         }
         // Sangrando (Heavy Cut): icone Bleed no lugar do icone de party do player.
         if (System.currentTimeMillis() < mob.sangraAteMs) {

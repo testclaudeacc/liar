@@ -413,7 +413,10 @@ public final class BookMenuUI {
         final int magiaGolpes;        // Arrow Barrage: 3 flechas
         final String magiaDescricao;
         final boolean magiaArea; // true = dano em area; false = um alvo so'
-        final int sangraTicks, sangraPct, sangraCada; // Heavy Cut: N ticks de X% a cada S segundos
+        final int sangraTicks;               // ticks do DoT (Heavy Cut: sangra; Small Vines: veneno)
+        final float sangraPct, sangraCada;   // % por tick e segundos entre eles
+        final String magiaDot;               // "bleed" ou "poison"
+        final float magiaLento;              // segundos de lentidao no mob
         final String magiaSlot; // cor do slot: "orange" (padrao) ou "red"
 
         final boolean treino;  // arma de treino (servidor.py::dano_arma_treino)
@@ -430,8 +433,10 @@ public final class BookMenuUI {
             this.magiaDescricao = d.getString("spell_desc", "");
             this.magiaArea = d.getBoolean("spell_area", false);
             this.sangraTicks = d.getInt("spell_bleed_ticks", 0);
-            this.sangraPct = d.getInt("spell_bleed_pct", 0);
-            this.sangraCada = d.getInt("spell_bleed_every", 0);
+            this.sangraPct = d.getFloat("spell_bleed_pct", 0f);
+            this.sangraCada = d.getFloat("spell_bleed_every", 0f);
+            this.magiaDot = d.getString("spell_dot", "bleed");
+            this.magiaLento = d.getFloat("spell_slow", 0f);
             this.magiaSlot = d.getString("spell_slot", "orange");
             this.treino = d.getBoolean("training", false);
             this.economiaFlecha = d.getInt("ammo_save", 0);
@@ -866,7 +871,8 @@ public final class BookMenuUI {
             bloco.add(linhaStat(dados.magiaMana + " Mana", COR_MANA)).left().row();
             bloco.add(linhaStat(dados.magiaCd + "s Cooldown", Color.LIGHT_GRAY)).left().row();
             bloco.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET)).left().padTop(6).row();
-            if (dados.sangraTicks > 0) bloco.add(linhaStat(textoSangramento(dados), COR_SANGRAMENTO)).left().row();
+            if (dados.sangraTicks > 0) bloco.add(linhaStat(textoSangramento(dados), corDoDot(dados))).left().row();
+            if (dados.magiaLento > 0) bloco.add(linhaStat("Slows for " + porcento(dados.magiaLento) + "s", Color.LIGHT_GRAY)).left().row();
             if (dados.magiaGolpes > 1) bloco.add(linhaStat(textoGolpes(dados), Color.LIGHT_GRAY)).left().row();
             bloco.add(linhaStat(dados.magiaArea ? "Area Damage" : "Single Target", COR_ALVO_MAGIA)).left().row();
             return;
@@ -5120,6 +5126,7 @@ public final class BookMenuUI {
     private static final Color COR_MAGIA_BORDA_OVER = new Color(0.85f, 0.42f, 0.1f, 1f);
     private static final Color COR_MAGIA_SELECIONADA = new Color(1f, 0.78f, 0.3f, 1f);
     private static final Color COR_SANGRAMENTO = Color.valueOf("ff5a5a");
+    private static final Color COR_VENENO = Color.valueOf("8cd612");
     // {fundo, borda, fundo hover, borda hover, borda selecionada,
     //  fundo da gaveta, borda da gaveta, fundo da gaveta hover}
     private static final Color[] CORES_SLOT_LARANJA = {COR_MAGIA_FUNDO, COR_MAGIA_BORDA, COR_MAGIA_FUNDO_OVER, COR_MAGIA_BORDA_OVER,
@@ -5171,8 +5178,11 @@ public final class BookMenuUI {
     private static String textoGolpes(EquipStats d) { return d.magiaGolpes + " hits of " + porcento(d.magiaDano) + "%"; }
 
     private static String textoSangramento(EquipStats d) {
-        return "Bleed: " + d.sangraTicks + "x " + d.sangraPct + "% (every " + d.sangraCada + "s)";
+        String tipo = "poison".equals(d.magiaDot) ? "Poison" : "Bleed";
+        return tipo + ": " + d.sangraTicks + "x " + porcento(d.sangraPct) + "% (every " + porcento(d.sangraCada) + "s)";
     }
+
+    private static Color corDoDot(EquipStats d) { return "poison".equals(d.magiaDot) ? COR_VENENO : COR_SANGRAMENTO; }
 
     /** Linha clicavel da aba Spells: slot da magia + nome, custo de mana,
      * descricao e % de dano. Borda clara = ja' esta' nesse slot. */
@@ -5247,7 +5257,8 @@ public final class BookMenuUI {
             linhaDano.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET));
             linhaDano.add(linhaStat(dados.magiaArea ? "Area Damage" : "Single Target", COR_ALVO_MAGIA)).padLeft(10);
             texto.add(linhaDano).left().row();
-            if (dados.sangraTicks > 0) texto.add(linhaStat(textoSangramento(dados), COR_SANGRAMENTO)).left().row();
+            if (dados.sangraTicks > 0) texto.add(linhaStat(textoSangramento(dados), corDoDot(dados))).left().row();
+            if (dados.magiaLento > 0) texto.add(linhaStat("Slows for " + porcento(dados.magiaLento) + "s", Color.LIGHT_GRAY)).left().row();
             if (dados.magiaGolpes > 1) texto.add(linhaStat(textoGolpes(dados), Color.LIGHT_GRAY)).left().row();
         }
         if (preco > 0) {
