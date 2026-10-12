@@ -539,6 +539,8 @@ public final class BookMenuUI {
             }
             if (pagina.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, extra);
         }
+        // Mercado: lista de itens + painel das ofertas lado a lado.
+        if (modoMercado && mercadoPage.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, EXTRA_JANELA_MAX);
         // Aba Spells (lista de magias): a janela alarga ate' a descricao caber numa linha.
         if (conteudoMagias != null && spellsPage.getParent() == mainWindow && conteudoMagias.getStage() != null) {
             float esquerda = TAM_SLOT_ATALHO * 3f + 6f * 3f + 22f + 6f;
@@ -4522,6 +4524,421 @@ public final class BookMenuUI {
     // Esquerda: os slots da hotbar em grade 3x3 (celular: so' os que tem botao
     // na tela). Clicar seleciona; a direita mostra Inventory/Spells e clicar
     // num item coloca ele no slot.
+    // ===================== MERCADO (Luna) =====================
+    // Lista de todos os itens (busca + filtros); clicar num item mostra as
+    // ofertas de compra/venda dele e o formulario pra criar a sua. "My offers"
+    // lista as suas pra cancelar. Servidor: servidor.py::handle_market_*.
+    private final Table mercadoPage = new Table();
+    private final Table mercadoLista = new Table();
+    private final Table mercadoDetalhe = new Table();
+    private boolean modoMercado = false, mercadoAbaVenda = true, mercadoVendoMinhas = false;
+    private String mercadoNpc = "", mercadoItem = null, secaoAntesDoMercado = "Bag";
+    private JsonValue mercadoOfertas, mercadoMinhas;
+    private int mercadoTenho = 0, mercadoTaxa = 10;
+    private String mercadoAviso = "";
+    private com.badlogic.gdx.scenes.scene2d.ui.TextField mercadoBusca, mercadoQtd, mercadoPreco;
+    private com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> mercadoClasse, mercadoNivel, mercadoTipo;
+    private static final String[] FILTRO_CLASSES = {"All classes", "Knight", "Ranger", "Mage", "Bard", "Universal"};
+    private static final String[] FILTRO_NIVEIS = {"All levels", "Lv 0-9", "Lv 10-19", "Lv 20-29", "Lv 30+"};
+    private static final String[] FILTRO_TIPOS = {"All types", "Weapons", "Off-hand", "Armor", "Ammo", "Potions", "Food", "Scrolls", "Other"};
+
+    public boolean emMercado() { return modoMercado; }
+
+    public void abrirMercado(String npcId, int taxa) {
+        if (modoTrade) return;
+        if (modoBanco) fecharBanco();
+        if (modoLoja) fecharLoja();
+        if (mercadoPage.getChildren().size == 0) construirPaginaMercado();
+        mercadoNpc = npcId == null ? "" : npcId;
+        mercadoTaxa = taxa;
+        mercadoItem = null; mercadoOfertas = null; mercadoVendoMinhas = false; mercadoAviso = "";
+        if (!modoMercado) secaoAntesDoMercado = secaoAtual;
+        modoMercado = true;
+        cancelarExclusao();
+        if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(false);
+        if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(false);
+        mainWindow.clearChildren();
+        mainWindow.pad(8);
+        mainWindow.add(mercadoPage).grow();
+        actionBar.setVisible(false);
+        atualizarListaMercado();
+        atualizarDetalheMercado();
+        root.setVisible(true);
+    }
+
+    public void fecharMercado() {
+        fecharPopupQuantidade();
+        if (!modoMercado) return;
+        modoMercado = false;
+        if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(true);
+        if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(true);
+        root.setVisible(false);
+        selecionarSecao(secaoAntesDoMercado);
+    }
+
+    /** market_offers: {item, buy:[{id,qty,price,owner,mine}], sell:[...], have}. */
+    public void mercadoRecebeuOfertas(JsonValue d) {
+        if (!modoMercado || d == null || !d.getString("item", "").equals(mercadoItem)) return;
+        mercadoOfertas = d;
+        mercadoTenho = d.getInt("have", 0);
+        atualizarDetalheMercado();
+    }
+
+    /** market_mine: {offers:[{id,kind,item,qty,price}]}. */
+    public void mercadoRecebeuMinhas(JsonValue d) {
+        mercadoMinhas = d;
+        if (modoMercado && mercadoVendoMinhas) atualizarDetalheMercado();
+    }
+
+    /** market_result: {ok, msg, currency}. */
+    public void mercadoResultado(JsonValue d) {
+        if (d == null) return;
+        atualizarMoedas(d.getLong("currency", currencyTotal));
+        mercadoAviso = d.getString("msg", "");
+        if (modoMercado) atualizarDetalheMercado();
+    }
+
+    /** Manda um evento do mercado com o npc_id junto (campos: os outros). */
+    private void emitirMercado(String evento, GameSocket.PayloadWriter campos) {
+        if (!socket.isConnected()) return;
+        String npc = mercadoNpc;
+        socket.emitRaw(evento, GameSocket.obj(w -> {
+            w.set("npc_id", npc);
+            campos.write(w);
+        }));
+    }
+
+    private com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> seletorMercado(String[] opcoes) {
+        com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> sb = new com.badlogic.gdx.scenes.scene2d.ui.SelectBox<>(skin, "zoom-select");
+        sb.setItems(opcoes);
+        sb.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { atualizarListaMercado(); }
+        });
+        return sb;
+    }
+
+    private void construirPaginaMercado() {
+        mercadoPage.top().left();
+        mercadoBusca = new com.badlogic.gdx.scenes.scene2d.ui.TextField("", skin);
+        mercadoBusca.setMessageText("Search item...");
+        mercadoBusca.setTextFieldListener((campo, c) -> atualizarListaMercado());
+        TextButton minhas = botaoSpells("My offers", "default", () -> {
+            mercadoVendoMinhas = !mercadoVendoMinhas;
+            mercadoAviso = "";
+            atualizarDetalheMercado();
+        });
+        TextButton fechar = new TextButton("X", estiloPlano(COR_BLOQUEADO, Color.WHITE));
+        fechar.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { setVisible(false); }
+        });
+        Table topo = new Table();
+        topo.add(mercadoBusca).growX().height(38).padRight(6);
+        topo.add(minhas).width(130).height(38).padRight(6);
+        topo.add(fechar).size(38);
+        mercadoClasse = seletorMercado(FILTRO_CLASSES);
+        mercadoNivel = seletorMercado(FILTRO_NIVEIS);
+        mercadoTipo = seletorMercado(FILTRO_TIPOS);
+        Table filtros = new Table();
+        filtros.add(mercadoClasse).growX().height(32).padRight(4);
+        filtros.add(mercadoNivel).growX().height(32).padRight(4);
+        filtros.add(mercadoTipo).growX().height(32);
+        mercadoLista.top().left();
+        ScrollPane rolagemLista = rolagem(mercadoLista);
+        rolagemComRodinha(rolagemLista);
+        Table esquerda = painelSpells();
+        esquerda.add(rolagemLista).grow();
+        Table direita = painelSpells();
+        mercadoDetalhe.top().left();
+        direita.add(mercadoDetalhe).grow();
+        Table corpo = new Table();
+        corpo.add(esquerda).width(250).growY().padRight(6);
+        corpo.add(direita).grow();
+        mercadoPage.add(topo).growX().padBottom(6).row();
+        mercadoPage.add(filtros).growX().padBottom(6).row();
+        mercadoPage.add(corpo).grow();
+    }
+
+    /** O item passa nos filtros e na busca? */
+    private boolean passaFiltrosMercado(String caminho, EquipStats d) {
+        String busca = mercadoBusca.getText().trim().toLowerCase();
+        if (!busca.isEmpty() && !nomeExibicao(caminho).toLowerCase().contains(busca)) return false;
+        int c = mercadoClasse.getSelectedIndex();
+        if (c >= 1 && c <= 4 && !("All".equals(d.reqClass) || FILTRO_CLASSES[c].equals(d.reqClass))) return false;
+        if (c == 5 && !"All".equals(d.reqClass)) return false;
+        int n = mercadoNivel.getSelectedIndex();
+        if (n >= 1) {
+            int min = (n - 1) * 10, max = n == 4 ? Integer.MAX_VALUE : min + 9;
+            if (d.reqLevel < min || d.reqLevel > max) return false;
+        }
+        String slot = slotDoItem(caminho);
+        String tipo;
+        if ("MainHand".equals(slot)) tipo = "Weapons";
+        else if ("Hand".equals(slot)) tipo = d.empilhavel ? "Ammo" : "Off-hand";
+        else if (slot != null) tipo = "Armor";
+        else if (d.ehPocao()) tipo = "Potions";
+        else if (d.fullness > 0) tipo = "Food";
+        else if (d.usavel) tipo = "Scrolls";
+        else tipo = "Other";
+        int t = mercadoTipo.getSelectedIndex();
+        return t == 0 || FILTRO_TIPOS[t].equals(tipo);
+    }
+
+    private void atualizarListaMercado() {
+        if (mercadoBusca == null) return;
+        mercadoLista.clearChildren();
+        List<String> itens = new ArrayList<>();
+        for (Map.Entry<String, EquipStats> e : ITEM_STATS.entrySet()) {
+            if (ehMagia(e.getKey()) || e.getValue().nome.isEmpty()) continue;
+            if (passaFiltrosMercado(e.getKey(), e.getValue())) itens.add(e.getKey());
+        }
+        itens.sort((a, b) -> nomeExibicao(a).compareToIgnoreCase(nomeExibicao(b)));
+        for (String caminho : itens) mercadoLista.add(gavetaItemMercado(caminho)).growX().padBottom(3).row();
+        if (itens.isEmpty()) mercadoLista.add(linhaStat("No items found.", Color.GRAY)).left().pad(4);
+    }
+
+    /** Gaveta da lista: icone + nome (+ level); clicar abre as ofertas dele. */
+    private Button gavetaItemMercado(String caminho) {
+        boolean escolhido = caminho.equals(mercadoItem);
+        Button.ButtonStyle estilo = new Button.ButtonStyle();
+        estilo.up = UiSkin.retangulo(new Color(0.11f, 0.11f, 0.11f, 1f), escolhido ? Color.valueOf("ffd56b") : new Color(0.25f, 0.25f, 0.25f, 1f), 1);
+        estilo.over = UiSkin.retangulo(new Color(0.16f, 0.16f, 0.16f, 1f), escolhido ? Color.valueOf("ffd56b") : new Color(0.4f, 0.4f, 0.4f, 1f), 1);
+        Button g = new Button(estilo);
+        g.left().pad(3, 4, 3, 6);
+        TextureAtlas.AtlasRegion icone = iconeDoItem(caminho);
+        if (icone != null) {
+            Image img = new Image(new TextureRegionDrawable(icone));
+            img.setScaling(Scaling.fit);
+            g.add(img).size(30).padRight(6);
+        }
+        Table txt = new Table();
+        txt.left();
+        txt.add(linhaStat(nomeExibicao(caminho), Color.WHITE)).left().row();
+        EquipStats d = ITEM_STATS.get(caminho);
+        if (d != null && d.reqLevel > 0) txt.add(linhaStat("Lv " + d.reqLevel, COR_REQUISITO)).left().row();
+        g.add(txt).growX().left();
+        g.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                mercadoItem = caminho;
+                mercadoOfertas = null;
+                mercadoVendoMinhas = false;
+                mercadoAviso = "";
+                atualizarListaMercado();
+                atualizarDetalheMercado();
+                emitirMercado("market_item", w -> w.set("item", caminho));
+            }
+        });
+        return g;
+    }
+
+    /** "1g 50s" (igual servidor.py::formatar_moedas). */
+    private static String formatarMoedas(long v) {
+        StringBuilder sb = new StringBuilder();
+        String[] nomes = {"p", "g", "s", "c"};
+        long[] valores = {1000000L, 10000L, 100L, 1L};
+        for (int i = 0; i < 4; i++) {
+            if (v >= valores[i] || (i == 3 && sb.length() == 0)) {
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(v / valores[i]).append(nomes[i]);
+                v %= valores[i];
+            }
+        }
+        return sb.toString();
+    }
+
+    /** "150", "5s", "2g 50s" -> copper; -1 = invalido. */
+    private static long lerPreco(String texto) {
+        if (texto == null) return -1;
+        String t = texto.trim().toLowerCase().replace(",", "");
+        if (t.isEmpty()) return -1;
+        long total = 0;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)\\s*([cpsg]?)").matcher(t);
+        int fim = 0;
+        while (m.find()) {
+            if (!t.substring(fim, m.start()).trim().isEmpty()) return -1;
+            long n = Long.parseLong(m.group(1));
+            switch (m.group(2)) {
+                case "s": n *= 100L; break;
+                case "g": n *= 10000L; break;
+                case "p": n *= 1000000L; break;
+                default: break;
+            }
+            total += n;
+            fim = m.end();
+        }
+        return t.substring(fim).trim().isEmpty() && total > 0 ? total : -1;
+    }
+
+    private static long lerInteiro(String texto) {
+        try { return Long.parseLong(texto.trim()); } catch (RuntimeException e) { return -1; }
+    }
+
+    private void atualizarDetalheMercado() {
+        mercadoDetalhe.clearChildren();
+        mercadoDetalhe.top().left();
+        if (mercadoVendoMinhas) { detalheMinhasOfertas(); return; }
+        if (mercadoItem == null) {
+            mercadoDetalhe.add(linhaStat("Select an item on the left.", Color.GRAY)).expand().center();
+            return;
+        }
+        String caminho = mercadoItem;
+        // Cabecalho: icone + nome + quantos tenho na bag.
+        Table cab = new Table();
+        cab.left();
+        TextureAtlas.AtlasRegion icone = iconeDoItem(caminho);
+        if (icone != null) {
+            Image img = new Image(new TextureRegionDrawable(icone));
+            img.setScaling(Scaling.fit);
+            cab.add(img).size(36).padRight(8);
+        }
+        Table nomes = new Table();
+        nomes.left();
+        nomes.add(new LabelPixel(nomeExibicao(caminho), new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE))).left().row();
+        nomes.add(linhaStat("In your bag: " + mercadoTenho, Color.LIGHT_GRAY)).left().row();
+        cab.add(nomes).left();
+        mercadoDetalhe.add(cab).left().padBottom(6).row();
+        // Abas: Sell offers (outros vendendo) / Buy offers (outros comprando).
+        Table abas = new Table();
+        abas.left();
+        abas.add(botaoSpells("Sell offers", mercadoAbaVenda ? "verde" : "default", () -> {
+            mercadoAbaVenda = true; mercadoAviso = ""; atualizarDetalheMercado();
+        })).width(140).height(34).padRight(6);
+        abas.add(botaoSpells("Buy offers", mercadoAbaVenda ? "default" : "verde", () -> {
+            mercadoAbaVenda = false; mercadoAviso = ""; atualizarDetalheMercado();
+        })).width(140).height(34);
+        mercadoDetalhe.add(abas).left().padBottom(6).row();
+        // Lista das ofertas.
+        Table lista = new Table();
+        lista.top().left();
+        JsonValue ofertas = mercadoOfertas == null ? null : mercadoOfertas.get(mercadoAbaVenda ? "sell" : "buy");
+        if (mercadoOfertas == null) lista.add(linhaStat("Loading...", Color.GRAY)).left();
+        else if (ofertas == null || ofertas.size == 0) lista.add(linhaStat(mercadoAbaVenda ? "Nobody is selling this." : "Nobody is buying this.", Color.GRAY)).left();
+        else for (JsonValue o = ofertas.child; o != null; o = o.next) lista.add(linhaOferta(caminho, o)).growX().padBottom(3).row();
+        ScrollPane rolagemOfertas = rolagem(lista);
+        rolagemComRodinha(rolagemOfertas);
+        mercadoDetalhe.add(rolagemOfertas).grow().row();
+        // Criar a minha oferta (do tipo da aba).
+        mercadoDetalhe.add(formularioOferta(caminho)).growX().padTop(6).row();
+        if (!mercadoAviso.isEmpty()) mercadoDetalhe.add(linhaStat(mercadoAviso, Color.valueOf("ffd56b"))).left().padTop(4).row();
+    }
+
+    /** Uma oferta: quantidade, preco por unidade, dono e o botao. */
+    private Table linhaOferta(String caminho, JsonValue o) {
+        long id = o.getLong("id", 0), preco = o.getLong("price", 0);
+        int qtd = o.getInt("qty", 0);
+        boolean minha = o.getBoolean("mine", false);
+        Table linha = new Table();
+        linha.setBackground(UiSkin.retangulo(new Color(0.1f, 0.1f, 0.1f, 1f), new Color(0.25f, 0.25f, 0.25f, 1f), 1));
+        linha.pad(3, 6, 3, 4);
+        Table info = new Table();
+        info.left();
+        info.add(linhaStat(qtd + "x  " + formatarMoedas(preco) + " each", Color.WHITE)).left().row();
+        info.add(linhaStat((minha ? "You" : o.getString("owner", "")) + "  -  total " + formatarMoedas(preco * qtd), Color.GRAY)).left().row();
+        linha.add(info).growX().left();
+        TextButton acao;
+        if (minha) {
+            acao = botaoSpells("Cancel", "vermelho", () -> emitirMercado("market_cancel", w -> w.set("id", id)));
+        } else if (mercadoAbaVenda) {
+            // Alguem vende: eu compro (ate' o que o dinheiro paga).
+            int max = (int) Math.min(qtd, preco > 0 ? currencyTotal / preco : 0);
+            acao = botaoSpells(max > 0 ? "Buy" : "No money", max > 0 ? "verde" : "default", () -> {
+                if (max <= 0) return;
+                if (max == 1) { emitirMercado("market_accept", w -> { w.set("id", id); w.set("qty", 1); }); return; }
+                abrirPopupQuantidade(nomeExibicao(caminho), iconeDoItem(caminho), max, null,
+                    v -> emitirMercado("market_accept", w -> { w.set("id", id); w.set("qty", v); }));
+            });
+        } else {
+            // Alguem compra: eu vendo (ate' o que tenho na bag).
+            int max = Math.min(qtd, mercadoTenho);
+            acao = botaoSpells(max > 0 ? "Sell" : "None", max > 0 ? "verde" : "default", () -> {
+                if (max <= 0) return;
+                if (max == 1) { emitirMercado("market_accept", w -> { w.set("id", id); w.set("qty", 1); }); return; }
+                abrirPopupQuantidade(nomeExibicao(caminho), iconeDoItem(caminho), max, null,
+                    v -> emitirMercado("market_accept", w -> { w.set("id", id); w.set("qty", v); }));
+            });
+        }
+        linha.add(acao).width(110).height(34);
+        return linha;
+    }
+
+    /** Quantidade + preco (aceita 150, 5s, 2g 50s) + total/taxa + Create. */
+    private Table formularioOferta(String caminho) {
+        Table f = new Table();
+        f.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.3f, 0.3f, 0.3f, 1f), 1));
+        f.pad(6);
+        f.left();
+        f.add(linhaStat(mercadoAbaVenda ? "Sell yours" : "Ask to buy", Color.WHITE)).left().colspan(3).padBottom(4).row();
+        String qtdAntes = mercadoQtd != null ? mercadoQtd.getText() : "1";
+        String precoAntes = mercadoPreco != null ? mercadoPreco.getText() : "";
+        mercadoQtd = new com.badlogic.gdx.scenes.scene2d.ui.TextField(qtdAntes, skin);
+        mercadoQtd.setMessageText("Qty");
+        mercadoPreco = new com.badlogic.gdx.scenes.scene2d.ui.TextField(precoAntes, skin);
+        mercadoPreco.setMessageText("Price each (ex: 50s, 2g)");
+        Label resumo = linhaStat("", Color.LIGHT_GRAY);
+        Runnable atualizarResumo = () -> {
+            long q = lerInteiro(mercadoQtd.getText()), pr = lerPreco(mercadoPreco.getText());
+            if (q <= 0 || pr <= 0) { resumo.setText("Price: 150 = 150c, 5s, 2g 50s..."); return; }
+            long total = q * pr;
+            resumo.setText(mercadoAbaVenda
+                ? "Total " + formatarMoedas(total) + "  -  fee " + mercadoTaxa + "%: " + formatarMoedas(Math.max(1, (long) Math.ceil(total * mercadoTaxa / 100.0)))
+                : "You pay " + formatarMoedas(total) + " now");
+        };
+        mercadoQtd.setTextFieldListener((c, ch) -> atualizarResumo.run());
+        mercadoPreco.setTextFieldListener((c, ch) -> atualizarResumo.run());
+        atualizarResumo.run();
+        TextButton criar = botaoSpells(mercadoAbaVenda ? "Create sell offer" : "Create buy offer", "verde", () -> {
+            long q = lerInteiro(mercadoQtd.getText()), pr = lerPreco(mercadoPreco.getText());
+            if (q <= 0 || pr <= 0) { mercadoAviso = "Type a quantity and a price."; atualizarDetalheMercado(); return; }
+            String tipo = mercadoAbaVenda ? "sell" : "buy";
+            emitirMercado("market_create", w -> {
+                w.set("kind", tipo);
+                w.set("item", caminho);
+                w.set("qty", q);
+                w.set("price", pr);
+            });
+        });
+        f.add(mercadoQtd).width(70).height(34).padRight(6);
+        f.add(mercadoPreco).growX().height(34).padRight(6);
+        f.add(criar).width(170).height(34).row();
+        f.add(resumo).left().colspan(3).padTop(4);
+        return f;
+    }
+
+    private void detalheMinhasOfertas() {
+        mercadoDetalhe.add(linhaStat("My offers", Color.WHITE)).left().padBottom(6).row();
+        Table lista = new Table();
+        lista.top().left();
+        JsonValue ofertas = mercadoMinhas == null ? null : mercadoMinhas.get("offers");
+        if (ofertas == null || ofertas.size == 0) lista.add(linhaStat("You have no offers.", Color.GRAY)).left();
+        else for (JsonValue o = ofertas.child; o != null; o = o.next) {
+            String caminho = o.getString("item", "");
+            long id = o.getLong("id", 0), preco = o.getLong("price", 0);
+            int qtd = o.getInt("qty", 0);
+            boolean venda = "sell".equals(o.getString("kind", ""));
+            Table linha = new Table();
+            linha.setBackground(UiSkin.retangulo(new Color(0.1f, 0.1f, 0.1f, 1f), new Color(0.25f, 0.25f, 0.25f, 1f), 1));
+            linha.pad(3, 6, 3, 4);
+            TextureAtlas.AtlasRegion icone = iconeDoItem(caminho);
+            if (icone != null) {
+                Image img = new Image(new TextureRegionDrawable(icone));
+                img.setScaling(Scaling.fit);
+                linha.add(img).size(28).padRight(6);
+            }
+            Table info = new Table();
+            info.left();
+            info.add(linhaStat((venda ? "Selling " : "Buying ") + qtd + "x " + nomeExibicao(caminho),
+                venda ? Color.valueOf("7fd47f") : Color.valueOf("7fb4ff"))).left().row();
+            info.add(linhaStat(formatarMoedas(preco) + " each", Color.GRAY)).left().row();
+            linha.add(info).growX().left();
+            linha.add(botaoSpells("Cancel", "vermelho", () -> emitirMercado("market_cancel", w -> w.set("id", id))))
+                .width(110).height(34);
+            lista.add(linha).growX().padBottom(3).row();
+        }
+        ScrollPane rolagemMinhas = rolagem(lista);
+        rolagemComRodinha(rolagemMinhas);
+        mercadoDetalhe.add(rolagemMinhas).grow().row();
+        if (!mercadoAviso.isEmpty()) mercadoDetalhe.add(linhaStat(mercadoAviso, Color.valueOf("ffd56b"))).left().padTop(4).row();
+    }
+
     // ===================== RANK =====================
     // Abas: Level (level + XP total) e as skills (Defense, Magic, Focus,
     // Musicality, Melee - o level da skill). Linha: posicao, icone da classe,
@@ -5593,6 +6010,10 @@ public final class BookMenuUI {
         }
         if (!visible && modoLoja) {
             fecharLoja();
+            return;
+        }
+        if (!visible && modoMercado) {
+            fecharMercado();
             return;
         }
         if (visible && modoLoja && !root.isVisible()) fecharLoja();

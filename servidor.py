@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.34"
+SERVER_VERSION = "v0.35"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -2106,6 +2106,25 @@ def init_db():
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS deleted_at DOUBLE PRECISION")
         # Ultima vez visto (epoch): atualizado a cada save do personagem.
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS last_seen DOUBLE PRECISION")
+        # Mercado (NPC Luna): ofertas publicas e a "caixa" de quem estava offline.
+        c.execute('''CREATE TABLE IF NOT EXISTS market_offers (
+                        id SERIAL PRIMARY KEY,
+                        kind TEXT NOT NULL,
+                        item TEXT NOT NULL,
+                        qty INTEGER NOT NULL,
+                        price BIGINT NOT NULL,
+                        owner_name TEXT NOT NULL,
+                        owner_user INTEGER,
+                        created DOUBLE PRECISION)''')
+        c.execute("CREATE INDEX IF NOT EXISTS market_offers_item ON market_offers (item)")
+        c.execute('''CREATE TABLE IF NOT EXISTS market_inbox (
+                        id SERIAL PRIMARY KEY,
+                        char_name TEXT NOT NULL,
+                        item TEXT,
+                        qty INTEGER DEFAULT 0,
+                        coins BIGINT DEFAULT 0,
+                        msg TEXT,
+                        created DOUBLE PRECISION)''')
         c.execute('''CREATE TABLE IF NOT EXISTS friendships (
                         id SERIAL PRIMARY KEY,
                         owner_name TEXT NOT NULL,
@@ -2830,6 +2849,8 @@ def handle_join_game(data):
         # inteiro de cada player (inventario, skills, user_id...): pesado com
         # muita gente online e vazava dado privado pros outros clients.
         emit('current_players', {o_sid: resumo_player_area(o_p) for o_sid, o_p in online_players.items()}, room=sid)
+        # Mercado: o que vendeu/comprou enquanto estava offline (moedas, itens e aviso).
+        _entregar_caixa_mercado(sid, data)
         emit('player_joined', resumo_player_area(data), broadcast=True, include_self=False)
 
         emit('sync_area_data', montar_sync_area(sid, room), room=sid)
@@ -6178,6 +6199,270 @@ def handle_shop_sell(data):
         else: inventario.remove(inst)
     p['currency'] = int(p.get('currency', 0)) + total
     _depois_da_loja(sid, p, 'sold')
+
+# =========================================================================
+# MERCADO (NPC Luna, estilo Tibia)
+# =========================================================================
+# Ofertas publicas por item: "sell" (o dono vende; os itens ficam presos no
+# mercado e ele paga MERCADO_TAXA do total na hora) e "buy" (o dono compra; o
+# dinheiro fica preso). Qualquer um aceita a oferta de outro. Quem estava
+# offline recebe na caixa (market_inbox) quando entrar, com o aviso.
+MERCADO_TAXA = 0.10
+MERCADO_MAX_OFERTAS = 20
+MERCADO_QTD_MAX = 10000
+MERCADO_PRECO_MAX = 10 ** 9
+
+def item_negociavel(item):
+    return isinstance(item, str) and item in ITEM_DB and not eh_magia(item)
+
+def formatar_moedas(v):
+    v = int(v); partes = []
+    for nome, valor in (('p', 1000000), ('g', 10000), ('s', 100), ('c', 1)):
+        if v >= valor or (nome == 'c' and not partes):
+            partes.append(f"{v // valor}{nome}"); v %= valor
+    return ' '.join(partes)
+
+def quantidade_na_bag(p, item):
+    return sum(int(i.get('qty', 1)) if eh_empilhavel(item) else 1
+               for i in p.get('inventory', []) if isinstance(i, dict) and i.get('item') == item)
+
+def tirar_da_bag(p, item, qtd):
+    """Tira qtd unidades do item da bag (pilhas ou instancias). False se nao tem."""
+    if quantidade_na_bag(p, item) < qtd: return False
+    inv = p.setdefault('inventory', [])
+    falta = qtd
+    for inst in [i for i in inv if isinstance(i, dict) and i.get('item') == item]:
+        if falta <= 0: break
+        if eh_empilhavel(item):
+            q = int(inst.get('qty', 1)); usa = min(q, falta)
+            if usa >= q: inv.remove(inst)
+            else: inst['qty'] = q - usa
+            falta -= usa
+        else:
+            inv.remove(inst); falta -= 1
+    return True
+
+def dar_na_bag(p, item, qtd):
+    if eh_empilhavel(item): adicionar_municao_ao_jogador(p, item, qtd)
+    else:
+        for _ in range(qtd): p.setdefault('inventory', []).append(criar_instancia_item(item))
+
+def _mercado_do_evento(sid, data):
+    p = online_players.get(sid)
+    if not p or not isinstance(data, dict) or p.get('is_dead') or p.get('trade_id'): return None
+    npc_id = str(data.get('npc_id', '')).strip().lower()[:64]
+    if NPC_DB.get(npc_id, {}).get('role') != 'market' or not _perto_do_npc(p, npc_id): return None
+    return p
+
+def _creditar(nome, coins=0, item=None, qtd=0, msg=''):
+    """Entrega pro dono de uma oferta: na hora se online, senao na caixa."""
+    sid_dono = players_by_name.get(nome)
+    dono = online_players.get(sid_dono) if sid_dono else None
+    if dono is not None and not dono.get('corpo_ausente'):
+        if coins: dono['currency'] = int(dono.get('currency', 0)) + int(coins)
+        if item and qtd: dar_na_bag(dono, item, qtd)
+        _queue_save(dono)
+        socketio.emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(dono.get('inventory', [])),
+                                           'equipped_items': dono.get('equipped_items', {})}, room=sid_dono)
+        socketio.emit('sync_stats', _montar_payload_sync_stats(dono), room=sid_dono)
+        if msg: socketio.emit('market_notice', {'msg': msg, 'item': item or ''}, room=sid_dono)
+        return
+    conn = None
+    try:
+        conn = db_pool.getconn(); c = conn.cursor()
+        c.execute("INSERT INTO market_inbox (char_name, item, qty, coins, msg, created) VALUES (%s,%s,%s,%s,%s,%s)",
+                  (nome, item, int(qtd), int(coins), msg, time.time()))
+        conn.commit(); c.close()
+    except Exception: traceback.print_exc()
+    finally:
+        if conn: db_pool.putconn(conn)
+
+def _entregar_caixa_mercado(sid, p):
+    conn = None
+    try:
+        conn = db_pool.getconn(); c = conn.cursor()
+        c.execute("DELETE FROM market_inbox WHERE char_name = %s RETURNING item, qty, coins, msg", (p.get('name', ''),))
+        linhas = c.fetchall(); conn.commit(); c.close()
+    except Exception:
+        traceback.print_exc(); linhas = []
+    finally:
+        if conn: db_pool.putconn(conn)
+    if not linhas: return
+    for item, qtd, coins, msg in linhas:
+        if coins: p['currency'] = int(p.get('currency', 0)) + int(coins)
+        if item and qtd and item in ITEM_DB: dar_na_bag(p, item, int(qtd))
+        if msg: emit('market_notice', {'msg': msg, 'item': item or ''}, room=sid)
+    _queue_save(p)
+    emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(p.get('inventory', [])),
+                              'equipped_items': p.get('equipped_items', {})}, room=sid)
+    emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+
+def _ofertas_json(linhas, meu_nome):
+    return [{'id': i, 'qty': q, 'price': pr, 'owner': dono, 'mine': dono == meu_nome}
+            for (i, q, pr, dono) in linhas]
+
+def _mandar_ofertas_item(sid, p, item):
+    conn = None
+    try:
+        conn = db_pool.getconn(); c = conn.cursor()
+        c.execute("SELECT id, qty, price, owner_name FROM market_offers WHERE item = %s AND kind = 'buy' ORDER BY price DESC, id", (item,))
+        compras = c.fetchall()
+        c.execute("SELECT id, qty, price, owner_name FROM market_offers WHERE item = %s AND kind = 'sell' ORDER BY price ASC, id", (item,))
+        vendas = c.fetchall(); c.close()
+    finally:
+        if conn: db_pool.putconn(conn)
+    emit('market_offers', {'item': item, 'buy': _ofertas_json(compras, p.get('name')),
+                           'sell': _ofertas_json(vendas, p.get('name')),
+                           'have': quantidade_na_bag(p, item)}, room=sid)
+
+def _mandar_minhas_ofertas(sid, p):
+    conn = None
+    try:
+        conn = db_pool.getconn(); c = conn.cursor()
+        c.execute("SELECT id, kind, item, qty, price FROM market_offers WHERE owner_name = %s ORDER BY id DESC", (p.get('name', ''),))
+        linhas = c.fetchall(); c.close()
+    finally:
+        if conn: db_pool.putconn(conn)
+    emit('market_mine', {'offers': [{'id': i, 'kind': k, 'item': it, 'qty': q, 'price': pr} for (i, k, it, q, pr) in linhas]}, room=sid)
+
+def _depois_do_mercado(sid, p, msg, ok=True, item=None):
+    _queue_save(p)
+    emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(p.get('inventory', [])),
+                              'equipped_items': p.get('equipped_items', {})}, room=sid)
+    emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+    emit('market_result', {'ok': ok, 'msg': msg, 'currency': int(p.get('currency', 0))}, room=sid)
+    if item: _mandar_ofertas_item(sid, p, item)
+    _mandar_minhas_ofertas(sid, p)
+
+@socketio.on('market_open')
+def handle_market_open(data):
+    try:
+        sid = request.sid
+        p = _mercado_do_evento(sid, data)
+        if not p: return
+        emit('market_opened', {'fee': int(MERCADO_TAXA * 100), 'max_offers': MERCADO_MAX_OFERTAS}, room=sid)
+        _mandar_minhas_ofertas(sid, p)
+    except Exception: traceback.print_exc()
+
+@socketio.on('market_item')
+def handle_market_item(data):
+    try:
+        sid = request.sid
+        p = _mercado_do_evento(sid, data)
+        item = str((data or {}).get('item', ''))
+        if not p or not item_negociavel(item): return
+        _mandar_ofertas_item(sid, p, item)
+    except Exception: traceback.print_exc()
+
+def _int_campo(data, chave, minimo, maximo):
+    try: v = int(data.get(chave, 0))
+    except (TypeError, ValueError): return None
+    return v if minimo <= v <= maximo else None
+
+@socketio.on('market_create')
+def handle_market_create(data):
+    conn = None
+    try:
+        sid = request.sid
+        p = _mercado_do_evento(sid, data)
+        if not p: return
+        tipo = data.get('kind'); item = str(data.get('item', ''))
+        qtd = _int_campo(data, 'qty', 1, MERCADO_QTD_MAX); preco = _int_campo(data, 'price', 1, MERCADO_PRECO_MAX)
+        if tipo not in ('buy', 'sell') or not item_negociavel(item) or qtd is None or preco is None: return
+        total = qtd * preco
+        conn = db_pool.getconn(); c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM market_offers WHERE owner_name = %s", (p.get('name', ''),))
+        if c.fetchone()[0] >= MERCADO_MAX_OFERTAS:
+            c.close(); return _depois_do_mercado(sid, p, f"You can have at most {MERCADO_MAX_OFERTAS} offers.", False)
+        if tipo == 'sell':
+            taxa = max(1, int(math.ceil(total * MERCADO_TAXA)))
+            if int(p.get('currency', 0)) < taxa:
+                c.close(); return _depois_do_mercado(sid, p, f"You need {formatar_moedas(taxa)} for the market fee.", False, item)
+            if not tirar_da_bag(p, item, qtd):
+                c.close(); return _depois_do_mercado(sid, p, "You don't have that many in your bag.", False, item)
+            p['currency'] = int(p.get('currency', 0)) - taxa
+        else:
+            if int(p.get('currency', 0)) < total:
+                c.close(); return _depois_do_mercado(sid, p, "Not enough money.", False, item)
+            p['currency'] = int(p.get('currency', 0)) - total
+        c.execute("INSERT INTO market_offers (kind, item, qty, price, owner_name, owner_user, created) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                  (tipo, item, qtd, preco, p.get('name', ''), p.get('user_id'), time.time()))
+        conn.commit(); c.close()
+        _depois_do_mercado(sid, p, "Offer created.", True, item)
+    except Exception:
+        traceback.print_exc()
+        if conn: conn.rollback()
+    finally:
+        if conn: db_pool.putconn(conn)
+
+@socketio.on('market_accept')
+def handle_market_accept(data):
+    conn = None
+    try:
+        sid = request.sid
+        p = _mercado_do_evento(sid, data)
+        if not p: return
+        oid = _int_campo(data, 'id', 1, 2 ** 31 - 1); qtd = _int_campo(data, 'qty', 1, MERCADO_QTD_MAX)
+        if oid is None or qtd is None: return
+        conn = db_pool.getconn(); c = conn.cursor()
+        c.execute("SELECT kind, item, qty, price, owner_name FROM market_offers WHERE id = %s FOR UPDATE", (oid,))
+        linha = c.fetchone()
+        if not linha:
+            conn.rollback(); c.close(); return _depois_do_mercado(sid, p, "This offer is gone.", False)
+        tipo, item, disp, preco, dono = linha
+        if dono == p.get('name'):
+            conn.rollback(); c.close(); return _depois_do_mercado(sid, p, "You can't accept your own offer.", False, item)
+        qtd = min(qtd, disp); total = qtd * preco
+        nome_item = ITEM_DB.get(item, {}).get('name', item)
+        if tipo == 'sell':
+            # Eu compro do vendedor: pago, levo o item; ele recebe as moedas.
+            if int(p.get('currency', 0)) < total:
+                conn.rollback(); c.close(); return _depois_do_mercado(sid, p, "Not enough money.", False, item)
+        else:
+            # Eu vendo pro comprador: dou o item, levo as moedas (ja' presas na oferta).
+            if quantidade_na_bag(p, item) < qtd:
+                conn.rollback(); c.close(); return _depois_do_mercado(sid, p, "You don't have that many in your bag.", False, item)
+        if qtd >= disp: c.execute("DELETE FROM market_offers WHERE id = %s", (oid,))
+        else: c.execute("UPDATE market_offers SET qty = qty - %s WHERE id = %s", (qtd, oid))
+        conn.commit(); c.close()
+        if tipo == 'sell':
+            p['currency'] = int(p.get('currency', 0)) - total
+            dar_na_bag(p, item, qtd)
+            _creditar(dono, coins=total, msg=f"You sold {qtd}x {nome_item} for {formatar_moedas(total)}.")
+            _depois_do_mercado(sid, p, f"You bought {qtd}x {nome_item} for {formatar_moedas(total)}.", True, item)
+        else:
+            tirar_da_bag(p, item, qtd)
+            p['currency'] = int(p.get('currency', 0)) + total
+            _creditar(dono, item=item, qtd=qtd, msg=f"You bought {qtd}x {nome_item} for {formatar_moedas(total)}.")
+            _depois_do_mercado(sid, p, f"You sold {qtd}x {nome_item} for {formatar_moedas(total)}.", True, item)
+    except Exception:
+        traceback.print_exc()
+        if conn: conn.rollback()
+    finally:
+        if conn: db_pool.putconn(conn)
+
+@socketio.on('market_cancel')
+def handle_market_cancel(data):
+    conn = None
+    try:
+        sid = request.sid
+        p = _mercado_do_evento(sid, data)
+        if not p: return
+        oid = _int_campo(data, 'id', 1, 2 ** 31 - 1)
+        if oid is None: return
+        conn = db_pool.getconn(); c = conn.cursor()
+        c.execute("DELETE FROM market_offers WHERE id = %s AND owner_name = %s RETURNING kind, item, qty, price", (oid, p.get('name', '')))
+        linha = c.fetchone(); conn.commit(); c.close()
+        if not linha: return _depois_do_mercado(sid, p, "This offer is gone.", False)
+        tipo, item, qtd, preco = linha
+        if tipo == 'sell': dar_na_bag(p, item, qtd)              # itens voltam (a taxa nao)
+        else: p['currency'] = int(p.get('currency', 0)) + qtd * preco
+        _depois_do_mercado(sid, p, "Offer cancelled.", True, item)
+    except Exception:
+        traceback.print_exc()
+        if conn: conn.rollback()
+    finally:
+        if conn: db_pool.putconn(conn)
 
 ICONES_AMIZADE_VALIDOS = {'pk': 'icon_pk', 'guild': 'icon_guild', 'seller': 'icon_seller'}
 

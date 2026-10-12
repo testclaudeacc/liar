@@ -3502,6 +3502,24 @@ public class WorldScreen extends ScreenAdapter {
             if (mob.id.equals(alvoMob)) alvoMob = null;
             avisarMobTravado(mob);
         });
+        // ---- Mercado (Luna) ----
+        socket.on("market_opened", (nomeEvt, data) -> {
+            if (data == null || npcMercado == null) return;
+            if (chat.isVisivel()) chat.setVisivel(false);
+            if (settingsAberta()) fecharSettings();
+            bookMenu.abrirMercado(npcMercado.tipo.toLowerCase(), data.getInt("fee", 10));
+            atualizarVisibilidadeJoystick();
+        });
+        socket.on("market_offers", (nomeEvt, data) -> bookMenu.mercadoRecebeuOfertas(data));
+        socket.on("market_mine", (nomeEvt, data) -> bookMenu.mercadoRecebeuMinhas(data));
+        socket.on("market_result", (nomeEvt, data) -> bookMenu.mercadoResultado(data));
+        // Alguem aceitou uma oferta minha (agora, ou enquanto eu estava offline).
+        socket.on("market_notice", (nomeEvt, data) -> {
+            if (data == null) return;
+            String msg = data.getString("msg", "");
+            hud.notificarTipo(HudVitais.NOTIF_TRADE, msg);
+            if (chat != null) chat.adicionarMensagemSistema(msg);
+        });
         // Magia lancada (so' eu): comeca o cooldown dela nos slots.
         socket.on("spell_used", (nomeEvt, data) -> {
             if (data == null) return;
@@ -4090,6 +4108,7 @@ public class WorldScreen extends ScreenAdapter {
     /** NPC do bank aberto agora (pra fechar ao se afastar). */
     private NPCVisual npcBanco;
     /** NPC da loja aberta agora (idem). */
+    private NPCVisual npcMercado;   // Luna: mercado aberto (fecha se afastar)
     private NPCVisual npcLoja;
     /** Funcoes de NPC que abrem a loja (os outros vendedores entram aqui quando tiverem "shop"). */
     private static final java.util.Set<String> PAPEIS_COM_LOJA = new java.util.HashSet<>(java.util.Arrays.asList("food", "pot", "weapon", "spell"));
@@ -4103,6 +4122,13 @@ public class WorldScreen extends ScreenAdapter {
         if ("bank".equals(npc.papel)) {
             npcBanco = npc;
             if (socket.isConnected()) socket.emitRaw("bank_open", "{}");
+            return;
+        }
+        // Luna (role "market"): mercado entre players (servidor.py::handle_market_*).
+        if ("market".equals(npc.papel)) {
+            npcMercado = npc;
+            String tipoNpc = npc.tipo.toLowerCase();
+            if (socket.isConnected()) socket.emitRaw("market_open", GameSocket.obj(w -> w.set("npc_id", tipoNpc)));
             return;
         }
         // NPC com loja (servidor.py::NPC_DB "shop"): abre direto a tela Buy/Sell.
@@ -4171,6 +4197,12 @@ public class WorldScreen extends ScreenAdapter {
      * e mexer em outras GUIs com o dialogo aberto agora e' permitido, mas
      * sair dos SQMs do NPC encerra a conversa). Chamado todo frame. */
     private void fecharDialogoNPCSeForaDeAlcance() {
+        // Mercado aberto: sair de perto da Luna fecha.
+        if (bookMenu.emMercado() && npcMercado != null && distanciaQuadradaAteNPC(npcMercado) > ALCANCE_NPC_AO_QUADRADO) {
+            bookMenu.setVisible(false);
+            npcMercado = null;
+            atualizarVisibilidadeJoystick();
+        }
         // Loja aberta: sair de perto do vendedor fecha.
         if (bookMenu.emLoja() && npcLoja != null && distanciaQuadradaAteNPC(npcLoja) > ALCANCE_NPC_AO_QUADRADO) {
             bookMenu.setVisible(false);
