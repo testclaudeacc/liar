@@ -68,13 +68,22 @@ public final class HotbarUI {
     private final Stack[] conteudos = new Stack[BookMenuUI.SLOTS_ATALHO];
     private Button.ButtonStyle estiloSlot, estiloSlotEscolhido;
     /** Celular: slot com magia e' quadrado (o icone da magia e' quadrado). */
-    private Button.ButtonStyle estiloQuadrado, estiloQuadradoEscolhido;
+    /** Estilo de cada slot com magia (a cor vem da magia: laranja, vermelho...). */
+    private final Button.ButtonStyle[] estiloMagia = new Button.ButtonStyle[BookMenuUI.SLOTS_ATALHO];
+    private final Button.ButtonStyle[] estiloMagiaEscolhido = new Button.ButtonStyle[BookMenuUI.SLOTS_ATALHO];
+    private final java.util.Map<String, Button.ButtonStyle> cacheEstilos = new java.util.HashMap<>();
+
+    private Button.ButtonStyle estiloDaMagia(Color[] c, boolean escolhido) {
+        String chave = c[0].toString() + (escolhido ? "e" : "");
+        return cacheEstilos.computeIfAbsent(chave, k -> {
+            Button.ButtonStyle e = new Button.ButtonStyle();
+            int borda = MOBILE ? 3 : 2;
+            e.up = UiSkin.retangulo(c[0], escolhido ? COR_EDICAO : c[1], borda);
+            if (!MOBILE && !escolhido) e.over = UiSkin.retangulo(c[2], c[3], borda);
+            return e;
+        });
+    }
     private final boolean[] slotMagia = new boolean[BookMenuUI.SLOTS_ATALHO];
-    // Slot com magia: laranja (fundo bem escuro, borda laranja media) no lugar dos cinzas.
-    private static final Color COR_MAGIA_FUNDO = new Color(0.22f, 0.09f, 0.01f, 0.94f);
-    private static final Color COR_MAGIA_BORDA = new Color(0.72f, 0.33f, 0.06f, 1f);
-    private static final Color COR_MAGIA_FUNDO_OVER = new Color(0.28f, 0.12f, 0.02f, 0.96f);
-    private static final Color COR_MAGIA_BORDA_OVER = new Color(0.85f, 0.42f, 0.1f, 1f);
     /** Celular: botoes (1 a 9; botao i = slot i), salvo no aparelho. */
     private List<Controles.BotaoMobile> layout = new ArrayList<>();
 
@@ -88,17 +97,11 @@ public final class HotbarUI {
             estiloSlot.up = circulo(new Color(0.15f, 0.15f, 0.15f, 0.92f), new Color(0.32f, 0.32f, 0.32f, 1f));
             estiloSlotEscolhido = new Button.ButtonStyle();
             estiloSlotEscolhido.up = circulo(new Color(0.22f, 0.22f, 0.22f, 0.96f), COR_EDICAO);
-            estiloQuadrado = new Button.ButtonStyle();
-            estiloQuadrado.up = UiSkin.retangulo(COR_MAGIA_FUNDO, COR_MAGIA_BORDA, 3);
-            estiloQuadradoEscolhido = new Button.ButtonStyle();
-            estiloQuadradoEscolhido.up = UiSkin.retangulo(COR_MAGIA_FUNDO, COR_EDICAO, 3);
+
         } else {
             // Um pouco mais escuro que os slots da bag (a pedido do usuario).
             estiloSlot.up = UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 0.92f), new Color(0.17f, 0.17f, 0.17f, 1f), 2);
             estiloSlot.over = UiSkin.retangulo(new Color(0.12f, 0.12f, 0.12f, 0.95f), new Color(0.27f, 0.27f, 0.27f, 1f), 2);
-            estiloQuadrado = new Button.ButtonStyle();
-            estiloQuadrado.up = UiSkin.retangulo(COR_MAGIA_FUNDO, COR_MAGIA_BORDA, 2);
-            estiloQuadrado.over = UiSkin.retangulo(COR_MAGIA_FUNDO_OVER, COR_MAGIA_BORDA_OVER, 2);
         }
         for (int i = 0; i < slots.length; i++) {
             final int indice = i;
@@ -152,7 +155,7 @@ public final class HotbarUI {
             Controles.BotaoMobile b = layout.get(i);
             slots[i].setBounds(w - b.x - b.tamanho / 2f, b.y - b.tamanho / 2f, b.tamanho, b.tamanho);
             boolean escolhido = editando && i == selecionado;
-            slots[i].setStyle(slotMagia[i] ? (escolhido ? estiloQuadradoEscolhido : estiloQuadrado)
+            slots[i].setStyle(slotMagia[i] ? (escolhido ? estiloMagiaEscolhido[i] : estiloMagia[i])
                 : (escolhido ? estiloSlotEscolhido : estiloSlot));
         }
     }
@@ -365,7 +368,12 @@ public final class HotbarUI {
             pilha.clearChildren();
             String caminho = i < atalhos.length ? atalhos[i] : "";
             slotMagia[i] = caminho != null && !caminho.isEmpty() && livro.ehMagia(caminho);
-            if (!MOBILE) slots[i].setStyle(slotMagia[i] ? estiloQuadrado : estiloSlot);
+            if (slotMagia[i]) {
+                Color[] cores = livro.coresSlotMagia(caminho);
+                estiloMagia[i] = estiloDaMagia(cores, false);
+                estiloMagiaEscolhido[i] = estiloDaMagia(cores, true);
+            }
+            if (!MOBILE) slots[i].setStyle(slotMagia[i] ? estiloMagia[i] : estiloSlot);
             if (caminho != null && !caminho.isEmpty()) {
                 // Magia: sem numero (nao e' item da bag).
                 int qtd = slotMagia[i] ? 0 : livro.quantidadeNaBag(caminho);

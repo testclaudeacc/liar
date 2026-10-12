@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.31"
+SERVER_VERSION = "v0.32"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -160,7 +160,7 @@ NPC_DB = {
         "res://sprites/items/Food/Blueberries.tres", "res://sprites/items/Food/VegetableSoup.tres",
         "res://sprites/items/Food/Pepper.tres", "res://sprites/items/Food/Beetroot.tres"], "falas": ["Hungry, traveler? Fresh food, right here."]},
     "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "shop": [
-        "res://sprites/spells/Igniculus.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
+        "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
         "res://sprites/items/Bard/Weapons/RawFlute.tres", "res://sprites/items/Ranger/Weapons/RawBow.tres",
@@ -353,6 +353,11 @@ ITEM_DB = {
     # vez por cooldown da magia - nao da' pra abusar com atk speed).
     # A Nyla so' mostra a magia pra quem tem o level e a classe dela.
     "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 75, "spell_area": False, "spell_skill": "magic", "spell_skill_hits": 5, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r73_c11", "cap": 0.0},
+    # Heavy Cut (Knight): corte (20%) + sangramento: spell_bleed_ticks ticks de
+    # spell_bleed_pct% a cada spell_bleed_every s; cada tick da' 1 golpe na
+    # skill spell_bleed_skill. spell_range "melee": so' colado no mob.
+    # spell_slot: cor do slot da magia no client (orange/red).
+    "res://sprites/spells/HeavyCut.tres": {"name": "Heavy Cut", "type": "Spell", "spell": "heavy_cut", "spell_words": "Incisio Cruenta", "spell_desc": "A brutal cut that leaves the target bleeding.", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 15, "spell_cd": 12, "spell_dmg": 20, "spell_area": False, "spell_range": "melee", "spell_bleed_ticks": 3, "spell_bleed_pct": 15, "spell_bleed_every": 2, "spell_bleed_skill": "melee", "spell_hit": "SwordInv", "spell_proj": "", "spell_color": "ff4a4a", "spell_slot": "red", "price": 3000, "icon": "sheet/r77_c8", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
@@ -389,7 +394,8 @@ CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
                        "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap", "usable",
                        "regen_hp", "regen_mp", "regen_seg", "price", "set", "set_xp", "training", "ammo_save",
-                       "spell", "spell_mana", "spell_cd", "spell_dmg", "spell_desc", "spell_area")
+                       "spell", "spell_mana", "spell_cd", "spell_dmg", "spell_desc", "spell_area",
+                       "spell_bleed_ticks", "spell_bleed_pct", "spell_bleed_every", "spell_slot")
 
 def montar_item_db_cliente():
     db = {}
@@ -3783,17 +3789,17 @@ def _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano_final, now, ex
                 max_hp_novo, max_mp_novo = calcular_max_vitais(part_p)
                 part_p['current_hp'] = max_hp_novo
                 part_p['current_mp'] = max_mp_novo
-                emit('sync_vitals', {'current_hp': part_p['current_hp'], 'current_mp': part_p['current_mp']}, room=participant_sid)
+                socketio.emit('sync_vitals', {'current_hp': part_p['current_hp'], 'current_mp': part_p['current_mp']}, room=participant_sid)
                 broadcast_hp(participant_sid, part_p)
             
             _queue_save(part_p) 
-            emit('xp_gained', {'amount': xp_gained}, room=participant_sid)
+            socketio.emit('xp_gained', {'amount': xp_gained}, room=participant_sid)
             
             stats_payload = _montar_payload_sync_stats(part_p)
             stats_payload['leveled_up'] = False
             stats_payload['char_leveled_up'] = char_leveled_up
             stats_payload['new_char_level'] = current_level
-            emit('sync_stats', stats_payload, room=participant_sid)
+            socketio.emit('sync_stats', stats_payload, room=participant_sid)
             
             if char_leveled_up:
                 # Área toda (chunks vizinhos) de quem upou; antes ia só pro
@@ -3815,12 +3821,13 @@ def _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano_final, now, ex
             # pos/has_items guardados pra recriar a bag de quem relogar.
             ground_loot[loot_id] = {"items": itens_rolados, "currency": currency_rolada, "room": room, "criado_em": now, "owners": {part_name},
                                     "pos": [mob_data.get('pos_x', 0), mob_data.get('pos_y', 0)], "has_items": has_items}
-            emit('mob_died', {'mob_id': mob_id, 'loot_id': loot_id, 'has_items': has_items,
+            socketio.emit('mob_died', {'mob_id': mob_id, 'loot_id': loot_id, 'has_items': has_items,
                               'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room=participant_sid)
             owner_sids.append(participant_sid)
         emit_area('mob_died', {'mob_id': mob_id, 'loot_id': '', 'has_items': False,
                                'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room, skip_sid=owner_sids)
         mob_data['died_at'] = now
+        mob_data.pop('sangria', None)  # sangramento acaba com a morte
         mob_data['target_sid'] = None
         mob_data['returning'] = False
         mob_data['path'] = None
@@ -3844,10 +3851,15 @@ def _lancar_magia(sid, p, caminho, mob_id):
     mob_data = active_mobs.get(mob_id) if mob_id else None
     if mob_data is None or mob_data.get('hp', 1) <= 0 or 'pos_x' not in mob_data or na_pz(mob_data): return falha('no_target')
     if int(p.get('floor', 1) or 1) != MOB_FLOOR: return falha('no_target')
-    if _dist_px(mob_data, p) > (ALCANCE_RANGED_SQM + 1) * TILE: return falha('range')
-    if int(p.get('floor', 1) or 1) == 1 and not linha_de_visao(
-            mapas_colisao.get(p.get('mapa')), tile_de(p.get('pos_x', 0), p.get('pos_y', 0)), tile_do_mob(mob_data)):
-        return falha('range')
+    if dados.get('spell_range') == 'melee':
+        # Corpo a corpo: igual o golpe do Knight (SQM do lado, +1 de folga).
+        tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0)); tm = tile_do_mob(mob_data)
+        if max(abs(tp[0] - tm[0]), abs(tp[1] - tm[1])) > 2: return falha('range')
+    else:
+        if _dist_px(mob_data, p) > (ALCANCE_RANGED_SQM + 1) * TILE: return falha('range')
+        if int(p.get('floor', 1) or 1) == 1 and not linha_de_visao(
+                mapas_colisao.get(p.get('mapa')), tile_de(p.get('pos_x', 0), p.get('pos_y', 0)), tile_do_mob(mob_data)):
+            return falha('range')
     trava = mob_data.get('treino_trava')
     if trava and trava.get('sid') != sid and trava.get('ate', 0) > now and trava.get('sid') in online_players:
         emit('mob_locked', {'mob_id': mob_id, 'owner': trava.get('nome', ''), 'secs': round(trava['ate'] - now, 1)}, room=sid)
@@ -3888,9 +3900,37 @@ def _lancar_magia(sid, p, caminho, mob_id):
             ultimas[caminho] = now
             _dar_hits_skill(sid, p, skill_magia, int(dados.get('spell_skill_hits', 0) or 0))
     mob_type_id = mob_data.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
-    _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano, now,
-                      {'hit_type': dados.get('spell_hit', 'Physical'), 'is_crit': False, 'reduced': False, 'is_miss': False,
-                       'w_type': 'Ranged', 'proj': dados.get('spell_proj', '')})
+    ticks = int(dados.get('spell_bleed_ticks', 0) or 0)
+    cada = float(dados.get('spell_bleed_every', 2) or 2)
+    extra = {'hit_type': dados.get('spell_hit', 'Physical'), 'is_crit': False, 'reduced': False, 'is_miss': False,
+             'w_type': 'Melee' if dados.get('spell_range') == 'melee' else 'Ranged', 'proj': dados.get('spell_proj', '')}
+    if ticks > 0: extra['bleed_secs'] = ticks * cada
+    _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano, now, extra)
+    if ticks > 0 and mob_data.get('hp', 0) > 0:
+        # Sangramento: substitui um anterior (o token muda e a tarefa velha para).
+        token = uuid.uuid4().hex
+        mob_data['sangria'] = token
+        dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_bleed_pct', 0) or 0) / 100.0)))
+        socketio.start_background_task(_sangrar, sid, mob_id, mob_data, token, ticks, cada, dano_tick,
+                                       dados.get('spell_bleed_skill'), mob_type_id)
+
+def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id):
+    """Ticks do sangramento (Heavy Cut). Para se o mob morrer/renascer, se
+    outro sangramento substituir esse ou se quem lancou sair do jogo."""
+    try:
+        for i in range(ticks):
+            socketio.sleep(cada)
+            m = active_mobs.get(mob_id)
+            p = online_players.get(sid)
+            if m is not mob_ref or m.get('sangria') != token or m.get('hp', 0) <= 0 or p is None: return
+            restante = (ticks - i - 1) * cada
+            _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano_tick, time.time(),
+                              {'hit_type': '', 'is_crit': False, 'reduced': False, 'is_miss': False,
+                               'w_type': 'Melee', 'proj': '', 'is_bleed': True, 'bleed_secs': restante})
+            if skill: _dar_hits_skill(sid, p, skill, 1)
+            if m.get('hp', 0) <= 0: return
+        if mob_ref.get('sangria') == token: mob_ref.pop('sangria', None)
+    except Exception: traceback.print_exc()
 
 @socketio.on('hit_mob')
 def handle_hit_mob(data):
@@ -4386,7 +4426,7 @@ def _dar_hits_skill(sid, p, skill_name, n):
     skills[skill_name] = nivel; skills[hits_key] = hits; p['skills'] = skills
     payload = _montar_payload_sync_stats(p)
     payload['leveled_up'] = subiu; payload['skill_name'] = skill_name; payload['new_level'] = nivel
-    emit('sync_stats', payload, room=sid)
+    socketio.emit('sync_stats', payload, room=sid)
     if subiu and p.get('room') and p.get('name'):
         emit_area('player_skill_leveled_up', {'name': p.get('name'), 'skill_name': skill_name, 'new_level': nivel}, p.get('room'))
 

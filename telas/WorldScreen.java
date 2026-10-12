@@ -131,6 +131,7 @@ public class WorldScreen extends ScreenAdapter {
         boolean voltando = false;     // voltando pra casa (flag do servidor)
         float tempoCorpo = 0f;        // segundos restantes do cadaver no chao
         float tempoTargetHit = 0f;    // quadradinho de "atacou" (mob.gd::_exibir_target_hit)
+        long sangraAteMs = 0L;        // Heavy Cut: icone Bleed em cima ate' esse momento
         String treinoDono = null;     // player treinando nele (arma de treino) - outros nao batem
         long treinoAteMs = 0L;
 
@@ -2528,6 +2529,7 @@ public class WorldScreen extends ScreenAdapter {
 
     // ---- Coroa/escudo da party: na altura do balao, mas a ESQUERDA do player ----
     private static final float TAM_ICONE_PARTY = 20f;
+    private TextureRegion regiaoBleed;
 
     private void desenharIconeParty(Jogador j) {
         if (j == local ? localMorto : estaMorto(j)) return;
@@ -3341,6 +3343,15 @@ public class WorldScreen extends ScreenAdapter {
             mob.maxHp = Math.max(1f, data.getFloat("max_hp", mob.maxHp));
             mob.hp = Math.max(0f, data.getFloat("new_hp", mob.hp));
             if (data.has("training_lock")) travarMobTreino(mob, data.getString("training_lock", ""), data.getFloat("lock_secs", 5f));
+            // Sangramento (Heavy Cut): icone Bleed enquanto durar; tick = so' o numero vermelho.
+            if (data.has("bleed_secs")) mob.sangraAteMs = System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L;
+            if (data.getBoolean("is_bleed", false)) {
+                NumeroDano n = new NumeroDano(mob.x, mob.y, String.valueOf(data.getInt("damage", 0)), false);
+                n.cor = new Color(0.85f, 0.08f, 0.08f, 1f);
+                numerosDano.add(n);
+                if (data.getInt("damage", 0) > 0) sangrar(mob.x, mob.y);
+                return;
+            }
             boolean critico = data.getBoolean("is_crit", false);
             boolean errou = data.getBoolean("is_miss", false);
             NumeroDano numero = new NumeroDano(mob.x, mob.y, errou ? "Miss" : data.getInt("damage", 0) + (critico ? "!" : ""), critico);
@@ -5222,6 +5233,18 @@ public class WorldScreen extends ScreenAdapter {
         String chave = nome == null ? "Physical" : nome;
         TextureRegion[] quadros = cacheEfeitos.get(chave);
         if (quadros != null) return quadros;
+        // Heavy Cut: o corte do Knight espelhado (de cima-esquerda pra baixo-direita).
+        if ("SwordInv".equals(chave)) {
+            TextureRegion[] normal = quadrosEfeito("Sword");
+            if (normal == null) return null;
+            quadros = new TextureRegion[normal.length];
+            for (int i = 0; i < normal.length; i++) {
+                quadros[i] = new TextureRegion(normal[i]);
+                quadros[i].flip(true, false);
+            }
+            cacheEfeitos.put(chave, quadros);
+            return quadros;
+        }
         TextureRegion tira;
         switch (chave) {
             case "Sword": tira = atlas.findRegion("ui/items/Sword"); break;
@@ -5255,7 +5278,7 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion[] quadros = quadrosEfeito(nome);
         if (quadros == null) return null;
         Efeito e = new Efeito(quadros, x, y);
-        boolean rapido = !"Sword".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome); // Arrow ou Physical
+        boolean rapido = !"Sword".equals(nome) && !"SwordInv".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome); // Arrow ou Physical
         // Mana (sprite novo, 7 quadros) na mesma velocidade do fogo.
         e.duracaoQuadro = "Fire".equals(nome) || "Mana".equals(nome) ? DURACAO_QUADRO_HIT_FOGO
             : "Arrow".equals(nome) ? DURACAO_QUADRO_HIT_FLECHA
@@ -5936,6 +5959,15 @@ public class WorldScreen extends ScreenAdapter {
         // (depois do nome e da barra de vida) pra ficar por cima dos dois.
         if (mob.voltando && regiaoFlag != null) {
             batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 10f, 12f, 12f);
+        }
+        // Sangrando (Heavy Cut): icone Bleed no lugar do icone de party do player.
+        if (System.currentTimeMillis() < mob.sangraAteMs) {
+            if (regiaoBleed == null) regiaoBleed = atlas.findRegion("ui/items/Bleed");
+            if (regiaoBleed != null) {
+                float w = regiaoBleed.getRegionWidth() * 2f, h = regiaoBleed.getRegionHeight() * 2f;
+                batch.draw(regiaoBleed, ancoraX + 9f - TAM_ICONE_PARTY + (TAM_ICONE_PARTY - w) / 2f,
+                    ancoraY + 13.5f - h / 2f, w, h);
+            }
         }
     }
 
