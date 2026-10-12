@@ -2530,7 +2530,8 @@ public class WorldScreen extends ScreenAdapter {
     // ---- Coroa/escudo da party: na altura do balao, mas a ESQUERDA do player ----
     private static final float TAM_ICONE_PARTY = 20f;
     private TextureRegion regiaoBleed;
-    private static final float TAM_ICONE_SANGRA = 11f;
+    private static final float TAM_ICONE_SANGRA = 8f;
+    private static final float RECUO_ICONE_SANGRA = 4f; // mais pra esquerda que a coroa
 
     private void desenharIconeParty(Jogador j) {
         if (j == local ? localMorto : estaMorto(j)) return;
@@ -3350,6 +3351,7 @@ public class WorldScreen extends ScreenAdapter {
                 NumeroDano n = new NumeroDano(mob.x, mob.y, String.valueOf(data.getInt("damage", 0)), false);
                 n.cor = new Color(0.85f, 0.08f, 0.08f, 1f);
                 numerosDano.add(n);
+                tocarEfeitoNoMob("PhysATK", mob); // mesmo efeito do golpe do rotworm
                 if (data.getInt("damage", 0) > 0) sangrar(mob.x, mob.y);
                 return;
             }
@@ -5967,7 +5969,7 @@ public class WorldScreen extends ScreenAdapter {
             // mesmo quadrado da coroa da party (TAM_ICONE_PARTY, mesma posicao).
             if (regiaoBleed == null) regiaoBleed = atlas.findRegion("sheet/r76_c11");
             if (regiaoBleed != null) {
-                float caixaX = ancoraX + 9f - TAM_ICONE_PARTY, caixaY = ancoraY + 13.5f - TAM_ICONE_PARTY / 2f;
+                float caixaX = ancoraX + 9f - TAM_ICONE_PARTY - RECUO_ICONE_SANGRA, caixaY = ancoraY + 13.5f - TAM_ICONE_PARTY / 2f;
                 batch.draw(regiaoBleed, caixaX + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f,
                     caixaY + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f, TAM_ICONE_SANGRA, TAM_ICONE_SANGRA);
             }
