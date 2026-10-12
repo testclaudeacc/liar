@@ -2530,6 +2530,7 @@ public class WorldScreen extends ScreenAdapter {
     // ---- Coroa/escudo da party: na altura do balao, mas a ESQUERDA do player ----
     private static final float TAM_ICONE_PARTY = 20f;
     private TextureRegion regiaoBleed;
+    private static final float TAM_ICONE_SANGRA = 11f;
 
     private void desenharIconeParty(Jogador j) {
         if (j == local ? localMorto : estaMorto(j)) return;
@@ -5962,11 +5963,13 @@ public class WorldScreen extends ScreenAdapter {
         }
         // Sangrando (Heavy Cut): icone Bleed no lugar do icone de party do player.
         if (System.currentTimeMillis() < mob.sangraAteMs) {
-            if (regiaoBleed == null) regiaoBleed = atlas.findRegion("ui/items/Bleed");
+            // Gota de sangue (752,736 no atlas, 16x16) bem reduzida, centrada no
+            // mesmo quadrado da coroa da party (TAM_ICONE_PARTY, mesma posicao).
+            if (regiaoBleed == null) regiaoBleed = atlas.findRegion("sheet/r76_c11");
             if (regiaoBleed != null) {
-                float w = regiaoBleed.getRegionWidth() * 2f, h = regiaoBleed.getRegionHeight() * 2f;
-                batch.draw(regiaoBleed, ancoraX + 9f - TAM_ICONE_PARTY + (TAM_ICONE_PARTY - w) / 2f,
-                    ancoraY + 13.5f - h / 2f, w, h);
+                float caixaX = ancoraX + 9f - TAM_ICONE_PARTY, caixaY = ancoraY + 13.5f - TAM_ICONE_PARTY / 2f;
+                batch.draw(regiaoBleed, caixaX + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f,
+                    caixaY + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f, TAM_ICONE_SANGRA, TAM_ICONE_SANGRA);
             }
         }
     }
