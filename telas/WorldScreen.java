@@ -354,6 +354,7 @@ public class WorldScreen extends ScreenAdapter {
         final MobVisual alvo;   // persegue o mob (ele pode estar andando)
         final String efeitoHit;
         NumeroDano numero;      // dano que aparece quando o projetil chega
+        Runnable aoChegar;      // ex: Small Vines - as vinhas brotam quando a semente chega
         float tempo = 0f;
         // Tempo fixo (a velocidade cresce com a distancia): sempre chega logo,
         // e so' entao aparecem o hit e o numero de dano.
@@ -3468,7 +3469,20 @@ public class WorldScreen extends ScreenAdapter {
             if (data.has("poison_secs")) mob.venenoAteMs = System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L;
             if (data.has("bleed_secs")) mob.sangraAteMs = System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L;
             String efeito = data.getString("effect", "");
-            if ("Vines".equals(efeito)) tocarVinhas(mob, data.getFloat("hold", 2f));
+            if ("Vines".equals(efeito)) {
+                float segurar = data.getFloat("hold", 2f);
+                // Semente de espinhos (ThornSeed) voa do Bard ate' o mob; as vinhas
+                // brotam quando ela chega. Sem o sprite/atacante: vinhas na hora.
+                Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
+                TextureRegion semente = regiaoPorArquivo("ThornSeed");
+                if (atacante != null && semente != null) {
+                    Projetil pr = new Projetil(semente, atacante.x, atacante.y + 8f, mob, null);
+                    pr.aoChegar = () -> tocarVinhas(mob, segurar);
+                    projeteis.add(pr);
+                } else {
+                    tocarVinhas(mob, segurar);
+                }
+            }
         });
         // Golpe recusado: mob travado por quem esta' treinando nele.
         socket.on("mob_locked", (nomeEvt, data) -> {
@@ -5339,6 +5353,19 @@ public class WorldScreen extends ScreenAdapter {
      * pro chao (os quadros de ida tocados ao contrario). Sheet "Vines" do atlas. */
     private static final float DURACAO_QUADRO_VINHAS = 0.06f;
 
+    /** Regiao do atlas pelo nome do arquivo (qualquer pasta), ex: "ThornSeed". */
+    private final java.util.Map<String, TextureRegion> cacheArquivos = new java.util.HashMap<>();
+
+    private TextureRegion regiaoPorArquivo(String nome) {
+        if (cacheArquivos.containsKey(nome)) return cacheArquivos.get(nome);
+        TextureRegion achada = null;
+        for (TextureAtlas.AtlasRegion r : atlas.getRegions()) {
+            if (r.name.substring(r.name.lastIndexOf('/') + 1).equalsIgnoreCase(nome)) { achada = r; break; }
+        }
+        cacheArquivos.put(nome, achada);
+        return achada;
+    }
+
     private void tocarVinhas(MobVisual mob, float segurar) {
         TextureRegion[] ida = quadrosCura("Vines");   // acha a regiao pelo nome do arquivo
         if (ida == null || ida.length == 0) return;
@@ -5681,7 +5708,8 @@ public class WorldScreen extends ScreenAdapter {
             pr.tempo += delta;
             if (pr.tempo >= pr.duracao) {
                 projeteis.remove(i);
-                tocarEfeitoNoMob(pr.efeitoHit, pr.alvo);
+                if (pr.efeitoHit != null) tocarEfeitoNoMob(pr.efeitoHit, pr.alvo);
+                if (pr.aoChegar != null) pr.aoChegar.run();
                 if (pr.numero != null) {
                     // Numero no lugar onde o mob esta agora (ele pode ter andado).
                     NumeroDano n = new NumeroDano(pr.alvo.x, pr.alvo.y, pr.numero.texto, pr.numero.critico);
