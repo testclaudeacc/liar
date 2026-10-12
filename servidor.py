@@ -1975,6 +1975,7 @@ def _queue_save(p, position_ack_sid=None):
         'direction': p.get('direction', 'down'), 'floor': p.get('floor', 1),
         'level': p.get('level', 1), 'exp': p.get('exp', 0), 'kills': p.get('kills', 0),
         'current_hp': hp, 'current_mp': mp, 'currency': p.get('currency', 0),
+        'class_name': p.get('class_name'),
         'inventory': p.get('inventory', []).copy() if isinstance(p.get('inventory'), list) else [],
         'equipped_items': p.get('equipped_items', {}).copy() if isinstance(p.get('equipped_items'), dict) else {},
         'skills': p.get('skills', {}).copy() if isinstance(p.get('skills'), dict) else {},
@@ -2009,7 +2010,7 @@ def db_writer_worker():
                     exp = %s, kills = %s, current_hp = %s, current_mp = %s,
                     inventory = %s, equipped_items = %s, skills = %s, skins = %s, currency = %s,
                     time_played = %s, npc_dialogue_state = %s, hotbar = %s, last_seen = %s,
-                    class_name = %s
+                    class_name = COALESCE(%s, class_name)
                 WHERE user_id = %s AND name = %s
             """
             params = (
@@ -2023,7 +2024,9 @@ def db_writer_worker():
                 json.dumps(normalizar_hotbar(player_data.get('hotbar'))),
                 player_data.get('last_seen'),
                 # /class do admin troca a classe (o resto nunca muda isso).
-                player_data.get('class_name') if player_data.get('class_name') in CLASSES_VALIDAS else 'Knight',
+                # Classe invalida/ausente: NULL -> o COALESCE mantem a do banco
+                # (antes caia em 'Knight' e sobrescrevia a classe de todo mundo).
+                player_data.get('class_name') if player_data.get('class_name') in CLASSES_VALIDAS else None,
                 player_data.get('user_id'), player_data.get('name')
             )
             c.execute(query, params)
@@ -3050,6 +3053,7 @@ ADMIN_COMANDOS = [
     ("atkspd", "/atkspd <1-50>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
     ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
     ("class", "/class <Knight|Ranger|Mage|Bard>", "troca sua classe (equip separado por classe; recarrega o personagem)"),
+    ("fixclass", "/fixclass [nome classe]", "sem nada: lista quem parece ter virado Knight por engano; com nome e classe: corrige"),
     ("spells", "/spells reset", "esquece todas as magias aprendidas (da' pra comprar de novo)"),
     ("money", "/money add <quantia><c|s|g|p>", "da' moedas (ex: /money add 5g, /money add 1p)"),
     ("quests", "/quests", "quests e se voce ja fez"),
@@ -3065,9 +3069,72 @@ def argumentos_admin():
         'soul': ['on', 'off'], 'ghost': ['on', 'off'],
         'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'], 'spells': ['reset'],
         'class': list(CLASSES_VALIDAS),
+        'fixclass': list(CLASSES_VALIDAS),
         'time': list(FASES_DO_DIA.keys()), 'money': ['add'],
         'quest': list(_todas_as_quests()) + ['complete', 'reset'],
     }
+
+def _palpite_classe(equipados, skills):
+    """Classe provavel de um personagem pela arma equipada (pasta da classe)
+    ou, sem ela, pela skill principal mais alta. None = parece Knight mesmo."""
+    try: equipados = json.loads(equipados) if isinstance(equipados, str) else (equipados or {})
+    except (TypeError, ValueError): equipados = {}
+    try: skills = json.loads(skills) if isinstance(skills, str) else (skills or {})
+    except (TypeError, ValueError): skills = {}
+    arma = (equipados.get('MainHand') or {}).get('item', '') if isinstance(equipados.get('MainHand'), dict) else ''
+    for c in ('Mage', 'Ranger', 'Bard'):
+        if f'/{c}/' in arma: return c
+    if '/Knight/' in arma: return None
+    niveis = {c: int(skills.get(SKILL_DA_CLASSE[c], 10) or 10) for c in CLASSES_VALIDAS}
+    melhor = max(niveis, key=niveis.get)
+    return melhor if melhor != 'Knight' and niveis[melhor] > niveis['Knight'] else None
+
+def _comando_fixclass(sid, args):
+    """Conserta a classe gravada como Knight pelo bug do save (v0.31/v0.32)."""
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        c = conn.cursor()
+        if not args:
+            c.execute("SELECT name, equipped_items, skills FROM characters WHERE class_name = 'Knight' AND deleted_at IS NULL")
+            suspeitos = []
+            for nome, eq, sk in c.fetchall():
+                sid_on = players_by_name.get(nome)
+                if sid_on in online_players:   # online: o equip/skills em memoria e' o mais novo
+                    po = online_players[sid_on]; eq, sk = po.get('equipped_items'), po.get('skills')
+                palpite = _palpite_classe(eq, sk)
+                if palpite: suspeitos.append(f"{nome} -> {palpite}")
+            c.close()
+            chat_sistema(sid, ("Probably not Knights: " + ", ".join(suspeitos) + ". Fix: /fixclass <name> <class>")
+                         if suspeitos else "No suspicious Knights found.")
+            return
+        if len(args) < 2:
+            chat_sistema(sid, "Usage: /fixclass <name> <class>", 'red'); return
+        nome = args[0]
+        classe = next((k for k in CLASSES_VALIDAS if k.lower() == args[1].lower()), None)
+        if classe is None:
+            chat_sistema(sid, "Class must be Knight, Ranger, Mage or Bard.", 'red'); return
+        sid_on = players_by_name.get(nome)
+        if sid_on in online_players:
+            # Online: troca em memoria (mantem o equip dele) e recarrega o client dele.
+            po = online_players[sid_on]
+            po['class_name'] = classe
+            po['battle_until'] = 0; po['em_batalha'] = False
+            _queue_save(po)
+            socketio.emit('class_changed', {'class': classe}, room=sid_on)
+        else:
+            c.execute("UPDATE characters SET class_name = %s WHERE name = %s AND deleted_at IS NULL", (classe, nome))
+            if c.rowcount == 0:
+                conn.rollback(); c.close()
+                chat_sistema(sid, f"Character {nome} not found.", 'red'); return
+            conn.commit()
+        c.close()
+        chat_sistema(sid, f"{nome} is now a {classe}.")
+    except Exception:
+        traceback.print_exc()
+        chat_sistema(sid, "Error fixing class (see server log).", 'red')
+    finally:
+        if conn: db_pool.putconn(conn)
 
 def comando_admin(sid, p, texto):
     partes = texto[1:].split()
@@ -3234,6 +3301,9 @@ def comando_admin(sid, p, texto):
         _queue_save(p)
         chat_sistema(sid, f"Class changed to {alvo}. Reloading...")
         socketio.emit('class_changed', {'class': alvo}, room=sid)
+        return
+    if cmd == 'fixclass':
+        _comando_fixclass(sid, partes[1:])
         return
     if cmd == 'spells':
         if len(partes) < 2 or partes[1].lower() != 'reset':
