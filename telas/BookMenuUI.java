@@ -100,6 +100,8 @@ public final class BookMenuUI {
     private final Table equipDetalhesEsquerda = new Table();
     private final Table equipDetalhesDireita = new Table();
     private Table equipColunaEsquerda;
+    // Detalhes do equip com rolagem: descricao comprida (ex: set) rola em vez de vazar a janela.
+    private ScrollPane equipScrollEsquerda, equipScrollDireita;
     private Table equipSlotsTabela;
     private Table equipColunaDireita;
     private Table equipPainelGrade;
@@ -507,14 +509,16 @@ public final class BookMenuUI {
         for (Table d : new Table[]{bagDetalhes, tradeDetalhes, bancoDetalhes, lojaDetalhes, equipDetalhesEsquerda}) {
             boolean equip = d == equipDetalhesEsquerda;
             float base = equip ? COLUNA_EQUIP : COLUNA_BAG;
+            // Equip: os detalhes ficam dentro de um scroll (a celula da coluna e' a dele).
+            com.badlogic.gdx.scenes.scene2d.Actor caixa = equip && equipScrollEsquerda != null ? equipScrollEsquerda : d;
             // Equip: os detalhes saem da coluna quando nao tem item - ela volta ao normal.
-            if (equip && equipColunaEsquerda != null && d.getParent() != equipColunaEsquerda) {
+            if (equip && equipColunaEsquerda != null && caixa.getParent() != equipColunaEsquerda) {
                 com.badlogic.gdx.scenes.scene2d.ui.Cell<?> c = equipPage.getCell(equipColunaEsquerda);
                 if (c != null && Math.abs(c.getMinWidth() - base) > 0.5f) { c.width(base); equipPage.invalidateHierarchy(); }
                 continue;
             }
-            if (!(d.getParent() instanceof Table) || !(d.getParent().getParent() instanceof Table)) continue;
-            Table coluna = (Table) d.getParent();
+            if (!(caixa.getParent() instanceof Table) || !(caixa.getParent().getParent() instanceof Table)) continue;
+            Table coluna = (Table) caixa.getParent();
             Table pagina = (Table) coluna.getParent();
             // Loja de magia (aba Learn): sem coluna da esquerda - a gaveta tem tudo e o botao.
             if (d == lojaDetalhes) {
@@ -526,13 +530,22 @@ public final class BookMenuUI {
                     continue;
                 }
             }
-            com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cDet = coluna.getCell(d), cCol = pagina.getCell(coluna);
+            com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cDet = coluna.getCell(caixa), cCol = pagina.getCell(coluna);
             if (cDet == null || cCol == null) continue;
             float pad = cDet.getPadLeft() + cDet.getPadRight();
             float precisa = d.getPrefWidth() + pad + 2f;
             // Loja: o botao de baixo ("Are you sure?" e' comprido) tambem tem que caber.
             if (d == lojaDetalhes && lojaAcao != null) precisa = Math.max(precisa, lojaAcao.getPrefWidth() + 14f);
+            // Trade: o botao Send Offer tambem (a coluna alarga pro texto dele).
+            if (d == tradeDetalhes && botaoEnviarTrade != null) precisa = Math.max(precisa, botaoEnviarTrade.getPrefWidth() + 14f);
             float extra = Math.min(limite, Math.max(0f, precisa - base));
+            if (d == tradeDetalhes && botaoEnviarTrade != null) {
+                com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cBotao = coluna.getCell(botaoEnviarTrade);
+                if (cBotao != null && Math.abs(cBotao.getMinWidth() - (base - 14f + extra)) > 0.5f) {
+                    cBotao.width(base - 14f + extra);
+                    coluna.invalidateHierarchy();
+                }
+            }
             if (d == lojaDetalhes && lojaRodapeAcao != null) {
                 com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cBotao = lojaRodapeAcao.getCell(lojaAcao);
                 com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cRodape = coluna.getCell(lojaRodapeAcao);
@@ -636,6 +649,8 @@ public final class BookMenuUI {
         equipColunaEsquerda.setBackground(UiSkin.retangulo(
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
         equipDetalhesEsquerda.top().left();
+        equipScrollEsquerda = scrollDetalhesEquip(equipDetalhesEsquerda);
+        equipScrollDireita = scrollDetalhesEquip(equipDetalhesDireita);
 
         // Coluna direita: itens da bag que podem ser equipados + botao + detalhes.
         equipItemGrid.top().left();
@@ -779,7 +794,7 @@ public final class BookMenuUI {
             preencherBlocoStats(equipDetalhesEsquerda, equipadoPath, null,
                 equippedQuantidades.getOrDefault(slotDoItem(equipadoPath), 1));
             equipColunaEsquerda.add(separadorEquip()).growX().height(1).padTop(4).row();
-            equipColunaEsquerda.add(equipDetalhesEsquerda).growX().top().left().pad(10, 12, 10, 12).row();
+            equipColunaEsquerda.add(equipScrollEsquerda).grow().top().left().pad(10, 12, 10, 12).row();
         }
 
         // Direita: grade; com candidato -> botao Equip + detalhes comparando
@@ -792,7 +807,7 @@ public final class BookMenuUI {
             equipColunaDireita.add(equipButton).width(120).height(42).right().padRight(14).padBottom(8).row();
             equipColunaDireita.add(separadorEquip()).growX().height(1).row();
             preencherBlocoStats(equipDetalhesDireita, candidatoPath, atual == null ? "" : atual);
-            equipColunaDireita.add(equipDetalhesDireita).grow().top().left().pad(10, 12, 10, 12);
+            equipColunaDireita.add(equipScrollDireita).grow().top().left().pad(10, 12, 10, 12);
             boolean bloqueado = !podeEquipar(candidatoPath);
             equipButton.setStyle(bloqueado ? estiloEquiparBloqueado : estiloEquipar);
             equipButton.setDisabled(bloqueado || (slotAlvo == null && selectedSlot.isEmpty()));
@@ -802,6 +817,15 @@ public final class BookMenuUI {
                 equipColunaDireita.add(unequipButton).width(120).height(42).right().padRight(14).padBottom(10);
             }
         }
+    }
+
+    private ScrollPane scrollDetalhesEquip(Table detalhes) {
+        ScrollPane sp = new ScrollPane(detalhes, skin);
+        sp.setFadeScrollBars(false);
+        sp.setScrollingDisabled(true, false);
+        sp.setOverscroll(false, false);
+        sp.setFlickScroll(true);
+        return sp;
     }
 
     private Image separadorEquip() {
@@ -964,14 +988,9 @@ public final class BookMenuUI {
         int equipadas = 0;
         for (String peca : pecas) if (equippedItemPaths.containsValue(peca)) equipadas++;
         boolean completo = equipadas >= pecas.size();
-        // Celular: as linhas do set quebram em vez de alargar a janela pra fora da tela.
-        Label titulo = linhaStat(dados.conjunto + " Set (" + equipadas + "/" + pecas.size() + ")", COR_SET);
-        titulo.setWrap(MOBILE_LIVRO);
-        bloco.add(titulo).left().growX().padTop(6).row();
+        bloco.add(linhaStat(dados.conjunto + " Set (" + equipadas + "/" + pecas.size() + ")", COR_SET)).left().padTop(6).row();
         for (String peca : pecas) {
-            Label l = linhaStat(nomeExibicao(peca), equippedItemPaths.containsValue(peca) ? COR_SET : COR_SET_OFF);
-            l.setWrap(MOBILE_LIVRO);
-            bloco.add(l).left().growX().row();
+            bloco.add(linhaStat(nomeExibicao(peca), equippedItemPaths.containsValue(peca) ? COR_SET : COR_SET_OFF)).left().row();
         }
         if (dados.conjuntoXp > 0) {
             Color cor = completo ? COR_SET : COR_SET_OFF;
@@ -2093,6 +2112,8 @@ public final class BookMenuUI {
         tradeGrid.top().left();
         tradeDetalhes.top().left();
         botaoEnviarTrade = botaoComIcone("Send Offer", "ui/currency/Gold", estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
+        // Celular: o livro ja' e' ampliado 1.2x - a fonte do botao ficava enorme.
+        if (MOBILE_LIVRO) botaoEnviarTrade.getLabel().setFontScale(0.7f);
         botaoEnviarTrade.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { enviarOfertaTrade(); }
         });
@@ -2102,7 +2123,6 @@ public final class BookMenuUI {
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
         esquerda.add(tradeDetalhes).grow().top().left().pad(8).row();
         esquerda.add(botaoEnviarTrade).width(COLUNA_BAG - 14f).height(44).pad(6);
-        caberTextoBotao(botaoEnviarTrade, COLUNA_BAG - 14f);
 
         tituloTrade = new Label("", estiloTitulo);
         ScrollPane scroll = new ScrollPane(tradeGrid, skin);
@@ -2225,7 +2245,6 @@ public final class BookMenuUI {
         tituloTrade.setText("Trade with " + outro);
         passoTrade.setText("Step 1 of 2  -  Tap what you want to give");
         botaoEnviarTrade.setText("Send Offer");
-        caberTextoBotao(botaoEnviarTrade, COLUNA_BAG - 14f);
         botaoEnviarTrade.setDisabled(false);
         mostrarPaginaTrade(tradePage);
         atualizarGradeTrade();
@@ -2739,7 +2758,6 @@ public final class BookMenuUI {
         socket.emitRaw("trade_ready", "{}");
         tradeEnviado = true;
         botaoEnviarTrade.setText("Waiting...");
-        caberTextoBotao(botaoEnviarTrade, COLUNA_BAG - 14f);
         passoTrade.setText("Waiting for " + tradeOutro + "...");
         botaoEnviarTrade.setDisabled(true);
         if (root.getStage() != null && campoQtdTrade != null && root.getStage().getKeyboardFocus() == campoQtdTrade) {
@@ -2920,18 +2938,6 @@ public final class BookMenuUI {
         }
         b.add(b.getLabel());
         return b;
-    }
-
-    /** Diminui a fonte do texto do botao (com icone) ate' caber na largura. */
-    private void caberTextoBotao(TextButton b, float largura) {
-        Label l = b.getLabel();
-        l.setFontScale(1f);
-        float icone = b.getCells().size > 1 ? 28f : 0f;
-        float livre = largura - icone - 12f;
-        com.badlogic.gdx.graphics.g2d.GlyphLayout gl =
-            new com.badlogic.gdx.graphics.g2d.GlyphLayout(l.getStyle().font, l.getText());
-        if (gl.width > livre && gl.width > 0f) l.setFontScale(Math.max(0.6f, livre / gl.width));
-        b.invalidateHierarchy();
     }
 
     /** Barrinha cinza com "usado/maximo" no meio (Capacity e slots do bank). */
