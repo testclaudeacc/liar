@@ -491,8 +491,18 @@ public final class BookMenuUI {
 
     /** Coluna de detalhes (Bag, trade, banco, loja) cresce ate' caber o texto
      * mais largo; a janela cresce junto quando e' a pagina aberta. */
+    /** Quanto a janela ainda pode alargar sem sair da tela (no celular o
+     * livro e' ampliado 1.2x a partir do centro). */
+    private float limiteExtraTela() {
+        if (root.getStage() == null || celulaOrganizer == null || celulaOrganizer.getActor() == null) return EXTRA_JANELA_MAX;
+        float escala = Math.max(0.01f, celulaOrganizer.getActor().getScaleX());
+        float cabe = (root.getStage().getWidth() - 8f) / escala - (COLUNA_LARGURA * 2f + JANELA_LARGURA);
+        return Math.max(0f, Math.min(EXTRA_JANELA_MAX, cabe));
+    }
+
     private void ajustarLarguraDetalhes() {
         if (celulaJanela == null) return;
+        float limite = limiteExtraTela();
         float extraVisivel = 0f;
         for (Table d : new Table[]{bagDetalhes, tradeDetalhes, bancoDetalhes, lojaDetalhes, equipDetalhesEsquerda}) {
             boolean equip = d == equipDetalhesEsquerda;
@@ -522,7 +532,7 @@ public final class BookMenuUI {
             float precisa = d.getPrefWidth() + pad + 2f;
             // Loja: o botao de baixo ("Are you sure?" e' comprido) tambem tem que caber.
             if (d == lojaDetalhes && lojaAcao != null) precisa = Math.max(precisa, lojaAcao.getPrefWidth() + 14f);
-            float extra = Math.min(EXTRA_JANELA_MAX, Math.max(0f, precisa - base));
+            float extra = Math.min(limite, Math.max(0f, precisa - base));
             if (d == lojaDetalhes && lojaRodapeAcao != null) {
                 com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cBotao = lojaRodapeAcao.getCell(lojaAcao);
                 com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cRodape = coluna.getCell(lojaRodapeAcao);
@@ -540,13 +550,13 @@ public final class BookMenuUI {
             if (pagina.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, extra);
         }
         // Mercado: lista de itens + painel das ofertas lado a lado.
-        if (modoMercado && mercadoPage.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, EXTRA_JANELA_MAX);
+        if (modoMercado && mercadoPage.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, limite);
         // Aba Spells (lista de magias): a janela alarga ate' a descricao caber numa linha.
         if (conteudoMagias != null && spellsPage.getParent() == mainWindow && conteudoMagias.getStage() != null) {
             float esquerda = TAM_SLOT_ATALHO * 3f + 6f * 3f + 22f + 6f;
             float disponivel = JANELA_LARGURA - 16f - esquerda - 20f - 14f; // pads do painel + barra de rolagem
             extraVisivel = Math.max(extraVisivel,
-                Math.min(EXTRA_JANELA_MAX, Math.max(0f, conteudoMagias.getPrefWidth() - disponivel)));
+                Math.min(limite, Math.max(0f, conteudoMagias.getPrefWidth() - disponivel)));
         }
         if (Math.abs(extraVisivel - extraJanela) > 0.5f) {
             extraJanela = extraVisivel;
@@ -846,7 +856,7 @@ public final class BookMenuUI {
         nome.setWrap(true);
         // Largura do nome inteiro (ate' um limite): a coluna cresce pra ele
         // caber numa linha; maior que isso quebra a linha.
-        float larguraNome = Math.min(COLUNA_BAG - 16f + EXTRA_JANELA_MAX,
+        float larguraNome = Math.min(COLUNA_BAG - 16f + limiteExtraTela(),
             new com.badlogic.gdx.graphics.g2d.GlyphLayout(nome.getStyle().font, nome.getText()).width + 2f);
         boolean colunaCresce = bloco == bagDetalhes || bloco == tradeDetalhes || bloco == bancoDetalhes || bloco == lojaDetalhes
             || bloco == equipDetalhesEsquerda;
@@ -954,9 +964,14 @@ public final class BookMenuUI {
         int equipadas = 0;
         for (String peca : pecas) if (equippedItemPaths.containsValue(peca)) equipadas++;
         boolean completo = equipadas >= pecas.size();
-        bloco.add(linhaStat(dados.conjunto + " Set (" + equipadas + "/" + pecas.size() + ")", COR_SET)).left().padTop(6).row();
+        // Celular: as linhas do set quebram em vez de alargar a janela pra fora da tela.
+        Label titulo = linhaStat(dados.conjunto + " Set (" + equipadas + "/" + pecas.size() + ")", COR_SET);
+        titulo.setWrap(MOBILE_LIVRO);
+        bloco.add(titulo).left().growX().padTop(6).row();
         for (String peca : pecas) {
-            bloco.add(linhaStat(nomeExibicao(peca), equippedItemPaths.containsValue(peca) ? COR_SET : COR_SET_OFF)).left().row();
+            Label l = linhaStat(nomeExibicao(peca), equippedItemPaths.containsValue(peca) ? COR_SET : COR_SET_OFF);
+            l.setWrap(MOBILE_LIVRO);
+            bloco.add(l).left().growX().row();
         }
         if (dados.conjuntoXp > 0) {
             Color cor = completo ? COR_SET : COR_SET_OFF;
@@ -2087,6 +2102,7 @@ public final class BookMenuUI {
             new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.35f, 0.35f, 0.35f, 1f), 1));
         esquerda.add(tradeDetalhes).grow().top().left().pad(8).row();
         esquerda.add(botaoEnviarTrade).width(COLUNA_BAG - 14f).height(44).pad(6);
+        caberTextoBotao(botaoEnviarTrade, COLUNA_BAG - 14f);
 
         tituloTrade = new Label("", estiloTitulo);
         ScrollPane scroll = new ScrollPane(tradeGrid, skin);
@@ -2209,6 +2225,7 @@ public final class BookMenuUI {
         tituloTrade.setText("Trade with " + outro);
         passoTrade.setText("Step 1 of 2  -  Tap what you want to give");
         botaoEnviarTrade.setText("Send Offer");
+        caberTextoBotao(botaoEnviarTrade, COLUNA_BAG - 14f);
         botaoEnviarTrade.setDisabled(false);
         mostrarPaginaTrade(tradePage);
         atualizarGradeTrade();
@@ -2722,6 +2739,7 @@ public final class BookMenuUI {
         socket.emitRaw("trade_ready", "{}");
         tradeEnviado = true;
         botaoEnviarTrade.setText("Waiting...");
+        caberTextoBotao(botaoEnviarTrade, COLUNA_BAG - 14f);
         passoTrade.setText("Waiting for " + tradeOutro + "...");
         botaoEnviarTrade.setDisabled(true);
         if (root.getStage() != null && campoQtdTrade != null && root.getStage().getKeyboardFocus() == campoQtdTrade) {
@@ -2902,6 +2920,18 @@ public final class BookMenuUI {
         }
         b.add(b.getLabel());
         return b;
+    }
+
+    /** Diminui a fonte do texto do botao (com icone) ate' caber na largura. */
+    private void caberTextoBotao(TextButton b, float largura) {
+        Label l = b.getLabel();
+        l.setFontScale(1f);
+        float icone = b.getCells().size > 1 ? 28f : 0f;
+        float livre = largura - icone - 12f;
+        com.badlogic.gdx.graphics.g2d.GlyphLayout gl =
+            new com.badlogic.gdx.graphics.g2d.GlyphLayout(l.getStyle().font, l.getText());
+        if (gl.width > livre && gl.width > 0f) l.setFontScale(Math.max(0.6f, livre / gl.width));
+        b.invalidateHierarchy();
     }
 
     /** Barrinha cinza com "usado/maximo" no meio (Capacity e slots do bank). */
@@ -4444,7 +4474,9 @@ public final class BookMenuUI {
     }
 
     /** "(icone de MP) 50" em azul, pro canto do slot de uma magia. */
-    public Table rotuloManaMagia(String caminho, float tamIcone) {
+    public Table rotuloManaMagia(String caminho, float tamIcone) { return rotuloManaMagia(caminho, tamIcone, "quantidade"); }
+
+    public Table rotuloManaMagia(String caminho, float tamIcone, String estilo) {
         Table t = new Table();
         TextureAtlas.AtlasRegion r = atlas.findRegion("ui/MPIcon");
         if (r != null) {
@@ -4452,7 +4484,7 @@ public final class BookMenuUI {
             img.setScaling(Scaling.fit);
             t.add(img).size(tamIcone).padRight(1);
         }
-        Label valor = new LabelPixel(String.valueOf(manaDaMagia(caminho)), skin.get("quantidade", Label.LabelStyle.class));
+        Label valor = new LabelPixel(String.valueOf(manaDaMagia(caminho)), skin.get(estilo, Label.LabelStyle.class));
         valor.setColor(COR_MANA);
         t.add(valor);
         return t;

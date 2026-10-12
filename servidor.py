@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.35"
+SERVER_VERSION = "v0.36"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -6324,6 +6324,7 @@ def _creditar(nome, coins=0, item=None, qtd=0, msg='', instancias=None, user_id=
         socketio.emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(dono.get('inventory', [])),
                                            'equipped_items': dono.get('equipped_items', {})}, room=sid_dono)
         socketio.emit('sync_stats', _montar_payload_sync_stats(dono), room=sid_dono)
+        socketio.emit('bank_currency', {'currency': int(dono.get('currency', 0))}, room=sid_dono)
         if msg: socketio.emit('market_notice', {'msg': msg, 'item': item or ''}, room=sid_dono)
         return
     conn = None
@@ -6354,6 +6355,7 @@ def _entregar_caixa_mercado(sid, p):
     _queue_save(p)
     emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(p.get('inventory', [])),
                               'equipped_items': p.get('equipped_items', {})}, room=sid)
+    emit('bank_currency', {'currency': int(p.get('currency', 0))}, room=sid)
     emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
 
 def _ofertas_json(linhas, meu_nome):
@@ -6499,14 +6501,14 @@ def handle_market_accept(data):
         if tipo == 'sell':
             p['currency'] = int(p.get('currency', 0)) - total
             dar_na_bag(p, item, qtd, entregar)
-            _creditar(dono, coins=total, msg=f"You sold {qtd}x {nome_item} for {formatar_moedas(total)}.")
+            _creditar(dono, coins=total, msg=f"You sold {qtd}x {nome_item} for {{c:{total}}}.")
             _depois_do_mercado(sid, p, f"You bought {qtd}x {nome_item} for {formatar_moedas(total)}.", True, item)
         else:
             tiradas = tirar_da_bag(p, item, qtd) or instancias_novas(item, qtd)
             p['currency'] = int(p.get('currency', 0)) + total
             # Oferta de compra: o item (mesmo id) vai pro BANK de quem comprou.
             _creditar(dono, item=item, qtd=qtd, instancias=tiradas, user_id=dono_user,
-                      msg=f"You bought {qtd}x {nome_item} for {formatar_moedas(total)}. It is in your bank.")
+                      msg=f"You bought {qtd}x {nome_item} for {{c:{total}}}. It is in your bank.")
             _depois_do_mercado(sid, p, f"You sold {qtd}x {nome_item} for {formatar_moedas(total)}.", True, item)
     except Exception:
         traceback.print_exc()

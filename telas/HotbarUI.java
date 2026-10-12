@@ -390,6 +390,7 @@ public final class HotbarUI {
                 pilha.add(centro);
                 if (qtd > 0) {
                     Label numero = livro.rotuloQuantidade(qtd);
+                    if (MOBILE) numero.setStyle(skin.get("quantidade-grande", Label.LabelStyle.class));
                     Table canto = new Table();
                     // Quantidade no canto de baixo a direita (no redondo, um pouco
                     // pra dentro pra nao sair do circulo).
@@ -404,7 +405,7 @@ public final class HotbarUI {
                     Table cantoMana = new Table();
                     cantoMana.bottom().left();
                     float dentro = MOBILE ? tamanhoSlot(i) * 0.06f : 0f;
-                    cantoMana.add(livro.rotuloManaMagia(caminho, tamanhoSlot(i) * 0.24f)).pad(0, 2 + dentro, 1 + dentro, 0);
+                    cantoMana.add(livro.rotuloManaMagia(caminho, tamanhoSlot(i) * (MOBILE ? 0.28f : 0.24f), MOBILE ? "quantidade-grande" : "quantidade")).pad(0, 2 + dentro, 1 + dentro, 0);
                     pilha.add(cantoMana);
                 }
                 // Pocao em cooldown: cinza escuro + segundos por cima.

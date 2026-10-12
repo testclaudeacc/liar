@@ -202,6 +202,10 @@ public class UiSkin {
         fonteQuantidade.setUseIntegerPositions(false);
         skin.add("quantidade-font", fonteQuantidade);
         skin.add("quantidade", new Label.LabelStyle(fonteQuantidade, Color.WHITE));
+        // Slots redondos da hotbar no celular: numeros (quantidade/mana) maiores.
+        BitmapFont fonteQuantidadeGrande = gerarFonte("fonts/dejavu-sans.condensed.ttf", 21, 1, escala);
+        fonteQuantidadeGrande.setUseIntegerPositions(false);
+        skin.add("quantidade-grande", new Label.LabelStyle(fonteQuantidadeGrande, Color.WHITE));
         BitmapFont fonteCooldown = gerarFonte("fonts/dejavu-sans.condensed.ttf", 17, 2, escala);
         fonteCooldown.setUseIntegerPositions(false);
         skin.add("cooldown-font", fonteCooldown);

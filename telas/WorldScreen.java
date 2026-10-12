@@ -3517,7 +3517,16 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("market_notice", (nomeEvt, data) -> {
             if (data == null) return;
             String msg = data.getString("msg", "");
-            hud.notificarTipo(HudVitais.NOTIF_TRADE, msg);
+            // "{c:750}" no texto = valor em moedas: icones na notificacao, "7s 50c" no chat.
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{c:(\\d+)\\}").matcher(msg);
+            if (m.find()) {
+                long valor = Long.parseLong(m.group(1));
+                String antes = msg.substring(0, m.start()), depois = msg.substring(m.end());
+                hud.notificarMoedas(HudVitais.NOTIF_TRADE, antes, valor, depois);
+                msg = antes + textoMoedas(valor) + depois;
+            } else {
+                hud.notificarTipo(HudVitais.NOTIF_TRADE, msg);
+            }
             if (chat != null) chat.adicionarMensagemSistema(msg);
         });
         // Magia lancada (so' eu): comeca o cooldown dela nos slots.
@@ -5684,6 +5693,21 @@ public class WorldScreen extends ScreenAdapter {
         if (!loot.textos.isEmpty() || loot.semCapacidade) lootsFlutuantes.add(loot);
     }
 
+    /** "2p 5g 30c" (igual o formatar_moedas do servidor). */
+    private static String textoMoedas(long v) {
+        String[] nomes = {"p", "g", "s", "c"};
+        long[] valores = {1_000_000L, 10_000L, 100L, 1L};
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < nomes.length; i++) {
+            if (v >= valores[i] || (i == nomes.length - 1 && sb.length() == 0)) {
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(v / valores[i]).append(nomes[i]);
+                v %= valores[i];
+            }
+        }
+        return sb.toString();
+    }
+
     /** Cor da quantidade por tipo de moeda. */
     private static Color corMoeda(String tipo) {
         switch (tipo) {
@@ -5738,6 +5762,8 @@ public class WorldScreen extends ScreenAdapter {
         font.setColor(anterior);
     }
 
+    private boolean estavaNaPz = false;
+
     private void atualizarCombate(float delta) {
         for (int i = efeitos.size() - 1; i >= 0; i--) {
             Efeito e = efeitos.get(i);
@@ -5769,6 +5795,16 @@ public class WorldScreen extends ScreenAdapter {
             }
         }
 
+        // Entrou na Protection Zone: desfoca o mob/player mirado.
+        boolean euNaPz = mapa.propriedades.naZonaProtegida(local.x, local.y);
+        if (euNaPz && !estavaNaPz) { alvoMob = null; amigoMarcado = null; }
+        estavaNaPz = euNaPz;
+        // Player mirado: perde o alvo longe igual o mob (ou se saiu da tela).
+        if (amigoMarcado != null) {
+            Jogador j = remotos.get(amigoMarcado);
+            if (j == null || distanciaSqm(local.x, local.y, j.x, j.y) > DISTANCIA_PERDE_ALVO_SQM) amigoMarcado = null;
+        }
+
         // Ataque automatico no mob mirado.
         esperaAtaque -= delta;
         if (alvoMob == null) return;
@@ -5794,8 +5830,7 @@ public class WorldScreen extends ScreenAdapter {
         }
         if (localMorto || esperaAtaque > 0f || !socket.isConnected()) return;
         // Protection Zone: ninguem ataca de dentro (nem mob que esta' dentro).
-        // Mantem o alvo: saindo da PZ o ataque volta sozinho.
-        if (mapa.propriedades.naZonaProtegida(local.x, local.y) || mapa.propriedades.naZonaProtegida(alvo.x, alvo.y)) return;
+        if (euNaPz || mapa.propriedades.naZonaProtegida(alvo.x, alvo.y)) return;
         // Arco sem flecha nao ataca (o servidor tambem recusa).
         if ("Ranger".equals(local.classe) && (caminhoMunicao == null || quantidadeMunicao <= 0)) {
             if (!avisouSemMunicao) {

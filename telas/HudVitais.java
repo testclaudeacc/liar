@@ -93,6 +93,8 @@ public final class HudVitais {
     private final TextureRegion iconeNotificacaoPadrao;
     private TextureRegion iconeNotifTrade, iconeNotifAmigo, iconeNotifParty;
     private Table internoNotif, blocoIconeNotif;
+    private final Table moedasNotif = new Table();
+    private Label textoNotifDepois;
     private float alturaNotif;
     private com.badlogic.gdx.scenes.scene2d.ui.Cell<?> celulaIconeNotif;
 
@@ -111,6 +113,8 @@ public final class HudVitais {
         int tipo = NOTIF_AVISO;
         TextureRegion iconeProprio; // notificarIcone: icone/cor de fundo escolhidos por quem chamou
         Color fundoProprio;
+        long moedas = -1;           // notificarMoedas: icones das moedas entre texto e textoDepois
+        String textoDepois = "";
         Notificacao(String texto, Color cor, Runnable aoClicar) {
             this.texto = texto;
             this.cor = cor;
@@ -376,7 +380,13 @@ public final class HudVitais {
         iconeNotifTrade = atlas.findRegion("ui/currency/Gold");
         iconeNotifAmigo = atlas.findRegion("ui/buttons/FriendsBtn");
         iconeNotifParty = atlas.findRegion("ui/buttons/PartyBtn");
-        internoNotif.add(textoNotificacao).left().expandX().padLeft(px(10)).padRight(px(12));
+        // Texto | moedas (icone + quantidade) | resto do texto - as moedas so' em notificarMoedas.
+        textoNotifDepois = new LabelNitido("", new Label.LabelStyle(fonteNotificacao, Color.WHITE));
+        Table linhaNotif = new Table();
+        linhaNotif.add(textoNotificacao);
+        linhaNotif.add(moedasNotif);
+        linhaNotif.add(textoNotifDepois);
+        internoNotif.add(linhaNotif).left().expandX().padLeft(px(10)).padRight(px(12));
         painelNotificacao.setBackground(cor(Color.BLACK));
         painelNotificacao.pad(px(1));
         painelNotificacao.add(internoNotif).minWidth(px(150)).height(alturaNotif);
@@ -844,9 +854,52 @@ public final class HudVitais {
         filaNotificacoes.addLast(n);
     }
 
+    /** Notificacao do tipo com o valor em icones de moeda no meio do texto
+     * (ex: "You sold 5x Pot for " [2 platina] "."). */
+    public void notificarMoedas(int tipo, String antes, long moedas, String depois) {
+        Notificacao n = new Notificacao(antes == null ? "" : antes, Color.WHITE, null);
+        n.tipo = tipo;
+        n.moedas = Math.max(0L, moedas);
+        n.textoDepois = depois == null ? "" : depois;
+        if (notificacaoAtual == null) {
+            mostrarNotificacao(n);
+            return;
+        }
+        if (filaNotificacoes.size() >= MAX_FILA_NOTIFICACOES) filaNotificacoes.pollFirst();
+        filaNotificacoes.addLast(n);
+    }
+
+    private static final String[] MOEDAS_NOTIF = {"Platinum", "Gold", "Silver", "Copper"};
+    private static final long[] VALOR_MOEDA_NOTIF = {1_000_000L, 10_000L, 100L, 1L};
+    private static final Color[] COR_MOEDA_NOTIF = {Color.valueOf("e4e4e4"), Color.valueOf("ffd34e"),
+        Color.valueOf("a9bcd6"), Color.valueOf("ff8a3d")};
+
+    private void montarMoedasNotif(long valor) {
+        moedasNotif.clearChildren();
+        if (valor < 0) return;
+        float tam = fonteNotificacao.getLineHeight() * 0.9f;
+        boolean algum = false;
+        for (int i = 0; i < MOEDAS_NOTIF.length; i++) {
+            long q = i == 0 ? valor / VALOR_MOEDA_NOTIF[0] : (valor % VALOR_MOEDA_NOTIF[i - 1]) / VALOR_MOEDA_NOTIF[i];
+            if (q <= 0 && !(i == MOEDAS_NOTIF.length - 1 && !algum)) continue;
+            Label n = new LabelNitido((algum ? " " : "") + q, new Label.LabelStyle(fonteNotificacao, Color.WHITE));
+            n.setColor(COR_MOEDA_NOTIF[i]);
+            moedasNotif.add(n);
+            TextureAtlas.AtlasRegion r = atlasHud.findRegion("ui/currency/" + MOEDAS_NOTIF[i]);
+            if (r != null) {
+                Image img = new Image(new TextureRegionDrawable(r));
+                img.setScaling(Scaling.fit);
+                moedasNotif.add(img).size(tam).padLeft(px(1));
+            }
+            algum = true;
+        }
+    }
+
     private void mostrarNotificacao(Notificacao n) {
         notificacaoAtual = n;
         textoNotificacao.setText(n.texto);
+        textoNotifDepois.setText(n.textoDepois);
+        montarMoedasNotif(n.moedas);
         textoNotificacao.setColor(Color.WHITE); // todas brancas
         TextureRegion icone = iconeNotificacaoPadrao;
         Color fundo = COR_MUNICAO;
