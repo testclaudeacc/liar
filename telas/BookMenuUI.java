@@ -5116,13 +5116,17 @@ public final class BookMenuUI {
     private static final Color COR_MAGIA_BORDA_OVER = new Color(0.85f, 0.42f, 0.1f, 1f);
     private static final Color COR_MAGIA_SELECIONADA = new Color(1f, 0.78f, 0.3f, 1f);
     private static final Color COR_SANGRAMENTO = Color.valueOf("ff5a5a");
-    private static final Color[] CORES_SLOT_LARANJA = {COR_MAGIA_FUNDO, COR_MAGIA_BORDA, COR_MAGIA_FUNDO_OVER, COR_MAGIA_BORDA_OVER};
+    // {fundo, borda, fundo hover, borda hover, borda selecionada,
+    //  fundo da gaveta, borda da gaveta, fundo da gaveta hover}
+    private static final Color[] CORES_SLOT_LARANJA = {COR_MAGIA_FUNDO, COR_MAGIA_BORDA, COR_MAGIA_FUNDO_OVER, COR_MAGIA_BORDA_OVER,
+        COR_MAGIA_SELECIONADA, new Color(0.11f, 0.06f, 0.03f, 1f), new Color(0.35f, 0.2f, 0.08f, 1f), new Color(0.16f, 0.08f, 0.03f, 1f)};
     private static final Color[] CORES_SLOT_VERMELHO = {
         new Color(0.24f, 0.03f, 0.03f, 0.94f), new Color(0.75f, 0.14f, 0.12f, 1f),
-        new Color(0.30f, 0.05f, 0.05f, 0.96f), new Color(0.88f, 0.22f, 0.18f, 1f)};
+        new Color(0.30f, 0.05f, 0.05f, 0.96f), new Color(0.88f, 0.22f, 0.18f, 1f),
+        new Color(1f, 0.45f, 0.4f, 1f), new Color(0.12f, 0.03f, 0.03f, 1f), new Color(0.42f, 0.1f, 0.1f, 1f), new Color(0.17f, 0.04f, 0.04f, 1f)};
 
-    /** Cores do slot de uma magia: {fundo, borda, fundo hover, borda hover}
-     * - laranja (padrao) ou vermelho (servidor.py "spell_slot"). */
+    /** Cores de uma magia (slot e gaveta) - laranja (padrao) ou vermelho
+     * (servidor.py "spell_slot"). Indices: ver CORES_SLOT_LARANJA. */
     public Color[] coresSlotMagia(String caminho) {
         EquipStats d = caminho == null ? null : ITEM_STATS.get(caminho);
         return d != null && "red".equals(d.magiaSlot) ? CORES_SLOT_VERMELHO : CORES_SLOT_LARANJA;
@@ -5184,8 +5188,9 @@ public final class BookMenuUI {
     private Button gavetaMagia(String caminho, boolean noSlot, Runnable aoClicar, long preco) {
         EquipStats dados = ITEM_STATS.get(caminho);
         Button.ButtonStyle estilo = new Button.ButtonStyle();
-        estilo.up = UiSkin.retangulo(new Color(0.11f, 0.06f, 0.03f, 1f), noSlot ? COR_MAGIA_SELECIONADA : new Color(0.35f, 0.2f, 0.08f, 1f), 1);
-        estilo.over = UiSkin.retangulo(new Color(0.16f, 0.08f, 0.03f, 1f), noSlot ? COR_MAGIA_SELECIONADA : COR_MAGIA_BORDA, 1);
+        Color[] c = coresSlotMagia(caminho);
+        estilo.up = UiSkin.retangulo(c[5], noSlot ? c[4] : c[6], 1);
+        estilo.over = UiSkin.retangulo(c[7], noSlot ? c[4] : c[1], 1);
         Button gaveta = new Button(estilo);
         gaveta.left().pad(6);
         Button icone = slotAtalho(caminho, noSlot, null, null, false, TAM_ICONE_GAVETA, preco <= 0);
@@ -5274,7 +5279,7 @@ public final class BookMenuUI {
         if (caminho != null && ehMagia(caminho)) {
             // Magia: laranja no lugar dos cinzas (igual o slot da hotbar).
             Color[] c = coresSlotMagia(caminho);
-            estilo.up = UiSkin.retangulo(c[0], selecionado ? COR_MAGIA_SELECIONADA : c[1], 2);
+            estilo.up = UiSkin.retangulo(c[0], selecionado ? c[4] : c[1], 2);
             estilo.over = aoClicar != null && !selecionado ? UiSkin.retangulo(c[2], c[3], 2) : estilo.up;
         } else {
             estilo.up = skinDrawable(selecionado ? "bag-slot-selected" : "bag-slot");
