@@ -3474,7 +3474,14 @@ public class WorldScreen extends ScreenAdapter {
                 // Semente de espinhos (ThornSeed) voa do Bard ate' o mob; as vinhas
                 // brotam quando ela chega. Sem o sprite/atacante: vinhas na hora.
                 Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
-                TextureRegion semente = regiaoPorArquivo("ThornSeed");
+                // Projetil vem do servidor (spell_proj, ex: res://ui/ThornSeed.png),
+                // igual as outras magias; fora dessa pasta, acha pelo nome do arquivo.
+                String proj = data.getString("proj", "");
+                TextureRegion semente = regiaoDoCaminho(proj);
+                if (semente == null && !proj.isEmpty()) {
+                    String arq = proj.substring(proj.lastIndexOf('/') + 1);
+                    semente = regiaoPorArquivo(arq.contains(".") ? arq.substring(0, arq.lastIndexOf('.')) : arq);
+                }
                 if (atacante != null && semente != null) {
                     Projetil pr = new Projetil(semente, atacante.x, atacante.y + 8f, mob, null);
                     pr.aoChegar = () -> tocarVinhas(mob, segurar);

@@ -367,7 +367,7 @@ ITEM_DB = {
     # Small Vines (Bard): vinhas prendem o mob (efeito "Vines" no client, ~2s
     # fechadas): veneno de spell_bleed_ticks ticks (spell_dot "poison") e o mob
     # fica lento (spell_slow s). Sem golpe inicial (spell_dmg 0).
-    "res://sprites/spells/SmallVines.tres": {"name": "Small Vines", "type": "Spell", "spell": "small_vines", "spell_words": "Vineolae", "spell_desc": "Vines burst from the ground, slowing and poisoning the target.", "req_level": 10, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 12, "spell_dmg": 0, "spell_area": False, "spell_dot": "poison", "spell_bleed_ticks": 3, "spell_bleed_pct": 20, "spell_bleed_every": 0.67, "spell_bleed_skill": "musicality", "spell_slow": 2.0, "spell_effect": "Vines", "spell_hit": "", "spell_proj": "", "spell_color": "8cd612", "spell_slot": "376d03", "price": 4000, "icon": "sheet/r75_c8", "cap": 0.0},
+    "res://sprites/spells/SmallVines.tres": {"name": "Small Vines", "type": "Spell", "spell": "small_vines", "spell_words": "Vineolae", "spell_desc": "Vines burst from the ground, slowing and poisoning the target.", "req_level": 10, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 12, "spell_dmg": 0, "spell_area": False, "spell_dot": "poison", "spell_bleed_ticks": 3, "spell_bleed_pct": 20, "spell_bleed_every": 0.67, "spell_bleed_skill": "musicality", "spell_slow": 2.0, "spell_effect": "Vines", "spell_hit": "", "spell_proj": "res://ui/ThornSeed.png", "spell_color": "8cd612", "spell_slot": "376d03", "price": 4000, "icon": "sheet/r75_c8", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
@@ -4014,7 +4014,8 @@ def _lancar_magia(sid, p, caminho, mob_id):
         _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano, now, extra)
     else:
         # Sem golpe (Small Vines): so' o efeito no mob, o icone do DoT e a lentidao.
-        evt = {'mob_id': mob_id, 'effect': dados.get('spell_effect', ''), 'hold': lento, 'attacker_id': p.get('name', '')}
+        evt = {'mob_id': mob_id, 'effect': dados.get('spell_effect', ''), 'hold': lento, 'attacker_id': p.get('name', ''),
+               'proj': dados.get('spell_proj', '')}
         evt.update({k: v for k, v in extra.items() if k.endswith('_secs')})
         emit_area('spell_effect', evt, p.get('room'))
     golpes = int(dados.get('spell_hits', 1) or 1)
