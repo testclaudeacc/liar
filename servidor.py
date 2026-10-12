@@ -2019,6 +2019,12 @@ def db_writer_worker():
         try:
             conn = db_pool.getconn()
             c = conn.cursor()
+            if player_data.get('_so_banco'):
+                # Mercado entregou no bank de quem esta offline: mesma fila dos
+                # saves, entao nao e' sobrescrito por um save antigo da conta.
+                c.execute("UPDATE users SET bank = %s WHERE id = %s", (json.dumps(player_data['bank']), player_data['user_id']))
+                conn.commit(); c.close()
+                continue
             
             valid_inventory = normalizar_inventario(player_data.get('inventory', []))
             valid_equipped = normalizar_equipados(player_data.get('equipped_items', {}))
@@ -2121,6 +2127,8 @@ def init_db():
                         owner_user INTEGER,
                         created DOUBLE PRECISION)''')
         c.execute("CREATE INDEX IF NOT EXISTS market_offers_item ON market_offers (item)")
+        # Instancias reais (com id) dos itens de uma oferta de venda.
+        c.execute("ALTER TABLE market_offers ADD COLUMN IF NOT EXISTS instances TEXT")
         c.execute('''CREATE TABLE IF NOT EXISTS market_inbox (
                         id SERIAL PRIMARY KEY,
                         char_name TEXT NOT NULL,
@@ -5945,7 +5953,9 @@ def normalizar_banco(dados):
             itens.append({'id': str(e.get('id') or uuid.uuid4().hex), 'item': caminho, 'favorite': False})
     try: moedas = max(0, int(dados.get('currency', 0)))
     except (TypeError, ValueError): moedas = 0
-    return {'items': itens[:BANK_SLOTS * 2], 'currency': moedas}
+    # Pode passar dos BANK_SLOTS (o mercado entrega mesmo com o bank cheio);
+    # o limite aqui e' so' contra lixo/abuso.
+    return {'items': itens[:BANK_SLOTS * 10], 'currency': moedas}
 
 def _copia_banco(user_id):
     b = bancos.get(str(user_id))
@@ -5953,13 +5963,16 @@ def _copia_banco(user_id):
 
 def _banco_da_conta(p):
     """Bank em memoria; na 1a vez le do banco de dados."""
-    chave = str(p.get('user_id'))
+    return _banco_por_user_id(p.get('user_id'))
+
+def _banco_por_user_id(user_id):
+    chave = str(user_id)
     if chave in bancos: return bancos[chave]
     conn = None
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
-        c.execute("SELECT bank FROM users WHERE id = %s", (p.get('user_id'),))
+        c.execute("SELECT bank FROM users WHERE id = %s", (user_id,))
         linha = c.fetchone()
         c.close()
         try: dados = json.loads(linha[0]) if linha and linha[0] else {}
@@ -6231,25 +6244,62 @@ def quantidade_na_bag(p, item):
                for i in p.get('inventory', []) if isinstance(i, dict) and i.get('item') == item)
 
 def tirar_da_bag(p, item, qtd):
-    """Tira qtd unidades do item da bag (pilhas ou instancias). False se nao tem."""
-    if quantidade_na_bag(p, item) < qtd: return False
+    """Tira qtd unidades do item da bag. Devolve as instancias tiradas (com o
+    id original - o mesmo item segue pelo mercado) ou None se nao tem."""
+    if quantidade_na_bag(p, item) < qtd: return None
     inv = p.setdefault('inventory', [])
-    falta = qtd
+    falta, tiradas = qtd, []
     for inst in [i for i in inv if isinstance(i, dict) and i.get('item') == item]:
         if falta <= 0: break
         if eh_empilhavel(item):
             q = int(inst.get('qty', 1)); usa = min(q, falta)
-            if usa >= q: inv.remove(inst)
-            else: inst['qty'] = q - usa
+            if usa >= q: inv.remove(inst); tiradas.append({'id': inst.get('id'), 'item': item, 'qty': q})
+            else: inst['qty'] = q - usa; tiradas.append({'id': uuid.uuid4().hex, 'item': item, 'qty': usa})
             falta -= usa
         else:
             inv.remove(inst); falta -= 1
-    return True
+            tiradas.append({'id': inst.get('id'), 'item': item, 'favorite': False})
+    return tiradas
 
-def dar_na_bag(p, item, qtd):
-    if eh_empilhavel(item): adicionar_municao_ao_jogador(p, item, qtd)
-    else:
-        for _ in range(qtd): p.setdefault('inventory', []).append(criar_instancia_item(item))
+def separar_instancias(instancias, qtd):
+    """Pega qtd unidades de uma lista de instancias guardada (oferta de venda):
+    (tiradas, resto). Pilhas sao divididas; nao empilhaveis vao inteiras."""
+    tiradas, resto, falta = [], [], qtd
+    for inst in instancias:
+        if falta <= 0: resto.append(inst); continue
+        if eh_empilhavel(inst.get('item')):
+            q = int(inst.get('qty', 1)); usa = min(q, falta)
+            tiradas.append(dict(inst, qty=usa))
+            if q > usa: resto.append(dict(inst, id=uuid.uuid4().hex, qty=q - usa))
+            falta -= usa
+        else:
+            tiradas.append(inst); falta -= 1
+    return tiradas, resto
+
+def instancias_novas(item, qtd):
+    """Oferta antiga (sem instancias guardadas): cria as unidades."""
+    if eh_empilhavel(item): return [{'id': uuid.uuid4().hex, 'item': item, 'qty': qtd}]
+    return [criar_instancia_item(item) for _ in range(qtd)]
+
+def dar_na_bag(p, item, qtd, instancias=None):
+    """Poe na bag. Com instancias: as mesmas (mesmo id); senao cria."""
+    for inst in (instancias if instancias is not None else instancias_novas(item, qtd)):
+        if eh_empilhavel(inst.get('item')): adicionar_municao_ao_jogador(p, inst['item'], int(inst.get('qty', 1)))
+        else: p.setdefault('inventory', []).append({'id': inst.get('id') or uuid.uuid4().hex, 'item': inst['item'], 'favorite': False})
+
+def dar_no_banco(user_id, instancias):
+    """Poe no bank da conta (mesmo cheio: passa do limite pra nao perder nada)."""
+    banco = _banco_por_user_id(user_id)
+    if banco is None: return False
+    for inst in instancias:
+        item = inst.get('item')
+        if eh_empilhavel(item):
+            pilha = next((e for e in banco['items'] if e.get('item') == item), None)
+            if pilha: pilha['qty'] = min(BANK_QTD_MAX, int(pilha.get('qty', 1)) + int(inst.get('qty', 1)))
+            else: banco['items'].append({'id': inst.get('id') or uuid.uuid4().hex, 'item': item, 'qty': int(inst.get('qty', 1))})
+        else:
+            banco['items'].append({'id': inst.get('id') or uuid.uuid4().hex, 'item': item, 'favorite': False})
+    return True
 
 def _mercado_do_evento(sid, data):
     p = online_players.get(sid)
@@ -6258,10 +6308,15 @@ def _mercado_do_evento(sid, data):
     if NPC_DB.get(npc_id, {}).get('role') != 'market' or not _perto_do_npc(p, npc_id): return None
     return p
 
-def _creditar(nome, coins=0, item=None, qtd=0, msg=''):
-    """Entrega pro dono de uma oferta: na hora se online, senao na caixa."""
+def _creditar(nome, coins=0, item=None, qtd=0, msg='', instancias=None, user_id=None):
+    """Entrega pro dono de uma oferta: na hora se online, senao na caixa.
+    Com user_id + instancias (oferta de compra): os itens vao pro BANK da conta."""
     sid_dono = players_by_name.get(nome)
     dono = online_players.get(sid_dono) if sid_dono else None
+    if instancias is not None and user_id is not None and dar_no_banco(user_id, instancias):
+        item, qtd = None, 0           # itens ja' no bank; so' moedas/aviso seguem
+        if dono is not None: _queue_save(dono)  # bank vai junto com o save do personagem
+        else: save_queue.put({'_so_banco': True, 'user_id': user_id, 'bank': _copia_banco(user_id)})
     if dono is not None and not dono.get('corpo_ausente'):
         if coins: dono['currency'] = int(dono.get('currency', 0)) + int(coins)
         if item and qtd: dar_na_bag(dono, item, qtd)
@@ -6382,15 +6437,18 @@ def handle_market_create(data):
             taxa = max(1, int(math.ceil(total * MERCADO_TAXA)))
             if int(p.get('currency', 0)) < taxa:
                 c.close(); return _depois_do_mercado(sid, p, f"You need {formatar_moedas(taxa)} for the market fee.", False, item)
-            if not tirar_da_bag(p, item, qtd):
+            tiradas = tirar_da_bag(p, item, qtd)
+            if tiradas is None:
                 c.close(); return _depois_do_mercado(sid, p, "You don't have that many in your bag.", False, item)
             p['currency'] = int(p.get('currency', 0)) - taxa
+            instancias_json = json.dumps(tiradas)
         else:
             if int(p.get('currency', 0)) < total:
                 c.close(); return _depois_do_mercado(sid, p, "Not enough money.", False, item)
             p['currency'] = int(p.get('currency', 0)) - total
-        c.execute("INSERT INTO market_offers (kind, item, qty, price, owner_name, owner_user, created) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                  (tipo, item, qtd, preco, p.get('name', ''), p.get('user_id'), time.time()))
+            instancias_json = None
+        c.execute("INSERT INTO market_offers (kind, item, qty, price, owner_name, owner_user, created, instances) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                  (tipo, item, qtd, preco, p.get('name', ''), p.get('user_id'), time.time(), instancias_json))
         conn.commit(); c.close()
         _depois_do_mercado(sid, p, "Offer created.", True, item)
     except Exception:
@@ -6409,11 +6467,11 @@ def handle_market_accept(data):
         oid = _int_campo(data, 'id', 1, 2 ** 31 - 1); qtd = _int_campo(data, 'qty', 1, MERCADO_QTD_MAX)
         if oid is None or qtd is None: return
         conn = db_pool.getconn(); c = conn.cursor()
-        c.execute("SELECT kind, item, qty, price, owner_name FROM market_offers WHERE id = %s FOR UPDATE", (oid,))
+        c.execute("SELECT kind, item, qty, price, owner_name, owner_user, instances FROM market_offers WHERE id = %s FOR UPDATE", (oid,))
         linha = c.fetchone()
         if not linha:
             conn.rollback(); c.close(); return _depois_do_mercado(sid, p, "This offer is gone.", False)
-        tipo, item, disp, preco, dono = linha
+        tipo, item, disp, preco, dono, dono_user, inst_json = linha
         if dono == p.get('name'):
             conn.rollback(); c.close(); return _depois_do_mercado(sid, p, "You can't accept your own offer.", False, item)
         qtd = min(qtd, disp); total = qtd * preco
@@ -6426,18 +6484,29 @@ def handle_market_accept(data):
             # Eu vendo pro comprador: dou o item, levo as moedas (ja' presas na oferta).
             if quantidade_na_bag(p, item) < qtd:
                 conn.rollback(); c.close(); return _depois_do_mercado(sid, p, "You don't have that many in your bag.", False, item)
+        entregar = None
+        if tipo == 'sell':
+            # As unidades guardadas na oferta (mesmo id) vao pro comprador.
+            try: guardadas = json.loads(inst_json) if inst_json else None
+            except (TypeError, ValueError): guardadas = None
+            if guardadas: entregar, resto = separar_instancias(guardadas, qtd)
+            else: entregar, resto = instancias_novas(item, qtd), None
         if qtd >= disp: c.execute("DELETE FROM market_offers WHERE id = %s", (oid,))
+        elif tipo == 'sell' and resto is not None:
+            c.execute("UPDATE market_offers SET qty = qty - %s, instances = %s WHERE id = %s", (qtd, json.dumps(resto), oid))
         else: c.execute("UPDATE market_offers SET qty = qty - %s WHERE id = %s", (qtd, oid))
         conn.commit(); c.close()
         if tipo == 'sell':
             p['currency'] = int(p.get('currency', 0)) - total
-            dar_na_bag(p, item, qtd)
+            dar_na_bag(p, item, qtd, entregar)
             _creditar(dono, coins=total, msg=f"You sold {qtd}x {nome_item} for {formatar_moedas(total)}.")
             _depois_do_mercado(sid, p, f"You bought {qtd}x {nome_item} for {formatar_moedas(total)}.", True, item)
         else:
-            tirar_da_bag(p, item, qtd)
+            tiradas = tirar_da_bag(p, item, qtd) or instancias_novas(item, qtd)
             p['currency'] = int(p.get('currency', 0)) + total
-            _creditar(dono, item=item, qtd=qtd, msg=f"You bought {qtd}x {nome_item} for {formatar_moedas(total)}.")
+            # Oferta de compra: o item (mesmo id) vai pro BANK de quem comprou.
+            _creditar(dono, item=item, qtd=qtd, instancias=tiradas, user_id=dono_user,
+                      msg=f"You bought {qtd}x {nome_item} for {formatar_moedas(total)}. It is in your bank.")
             _depois_do_mercado(sid, p, f"You sold {qtd}x {nome_item} for {formatar_moedas(total)}.", True, item)
     except Exception:
         traceback.print_exc()
@@ -6455,11 +6524,14 @@ def handle_market_cancel(data):
         oid = _int_campo(data, 'id', 1, 2 ** 31 - 1)
         if oid is None: return
         conn = db_pool.getconn(); c = conn.cursor()
-        c.execute("DELETE FROM market_offers WHERE id = %s AND owner_name = %s RETURNING kind, item, qty, price", (oid, p.get('name', '')))
+        c.execute("DELETE FROM market_offers WHERE id = %s AND owner_name = %s RETURNING kind, item, qty, price, instances", (oid, p.get('name', '')))
         linha = c.fetchone(); conn.commit(); c.close()
         if not linha: return _depois_do_mercado(sid, p, "This offer is gone.", False)
-        tipo, item, qtd, preco = linha
-        if tipo == 'sell': dar_na_bag(p, item, qtd)              # itens voltam (a taxa nao)
+        tipo, item, qtd, preco, inst_json = linha
+        if tipo == 'sell':                                        # os mesmos itens voltam (a taxa nao)
+            try: guardadas = json.loads(inst_json) if inst_json else None
+            except (TypeError, ValueError): guardadas = None
+            dar_na_bag(p, item, qtd, guardadas)
         else: p['currency'] = int(p.get('currency', 0)) + qtd * preco
         _depois_do_mercado(sid, p, "Offer cancelled.", True, item)
     except Exception:
