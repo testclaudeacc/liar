@@ -46,6 +46,12 @@ public class ServerApi {
         post("/register", body, callback);
     }
 
+    /** Manda outro link de verificacao (o anterior expira). */
+    public static void resendVerification(String email, ApiCallback callback) {
+        String body = json(w -> w.set("email", email));
+        post("/resend-verification", body, callback);
+    }
+
     public static void forgotPassword(String email, ApiCallback callback) {
         String body = json(w -> w.set("email", email));
         post("/forgot-password", body, callback);

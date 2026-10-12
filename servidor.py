@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.36"
+SERVER_VERSION = "v0.37"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -2081,6 +2081,12 @@ def init_db():
                         email TEXT UNIQUE,
                         password TEXT)''')
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code TEXT")
+        # Cadastro esperando o clique no link do email: so' vira conta (users) depois.
+        c.execute('''CREATE TABLE IF NOT EXISTS pending_users (
+                        email TEXT PRIMARY KEY,
+                        password TEXT NOT NULL,
+                        token_hash TEXT NOT NULL,
+                        expires DOUBLE PRECISION NOT NULL)''')
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code_expires DOUBLE PRECISION")
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bestiary TEXT DEFAULT '{}'")
         # Bank da conta (todos os personagens): {"items": [...], "currency": N}.
@@ -2173,6 +2179,50 @@ def check_version():
     if dados.get('version', '') == SERVER_VERSION: return jsonify({"valid": True, "mensagem": "Version OK."}), 200
     return jsonify({"valid": False, "erro": "Version outdated, please update your game"}), 426
 
+VERIFY_TTL_SEG = 3600  # link de verificacao vale 1 hora
+# URL publica do servidor pro link do email (ex: https://meujogo.com). Sem ela,
+# usa o endereco que o client usou pra chamar o /register.
+PUBLIC_URL = (os.getenv("PUBLIC_URL") or "").rstrip('/')
+
+def _hash_token(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+def _url_base():
+    if PUBLIC_URL: return PUBLIC_URL
+    proto = request.headers.get('X-Forwarded-Proto', request.scheme)
+    return f"{proto}://{request.host}"
+
+def enviar_email_verificacao(email, link):
+    texto = (f"Welcome to Mitera Online!\n\nVerify your email by opening this link:\n{link}\n\n"
+             "This link expires in 1 hour. If you did not create an account, ignore this email.")
+    html = f"""<div style="font-family:Arial,sans-serif;background:#1b1b1b;padding:30px;text-align:center;color:#eee">
+  <h2 style="margin:0 0 12px">Welcome to Mitera Online!</h2>
+  <p style="margin:0 0 24px">Click the button below to verify your email and create your account.</p>
+  <a href="{link}" style="display:inline-block;background:#3c8c3c;color:#fff;text-decoration:none;
+     padding:14px 30px;border-radius:6px;font-weight:bold;font-size:16px">Verify Email</a>
+  <p style="margin:24px 0 0;font-size:12px;color:#999">This link expires in 1 hour.<br>
+     If you did not create an account, ignore this email.</p></div>"""
+    from email.mime.multipart import MIMEMultipart
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = "Verify your email - Mitera Online"
+    msg['From'] = GMAIL_SENDER
+    msg['To'] = email
+    msg.attach(MIMEText(texto, 'plain'))
+    msg.attach(MIMEText(html, 'html'))
+    with smtplib.SMTP('smtp.gmail.com', 587) as server:
+        server.starttls()
+        server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD)
+        server.sendmail(GMAIL_SENDER, email, msg.as_string())
+
+def _criar_pendente(c, email, hashed_password):
+    """Grava/troca o cadastro pendente com um token novo (o link anterior deixa de valer)."""
+    token = secrets.token_urlsafe(32)
+    c.execute("""INSERT INTO pending_users (email, password, token_hash, expires) VALUES (%s, %s, %s, %s)
+                 ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password,
+                 token_hash = EXCLUDED.token_hash, expires = EXCLUDED.expires""",
+              (email, hashed_password, _hash_token(token), time.time() + VERIFY_TTL_SEG))
+    return f"{_url_base()}/verify-email?token={token}"
+
 @app.route('/register', methods=['POST'])
 def register():
     dados = _json_requisicao()
@@ -2182,20 +2232,92 @@ def register():
     if len(email) > 254 or not RE_EMAIL.match(email): return jsonify({"erro": "Invalid email."}), 400
     if not (SENHA_MIN <= len(senha) <= SENHA_MAX): return jsonify({"erro": "Invalid password."}), 400
     if _limite_excedido(('register', _ip()), 5, 3600): return _resposta_limite()
-    hashed_password = _hash_senha(senha)
     conn = None
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
-        c.execute("INSERT INTO users (email, password) VALUES (%s, %s) RETURNING id", (email, hashed_password))
-        new_user_id = c.fetchone()[0]
+        c.execute("SELECT 1 FROM users WHERE email = %s", (email,))
+        if c.fetchone(): return jsonify({"erro": "Email in use."}), 409
+        # A conta so' e' criada quando clicar no link do email (/verify-email).
+        link = _criar_pendente(c, email, _hash_senha(senha))
         conn.commit()
-        return jsonify({"mensagem": "Account created!", "user_id": new_user_id, "email": email,
-                        "token": gerar_token(new_user_id, hashed_password)}), 201
-    except psycopg2.IntegrityError:
+        enviar_email_verificacao(email, link)
+        return jsonify({"mensagem": "Check your email to verify your account.", "pending": True, "email": email}), 202
+    except Exception as e:
         if conn: conn.rollback()
-        return jsonify({"erro": "Email in use."}), 409
-    except Exception as e: return _erro_interno(e)
+        return _erro_interno(e)
+    finally:
+        if conn: db_pool.putconn(conn)
+
+@app.route('/resend-verification', methods=['POST'])
+def resend_verification():
+    """Manda um link novo; o anterior expira (o token e' trocado)."""
+    dados = _json_requisicao()
+    email = str(dados.get('email') or '').strip().lower()
+    if not email: return jsonify({"erro": "Missing fields"}), 400
+    if _limite_excedido(('resend_ip', _ip()), 10, 3600) or _limite_excedido(('resend_email', email), 3, 900):
+        return _resposta_limite()
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        c = conn.cursor()
+        c.execute("SELECT password FROM pending_users WHERE email = %s", (email,))
+        linha = c.fetchone()
+        if not linha: return jsonify({"erro": "No pending registration for this email."}), 404
+        link = _criar_pendente(c, email, linha[0])
+        conn.commit()
+        enviar_email_verificacao(email, link)
+        return jsonify({"mensagem": "Verification email sent."}), 200
+    except Exception as e:
+        if conn: conn.rollback()
+        return _erro_interno(e)
+    finally:
+        if conn: db_pool.putconn(conn)
+
+def _pagina_verificacao(titulo, texto, ok):
+    cor = '#3c8c3c' if ok else '#a33'
+    html = f"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>{titulo}</title></head>
+<body style="margin:0;background:#141414;font-family:Arial,sans-serif;color:#eee;display:flex;
+  align-items:center;justify-content:center;min-height:100vh">
+<div style="background:#1f1f1f;border:2px solid {cor};border-radius:8px;padding:30px 36px;text-align:center;max-width:420px">
+<h2 style="margin:0 0 12px;color:{cor}">{titulo}</h2><p style="margin:0">{texto}</p></div></body></html>"""
+    return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+@app.route('/verify-email', methods=['GET'])
+def verify_email():
+    token = str(request.args.get('token') or '')
+    if not token or len(token) > 200:
+        return _pagina_verificacao("Invalid link", "This verification link is invalid.", False)
+    if _limite_excedido(('verify_ip', _ip()), 30, 3600): return _pagina_verificacao("Too many attempts", "Try again later.", False)
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        c = conn.cursor()
+        c.execute("SELECT email, password, expires FROM pending_users WHERE token_hash = %s", (_hash_token(token),))
+        linha = c.fetchone()
+        if not linha:
+            return _pagina_verificacao("Invalid link",
+                "This link is invalid or was replaced by a newer one. Use the latest email we sent.", False)
+        email, senha_hash, expira = linha
+        if time.time() > expira:
+            return _pagina_verificacao("Link expired",
+                "This link expired. Open the game and tap Resend Email to get a new one.", False)
+        c.execute("DELETE FROM pending_users WHERE email = %s", (email,))
+        try:
+            c.execute("INSERT INTO users (email, password) VALUES (%s, %s)", (email, senha_hash))
+        except psycopg2.IntegrityError:
+            conn.rollback()
+            c = conn.cursor()
+            c.execute("DELETE FROM pending_users WHERE email = %s", (email,))
+            conn.commit()
+            return _pagina_verificacao("Already verified", "This email is already verified. You can log in.", True)
+        conn.commit()
+        return _pagina_verificacao("Email verified!", "Your account was created. Go back to the game and log in.", True)
+    except Exception as e:
+        if conn: conn.rollback()
+        traceback.print_exc()
+        return _pagina_verificacao("Error", "Something went wrong. Try again later.", False)
     finally:
         if conn: db_pool.putconn(conn)
 
@@ -2217,6 +2339,12 @@ def login():
         if user and _conferir_senha(user[1], senha):
             return jsonify({"mensagem": "Login ok!", "user_id": user[0], "email": email,
                             "token": gerar_token(user[0], user[1])}), 200
+        if not user:
+            # Cadastrou mas ainda nao clicou no link: avisa (com a senha certa).
+            c.execute("SELECT password FROM pending_users WHERE email = %s", (email,))
+            pend = c.fetchone()
+            if pend and _conferir_senha(pend[0], senha):
+                return jsonify({"erro": "Email not verified.", "unverified": True}), 403
         return jsonify({"erro": "Invalid credentials."}), 401
     except Exception as e: return _erro_interno(e)
     finally:

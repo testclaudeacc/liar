@@ -174,8 +174,55 @@ public class InvertedRealmsGame extends Game {
         socket.connect(null);
     }
 
+    // Celular: o jogo em segundo plano por mais de 10 s (so' dentro do mundo)
+    // derruba a conexao - ninguem fica parado no mapa com o app minimizado.
+    // Na volta, a tela inicial mostra "Disconnected".
+    private static final long SEGUNDO_PLANO_MAX_MS = 10_000L;
+    private java.util.Timer timerSegundoPlano;
+    private volatile boolean caiuEmSegundoPlano = false;
+
+    private static boolean celular() {
+        Application.ApplicationType tipo = Gdx.app.getType();
+        return tipo == Application.ApplicationType.Android || tipo == Application.ApplicationType.iOS;
+    }
+
+    @Override
+    public void pause() {
+        super.pause();
+        if (!celular() || !(getScreen() instanceof WorldScreen) || socket == null || !socket.isConnected()) return;
+        cancelarTimerSegundoPlano();
+        final GameSocket alvo = socket;
+        timerSegundoPlano = new java.util.Timer("segundo-plano", true);
+        timerSegundoPlano.schedule(new java.util.TimerTask() {
+            @Override public void run() {
+                if (alvo != socket || !alvo.isConnected()) return;
+                caiuEmSegundoPlano = true;
+                desconexaoEsperada = true;
+                alvo.disconnect();
+            }
+        }, SEGUNDO_PLANO_MAX_MS);
+    }
+
+    @Override
+    public void resume() {
+        cancelarTimerSegundoPlano();
+        super.resume();
+        if (caiuEmSegundoPlano) {
+            caiuEmSegundoPlano = false;
+            setScreen(new AuthScreen(InvertedRealmsGame.this::entrarNoMundo, "Disconnected"));
+        }
+    }
+
+    private void cancelarTimerSegundoPlano() {
+        if (timerSegundoPlano != null) {
+            timerSegundoPlano.cancel();
+            timerSegundoPlano = null;
+        }
+    }
+
     @Override
     public void dispose() {
+        cancelarTimerSegundoPlano();
         if (socket != null) socket.disconnect();
         super.dispose();
     }

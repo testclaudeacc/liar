@@ -574,6 +574,8 @@ public class AuthScreen extends ScreenAdapter {
                             atualizarLogout();
                             Sessao.salvar(currentUserId, body.getString("email", em), body.getString("token", ""));
                             fetchCharacters();
+                        } else if (statusCode == 403 && body != null && body.getBoolean("unverified", false)) {
+                            telaVerificarEmail(em, "Your email is not verified yet.");
                         } else {
                             telaErro("Invalid email or password.", AuthScreen.this::telaLogin);
                         }
@@ -644,15 +646,22 @@ public class AuthScreen extends ScreenAdapter {
                 ServerApi.register(em, pw, new ServerApi.ApiCallback() {
                     @Override public void onResponse(int statusCode, JsonValue body) {
                         criarBtn.setDisabled(false);
-                        if (statusCode == 200 || statusCode == 201) {
+                        if (statusCode == 202) {
+                            // Conta so' e' criada depois do clique no link do email.
+                            telaVerificarEmail(em, null);
+                        } else if (statusCode == 200 || statusCode == 201) {
                             if (body != null && body.has("user_id")) {
                                 currentUserId = body.getInt("user_id");
                                 atualizarLogout();
                                 Sessao.salvar(currentUserId, body.getString("email", em), body.getString("token", ""));
                             }
                             telaErro("Account created successfully!", AuthScreen.this::fetchCharacters);
+                        } else if (statusCode == 409) {
+                            telaErro("Email already in use.", AuthScreen.this::telaRegistro);
+                        } else if (statusCode == 429) {
+                            telaErro("Too many attempts. Try again later.", AuthScreen.this::telaRegistro);
                         } else {
-                            telaErro("Email already in use or server error.", AuthScreen.this::telaRegistro);
+                            telaErro("Server error. Try again later.", AuthScreen.this::telaRegistro);
                         }
                     }
                     @Override public void onFailure(String motivo) { criarBtn.setDisabled(false); telaErro(motivo, AuthScreen.this::telaRegistro); }
@@ -660,6 +669,43 @@ public class AuthScreen extends ScreenAdapter {
             }
         });
         definirRodape(voltarBtn, criarBtn);
+    }
+
+    /** Cadastro enviado: falta clicar no link do email. Resend manda outro
+     * link (o anterior expira); o link vale 1 hora. */
+    private void telaVerificarEmail(String em, String aviso) {
+        limparConteudo();
+        String texto = (aviso != null ? aviso + "\n\n" : "")
+            + "We sent a verification link to\n" + em
+            + "\n\nOpen the email and tap Verify Email, then log in.\nThe link expires in 1 hour.";
+        Label label = new Label(texto, skin);
+        label.setWrap(true);
+        label.setAlignment(Align.center);
+        Table painel = criarPainel();
+        painel.add(label).width(mobile ? 420 : 340).pad(mobile ? 18 : 14);
+        content.add(painel);
+
+        TextButton loginBtn = new TextButton("Login", skin);
+        loginBtn.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaLogin(); }
+        });
+        TextButton reenviarBtn = new TextButton("Resend Email", skin, "verde");
+        reenviarBtn.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                reenviarBtn.setDisabled(true);
+                ServerApi.resendVerification(em, new ServerApi.ApiCallback() {
+                    @Override public void onResponse(int statusCode, JsonValue body) {
+                        Runnable voltar = () -> telaVerificarEmail(em, null);
+                        if (statusCode == 200) telaErro("A new link was sent. The old one no longer works.", voltar);
+                        else if (statusCode == 429) telaErro("Too many emails. Wait a few minutes.", voltar);
+                        else if (statusCode == 404) telaErro("This registration was not found. Register again.", AuthScreen.this::telaRegistro);
+                        else telaErro("Server error. Try again later.", voltar);
+                    }
+                    @Override public void onFailure(String motivo) { telaErro(motivo, () -> telaVerificarEmail(em, null)); }
+                });
+            }
+        });
+        definirRodape(loginBtn, reenviarBtn);
     }
 
     private void telaEsqueciSenha() {
