@@ -1,6 +1,7 @@
 package com.teste.game.telas;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -407,6 +408,33 @@ public class AuthScreen extends ScreenAdapter {
         return atualizar;
     }
 
+    /** Celular (so' login/cadastro/esqueci senha): tocar no campo abre a caixa
+     * de texto nativa do Android/iOS - o teclado do sistema com a linha do que
+     * esta' sendo digitado em cima (tela cheia no celular deitado). O texto
+     * volta pro campo ao confirmar e dispara as mesmas validacoes. */
+    private void campoNativo(TextField campo, String titulo) {
+        if (!mobile) return;
+        campo.setOnscreenKeyboard(visivel -> { }); // o teclado do libGDX nao abre
+        campo.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                if (campo.isDisabled()) return;
+                if (campo.getStage() != null) campo.getStage().setKeyboardFocus(null);
+                Input.OnscreenKeyboardType tipo = campo.isPasswordMode() ? Input.OnscreenKeyboardType.Password
+                    : titulo.contains("Email") ? Input.OnscreenKeyboardType.Email : Input.OnscreenKeyboardType.Default;
+                Gdx.input.getTextInput(new Input.TextInputListener() {
+                    @Override public void input(String texto) {
+                        Gdx.app.postRunnable(() -> {
+                            campo.setText(texto == null ? "" : texto);
+                            campo.setCursorPosition(campo.getText().length());
+                            campo.fire(new ChangeListener.ChangeEvent());
+                        });
+                    }
+                    @Override public void canceled() { }
+                }, titulo, campo.getText(), "", tipo);
+            }
+        });
+    }
+
     /** Registra um segundo campo pra tambem re-checar quando "campo" mudar -
      * usado pro "Confirm Email"/"Confirm Password" reagirem quando o campo
      * original muda (igual start_screen.gd::_on_email_text_changed tambem
@@ -534,6 +562,8 @@ public class AuthScreen extends ScreenAdapter {
         TextField senha = new TextField("", skin);
         senha.setPasswordMode(true);
         senha.setPasswordCharacter('*');
+        campoNativo(email, "Email");
+        campoNativo(senha, "Password");
         marcarValidacao(email, () -> EMAIL_REGEX.matcher(email.getText().trim()).matches());
         marcarValidacao(senha, () -> senha.getText().length() >= 5);
         TextButton esqueciBtn = new TextButton("Forgot Password?", skin, "link");
@@ -598,6 +628,10 @@ public class AuthScreen extends ScreenAdapter {
         TextField confirmSenha = new TextField("", skin);
         confirmSenha.setPasswordMode(true);
         confirmSenha.setPasswordCharacter('*');
+        campoNativo(email, "Email");
+        campoNativo(confirmEmail, "Confirm Email");
+        campoNativo(senha, "Password");
+        campoNativo(confirmSenha, "Confirm Password");
 
         Runnable atualizarConfirmEmail = marcarValidacao(confirmEmail, () ->
             !confirmEmail.getText().isEmpty() && confirmEmail.getText().equals(email.getText())
@@ -716,6 +750,9 @@ public class AuthScreen extends ScreenAdapter {
         TextField novaSenha = new TextField("", skin);
         novaSenha.setPasswordMode(true);
         novaSenha.setPasswordCharacter('*');
+        campoNativo(email, "Email");
+        campoNativo(codigo, "Code");
+        campoNativo(novaSenha, "New Password");
         marcarValidacao(email, () -> EMAIL_REGEX.matcher(email.getText().trim()).matches());
         marcarValidacao(novaSenha, () -> novaSenha.getText().length() >= 5);
 
