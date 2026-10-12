@@ -355,6 +355,7 @@ public class WorldScreen extends ScreenAdapter {
         final String efeitoHit;
         NumeroDano numero;      // dano que aparece quando o projetil chega
         Runnable aoChegar;      // ex: Small Vines - as vinhas brotam quando a semente chega
+        float escala = 1f;      // tamanho na tela (a pixel art continua a mesma)
         float tempo = 0f;
         // Tempo fixo (a velocidade cresce com a distancia): sempre chega logo,
         // e so' entao aparecem o hit e o numero de dano.
@@ -3485,6 +3486,7 @@ public class WorldScreen extends ScreenAdapter {
                 if (atacante != null && semente != null) {
                     Projetil pr = new Projetil(semente, atacante.x, atacante.y + 8f, mob, null);
                     pr.aoChegar = () -> tocarVinhas(mob, segurar);
+                    pr.escala = 0.5f; // a semente aparece na metade do tamanho
                     projeteis.add(pr);
                 } else {
                     tocarVinhas(mob, segurar);
@@ -5902,10 +5904,10 @@ public class WorldScreen extends ScreenAdapter {
             // A "cabeca" do projetil (fogo/mana) fica na frente do sprite: quem
             // segue o caminho e chega no centro do mob e' ela, nao o meio do
             // sprite (senao some com a cabeca ja' passada do mob).
-            float recuo = w * 0.22f, rad = angulo * com.badlogic.gdx.math.MathUtils.degreesToRadians;
+            float recuo = w * pr.escala * 0.22f, rad = angulo * com.badlogic.gdx.math.MathUtils.degreesToRadians;
             x -= com.badlogic.gdx.math.MathUtils.cos(rad) * recuo;
             y -= com.badlogic.gdx.math.MathUtils.sin(rad) * recuo;
-            batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, 1f, 1f, angulo);
+            batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, pr.escala, pr.escala, angulo);
         }
         for (Efeito e : efeitos) {
             int quadro = Math.min(e.quadros.length - 1, (int) (e.tempo / e.duracaoQuadro));
