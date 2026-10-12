@@ -4799,10 +4799,10 @@ public final class BookMenuUI {
         // Abas: Sell offers (outros vendendo) / Buy offers (outros comprando).
         Table abas = new Table();
         abas.left();
-        abas.add(botaoSpells("Sell offers", mercadoAbaVenda ? "verde" : "default", () -> {
+        abas.add(botaoSpells("Sell", mercadoAbaVenda ? "verde" : "default", () -> {
             mercadoAbaVenda = true; mercadoAviso = ""; atualizarDetalheMercado();
         })).width(140).height(34).padRight(6);
-        abas.add(botaoSpells("Buy offers", mercadoAbaVenda ? "default" : "verde", () -> {
+        abas.add(botaoSpells("Buy", mercadoAbaVenda ? "default" : "verde", () -> {
             mercadoAbaVenda = false; mercadoAviso = ""; atualizarDetalheMercado();
         })).width(140).height(34);
         mercadoDetalhe.add(abas).left().padBottom(6).row();
@@ -4831,8 +4831,15 @@ public final class BookMenuUI {
         linha.pad(3, 6, 3, 4);
         Table info = new Table();
         info.left();
-        info.add(linhaStat(qtd + "x  " + formatarMoedas(preco) + " each", Color.WHITE)).left().row();
-        info.add(linhaStat((minha ? "You" : o.getString("owner", "")) + "  -  total " + formatarMoedas(preco * qtd), Color.GRAY)).left().row();
+        Table cima = new Table();
+        cima.add(linhaStat(qtd + "x", Color.WHITE)).padRight(8);
+        cima.add(valorComMoedas(preco)).padRight(4);
+        cima.add(linhaStat("each", Color.GRAY));
+        info.add(cima).left().row();
+        Table baixo = new Table();
+        baixo.add(linhaStat((minha ? "You" : o.getString("owner", "")) + "  -  total", Color.GRAY)).padRight(6);
+        baixo.add(valorComMoedas(preco * qtd));
+        info.add(baixo).left().row();
         linha.add(info).growX().left();
         TextButton acao;
         if (minha) {
@@ -4860,34 +4867,107 @@ public final class BookMenuUI {
         return linha;
     }
 
-    /** Quantidade + preco (aceita 150, 5s, 2g 50s) + total/taxa + Create. */
+    /** Valor em moedas com icone: so' as que aparecem (ex: [ouro]1 [prata]50). */
+    private Table valorComMoedas(long valor) {
+        Table t = new Table();
+        boolean algum = false;
+        for (int i = MOEDAS_TRADE.length - 1; i >= 0; i--) {
+            long q = (valor / VALOR_MOEDA[i]) % (i == MOEDAS_TRADE.length - 1 ? Long.MAX_VALUE : 100L);
+            if (q <= 0 && !(i == 0 && !algum)) continue;
+            algum = true;
+            TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[i]);
+            if (r != null) {
+                Image img = new Image(new TextureRegionDrawable(r));
+                img.setScaling(Scaling.fit);
+                t.add(img).size(18).padRight(2);
+            }
+            Label n = new LabelPixel(String.valueOf(q), new Label.LabelStyle(UiSkin.fontePreco(skin), Color.WHITE));
+            n.setColor(corMoeda(MOEDAS_TRADE[i]));
+            t.add(n).padRight(6);
+        }
+        return t;
+    }
+
+    /** Campos do preco: um por moeda (platina, ouro, prata, cobre) com o icone. */
+    private final com.badlogic.gdx.scenes.scene2d.ui.TextField[] mercadoMoedas = new com.badlogic.gdx.scenes.scene2d.ui.TextField[4];
+
+    private long precoDosCampos() {
+        long total = 0;
+        for (int i = 0; i < 4; i++) {
+            if (mercadoMoedas[i] == null) continue;
+            String t = mercadoMoedas[i].getText().trim();
+            if (t.isEmpty()) continue;
+            long n = lerInteiro(t);
+            if (n < 0) return -1;
+            total += n * VALOR_MOEDA[i];
+        }
+        return total;
+    }
+
+    /** Quantidade + preco por unidade (4 moedas) + "Total: X + 10% Fee = Y" + Create. */
     private Table formularioOferta(String caminho) {
         Table f = new Table();
         f.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.3f, 0.3f, 0.3f, 1f), 1));
         f.pad(6);
         f.left();
-        f.add(linhaStat(mercadoAbaVenda ? "Sell yours" : "Ask to buy", Color.WHITE)).left().colspan(3).padBottom(4).row();
+        f.add(linhaStat(mercadoAbaVenda ? "Sell yours" : "Ask to buy", Color.WHITE)).left().padBottom(4).row();
+        // Quantidade
         String qtdAntes = mercadoQtd != null ? mercadoQtd.getText() : "1";
-        String precoAntes = mercadoPreco != null ? mercadoPreco.getText() : "";
         mercadoQtd = new com.badlogic.gdx.scenes.scene2d.ui.TextField(qtdAntes, skin);
-        mercadoQtd.setMessageText("Qty");
-        mercadoPreco = new com.badlogic.gdx.scenes.scene2d.ui.TextField(precoAntes, skin);
-        mercadoPreco.setMessageText("Price each (ex: 50s, 2g)");
-        Label resumo = linhaStat("", Color.LIGHT_GRAY);
+        mercadoQtd.setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
+        Table linhaQtd = new Table();
+        linhaQtd.add(linhaStat("Quantity", Color.LIGHT_GRAY)).padRight(8);
+        linhaQtd.add(mercadoQtd).width(80).height(32);
+        f.add(linhaQtd).left().padBottom(4).row();
+        // Preco por unidade: platina, ouro, prata, cobre
+        Table linhaPreco = new Table();
+        linhaPreco.add(linhaStat("Price each", Color.LIGHT_GRAY)).padRight(8);
+        for (int i = MOEDAS_TRADE.length - 1; i >= 0; i--) {
+            String antes = mercadoMoedas[i] != null ? mercadoMoedas[i].getText() : "";
+            mercadoMoedas[i] = new com.badlogic.gdx.scenes.scene2d.ui.TextField(antes, skin);
+            mercadoMoedas[i].setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
+            mercadoMoedas[i].setMessageText("0");
+            TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[i]);
+            if (r != null) {
+                Image img = new Image(new TextureRegionDrawable(r));
+                img.setScaling(Scaling.fit);
+                linhaPreco.add(img).size(20).padRight(2);
+            }
+            linhaPreco.add(mercadoMoedas[i]).width(58).height(32).padRight(6);
+        }
+        f.add(linhaPreco).left().padBottom(4).row();
+        // Resumo: "Total: X + 10% Fee = Y" (venda) / "You pay: X" (compra)
+        Table resumo = new Table();
+        resumo.left();
         Runnable atualizarResumo = () -> {
-            long q = lerInteiro(mercadoQtd.getText()), pr = lerPreco(mercadoPreco.getText());
-            if (q <= 0 || pr <= 0) { resumo.setText("Price: 150 = 150c, 5s, 2g 50s..."); return; }
+            resumo.clearChildren();
+            long q = lerInteiro(mercadoQtd.getText()), pr = precoDosCampos();
+            if (q <= 0 || pr <= 0) { resumo.add(linhaStat("Type the quantity and the price.", Color.GRAY)); return; }
             long total = q * pr;
-            resumo.setText(mercadoAbaVenda
-                ? "Total " + formatarMoedas(total) + "  -  fee " + mercadoTaxa + "%: " + formatarMoedas(Math.max(1, (long) Math.ceil(total * mercadoTaxa / 100.0)))
-                : "You pay " + formatarMoedas(total) + " now");
+            if (mercadoAbaVenda) {
+                long taxa = Math.max(1, (long) Math.ceil(total * mercadoTaxa / 100.0));
+                // "Total: 100 + 10% Fee = 110" e embaixo o que sai agora (so' a taxa).
+                resumo.add(linhaStat("Total:", Color.LIGHT_GRAY)).padRight(4);
+                resumo.add(valorComMoedas(total));
+                resumo.add(linhaStat("+ " + mercadoTaxa + "% Fee =", Color.LIGHT_GRAY)).padRight(4);
+                resumo.add(valorComMoedas(total + taxa)).row();
+                Table agora = new Table();
+                agora.add(linhaStat("Fee paid now:", Color.GRAY)).padRight(4);
+                agora.add(valorComMoedas(taxa));
+                resumo.add(agora).left().colspan(5).padTop(2);
+            } else {
+                resumo.add(linhaStat("You pay now:", Color.LIGHT_GRAY)).padRight(4);
+                resumo.add(valorComMoedas(total));
+            }
         };
-        mercadoQtd.setTextFieldListener((c, ch) -> atualizarResumo.run());
-        mercadoPreco.setTextFieldListener((c, ch) -> atualizarResumo.run());
+        com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldListener ouvinte = (c, ch) -> atualizarResumo.run();
+        mercadoQtd.setTextFieldListener(ouvinte);
+        for (com.badlogic.gdx.scenes.scene2d.ui.TextField campo : mercadoMoedas) campo.setTextFieldListener(ouvinte);
         atualizarResumo.run();
+        f.add(resumo).left().padBottom(6).row();
         TextButton criar = botaoSpells(mercadoAbaVenda ? "Create sell offer" : "Create buy offer", "verde", () -> {
-            long q = lerInteiro(mercadoQtd.getText()), pr = lerPreco(mercadoPreco.getText());
-            if (q <= 0 || pr <= 0) { mercadoAviso = "Type a quantity and a price."; atualizarDetalheMercado(); return; }
+            long q = lerInteiro(mercadoQtd.getText()), pr = precoDosCampos();
+            if (q <= 0 || pr <= 0) { mercadoAviso = "Type the quantity and the price."; atualizarDetalheMercado(); return; }
             String tipo = mercadoAbaVenda ? "sell" : "buy";
             emitirMercado("market_create", w -> {
                 w.set("kind", tipo);
@@ -4896,10 +4976,7 @@ public final class BookMenuUI {
                 w.set("price", pr);
             });
         });
-        f.add(mercadoQtd).width(70).height(34).padRight(6);
-        f.add(mercadoPreco).growX().height(34).padRight(6);
-        f.add(criar).width(170).height(34).row();
-        f.add(resumo).left().colspan(3).padTop(4);
+        f.add(criar).width(200).height(34).left();
         return f;
     }
 
@@ -4927,7 +5004,10 @@ public final class BookMenuUI {
             info.left();
             info.add(linhaStat((venda ? "Selling " : "Buying ") + qtd + "x " + nomeExibicao(caminho),
                 venda ? Color.valueOf("7fd47f") : Color.valueOf("7fb4ff"))).left().row();
-            info.add(linhaStat(formatarMoedas(preco) + " each", Color.GRAY)).left().row();
+            Table precoLinha = new Table();
+            precoLinha.add(valorComMoedas(preco)).padRight(4);
+            precoLinha.add(linhaStat("each", Color.GRAY));
+            info.add(precoLinha).left().row();
             linha.add(info).growX().left();
             linha.add(botaoSpells("Cancel", "vermelho", () -> emitirMercado("market_cancel", w -> w.set("id", id))))
                 .width(110).height(34);

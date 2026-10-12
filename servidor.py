@@ -306,7 +306,12 @@ def get_exp_for_level(level):
     if level <= 1: return 0
     return int((50 / 3) * (level**3 - 6 * (level**2) + 17 * level - 12))
 
+# Itens tirados do jogo: somem de bag/equip/banco de todo mundo (tudo passa
+# por validate_item ao carregar e salvar).
+ITENS_REMOVIDOS = {"res://sprites/items/Sword.tres"}  # Sword de teste (dano 100), corrompida
+
 def validate_item(item_path):
+    if item_path in ITENS_REMOVIDOS: return None
     if isinstance(item_path, str) and item_path.startswith("res://sprites/items/") and item_path.endswith(".tres"):
         return item_path
     return None
@@ -314,7 +319,6 @@ def validate_item(item_path):
 SLOTS_VALIDOS = {"Helm", "Gloves", "Chest", "Boots", "Necklace", "Ring", "MainHand", "Hand"}
 
 ITEM_DB = {
-    "res://sprites/items/Sword.tres": {"name": "Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 100, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "cap": 15.0},
     "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"name": "Wooden Flute", "type": "Flute", "req_level": 0, "req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "mana_cost": 2, "cap": 15.0},
     "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"name": "Basic Music Sheet", "type": "Music Sheet", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 15.0},
     "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 15.0},
