@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.32"
+SERVER_VERSION = "v0.33"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -160,7 +160,8 @@ NPC_DB = {
         "res://sprites/items/Food/Blueberries.tres", "res://sprites/items/Food/VegetableSoup.tres",
         "res://sprites/items/Food/Pepper.tres", "res://sprites/items/Food/Beetroot.tres"], "falas": ["Hungry, traveler? Fresh food, right here."]},
     "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "shop": [
-        "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
+        "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres",
+        "res://sprites/spells/ArrowBarrage.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
         "res://sprites/items/Bard/Weapons/RawFlute.tres", "res://sprites/items/Ranger/Weapons/RawBow.tres",
@@ -358,6 +359,10 @@ ITEM_DB = {
     # skill spell_bleed_skill. spell_range "melee": so' colado no mob.
     # spell_slot: cor do slot da magia no client (orange/red).
     "res://sprites/spells/HeavyCut.tres": {"name": "Heavy Cut", "type": "Spell", "spell": "heavy_cut", "spell_words": "Incisio Cruenta", "spell_desc": "A brutal cut that leaves the target bleeding.", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 15, "spell_cd": 12, "spell_dmg": 20, "spell_area": False, "spell_range": "melee", "spell_bleed_ticks": 3, "spell_bleed_pct": 15, "spell_bleed_every": 2, "spell_bleed_skill": "melee", "spell_hit": "SwordInv", "spell_proj": "", "spell_color": "ff4a4a", "spell_slot": "red", "price": 3000, "icon": "sheet/r77_c8", "cap": 0.0},
+    # Arrow Barrage (Ranger): spell_hits flechas seguidas (spell_hit_every s
+    # entre elas), cada uma com spell_dmg% (3 x 21.5 = 64.5%); cada flecha da'
+    # 1 golpe na skill spell_hit_skill. spell_slot aceita cor hex.
+    "res://sprites/spells/ArrowBarrage.tres": {"name": "Arrow Barrage", "type": "Spell", "spell": "arrow_barrage", "spell_words": "Sequentia Iaculorum", "spell_desc": "Fires three arrows in quick succession.", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 12, "spell_dmg": 21.5, "spell_hits": 3, "spell_hit_every": 0.3, "spell_hit_skill": "distance", "spell_area": False, "spell_hit": "Arrow", "spell_proj": "res://ui/items/Arrow1.png", "spell_color": "4fd1a5", "spell_slot": "00604b", "price": 4000, "icon": "ui/items/StarterArrow", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
@@ -395,7 +400,8 @@ CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage",
                        "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap", "usable",
                        "regen_hp", "regen_mp", "regen_seg", "price", "set", "set_xp", "training", "ammo_save",
                        "spell", "spell_mana", "spell_cd", "spell_dmg", "spell_desc", "spell_area",
-                       "spell_bleed_ticks", "spell_bleed_pct", "spell_bleed_every", "spell_slot")
+                       "spell_bleed_ticks", "spell_bleed_pct", "spell_bleed_every", "spell_slot",
+                       "spell_hits", "spell_hit_every")
 
 def montar_item_db_cliente():
     db = {}
@@ -3976,6 +3982,14 @@ def _lancar_magia(sid, p, caminho, mob_id):
              'w_type': 'Melee' if dados.get('spell_range') == 'melee' else 'Ranged', 'proj': dados.get('spell_proj', '')}
     if ticks > 0: extra['bleed_secs'] = ticks * cada
     _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano, now, extra)
+    golpes = int(dados.get('spell_hits', 1) or 1)
+    skill_golpe = dados.get('spell_hit_skill')
+    if skill_golpe: _dar_hits_skill(sid, p, skill_golpe, 1)
+    if golpes > 1 and mob_data.get('hp', 0) > 0:
+        # Rajada: as outras flechas saem em seguida (pow pow pow).
+        socketio.start_background_task(_rajada, sid, mob_id, mob_data, golpes - 1,
+                                       float(dados.get('spell_hit_every', 0.3) or 0.3), base_dmg,
+                                       float(dados.get('spell_dmg', 100) or 100), extra, skill_golpe, mob_type_id)
     if ticks > 0 and mob_data.get('hp', 0) > 0:
         # Sangramento: substitui um anterior (o token muda e a tarefa velha para).
         token = uuid.uuid4().hex
@@ -3983,6 +3997,20 @@ def _lancar_magia(sid, p, caminho, mob_id):
         dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_bleed_pct', 0) or 0) / 100.0)))
         socketio.start_background_task(_sangrar, sid, mob_id, mob_data, token, ticks, cada, dano_tick,
                                        dados.get('spell_bleed_skill'), mob_type_id)
+
+def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, mob_type_id):
+    """Flechas seguintes da Arrow Barrage. Param se o mob morrer ou o player sair."""
+    try:
+        for _ in range(restantes):
+            socketio.sleep(cada)
+            m = active_mobs.get(mob_id)
+            p = online_players.get(sid)
+            if m is not mob_ref or m.get('hp', 0) <= 0 or p is None or p.get('is_dead'): return
+            base = base_dmg * pct / 100.0
+            dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
+            _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, time.time(), dict(extra))
+            if skill: _dar_hits_skill(sid, p, skill, 1)
+    except Exception: traceback.print_exc()
 
 def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id):
     """Ticks do sangramento (Heavy Cut). Para se o mob morrer/renascer, se

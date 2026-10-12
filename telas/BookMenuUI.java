@@ -408,7 +408,9 @@ public final class BookMenuUI {
         final boolean usavel; // scroll etc: botao Use na Bag
         final boolean empilhavel;
         final String magia;    // id da magia (servidor.py "spell"); null = item normal
-        final int magiaMana, magiaCd, magiaDano; // custo, cooldown (s), % do dano base
+        final int magiaMana, magiaCd; // custo, cooldown (s)
+        final float magiaDano;        // % do dano base por golpe (ex: 21.5)
+        final int magiaGolpes;        // Arrow Barrage: 3 flechas
         final String magiaDescricao;
         final boolean magiaArea; // true = dano em area; false = um alvo so'
         final int sangraTicks, sangraPct, sangraCada; // Heavy Cut: N ticks de X% a cada S segundos
@@ -423,7 +425,8 @@ public final class BookMenuUI {
             this.magia = d.getString("spell", null);
             this.magiaMana = d.getInt("spell_mana", 0);
             this.magiaCd = d.getInt("spell_cd", 0);
-            this.magiaDano = d.getInt("spell_dmg", 0);
+            this.magiaDano = d.getFloat("spell_dmg", 0f);
+            this.magiaGolpes = Math.max(1, d.getInt("spell_hits", 1));
             this.magiaDescricao = d.getString("spell_desc", "");
             this.magiaArea = d.getBoolean("spell_area", false);
             this.sangraTicks = d.getInt("spell_bleed_ticks", 0);
@@ -864,6 +867,7 @@ public final class BookMenuUI {
             bloco.add(linhaStat(dados.magiaCd + "s Cooldown", Color.LIGHT_GRAY)).left().row();
             bloco.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET)).left().padTop(6).row();
             if (dados.sangraTicks > 0) bloco.add(linhaStat(textoSangramento(dados), COR_SANGRAMENTO)).left().row();
+            if (dados.magiaGolpes > 1) bloco.add(linhaStat(textoGolpes(dados), Color.LIGHT_GRAY)).left().row();
             bloco.add(linhaStat(dados.magiaArea ? "Area Damage" : "Single Target", COR_ALVO_MAGIA)).left().row();
             return;
         }
@@ -5129,11 +5133,42 @@ public final class BookMenuUI {
      * (servidor.py "spell_slot"). Indices: ver CORES_SLOT_LARANJA. */
     public Color[] coresSlotMagia(String caminho) {
         EquipStats d = caminho == null ? null : ITEM_STATS.get(caminho);
-        return d != null && "red".equals(d.magiaSlot) ? CORES_SLOT_VERMELHO : CORES_SLOT_LARANJA;
+        if (d == null || d.magiaSlot == null || "orange".equals(d.magiaSlot)) return CORES_SLOT_LARANJA;
+        if ("red".equals(d.magiaSlot)) return CORES_SLOT_VERMELHO;
+        return coresDoHex(d.magiaSlot);
     }
 
-    /** Dano total: golpe + todos os ticks de sangramento (Heavy Cut: 20 + 3x15 = 65). */
-    private static int danoTotalMagia(EquipStats d) { return d.magiaDano + d.sangraTicks * d.sangraPct; }
+    private final Map<String, Color[]> cacheCoresHex = new HashMap<>();
+
+    /** Paleta do slot/gaveta a partir de uma cor (ex: "00604b" do Arrow
+     * Barrage): a cor e' a borda; fundos sao ela bem escura; hover/selecao, clara. */
+    private Color[] coresDoHex(String hex) {
+        return cacheCoresHex.computeIfAbsent(hex, h -> {
+            Color b = SkinsUtil.cor(h); b.a = 1f;
+            java.util.function.BiFunction<Float, Float, Color> tom = (mult, branco) -> {
+                Color c = new Color(b).mul(mult, mult, mult, 1f);
+                return c.lerp(Color.WHITE, branco);
+            };
+            Color fundo = tom.apply(0.38f, 0f); fundo.a = 0.94f;
+            Color fundoOver = tom.apply(0.5f, 0f); fundoOver.a = 0.96f;
+            return new Color[]{fundo, tom.apply(1.15f, 0.05f), fundoOver, tom.apply(1.4f, 0.15f),
+                tom.apply(1.4f, 0.45f), tom.apply(0.2f, 0f), tom.apply(0.85f, 0f), tom.apply(0.28f, 0f)};
+        });
+    }
+
+    /** Dano total: golpes + ticks de sangramento (Heavy Cut: 20 + 3x15 = 65;
+     * Arrow Barrage: 3 x 21.5 = 64.5). Sem casa decimal quando e' inteiro. */
+    private static String danoTotalMagia(EquipStats d) {
+        return porcento(d.magiaDano * d.magiaGolpes + d.sangraTicks * d.sangraPct);
+    }
+
+    private static String porcento(float v) {
+        return Math.abs(v - Math.round(v)) < 0.01f ? String.valueOf(Math.round(v))
+            : String.format(java.util.Locale.US, "%.1f", v);
+    }
+
+    /** "3 hits of 21.5%" (so' magia com mais de um golpe). */
+    private static String textoGolpes(EquipStats d) { return d.magiaGolpes + " hits of " + porcento(d.magiaDano) + "%"; }
 
     private static String textoSangramento(EquipStats d) {
         return "Bleed: " + d.sangraTicks + "x " + d.sangraPct + "% (every " + d.sangraCada + "s)";
@@ -5213,6 +5248,7 @@ public final class BookMenuUI {
             linhaDano.add(linhaStat(dados.magiaArea ? "Area Damage" : "Single Target", COR_ALVO_MAGIA)).padLeft(10);
             texto.add(linhaDano).left().row();
             if (dados.sangraTicks > 0) texto.add(linhaStat(textoSangramento(dados), COR_SANGRAMENTO)).left().row();
+            if (dados.magiaGolpes > 1) texto.add(linhaStat(textoGolpes(dados), Color.LIGHT_GRAY)).left().row();
         }
         if (preco > 0) {
             // Preco: moedinha + valor na cor da moeda (igual os slots da loja).
