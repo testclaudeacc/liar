@@ -4816,8 +4816,9 @@ public final class BookMenuUI {
         ScrollPane rolagemOfertas = rolagem(lista);
         rolagemComRodinha(rolagemOfertas);
         mercadoDetalhe.add(rolagemOfertas).grow().row();
-        // Criar a minha oferta (do tipo da aba).
-        mercadoDetalhe.add(formularioOferta(caminho)).growX().padTop(6).row();
+        // Criar a minha oferta (do tipo da aba): abre uma janelinha por cima.
+        mercadoDetalhe.add(botaoSpells(mercadoAbaVenda ? "Create sell offer" : "Create buy offer", "verde",
+            () -> abrirPopupOferta(caminho))).width(220).height(36).left().padTop(6).row();
         if (!mercadoAviso.isEmpty()) mercadoDetalhe.add(linhaStat(mercadoAviso, Color.valueOf("ffd56b"))).left().padTop(4).row();
     }
 
@@ -4907,10 +4908,18 @@ public final class BookMenuUI {
     /** Quantidade + preco por unidade (4 moedas) + "Total: X + 10% Fee = Y" + Create. */
     private Table formularioOferta(String caminho) {
         Table f = new Table();
-        f.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.3f, 0.3f, 0.3f, 1f), 1));
-        f.pad(6);
         f.left();
-        f.add(linhaStat(mercadoAbaVenda ? "Sell yours" : "Ask to buy", Color.WHITE)).left().padBottom(4).row();
+        // Titulo: icone + "Sell <item>" / "Buy <item>".
+        Table titulo = new Table();
+        TextureAtlas.AtlasRegion iconeTitulo = iconeDoItem(caminho);
+        if (iconeTitulo != null) {
+            Image img = new Image(new TextureRegionDrawable(iconeTitulo));
+            img.setScaling(Scaling.fit);
+            titulo.add(img).size(30).padRight(6);
+        }
+        titulo.add(new LabelPixel((mercadoAbaVenda ? "Sell " : "Buy ") + nomeExibicao(caminho),
+            new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE)));
+        f.add(titulo).left().padBottom(8).row();
         // Quantidade
         String qtdAntes = mercadoQtd != null ? mercadoQtd.getText() : "1";
         mercadoQtd = new com.badlogic.gdx.scenes.scene2d.ui.TextField(qtdAntes, skin);
@@ -4965,9 +4974,22 @@ public final class BookMenuUI {
         for (com.badlogic.gdx.scenes.scene2d.ui.TextField campo : mercadoMoedas) campo.setTextFieldListener(ouvinte);
         atualizarResumo.run();
         f.add(resumo).left().padBottom(6).row();
-        TextButton criar = botaoSpells(mercadoAbaVenda ? "Create sell offer" : "Create buy offer", "verde", () -> {
+        return f;
+    }
+
+    /** Janelinha por cima do mercado pra criar a oferta (nao aperta a lista). */
+    private void abrirPopupOferta(String caminho) {
+        fecharPopupQuantidade();
+        Stage stage = root.getStage();
+        if (stage == null) return;
+        Table caixa = formularioOferta(caminho);
+        caixa.setBackground(UiSkin.retangulo(COR_POPUP_FUNDO, COR_POPUP_BORDA, 2));
+        caixa.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        caixa.pad(14, 16, 14, 16);
+        Label aviso = linhaStat("", Color.valueOf("ff6a6a"));
+        TextButton confirmar = botaoSpells("Confirm", "verde", () -> {
             long q = lerInteiro(mercadoQtd.getText()), pr = precoDosCampos();
-            if (q <= 0 || pr <= 0) { mercadoAviso = "Type the quantity and the price."; atualizarDetalheMercado(); return; }
+            if (q <= 0 || pr <= 0) { aviso.setText("Type the quantity and the price."); return; }
             String tipo = mercadoAbaVenda ? "sell" : "buy";
             emitirMercado("market_create", w -> {
                 w.set("kind", tipo);
@@ -4975,9 +4997,22 @@ public final class BookMenuUI {
                 w.set("qty", q);
                 w.set("price", pr);
             });
+            fecharPopupQuantidade();
         });
-        f.add(criar).width(200).height(34).left();
-        return f;
+        TextButton cancelar = botaoSpells("Cancel", "vermelho", this::fecharPopupQuantidade);
+        Table botoes = new Table();
+        botoes.add(cancelar).width(130).height(38).padRight(10);
+        botoes.add(confirmar).width(130).height(38);
+        caixa.add(aviso).left().row();
+        caixa.add(botoes).right().padTop(6);
+        popupQuantidade = new Table();
+        popupQuantidade.setFillParent(true);
+        popupQuantidade.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled); // bloqueia o mercado atras
+        popupQuantidade.setBackground(UiSkin.retangulo(new Color(0f, 0f, 0f, 0.45f), new Color(0f, 0f, 0f, 0.45f), 1));
+        popupQuantidade.center();
+        popupQuantidade.add(caixa);
+        stage.addActor(popupQuantidade);
+        stage.setKeyboardFocus(mercadoQtd);
     }
 
     private void detalheMinhasOfertas() {
