@@ -163,6 +163,7 @@ NPC_DB = {
         "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres",
         "res://sprites/spells/ArrowBarrage.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
+        "res://sprites/items/Ranger/SecondHand/StarterArrow.tres",
         "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
         "res://sprites/items/Bard/Weapons/RawFlute.tres", "res://sprites/items/Ranger/Weapons/RawBow.tres",
         "res://sprites/items/Outlander/OutlanderHelm.tres", "res://sprites/items/Outlander/OutlanderCape.tres",
@@ -321,7 +322,7 @@ ITEM_DB = {
     "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "mana_cost": 3, "cap": 15.0},
     "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 5, "cap": 15.0},
     "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 15.0},
-    "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "price": 1, "max_stack": 9999, "cap": 0.1},
     # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
     "res://sprites/items/Food/Cookie.tres": {"name": "Cookie", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "regen_hp": 1, "regen_mp": 1, "regen_seg": 10, "sound": "*Crunch*", "stackable": True, "max_stack": 9999, "cap": 0.1},
     # Comidas do Syron (loja). "regen_hp"/"regen_mp" = quanto a mais o regen
@@ -3289,9 +3290,26 @@ def comando_admin(sid, p, texto):
         sk = p['skills']
         # Equip separado por classe (nada de penalidade de item de outra
         # classe): guarda o desta e veste o da outra (1a vez: o kit inicial).
-        sk['admin_equip_' + atual] = p.get('equipped_items', {})
+        inventario = p.setdefault('inventory', [])
+        def so_da_classe(equip, classe):
+            """Fica so' o que a classe usa; o resto vai pra bag (nada some).
+            Conserta equip guardado errado (ex: o bug do save que gravava Knight).
+            Devolve (equip, slots que ficaram vazios por isso)."""
+            ok, tirados = {}, set()
+            for slot, inst in (equip or {}).items():
+                if not isinstance(inst, dict): continue
+                if obter_req_class_item(inst.get('item')) in ('All', classe): ok[slot] = inst
+                else: inventario.append(inst); tirados.add(slot)
+            return ok, tirados
+        sk['admin_equip_' + atual], _ = so_da_classe(p.get('equipped_items', {}), atual)
         guardado = sk.pop('admin_equip_' + alvo, None)
-        p['equipped_items'] = guardado if isinstance(guardado, dict) else montar_kit_inicial(alvo)[1]
+        if isinstance(guardado, dict):
+            novo, tirados = so_da_classe(guardado, alvo)
+        else:
+            novo, tirados = {}, None   # 1a vez nessa classe: kit inicial inteiro
+        for slot, inst in montar_kit_inicial(alvo)[1].items():
+            if tirados is None or (slot in tirados and slot not in novo): novo[slot] = inst
+        p['equipped_items'] = novo
         # A skill principal vai junto (ex: Melee 30 vira Magic 30).
         de, para = SKILL_DA_CLASSE.get(atual), SKILL_DA_CLASSE.get(alvo)
         if de and para:
