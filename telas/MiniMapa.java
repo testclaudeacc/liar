@@ -67,7 +67,7 @@ public class MiniMapa extends Actor {
 
     /** Cor de fora do mapa nesse ponto: void no Decaying Realm, agua no resto. */
     public static Color corForaDoMapa(MapaMundo mapa, float mundoX, float mundoY) {
-        return AREA_VOID.equals(mapa.propriedades.areaEm(mundoX, mundoY)) ? COR_VOID : COR_AGUA;
+        return mapa.noVoid(AREA_VOID, mundoX, mundoY) ? COR_VOID : COR_AGUA;
     }
 
     private final MapaMundo mapa;

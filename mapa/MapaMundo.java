@@ -434,8 +434,8 @@ public class MapaMundo {
             for (int x = 0; x < w; x++) {
                 int c = cores[y * w + x];
                 // SQM vazio: void dentro do Decaying Realm, a cor de fundo (agua) no resto.
-                int vazio = c != 0 ? 0 : (com.teste.game.telas.MiniMapa.AREA_VOID.equals(
-                    propriedades.areaEm((x + 0.5f) * tileWidth, (y + 0.5f) * tileHeight)) ? corVoid : corFundo);
+                int vazio = c != 0 ? 0 : (noVoid(com.teste.game.telas.MiniMapa.AREA_VOID,
+                    (x + 0.5f) * tileWidth, (y + 0.5f) * tileHeight) ? corVoid : corFundo);
                 pm.drawPixel(x, h - 1 - y, c != 0 ? c : vazio);
             }
         }
@@ -519,6 +519,31 @@ public class MapaMundo {
         if (cx < 0 || cy < 0 || cx >= mapaLarguraTiles || cy >= mapaAlturaTiles) return mapaInteiro;
         int id = componenteDaCelula[cy * mapaLarguraTiles + cx];
         return id > 0 ? componentes.get(id - 1) : mapaInteiro;
+    }
+
+    /** Retangulos "void" (fundo escuro em vez de agua): a area nomeada e as
+     * dimensoes (pedacos de mapa) que encostam nela. */
+    private java.util.List<com.badlogic.gdx.math.Rectangle> retangulosVoid;
+
+    public java.util.List<com.badlogic.gdx.math.Rectangle> retangulosVoid(String nomeArea) {
+        if (retangulosVoid != null) return retangulosVoid;
+        java.util.List<com.badlogic.gdx.math.Rectangle> lista = new java.util.ArrayList<>();
+        java.util.List<com.badlogic.gdx.math.Rectangle> areas = new java.util.ArrayList<>();
+        for (MapaPropriedades.AreaNomeada a : propriedades.areasNomeadas) if (nomeArea.equals(a.nome)) areas.add(a.area);
+        lista.addAll(areas);
+        java.util.List<com.badlogic.gdx.math.Rectangle> dims;
+        if (!propriedades.dimensoes.isEmpty()) dims = propriedades.dimensoes;
+        else { if (componenteDaCelula == null) acharComponentes(); dims = componentes; }
+        for (com.badlogic.gdx.math.Rectangle d : dims)
+            for (com.badlogic.gdx.math.Rectangle a : areas) if (d.overlaps(a)) { lista.add(d); break; }
+        retangulosVoid = lista;
+        return lista;
+    }
+
+    /** Ponto dentro do void (Decaying Realm ou o pedaco de mapa dele). */
+    public boolean noVoid(String nomeArea, float mundoX, float mundoY) {
+        for (com.badlogic.gdx.math.Rectangle r : retangulosVoid(nomeArea)) if (r.contains(mundoX, mundoY)) return true;
+        return false;
     }
 
     private void acharComponentes() {

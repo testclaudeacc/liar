@@ -4489,7 +4489,7 @@ public class WorldScreen extends ScreenAdapter {
         // Mundo inteiro desenhado DIRETO na tela real, num passo so' - igual
         // o Godot (Camera2D comum, sem viewport/buffer intermediario nenhum).
         // Fora do mapa: agua no mundo normal; preto (void) no Decaying Realm.
-        if (MiniMapa.AREA_VOID.equals(mapa.propriedades.areaEm(local.x, local.y + 1f))) Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
+        if (mapa.noVoid(MiniMapa.AREA_VOID, local.x, local.y + 1f)) Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         else Gdx.gl.glClearColor(MiniMapa.COR_AGUA.r, MiniMapa.COR_AGUA.g, MiniMapa.COR_AGUA.b, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         mapa.desenharMapa(camera);
