@@ -3377,6 +3377,8 @@ public class WorldScreen extends ScreenAdapter {
             String efeito = data.getString("hit_type", "physical_hit");
             // Dano de fogo (Igniculus): numero laranja (igual verde do veneno e vermelho do sangramento).
             if (!errou && "Fire".equals(efeito)) numero.cor = new Color(1f, 0.46f, 0f, 1f);
+            // Dano de mana (ataque do Mage): numero azul, igual o sprite da bolinha de mana.
+            if (!errou && "Mana".equals(efeito)) numero.cor = new Color(0.29f, 0.62f, 1f, 1f);
             Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
             TextureRegion projetil = regiaoDoCaminho(data.getString("proj", ""));
             if ("Ranged".equals(data.getString("w_type", "")) && projetil != null && atacante != null) {
