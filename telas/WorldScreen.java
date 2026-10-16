@@ -314,6 +314,38 @@ public class WorldScreen extends ScreenAdapter {
     private float esperaAtaque = 0f;
     /** Velocidade de ataque (servidor: sync_stats "atk_speed"; /atkspd do admin). */
     private float multAtaque = 1f;
+    /** Possuindo um mob (/ghost + botao direito): intervalo e efeito do golpe dele (sync_stats). */
+    private float morphCooldown = 0f;
+    private String morphHit = "";
+    /** Players possuindo um mob: nome -> tipo do mob (desenhados com o sprite dele). */
+    private final Map<String, String> morfos = new HashMap<>();
+    private final Map<String, AnimacaoCorpo> animacoesMorph = new HashMap<>();
+
+    private boolean euMorph() { return morfos.containsKey(local.nome); }
+
+    private void definirMorph(String nome, String tipo) {
+        if (nome == null || nome.isEmpty()) return;
+        String antes = morfos.get(nome);
+        if (tipo == null || tipo.isEmpty()) morfos.remove(nome); else morfos.put(nome, tipo);
+        if (java.util.Objects.equals(antes, morfos.get(nome))) return;
+        // Virou (ou largou) o mob: fumaca no lugar, e larga o alvo.
+        Jogador j = jogadorPorNome(nome);
+        if (j != null) efeitos.add(new Efeito(quadrosFumaca(), j.x, j.y));
+        if (nome.equals(local.nome)) { alvoMob = null; amigoMarcado = null; }
+    }
+
+    private AnimacaoCorpo animacaoMorph(String nome) {
+        String tipo = morfos.get(nome);
+        if (tipo == null) return null;
+        AnimacaoCorpo a = animacoesMorph.get(tipo);
+        if (a == null) {
+            TextureRegion sprite = spriteDoMob(tipo);
+            if (sprite == null) return null;
+            a = criarAnimacao(sprite);
+            animacoesMorph.put(tipo, a);
+        }
+        return a;
+    }
     // Cadencia de ataque (servidor.py::ATAQUE_COOLDOWN_SEG = 2.385s, mesmo valor
     // pro player e pros mobs) + uma folga pra latencia.
     private static final float INTERVALO_ATAQUE = 2.4f;
@@ -950,6 +982,16 @@ public class WorldScreen extends ScreenAdapter {
             @Override
             public boolean touchDown(int screenX, int screenY, int pointer, int button) {
                 if (chat.isVisivel() || settingsAberta() || bookMenu.isVisible() || dialogoNPC.isVisible()) return false;
+                // /ghost: botao direito num mob = possuir ele (o servidor confere tudo).
+                if (button == Input.Buttons.RIGHT && fantasmas.contains(local.nome) && !euMorph() && !localMorto) {
+                    com.badlogic.gdx.math.Vector3 c = camera.unproject(new com.badlogic.gdx.math.Vector3(screenX, screenY, 0));
+                    MobVisual possuido = mobNoPonto(c.x, c.y);
+                    if (possuido != null) {
+                        String idMob = possuido.id;
+                        if (socket.isConnected()) socket.emitRaw("morph_mob", GameSocket.obj(jw -> jw.set("mob_id", idMob)));
+                        return true;
+                    }
+                }
                 // Botao do mouse ligado a uma acao (Settings > Controls): igual apertar a tecla.
                 if (Controles.mouseAceito(button) && Controles.acaoDaTecla(Controles.codigoMouse(button)) != null) {
                     keyDown(Controles.codigoMouse(button));
@@ -3297,7 +3339,9 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("player_killed", (nomeEvt, data) -> {
             if (data == null || chat == null) return;
             MobVisual mob = mobs.get(data.getString("mob_id", ""));
-            String nomeMob = mob != null ? mob.nome : data.getString("mob_type", "monster");
+            String tipoMorto = data.getString("mob_type", "monster");
+            String nomeMob = mob != null ? mob.nome
+                : tipoMorto.isEmpty() ? "monster" : Character.toUpperCase(tipoMorto.charAt(0)) + tipoMorto.substring(1);
             chat.adicionarMensagemSistema(nomeVisivel(data.getString("name", "")) + " was killed by " + nomeMob + ".",
                 new Color(1f, 0.25f, 0.25f, 1f));
             // Eu morri: mostra quem matou na tela de morte.
@@ -3693,6 +3737,7 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("player_status_updated", (nomeEvt, data) -> {
             if (data == null) return;
             if (data.has("ghost")) definirFantasma(data.getString("name", ""), data.getBoolean("ghost", false));
+            if (data.has("morph")) definirMorph(data.getString("name", ""), data.getString("morph", ""));
             // Balaozinho em cima da cabeca: abriu/fechou chat, menu ou settings.
             for (String chave : CHAVES_BALAO) {
                 if (data.has(chave)) definirBalaoRemoto(data.getString("name", ""), chave, data.getBoolean(chave, false));
@@ -3911,6 +3956,7 @@ public class WorldScreen extends ScreenAdapter {
             multFome = comFome ? FOME_MULT_VELOCIDADE : 1f;
             if (data.has("move_speed")) multLevel = Math.max(0.1f, data.getFloat("move_speed", 1f));
             if (data.has("atk_speed")) multAtaque = Math.max(0.1f, data.getFloat("atk_speed", 1f));
+            if (data.has("morph_cd")) { morphCooldown = data.getFloat("morph_cd", 0f); morphHit = data.getString("morph_hit", ""); }
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
@@ -4264,6 +4310,7 @@ public class WorldScreen extends ScreenAdapter {
         if (p == null) return;
         String nome = p.getString("name", "");
         if (p.has("ghost")) definirFantasma(nome, p.getBoolean("ghost", false));
+        if (p.has("morph")) definirMorph(nome, p.getString("morph", ""));
         if (nome.isEmpty() || nome.equals(local.nome) || remotos.containsKey(nome) || remotosForaDeVisao.containsKey(nome)) return;
         String classe = p.has("class_name") ? p.getString("class_name") : "Knight";
         float rawX = p.getFloat("pos_x", -1f);
@@ -5135,6 +5182,15 @@ public class WorldScreen extends ScreenAdapter {
         if (j != local && j.nome.equals(amigoMarcado) && regiaoAlvoAmigo != null) {
             batch.draw(regiaoAlvoAmigo, ancoraX - regiaoAlvoAmigo.getRegionWidth() / 2f, ancoraY - 1f);
         }
+        // Possuindo um mob: desenha o mob no lugar do boneco (solido, mesmo no ghost).
+        AnimacaoCorpo animMob = animacaoMorph(j.nome);
+        if (animMob != null) {
+            TextureRegion q = estaMorto(j) && animMob.morte != null ? animMob.morte
+                : quadroAtual(animMob, j.movendo, j.direcao, j.progresso());
+            float lm = q.getRegionWidth() * ESCALA_SPRITE, am = q.getRegionHeight() * ESCALA_SPRITE;
+            batch.draw(q, ancoraX - lm / 2f, ancoraY, lm, am);
+            return;
+        }
         // /ghost do admin: o boneco inteiro meio transparente.
         float alfaFantasma = fantasmas.contains(j.nome) ? 0.5f : 1f;
         List<CamadaSkin> camadas = skinsJogadores.get(j.nome);
@@ -5536,27 +5592,28 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Clique num mob vivo: mira nele (ou tira a mira se ja era ele). */
     private boolean cliqueEmMob(float wx, float wy) {
-        // 1o o mob que esta no SQM clicado; so' depois o sprite (mais alto que
-        // o SQM) de algum mob - senao o sprite de um mob de baixo "rouba" o
-        // clique no SQM de cima.
+        MobVisual mob = mobNoPonto(wx, wy);
+        if (mob == null) return false;
+        mirarMob(mob);
+        return true;
+    }
+
+    /** Mob vivo no ponto clicado. 1o o mob que esta no SQM clicado; so' depois
+     * o sprite (mais alto que o SQM) de algum mob - senao o sprite de um mob
+     * de baixo "rouba" o clique no SQM de cima. */
+    private MobVisual mobNoPonto(float wx, float wy) {
         int cx = tileX(wx), cy = (int) Math.floor(wy / Jogador.TILE);
         for (MobVisual mob : mobs.values()) {
             if (mob.morto || !mob.visivel) continue;
-            if (tileX(mob.x) == cx && tileY(mob.y) == cy) {
-                mirarMob(mob);
-                return true;
-            }
+            if (tileX(mob.x) == cx && tileY(mob.y) == cy) return mob;
         }
         for (MobVisual mob : mobs.values()) {
             if (mob.morto || !mob.visivel) continue;
             float largura = mob.animacao.idleBaixo.getRegionWidth() * ESCALA_SPRITE;
             float altura = mob.animacao.idleBaixo.getRegionHeight() * ESCALA_SPRITE;
-            if (wx >= mob.x - largura / 2f && wx <= mob.x + largura / 2f && wy >= mob.y && wy <= mob.y + altura) {
-                mirarMob(mob);
-                return true;
-            }
+            if (wx >= mob.x - largura / 2f && wx <= mob.x + largura / 2f && wy >= mob.y && wy <= mob.y + altura) return mob;
         }
-        return false;
+        return null;
     }
 
     /** Alcance do auto target, em SQMs (quadrado em volta do player). */
@@ -5814,6 +5871,16 @@ public class WorldScreen extends ScreenAdapter {
 
         // Ataque automatico no mob mirado.
         esperaAtaque -= delta;
+        // Possuindo um mob: o player marcado apanha (golpe de mob, o servidor confere).
+        if (euMorph() && amigoMarcado != null && !localMorto && !euNaPz && esperaAtaque <= 0f && socket.isConnected()) {
+            Jogador alvoJ = remotos.get(amigoMarcado);
+            if (alvoJ != null && !remotosMortos.contains(alvoJ.nome) && !mapa.propriedades.naZonaProtegida(alvoJ.x, alvoJ.y)
+                    && distanciaSqm(local.x, local.y, alvoJ.x, alvoJ.y) <= 1) {
+                String nomeAlvo = alvoJ.nome;
+                socket.emitRaw("morph_attack", GameSocket.obj(jw -> jw.set("target", nomeAlvo)));
+                esperaAtaque = (morphCooldown > 0f ? morphCooldown : INTERVALO_ATAQUE) / multAtaque;
+            }
+        }
         if (alvoMob == null) return;
         MobVisual alvo = mobs.get(alvoMob);
         if (alvo == null || alvo.morto || !alvo.visivel) {
@@ -5838,6 +5905,20 @@ public class WorldScreen extends ScreenAdapter {
         if (localMorto || esperaAtaque > 0f || !socket.isConnected()) return;
         // Protection Zone: ninguem ataca de dentro (nem mob que esta' dentro).
         if (euNaPz || mapa.propriedades.naZonaProtegida(alvo.x, alvo.y)) return;
+        // Possuindo um mob: golpe dele (corpo a corpo, sem flecha/mana/skill).
+        if (euMorph()) {
+            if (distanciaSqm(local.x, local.y, alvo.x, alvo.y) > 1) return;
+            String idM = alvo.id, efeitoM = morphHit.isEmpty() ? "physical_hit" : morphHit;
+            socket.emitRaw("hit_mob", GameSocket.obj(jw -> {
+                jw.set("mob_id", idM);
+                jw.set("mob_type_id", idM);
+                jw.set("hit_type", efeitoM);
+                jw.set("w_type", "Melee");
+                jw.set("proj", "");
+            }));
+            esperaAtaque = (morphCooldown > 0f ? morphCooldown : INTERVALO_ATAQUE) / multAtaque;
+            return;
+        }
         // Arco sem flecha nao ataca (o servidor tambem recusa).
         if ("Ranger".equals(local.classe) && (caminhoMunicao == null || quantidadeMunicao <= 0)) {
             if (!avisouSemMunicao) {

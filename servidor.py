@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.37"
+SERVER_VERSION = "v0.38"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -780,6 +780,9 @@ def _montar_payload_sync_stats(p):
         'move_speed': mult_velocidade_level(p),
         # Velocidade de ataque (1 = normal; /atkspd do admin).
         'atk_speed': admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX),
+        # Possuindo um mob (morph): intervalo e efeito do golpe dele (0/"" = normal).
+        'morph_cd': float((p.get('morph') or {}).get('cooldown', 0)) if isinstance(p.get('morph'), dict) else 0.0,
+        'morph_hit': (p.get('morph') or {}).get('hit', '') if isinstance(p.get('morph'), dict) else '',
         'classe_penalizada': punido,
         'cap_atual': calcular_cap_usado(p), 'cap_maximo': calcular_cap_maximo(level),
         # Vitais pra barra de HP/MP do client.
@@ -788,6 +791,11 @@ def _montar_payload_sync_stats(p):
     }
 
 def calcular_max_vitais(p):
+    morph = p.get('morph')
+    if isinstance(morph, dict):
+        # Possuindo um mob (/ghost): HP maximo do mob; a mana continua a do player.
+        p_sem = {k: v for k, v in p.items() if k != 'morph'}
+        return float(morph.get('max_hp', 40)), calcular_max_vitais(p_sem)[1]
     if len(_slots_com_classe_invalida(p)) > 0: return PUNICAO_CLASSE_HP, PUNICAO_CLASSE_MP
     p_class = p.get('class_name', 'Knight')
     level = p.get('level', 1)
@@ -1030,6 +1038,7 @@ def resumo_player_area(p):
         "is_in_settings": bool(p.get('is_in_settings', False)),
         "is_in_skins": bool(p.get('is_in_skins', False)),
         "ghost": admin_ghost(p),
+        "morph": (p.get('morph') or {}).get('type_id', '') if isinstance(p.get('morph'), dict) else '',
     }
 
 # Replica o HP do player pros outros clientes da área (a barra do "remote").
@@ -1702,13 +1711,15 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
     _mob_emitir_estado(mob_id, m, passo)
     return True
 
-def _mob_atacar(mob_id, m, target_sid, now):
+def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
+    """Mob bate no player. Tambem usado pelo player possuindo um mob (morph):
+    ataque = dano do morph (com o /dmg do admin), mob_id = "morph:<nome>"."""
     target_player = online_players.get(target_sid)
     if target_player is None: return
     target_name = target_player.get('name', '')
     m['next_attack'] = now + max(0.3, float(m.get('cooldown', MOB_COOLDOWN_PADRAO)))
     m['ultimo_golpe'] = now
-    mob_attack_damage = MOB_DB.get(m.get('type_id'), {}).get("attack", 3.0)
+    mob_attack_damage = ataque if ataque is not None else MOB_DB.get(m.get('type_id'), {}).get("attack", 3.0)
     p_class = target_player.get('class_name', 'Knight')
     bonus_itens = somar_bonus_combate_equipados(target_player.get('equipped_items', {}))
     _, def_value = calc_player_stats(p_class, target_player.get('level', 1), target_player.get('skills', {}), bonus_def=bonus_itens['bonus_defense'])
@@ -1721,6 +1732,14 @@ def _mob_atacar(mob_id, m, target_sid, now):
     hp_atual = float(target_player.get('current_hp', -1))
     if hp_atual < 0: hp_atual = max_hp_alvo
     hp_atual = max(0.0, hp_atual - dano_final)
+    # Alvo possuindo um mob: em vez de morrer, volta a ser fantasma com o HP de antes.
+    if hp_atual <= 0 and isinstance(target_player.get('morph'), dict):
+        _desfazer_morph(target_sid, target_player, "Your possessed body died. You are a ghost again.")
+        hp_atual, max_hp_alvo = hp_publico(target_player)
+        emit_area('player_damaged', {'target_player': target_name, 'damage': dano_final, 'new_hp': hp_atual,
+                                     'max_hp': max_hp_alvo, 'hit_type': m.get('hit_effect', 'physical_hit'),
+                                     'attacker_mob_id': mob_id}, target_player.get('room'))
+        return
     target_player['current_hp'] = hp_atual
     target_player['_ultimo_hp_broadcast'] = [hp_atual, max_hp_alvo]
     target_player['last_hit_by_mob'] = now  # libera o treino de defense (register_skill_hit)
@@ -1735,6 +1754,97 @@ def _mob_atacar(mob_id, m, target_sid, now):
         # Aviso "X has been killed by <mob>" no chat de quem está perto (o
         # próprio morto incluso). O client pega o nome exibido do mob pelo id.
         emit_area('player_killed', {'name': target_name, 'mob_id': mob_id, 'mob_type': m.get('type_id', '')}, target_player.get('room'))
+
+# ---------------------------------------------------------------------------
+# MORPH (/ghost do admin): botao direito num mob = possuir ele. O mob some
+# (respawn normal), o player fica com o HP maximo, o dano e o cooldown do mob
+# (equips continuam; /dmg, /atkspd e /speed seguem valendo). Os outros mobs
+# continuam ignorando (ghost). Bate em mob e em player - no player e' o
+# mesmo golpe de mob (_mob_atacar), entao pra ele e' morrer pra um mob.
+# Morreu possuindo: volta a ser fantasma com o HP de antes.
+# ---------------------------------------------------------------------------
+MORPH_ALCANCE_SQM = 10
+
+def morph_de(p):
+    m = p.get('morph') if p else None
+    return m if isinstance(m, dict) else None
+
+def _avisar_morph(sid, p):
+    hp, max_hp = hp_publico(p)
+    emit_area('player_status_updated', {'name': p.get('name', ''), 'morph': (morph_de(p) or {}).get('type_id', ''),
+                                        'current_hp': hp, 'max_hp': max_hp, 'is_dead': False}, p.get('room'))
+    p['_ultimo_hp_broadcast'] = [hp, max_hp]
+    socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+    socketio.emit('sync_vitals', {'current_hp': hp}, room=sid)
+
+def _desfazer_morph(sid, p, msg=None):
+    m = morph_de(p)
+    if not m: return
+    p.pop('morph', None)
+    max_hp, _ = calcular_max_vitais(p)
+    try: hp = float(m.get('hp_antes', -1))
+    except (TypeError, ValueError): hp = -1.0
+    p['current_hp'] = max_hp if hp < 0 else min(hp, max_hp)
+    p['is_dead'] = False
+    _avisar_morph(sid, p)
+    if msg: chat_sistema(sid, msg)
+
+@socketio.on('morph_mob')
+def handle_morph_mob(data):
+    try:
+        sid = request.sid
+        p = online_players.get(sid)
+        if p is None or p.get('is_dead') or not admin_ghost(p) or morph_de(p): return
+        mob_id = str((data or {}).get('mob_id', ''))
+        m = active_mobs.get(mob_id)
+        if m is None or m.get('hp', 0) <= 0 or 'pos_x' not in m: return
+        if _dist_px(m, p) > MORPH_ALCANCE_SQM * TILE: return
+        tipo = m.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
+        info = MOB_DB.get(tipo, {})
+        max_hp = float(m.get('max_hp') or info.get('hp', 40))
+        max_antes, _ = calcular_max_vitais(p)
+        try: hp_antes = float(p.get('current_hp', -1))
+        except (TypeError, ValueError): hp_antes = -1.0
+        if hp_antes < 0: hp_antes = max_antes
+        p['morph'] = {'type_id': tipo, 'max_hp': max_hp, 'attack': float(info.get('attack', 3.0)),
+                      'cooldown': float(m.get('cooldown', MOB_COOLDOWN_PADRAO)),
+                      'hit': m.get('hit_effect', 'physical_hit'), 'hp_antes': hp_antes}
+        p['current_hp'] = max_hp
+        # O mob some (fumaca), conta como morto e renasce normal depois.
+        _mob_desaparece_por_perseguicao(mob_id, m, time.time())
+        _avisar_morph(sid, p)
+        chat_sistema(sid, f"You possessed a {info.get('name', tipo.capitalize())}. /morph off to leave it.")
+    except Exception: traceback.print_exc()
+
+@socketio.on('morph_attack')
+def handle_morph_attack(data):
+    """Possuindo um mob: golpe dele num player (mesmo dano de mob)."""
+    try:
+        sid = request.sid
+        p = online_players.get(sid)
+        m = morph_de(p)
+        if m is None or p.get('is_dead'): return
+        alvo_sid = players_by_name.get(str((data or {}).get('target', '')))
+        alvo = online_players.get(alvo_sid) if alvo_sid else None
+        if alvo is None or alvo_sid == sid or alvo.get('is_dead') or alvo.get('corpo_ausente'): return
+        try:
+            if float(alvo.get('current_hp', -1)) == 0: return
+        except (TypeError, ValueError): pass
+        if na_pz(p) or na_pz(alvo): return
+        if int(p.get('floor', 1) or 1) != int(alvo.get('floor', 1) or 1): return
+        tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+        ta = tile_de(alvo.get('pos_x', 0), alvo.get('pos_y', 0))
+        if max(abs(tp[0] - ta[0]), abs(tp[1] - ta[1])) > 2: return  # do lado (+1 de folga pro passo)
+        now = time.time()
+        cd = float(m.get('cooldown', MOB_COOLDOWN_PADRAO)) / admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
+        if now - p.get('last_attack_time', 0) < cd - min(0.1, cd * 0.3): return
+        p['last_attack_time'] = now
+        golpe = {'type_id': m.get('type_id'), 'cooldown': m.get('cooldown'), 'hit_effect': m.get('hit', 'physical_hit')}
+        marcar_batalha(alvo_sid, alvo, now)
+        marcar_batalha(sid, p, now)
+        _mob_atacar('morph:' + p.get('name', ''), golpe, alvo_sid, now,
+                    ataque=float(m.get('attack', 3.0)) * admin_mult(p, 'admin_dmg', 1000.0))
+    except Exception: traceback.print_exc()
 
 def _mob_tick(mob_id, m, now):
     if m.get('hp', 1) <= 0 or m.get('spawn') is None or 'pos_x' not in m: return
@@ -1973,6 +2083,8 @@ def montar_sync_area(sid, room):
 def _posicao_e_vitals_para_salvar(player):
     pos_x, pos_y = player.get('pos_x', -1), player.get('pos_y', -1)
     current_hp, current_mp = player.get('current_hp', -1), player.get('current_mp', -1)
+    # Possuindo um mob: salva o HP do player (o do mob e' so' enquanto dura).
+    if isinstance(player.get('morph'), dict): current_hp = player['morph'].get('hp_antes', -1)
     if current_hp is not None and float(current_hp) == 0:
         pos_x, pos_y = -1, -1
         current_hp, current_mp = -1, -1
@@ -2554,6 +2666,7 @@ def handle_disconnect():
         _limpar_convites_de_party_pendentes(sid, p_name)
         _remover_do_trade(sid, motivo="disconnected")
         _sair_de_todos_os_canais_chat(sid)
+        _desfazer_morph(sid, player)
 
         _queue_save(player)
 
@@ -3228,6 +3341,7 @@ ADMIN_COMANDOS = [
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
     ("atkspd", "/atkspd <1-50>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
     ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
+    ("morph", "/morph off", "sai do mob possuido (com /ghost on, botao direito num mob possui ele)"),
     ("class", "/class <Knight|Ranger|Mage|Bard>", "troca sua classe (equip separado por classe; recarrega o personagem)"),
     ("fixclass", "/fixclass [nome classe]", "sem nada: lista quem parece ter virado Knight por engano; com nome e classe: corrige"),
     ("spells", "/spells reset", "esquece todas as magias aprendidas (da' pra comprar de novo)"),
@@ -3242,7 +3356,7 @@ def argumentos_admin():
     mobs = [str(i.get('name', t.capitalize())) for t, i in MOB_DB.items()]
     return {
         'summons': mobs, 'bestiary': mobs + ['clear'],
-        'soul': ['on', 'off'], 'ghost': ['on', 'off'],
+        'soul': ['on', 'off'], 'ghost': ['on', 'off'], 'morph': ['off'],
         'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'], 'spells': ['reset'],
         'class': list(CLASSES_VALIDAS),
         'fixclass': list(CLASSES_VALIDAS),
@@ -3547,10 +3661,17 @@ def comando_admin(sid, p, texto):
                 if m.get('target_sid') == sid: m['target_sid'] = None
         else:
             p['skills'].pop('admin_ghost', None)
+            _desfazer_morph(sid, p)
         _queue_save(p)
         # Todo mundo perto (e eu) ve o fantasma meio transparente.
         emit_area('player_status_updated', {'name': p.get('name', ''), 'ghost': admin_ghost(p)}, p.get('room'))
         chat_sistema(sid, f"Ghost {partes[1].lower()}: mobs {'ignore' if admin_ghost(p) else 'see'} you.")
+        return
+    if cmd == 'morph':
+        if not morph_de(p):
+            chat_sistema(sid, "You are not possessing a creature. With /ghost on, right-click a creature.")
+            return
+        _desfazer_morph(sid, p, "You left the creature. You are a ghost again.")
         return
     if cmd == 'money':
         # /money add 5g  (c copper, s silver, g gold, p platinum; sem letra = copper)
@@ -4107,6 +4228,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
     if dados.get('req_class', 'All') not in ('All', p.get('class_name')): return falha('class')
     # Arma de treino equipada: so' o golpe normal (sem magia).
     if arma_principal(p).get('training'): return falha('training')
+    if morph_de(p): return falha('no_target')  # possuindo um mob: so' o golpe dele
     if na_pz(p): return falha('pz')
     now = time.time()
     cds = p.setdefault('_spell_cd', {})
@@ -4258,11 +4380,12 @@ def handle_hit_mob(data):
         now = time.time()
         # Pequena folga (0.1s) pra latencia: o client manda a cada ~2.4s.
         # /atkspd do admin divide o intervalo entre golpes.
-        cd = ATAQUE_COOLDOWN_SEG / admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
+        morph = morph_de(p)
+        cd = (float(morph.get('cooldown', MOB_COOLDOWN_PADRAO)) if morph else ATAQUE_COOLDOWN_SEG) / admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
         if now - p.get('last_attack_time', 0) < cd - min(0.1, cd * 0.3): return
         p['last_attack_time'] = now
         
-        precisa_municao = p.get('class_name') == "Ranger"
+        precisa_municao = p.get('class_name') == "Ranger" and not morph
         if precisa_municao and not tem_municao_equipada(p):
             emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(p.get('inventory', [])), 'equipped_items': p.get('equipped_items', {})}, room=sid)
             return
@@ -4284,7 +4407,7 @@ def handle_hit_mob(data):
         # conhecida nao pode ser validado - nega o golpe em vez de liberar
         # de qualquer distancia.
         if 'pos_x' not in mob_data: return
-        if p.get('class_name') in CLASSES_RANGED:
+        if p.get('class_name') in CLASSES_RANGED and not morph:
             if _dist_px(mob_data, p) > (ALCANCE_RANGED_SQM + 1) * TILE: return
             # Parede no meio: a flecha/magia nao passa.
             if int(p.get('floor', 1) or 1) == 1 and not linha_de_visao(
@@ -4298,7 +4421,7 @@ def handle_hit_mob(data):
         if int(p.get('floor', 1) or 1) != MOB_FLOOR: return
         # Arma que gasta mana (varinha): sem mana suficiente, não ataca. Só
         # cobra depois de validar alcance/andar (golpe recusado não gasta).
-        custo_mana = custo_mana_arma(p)
+        custo_mana = 0 if morph else custo_mana_arma(p)
         if custo_mana > 0:
             max_hp_m, max_mp_m = calcular_max_vitais(p)
             try: mp_atual = float(p.get('current_mp', -1))
@@ -4310,7 +4433,7 @@ def handle_hit_mob(data):
             p['current_mp'] = mp_atual - custo_mana
             emit('sync_vitals', {'current_mp': p['current_mp'], 'max_mp': max_mp_m}, room=sid)
         mob_data['last_activity'] = now
-        arma_treino = bool(arma_principal(p).get('training'))
+        arma_treino = bool(arma_principal(p).get('training')) and not morph
         # Quem bateu por ultimo (anti-KS da arma de treino).
         batendo = mob_data.setdefault('hits_recentes', {})
         outro_batendo = any(s2 != sid and s2 in online_players and now - t2 < TREINO_OUTRO_BATENDO_SEG
@@ -4327,17 +4450,19 @@ def handle_hit_mob(data):
         # player (ex: lure do knight): metade do dano e número amarelo. Se o
         # mob é dele (ou acabou de virar, em mob_focar_agressor), sem corte.
         tp_r = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
-        reduzido = (p.get('class_name') in CLASSES_RANGED and _adjacente(tile_do_mob(mob_data), tp_r)
+        reduzido = (p.get('class_name') in CLASSES_RANGED and not morph and _adjacente(tile_do_mob(mob_data), tp_r)
                     and mob_data.get('target_sid') != sid)
 
         skills = p.get('skills', {})
         p_class = p.get('class_name', 'Knight')
-        if len(_slots_com_classe_invalida(p)) > 0:
+        if morph:
+            base_dmg = max(1, int(round(float(morph.get('attack', 3.0)))))  # dano do mob possuido
+        elif len(_slots_com_classe_invalida(p)) > 0:
             base_dmg = PUNICAO_CLASSE_DANO
         else:
             bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}))
             base_dmg, _ = calc_player_stats(p_class, p.get('level', 1), skills, bonus_dmg=bonus_itens['bonus_damage'])
-        if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
+        if esta_com_fome(p) and not morph: base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
         
         min_dano = max(1, int(base_dmg * 0.85))
         max_dano = max(min_dano, int(base_dmg * 1.15))
