@@ -61,7 +61,14 @@ public class MiniMapa extends Actor {
     private static final Color COR_BORDA = new Color(83 / 255f, 83 / 255f, 83 / 255f, 1f);
     /** Cor do void (fora do mapa / fora da dimensao / SQM vazio) - a mesma do jogo. */
     public static final Color COR_VOID = Color.valueOf("10171a");
-    private static final Color COR_FUNDO = COR_VOID;
+    /** Fora do mapa no mundo normal: agua (o void escuro fica so' no Decaying Realm). */
+    public static final Color COR_AGUA = new Color(8 / 255f, 68 / 255f, 146 / 255f, 1f);
+    public static final String AREA_VOID = "Decaying Realm";
+
+    /** Cor de fora do mapa nesse ponto: void no Decaying Realm, agua no resto. */
+    public static Color corForaDoMapa(MapaMundo mapa, float mundoX, float mundoY) {
+        return AREA_VOID.equals(mapa.propriedades.areaEm(mundoX, mundoY)) ? COR_VOID : COR_AGUA;
+    }
 
     private final MapaMundo mapa;
     private Pintura pintura;
@@ -203,7 +210,8 @@ public class MiniMapa extends Actor {
         // Moldura + fundo.
         batch.setColor(COR_BORDA.r, COR_BORDA.g, COR_BORDA.b, parentAlpha);
         batch.draw(pixel, getX(), getY(), getWidth(), getHeight());
-        batch.setColor(COR_FUNDO.r, COR_FUNDO.g, COR_FUNDO.b, parentAlpha);
+        Color fundo = corForaDoMapa(mapa, fonte.jogadorX(), fonte.jogadorY() + 1f);
+        batch.setColor(fundo.r, fundo.g, fundo.b, parentAlpha);
         batch.draw(pixel, getX() + borda, getY() + borda, getWidth() - borda * 2f, getHeight() - borda * 2f);
         batch.setColor(Color.WHITE);
         if (getStage() == null) return;

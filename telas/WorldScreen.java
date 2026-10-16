@@ -569,7 +569,7 @@ public class WorldScreen extends ScreenAdapter {
                 // Acabou: minimapa refeito com a ponte inteira.
                 if (!mapa.temLinhaPendente() && pinturaMiniMapa != null) {
                     MiniMapa.Pintura velha = pinturaMiniMapa;
-                    pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
+                    pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_AGUA));
                     miniMapa.trocarPintura(pinturaMiniMapa);
                     mapaGrande.trocarPintura(pinturaMiniMapa);
                     velha.dispose();
@@ -1371,7 +1371,7 @@ public class WorldScreen extends ScreenAdapter {
 
         // Canto de cima a direita: minimapa (tocar abre o mapa grande) e
         // fps/ms embaixo dele.
-        pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
+        pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_AGUA));
         miniMapa = new MiniMapa(mapa, pinturaMiniMapa, fonteMiniMapa, TILES_MINIMAPA, TILES_MAPA_MIN, TILES_MAPA_MAX, false, 2f);
         miniMapa.definirTamanhoIcone(mobile ? 20f : 17f);
         // Coordenadas (SQM) no canto de baixo a esquerda.
@@ -3835,7 +3835,7 @@ public class WorldScreen extends ScreenAdapter {
             // algum tile mudou mesmo (no login quase nunca muda).
             if (pinturaMiniMapa != null && mapa.versaoQuests != versaoAntes) {
                 MiniMapa.Pintura velha = pinturaMiniMapa;
-                pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_VOID));
+                pinturaMiniMapa = new MiniMapa.Pintura(mapa.gerarPixmapMiniMapa(MiniMapa.COR_AGUA));
                 miniMapa.trocarPintura(pinturaMiniMapa);
                 mapaGrande.trocarPintura(pinturaMiniMapa);
                 velha.dispose();
@@ -4488,7 +4488,9 @@ public class WorldScreen extends ScreenAdapter {
 
         // Mundo inteiro desenhado DIRETO na tela real, num passo so' - igual
         // o Godot (Camera2D comum, sem viewport/buffer intermediario nenhum).
-        Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
+        // Fora do mapa: agua no mundo normal; preto (void) no Decaying Realm.
+        if (MiniMapa.AREA_VOID.equals(mapa.propriedades.areaEm(local.x, local.y + 1f))) Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
+        else Gdx.gl.glClearColor(MiniMapa.COR_AGUA.r, MiniMapa.COR_AGUA.g, MiniMapa.COR_AGUA.b, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         mapa.desenharMapa(camera);
         if (perf != null) perf.marca("map");

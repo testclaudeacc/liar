@@ -429,10 +429,14 @@ public class MapaMundo {
         Pixmap pm = new Pixmap(w, h, Pixmap.Format.RGBA8888);
         pm.setBlending(Pixmap.Blending.None);
         int corFundo = Color.rgba8888(fundo);
+        int corVoid = Color.rgba8888(com.teste.game.telas.MiniMapa.COR_VOID);
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
                 int c = cores[y * w + x];
-                pm.drawPixel(x, h - 1 - y, c != 0 ? c : corFundo);
+                // SQM vazio: void dentro do Decaying Realm, a cor de fundo (agua) no resto.
+                int vazio = c != 0 ? 0 : (com.teste.game.telas.MiniMapa.AREA_VOID.equals(
+                    propriedades.areaEm((x + 0.5f) * tileWidth, (y + 0.5f) * tileHeight)) ? corVoid : corFundo);
+                pm.drawPixel(x, h - 1 - y, c != 0 ? c : vazio);
             }
         }
         return pm;
