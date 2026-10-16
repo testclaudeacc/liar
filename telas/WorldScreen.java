@@ -3375,6 +3375,8 @@ public class WorldScreen extends ScreenAdapter {
             if (data.getBoolean("reduced", false)) numero.cor = new Color(1f, 0.9f, 0.1f, 1f);
             // Efeito de hit; a distancia, primeiro o projetil sai do atacante.
             String efeito = data.getString("hit_type", "physical_hit");
+            // Dano de fogo (Igniculus): numero laranja (igual verde do veneno e vermelho do sangramento).
+            if (!errou && "Fire".equals(efeito)) numero.cor = new Color(1f, 0.46f, 0f, 1f);
             Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
             TextureRegion projetil = regiaoDoCaminho(data.getString("proj", ""));
             if ("Ranged".equals(data.getString("w_type", "")) && projetil != null && atacante != null) {
@@ -4642,6 +4644,7 @@ public class WorldScreen extends ScreenAdapter {
         GameSocket.medidorEventos = (nome, ns) -> { if (perf != null) perf.eventoMedido(nome, ns); };
         labelPerf = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f), Color.WHITE));
         labelPerf.setColor(new Color(1f, 1f, 0.6f, 1f));
+        labelPerf.setVisible(false); // comeca escondido - F8 mostra/esconde
         cantoFpsTabela.clearChildren();
         cantoFpsTabela.add(labelPerf).left().row();
         cantoFpsTabela.add(infoDesempenho).left();
