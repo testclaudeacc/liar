@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.42"
+SERVER_VERSION = "v0.43"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -1104,6 +1104,23 @@ def salas_vizinhas(room):
         return [room] if room else []
     return [f"c_{floor}_{cx+dx}_{cy+dy}" for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
 
+def emit_tela(event, payload, x, y, incluir=None, skip_sid=None):
+    """Evento so' pra quem tem (x, y) no raio da tela (+ margem) - bem menos
+    gente que a area 3x3 de chunks. incluir: um sid que sempre recebe (quem
+    causou, ex: o atacante)."""
+    vxm, vym = float(VISAO_X) + VISAO_MARGEM_SAIR, float(VISAO_Y) + VISAO_MARGEM_SAIR
+    x, y = float(x), float(y)
+    destinos = set()
+    for sid in _candidatos_visao(x, y):
+        p = online_players.get(sid)
+        if p is None: continue
+        if abs(float(p.get('pos_x', 0)) - x) <= vxm and abs(float(p.get('pos_y', 0)) - y) <= vym:
+            destinos.add(sid)
+    if incluir and incluir in online_players: destinos.add(incluir)
+    destinos.discard(skip_sid)
+    for sid in destinos:
+        socketio.emit(event, payload, room=sid)
+
 def emit_area(event, payload, room, skip_sid=None):
     # Usa socketio.emit (e não o emit() do flask_socketio) porque este helper
     # também é chamado de background tasks (regen_loop). Lá não existe request
@@ -1516,8 +1533,134 @@ def payload_mob_pos(mob_id, m, step=0.0):
             '', 1 if m.get('returning') else 0, step]
 
 def _mob_emitir_estado(mob_id, m, step=0.0):
+    # Nao manda mais na hora pra area 3x3 inteira: entra na fila e sai no
+    # pacote 'mm' do fim do tick da IA (_flush_mobs), so' pra quem tem o mob
+    # na tela. Guarda o estado de AGORA (2 passos no mesmo pacote = 2 entradas).
     if m.get('room'):
-        emit_area('mob_pos', payload_mob_pos(mob_id, m, step), m['room'])
+        tx, ty = tile_do_mob(m)
+        _mob_fila.setdefault(mob_id, []).append(
+            (tx, ty, DIR_TO_INT.get(m.get('direction', 'down'), 0), 1 if m.get('returning') else 0, int(round(step * 1000))))
+
+# ---- Passos de mob em pacote, so' no raio da tela ('mm') ----
+# Antes cada passo de mob virava um 'mob_pos' na hora pra area 3x3 de chunks
+# (150x150 SQMs, ~6x a tela). Agora, no fim de cada tick da IA (0.05s):
+#  - cada player recebe UM 'mm' com os passos dos mobs que ele ve;
+#  - entrada: [nid, tx, ty, dir, flags, passo_ms] (SQM inteiro, id numerico);
+#    flags 1 = voltando pra casa, 2 = posicionar (entrou na tela agora: o
+#    client pode ter uma posicao velha) - essa leva o mob_id no fim (o client
+#    aprende o nid dele por ai);
+#  - mob fora da tela nao manda nada; quando entra (ele andou ou o player
+#    andou), vai a posicao absoluta.
+_mob_fila = {}            # mob_id -> [(tx, ty, dir, flags, passo_ms)] desde o ultimo pacote
+_mob_vistos = {}          # sid -> set(mob_id) com posicao em dia no client
+_mob_quem_ve = {}         # mob_id -> set(sid)
+_players_checar_mobs = set()  # andaram/teleportaram: ver se algum mob entrou na tela
+_mob_nid = {}
+_mob_prox_nid = [1]
+
+def nid_do_mob(mob_id):
+    n = _mob_nid.get(mob_id)
+    if n is None:
+        n = _mob_prox_nid[0]
+        _mob_prox_nid[0] += 1
+        _mob_nid[mob_id] = n
+    return n
+
+def _entrada_mob_absoluta(mob_id, m, passo_ms=0):
+    tx, ty = tile_do_mob(m)
+    # + HP e alvo: mob_damaged/mob_target so' vao pra quem ve, entao quem
+    # acabou de ver recebe o estado dele aqui.
+    return [nid_do_mob(mob_id), tx, ty, DIR_TO_INT.get(m.get('direction', 'down'), 0),
+            2 | (1 if m.get('returning') else 0), passo_ms, mob_id,
+            m.get('hp', 0), m.get('max_hp', m.get('hp', 0)), _nome_do_alvo(m)]
+
+def _mob_ver(sid, mob_id):
+    _mob_vistos.setdefault(sid, set()).add(mob_id)
+    _mob_quem_ve.setdefault(mob_id, set()).add(sid)
+
+def _mob_desver(sid, mob_id):
+    v = _mob_vistos.get(sid)
+    if v: v.discard(mob_id)
+    q = _mob_quem_ve.get(mob_id)
+    if q: q.discard(sid)
+
+def resetar_mobs_vistos(sid):
+    """O client recebeu as posicoes da area de novo (sync_area_data): recomeca
+    do zero - o proximo pacote manda a posicao absoluta de quem esta na tela."""
+    for mob_id in _mob_vistos.pop(sid, set()):
+        q = _mob_quem_ve.get(mob_id)
+        if q: q.discard(sid)
+    _players_checar_mobs.add(sid)
+
+def resetar_quem_ve_mob(mob_id):
+    """Mob teleportou (renasceu em outro SQM): quem esta vendo recebe absoluta."""
+    for sid in _mob_quem_ve.pop(mob_id, set()):
+        v = _mob_vistos.get(sid)
+        if v: v.discard(mob_id)
+        _players_checar_mobs.add(sid)
+
+def _flush_mobs():
+    global _mob_fila, _players_checar_mobs
+    fila, checar = _mob_fila, _players_checar_mobs
+    if not fila and not checar: return
+    _mob_fila, _players_checar_mobs = {}, set()
+    op = online_players
+    vx, vy = float(VISAO_X), float(VISAO_Y)
+    vxm, vym = vx + VISAO_MARGEM_SAIR, vy + VISAO_MARGEM_SAIR
+    pacotes = {}
+    # 1) Mobs que andaram/viraram: pra quem ja' via (passo) ou acabou de ver (absoluta).
+    for mob_id, estados in fila.items():
+        m = active_mobs.get(mob_id)
+        if m is None:
+            for sid in _mob_quem_ve.pop(mob_id, set()):
+                v = _mob_vistos.get(sid)
+                if v: v.discard(mob_id)
+            continue
+        mx, my = float(m.get('pos_x', 0)), float(m.get('pos_y', 0))
+        quem = _mob_quem_ve.setdefault(mob_id, set())
+        nid = nid_do_mob(mob_id)
+        entradas = None
+        for sid in set(_candidatos_visao(mx, my)) | quem:
+            p = op.get(sid)
+            if p is None:
+                quem.discard(sid)
+                continue
+            dx = abs(mx - float(p.get('pos_x', 0)))
+            dy = abs(my - float(p.get('pos_y', 0)))
+            if sid in quem:
+                if dx <= vxm and dy <= vym:
+                    if entradas is None: entradas = [[nid, tx, ty, d, f, ms] for (tx, ty, d, f, ms) in estados]
+                    pacotes.setdefault(sid, []).extend(entradas)
+                else:
+                    _mob_desver(sid, mob_id)
+            elif dx <= vx and dy <= vy and sid not in checar:
+                _mob_ver(sid, mob_id)
+                pacotes.setdefault(sid, []).append(_entrada_mob_absoluta(mob_id, m, estados[-1][4]))
+    # 2) Players que andaram: mob parado que entrou na tela deles (ou saiu).
+    for sid in checar:
+        p = op.get(sid)
+        if p is None: continue
+        px, py = float(p.get('pos_x', 0)), float(p.get('pos_y', 0))
+        vistos = _mob_vistos.setdefault(sid, set())
+        for mob_id in list(vistos):
+            m = active_mobs.get(mob_id)
+            if m is None or abs(float(m.get('pos_x', 0)) - px) > vxm or abs(float(m.get('pos_y', 0)) - py) > vym:
+                _mob_desver(sid, mob_id)
+        sala = p.get('room')
+        if not sala: continue
+        for mob_id, m in _mobs_perto(sala):
+            if mob_id in vistos or m.get('hp', 1) <= 0: continue
+            if abs(float(m.get('pos_x', 0)) - px) <= vx and abs(float(m.get('pos_y', 0)) - py) <= vy:
+                _mob_ver(sid, mob_id)
+                pacotes.setdefault(sid, []).append(_entrada_mob_absoluta(mob_id, m))
+    for sid, entradas in pacotes.items():
+        socketio.emit('mm', entradas, room=sid)
+
+def _mob_esquecer_player(sid):
+    for mob_id in _mob_vistos.pop(sid, set()):
+        q = _mob_quem_ve.get(mob_id)
+        if q: q.discard(sid)
+    _players_checar_mobs.discard(sid)
 
 def admin_ghost(p):
     """/ghost do admin: mobs nao miram nele (nem se ele atacar)."""
@@ -2344,6 +2487,10 @@ def mob_ai_loop():
                 _avisar_alvo_do_mob(mob_id, m)
             except Exception:
                 traceback.print_exc()
+        try:
+            _flush_mobs()
+        except Exception:
+            traceback.print_exc()
 
 def _nome_do_alvo(m):
     if m.get('hp', 1) <= 0: return ''
@@ -2356,9 +2503,10 @@ def _avisar_alvo_do_mob(mob_id, m):
     nome = _nome_do_alvo(m)
     if m.get('_alvo_avisado', '') == nome: return
     m['_alvo_avisado'] = nome
-    if m.get('room'): emit_area('mob_target', {'mob_id': mob_id, 'target': nome}, m['room'])
+    if m.get('room'): emit_tela('mob_target', {'mob_id': mob_id, 'target': nome}, m.get('pos_x', 0), m.get('pos_y', 0))
 
 def montar_sync_area(sid, room):
+    resetar_mobs_vistos(sid)
     rooms = set(salas_vizinhas(room))
     players_na_area = [resumo_player_area(o_p) for o_sid, o_p in online_players.items()
                        if o_sid != sid and o_p.get('room') in rooms]
@@ -4543,7 +4691,8 @@ def _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano_final, now, ex
                 # De onde sai o projetil, mesmo pra quem nao ve o atacante (ex: /ghost).
                 'attacker_pos': [p.get('pos_x', 0), p.get('pos_y', 0)]}
     evt_dano.update(extra_evt)
-    emit_area('mob_damaged', evt_dano, room)
+    # So' quem ve o mob (o HP de quem entra na tela vai no 'mm', ver _entrada_mob_absoluta).
+    emit_tela('mob_damaged', evt_dano, mob_data.get('pos_x', 0), mob_data.get('pos_y', 0), incluir=sid)
     
     if is_dead:
         _recompensar_morte_mob(mob_id, mob_type_id, mob_data, room, now)
@@ -4710,7 +4859,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
         evt = {'mob_id': mob_id, 'effect': dados.get('spell_effect', ''), 'hold': lento, 'attacker_id': p.get('name', ''),
                'proj': dados.get('spell_proj', '')}
         evt.update({k: v for k, v in extra.items() if k.endswith('_secs')})
-        emit_area('spell_effect', evt, p.get('room'))
+        emit_tela('spell_effect', evt, mob_data.get('pos_x', 0), mob_data.get('pos_y', 0), incluir=sid)
     golpes = int(dados.get('spell_hits', 1) or 1)
     skill_golpe = dados.get('spell_hit_skill')
     if skill_golpe: _dar_hits_skill(sid, p, skill_golpe, 1)
@@ -5358,6 +5507,7 @@ _passos_pendentes = {}   # sid -> [(x, y, d_int)] desde o ultimo pacote
 
 def marcar_movimento(sid, passo=None):
     _movidos.add(sid)
+    _players_checar_mobs.add(sid)
     if passo is not None:
         _passos_pendentes.setdefault(sid, []).append(passo)
 
@@ -5397,6 +5547,7 @@ def _foto(p):
             DIR_TO_INT.get(p.get('direction', 'down'), 0), 1 | (2 if p.get('is_dead') else 0)]
 
 def _remover_da_visao(sid):
+    _mob_esquecer_player(sid)
     _movidos.discard(sid)
     _passos_pendentes.pop(sid, None)
     cel = _celula_de.pop(sid, None)
@@ -7558,7 +7709,7 @@ def _beber_pocao(sid, p, inst, dados):
 # cor = hex RGB (laranja por padrao).
 def texto_de_acao(p, texto, cor="ff9a1f"):
     if not p or not p.get('room'): return
-    emit_area('action_text', {'name': p.get('name', ''), 'text': str(texto)[:40], 'color': cor}, p.get('room'))
+    emit_tela('action_text', {'name': p.get('name', ''), 'text': str(texto)[:40], 'color': cor}, p.get('pos_x', 0), p.get('pos_y', 0))
 
 def _comer(sid, p, inst):
     # Come 1 unidade da instância (botão Eat na bag ou atalho da hotbar).
@@ -7896,7 +8047,10 @@ def mob_cleanup_loop():
             m_room = m_data.get('room')
             if m_room:
                 emit_area('mob_respawn', {'mob_id': m_id, 'type': m_data.get('type_id', '')}, m_room)
+                # Area inteira (raro): quem viu ele morrer longe da tela nao fica
+                # com o mob vivo parado no lugar do cadaver.
                 emit_area('mob_pos', payload_mob_pos(m_id, m_data), m_room)
+                resetar_quem_ve_mob(m_id)
             else:
                 socketio.emit('mob_respawn', {'mob_id': m_id, 'type': m_data.get('type_id', '')})
 

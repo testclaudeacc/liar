@@ -628,6 +628,8 @@ public class WorldScreen extends ScreenAdapter {
     private static final float DURACAO_NUMERO_DANO = 0.85f;
 
     private final Map<String, MobVisual> mobs = new LinkedHashMap<>();
+    /** nid (id numerico do pacote 'mm') -> mob_id. */
+    private final Map<Integer, String> idMobPorNid = new java.util.HashMap<>();
     // Cadaver some depois disso (servidor: MOB_DESPAWN_CORPO_SEG).
     private static final float TEMPO_CORPO_MOB = 60f;
     private static final float FADE_CORPO = 2f; // segundos ficando transparente antes de sumir
@@ -3591,6 +3593,36 @@ public class WorldScreen extends ScreenAdapter {
             mob.voltando = data.size > 5 && data.get(5).asInt() == 1;
             float dur = data.size > 6 ? data.get(6).asFloat() : 0f;
             moverMob(mob, data.get(1).asFloat(), data.get(2).asFloat(), direcaoDoInt(data.get(3).asInt()), dur, false);
+        });
+        // Passos de mob em pacote (servidor.py::_flush_mobs): so' os mobs na
+        // minha tela. Entrada [nid, tx, ty, dir, flags, passo_ms(, mob_id)];
+        // flags 1 = voltando, 2 = posicionar (entrou na tela: traz o mob_id).
+        socket.on("mm", (nomeEvt, data) -> {
+            if (data == null || !data.isArray()) return;
+            for (JsonValue e = data.child; e != null; e = e.next) {
+                if (e.size < 6) continue;
+                int nid = e.getInt(0);
+                String id;
+                if (e.size > 6) {
+                    id = e.getString(6);
+                    idMobPorNid.put(nid, id);
+                } else id = idMobPorNid.get(nid);
+                if (id == null) continue;
+                MobVisual mob = mobs.get(id);
+                if (mob == null) continue;
+                int flags = e.getInt(4);
+                mob.voltando = (flags & 1) != 0;
+                // Entrou na tela: HP e alvo atuais (mob_damaged/mob_target so' vem pra quem ve).
+                if (e.size > 9 && !mob.morto) {
+                    mob.maxHp = Math.max(1f, e.getFloat(8));
+                    mob.hp = Math.max(0f, e.getFloat(7));
+                    mob.alvoNome = e.getString(9);
+                }
+                // SQM -> pixel cru igual servidor.py::centro_tile (x no meio, y no pe).
+                float rawX = e.getInt(1) * Jogador.TILE + Jogador.TILE / 2f;
+                float rawY = e.getInt(2) * Jogador.TILE + Jogador.TILE;
+                moverMob(mob, rawX, rawY, direcaoDoInt(e.getInt(3)), e.getInt(5) / 1000f, (flags & 2) != 0);
+            }
         });
         socket.on("mob_damaged", (nomeEvt, data) -> {
             if (data == null) return;
