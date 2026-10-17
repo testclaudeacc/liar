@@ -386,7 +386,7 @@ ITEM_DB = {
     "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"name": "Wooden Flute", "type": "Flute", "req_level": 0, "req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "mana_cost": 2, "cap": 15.0},
     "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"name": "Basic Music Sheet", "type": "Music Sheet", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 15.0},
     "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 15.0},
-    "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 15.0},
+    "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 3, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 15.0},
     "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "mana_cost": 3, "cap": 15.0},
     "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 5, "cap": 15.0},
     "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 15.0},
@@ -459,14 +459,22 @@ ITEM_DB = {
     "res://sprites/items/Jewelry/RubyNecklaceMagic.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Magic", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
     "res://sprites/items/Jewelry/RubyNecklaceFocus.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
     "res://sprites/items/Jewelry/RubyNecklaceMusicality.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
+    # ---- Formula dos equipamentos por tier (T = req_level / 10) ----
+    #   Peca de set (helm/chest/gloves/boots): ADC 3T, Armour 1T, Stamina 5T
+    #   Arma (mao principal): ADC 6T, Atk 2T, Stamina/Mana 10(T+1)
+    #     (Knight/Ranger: stamina; Mage: mana; Bard: metade de cada)
+    #   Segunda mao (shield/book/sheet): Defense 6T, Armour 2T, Stamina/Mana 20T
+    #     (shield: stamina; book: mana; sheet: metade de cada)
+    #   Linear de proposito: o HP/mana base do level tambem e' linear
+    #   (knight +15 HP/level), entao o equipamento fica sempre ~10-15% do total.
     # Armas lv 10: 6 de ADC e 2 de Atk (o dobro de uma peca de set). Basic Dagger:
     # metade do ADC de uma espada, mas bate 1.1x mais rapido ("atk_speed") -
     # mais que isso o Knight passa o DPS do Mage (a velocidade multiplica o golpe todo).
-    "res://sprites/items/Knight/Weapons/BasicDagger.tres": {"name": "Basic Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 10, "req_class": "Knight", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "atk_speed": 1.1, "price": 1000, "icon": "sheet/r98_c3", "cap": 8.0},
+    "res://sprites/items/Knight/Weapons/BasicDagger.tres": {"name": "Basic Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 10, "req_class": "Knight", "bonus_damage": 2, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "atk_speed": 1.1, "price": 1000, "icon": "sheet/r98_c3", "cap": 8.0},
     # atk_hit/atk_proj: efeito e projetil do ataque basico (no lugar do da classe).
-    "res://sprites/items/Mage/Weapons/RubyStaff.tres": {"name": "Ruby Staff", "type": "Staff", "slot": "MainHand", "req_level": 10, "req_class": "Mage", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Magic", "fourth_stat_value": 6, "mana_cost": 5, "atk_hit": "Fire", "atk_proj": "res://ui/FireProjectile.png", "price": 1000, "icon": "sheet/r104_c8", "cap": 15.0},
-    "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "mana_cost": 2, "price": 1000, "icon": "ui/armas/wooden rattle", "cap": 10.0},
-    "res://sprites/items/Ranger/Weapons/IronBow.tres": {"name": "Iron Bow", "type": "Bow", "slot": "MainHand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r93_c9", "cap": 15.0},
+    "res://sprites/items/Mage/Weapons/RubyStaff.tres": {"name": "Ruby Staff", "type": "Staff", "slot": "MainHand", "req_level": 10, "req_class": "Mage", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 20, "fourth_stat_type": "Magic", "fourth_stat_value": 6, "mana_cost": 5, "atk_hit": "Fire", "atk_proj": "res://ui/FireProjectile.png", "price": 1000, "icon": "sheet/r104_c8", "cap": 15.0},
+    "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 2, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "mana_cost": 2, "price": 1000, "icon": "ui/armas/wooden rattle", "cap": 10.0},
+    "res://sprites/items/Ranger/Weapons/IronBow.tres": {"name": "Iron Bow", "type": "Bow", "slot": "MainHand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 2, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r93_c9", "cap": 15.0},
     "res://sprites/items/Materials/WolfFur.tres": {"name": "Wolf Fur", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 15, "icon": "ui/Wolf_Fur", "stackable": True, "max_stack": 9999, "cap": 0.1},
     "res://sprites/items/Food/RedMushroom.tres": {"name": "Red Mushroom", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 1, "regen_hp": 1, "regen_mp": 0, "regen_seg": 10, "sound": "*Munch*", "sell_price": 5, "icon": "ui/Red Mushroom", "stackable": True, "max_stack": 9999, "cap": 0.1},
     "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 10.0},
@@ -7599,8 +7607,12 @@ REGEN_POR_PONTOS = 50.0
 # mana: 10 a cada 5s, quase paga o ataque basico da varinha). HP fica no 50.
 REGEN_MP_POR_PONTOS = 30.0
 
+# +1 de regen a cada 100 de HP/mana maxima (contando equipamento).
+REGEN_BONUS_A_CADA = 100.0
+
 def get_regen_amount(maximo, por_pontos=REGEN_POR_PONTOS):
-    return max(1.0, math.floor(float(maximo) / por_pontos))
+    m = float(maximo)
+    return max(1.0, math.floor(m / por_pontos)) + math.floor(m / REGEN_BONUS_A_CADA)
 
 # =========================================================================
 # FOME (Fullness) e BATTLE
