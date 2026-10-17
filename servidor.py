@@ -443,11 +443,12 @@ ITEM_DB = {
     "res://sprites/items/Jewelry/RubyNecklaceFocus.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
     "res://sprites/items/Jewelry/RubyNecklaceMusicality.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
     # Armas lv 10: 6 de ADC e 2 de Atk (o dobro de uma peca de set). Basic Dagger:
-    # metade do ADC de uma espada, mas bate 1.5x mais rapido ("atk_speed").
-    "res://sprites/items/Knight/Weapons/BasicDagger.tres": {"name": "Basic Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 10, "req_class": "Knight", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "atk_speed": 1.5, "price": 1000, "icon": "sheet/r98_c3", "cap": 8.0},
+    # metade do ADC de uma espada, mas bate 1.1x mais rapido ("atk_speed") -
+    # mais que isso o Knight passa o DPS do Mage (a velocidade multiplica o golpe todo).
+    "res://sprites/items/Knight/Weapons/BasicDagger.tres": {"name": "Basic Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 10, "req_class": "Knight", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "atk_speed": 1.1, "price": 1000, "icon": "sheet/r98_c3", "cap": 8.0},
     # atk_hit/atk_proj: efeito e projetil do ataque basico (no lugar do da classe).
     "res://sprites/items/Mage/Weapons/RubyStaff.tres": {"name": "Ruby Staff", "type": "Staff", "slot": "MainHand", "req_level": 10, "req_class": "Mage", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Magic", "fourth_stat_value": 6, "mana_cost": 5, "atk_hit": "Fire", "atk_proj": "res://ui/FireProjectile.png", "price": 1000, "icon": "sheet/r104_c8", "cap": 15.0},
-    "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "mana_cost": 2, "price": 1000, "icon": "sheet/r110_c1", "cap": 10.0},
+    "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "mana_cost": 2, "price": 1000, "icon": "ui/armas/wooden rattle", "cap": 10.0},
     "res://sprites/items/Ranger/Weapons/IronBow.tres": {"name": "Iron Bow", "type": "Bow", "slot": "MainHand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r93_c9", "cap": 15.0},
     "res://sprites/items/Materials/WolfFur.tres": {"name": "Wolf Fur", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 15, "icon": "ui/Wolf_Fur", "stackable": True, "max_stack": 9999, "cap": 0.1},
     "res://sprites/items/Food/RedMushroom.tres": {"name": "Red Mushroom", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 1, "regen_hp": 1, "regen_mp": 0, "regen_seg": 10, "sound": "*Munch*", "sell_price": 5, "icon": "ui/Red Mushroom", "stackable": True, "max_stack": 9999, "cap": 0.1},
@@ -671,7 +672,7 @@ def arma_principal(p):
 
 def mult_ataque(p):
     """Velocidade do ataque basico: /atkspd do admin x "atk_speed" da arma
-    (Basic Dagger = 1.5). Possuindo um mob vale so' o do admin (golpe do mob)."""
+    (Basic Dagger = 1.1). Possuindo um mob vale so' o do admin (golpe do mob)."""
     mult = admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
     if morph_de(p): return mult
     try: return mult * max(0.1, float(arma_principal(p).get('atk_speed', 1.0) or 1.0))

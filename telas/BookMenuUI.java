@@ -424,7 +424,7 @@ public final class BookMenuUI {
 
         final boolean treino;  // arma de treino (servidor.py::dano_arma_treino)
         final int economiaFlecha; // % de chance de nao gastar flecha
-        final float velocidadeAtaque; // "atk_speed" (Basic Dagger = 1.5); 1 = normal
+        final float velocidadeAtaque; // "atk_speed" (Basic Dagger = 1.1); 1 = normal
         final String efeitoAtaque, projetilAtaque; // "atk_hit"/"atk_proj": no lugar do da classe (Ruby Staff = fogo)
         final String conjunto; // set (ex: "Outlander"); null = nenhum
         final int conjuntoXp;  // % de XP extra com o set completo

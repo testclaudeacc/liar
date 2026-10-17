@@ -6309,7 +6309,7 @@ public class WorldScreen extends ScreenAdapter {
         }));
         esperaAtaque = INTERVALO_ATAQUE / multAtaque;
         // Progresso da skill principal da classe (o servidor conta e avisa o level up).
-        // Arma rapida (adaga 1.5x): a skill sobe no ritmo normal, nao a cada golpe.
+        // Arma rapida (adaga 1.1x): a skill sobe no ritmo normal, nao a cada golpe.
         long agoraMs = com.badlogic.gdx.utils.TimeUtils.millis();
         float multArma = bookMenu.velocidadeArmaEquipada();
         if (multArma > 1f && agoraMs - ultimaSkillAtaqueMs < (long) ((INTERVALO_ATAQUE * multArma / multAtaque - 0.05f) * 1000f)) return;
