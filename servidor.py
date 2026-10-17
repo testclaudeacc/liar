@@ -622,10 +622,9 @@ def obter_cap_instancia(inst):
     return cap_unit
 
 def calcular_cap_usado(p):
+    # So' a bag pesa: item equipado (inclusive a flecha da mao) nao conta cap.
     total = 0.0
     for inst in p.get('inventory', []):
-        total += obter_cap_instancia(inst)
-    for inst in p.get('equipped_items', {}).values():
         total += obter_cap_instancia(inst)
     return total
 
