@@ -1406,6 +1406,13 @@ public final class BookMenuUI {
 
         Table statusDireita = new Table();
         statusDireita.top().left();
+        // Regen a cada 5s: base (level) + extra dos equipamentos.
+        Table linhaRegenHp = linhaStatus("ui/HPIcon", "HP Regen", "regen_hp");
+        Table linhaRegenMp = linhaStatus("ui/MPIcon", "Mana Regen", "regen_mp");
+        pintarLinhaStatus(linhaRegenHp, COR_POCAO_HP);
+        pintarLinhaStatus(linhaRegenMp, COR_POCAO_MP);
+        statusDireita.add(linhaRegenHp).left().row();
+        statusDireita.add(linhaRegenMp).left().row();
         statusDireita.add(linhaStatus("ui/TotalXP", "Total EXP", "total_exp")).left().row();
         statusDireita.add(linhaStatus("ui/TotalKills", "Total Kills", "total_kills")).left().row();
 
@@ -1533,6 +1540,8 @@ public final class BookMenuUI {
         valoresStatus.get("crit").setText(formatarPercentual(crit));
         valoresStatus.get("block").setText(formatarPercentual(block));
         atualizarTextoCapacidade();
+        valoresStatus.get("regen_hp").setText(textoRegen(skills, "regen_hp"));
+        valoresStatus.get("regen_mp").setText(textoRegen(skills, "regen_mp"));
         valoresStatus.get("total_exp").setText(formatarNumero(totalExp));
         valoresStatus.get("total_kills").setText(formatarNumero(kills));
     }
@@ -1545,6 +1554,19 @@ public final class BookMenuUI {
     }
 
     /** [icone] Rotulo    valor - o valor fica alinhado numa coluna fixa. */
+    /** Rotulo e valor de uma linha de status na cor dada (ex: regen em vermelho/roxo). */
+    private static void pintarLinhaStatus(Table linha, Color cor) {
+        for (com.badlogic.gdx.scenes.scene2d.Actor a : linha.getChildren()) {
+            if (a instanceof Label) a.setColor(cor);
+        }
+    }
+
+    private static String textoRegen(JsonValue skills, String chave) {
+        JsonValue v = skills == null ? null : skills.get(chave);
+        if (v == null || !v.isArray() || v.size < 2) return "-";
+        return v.getInt(0) + "+" + v.getInt(1);
+    }
+
     private Table linhaStatus(String iconRegion, String rotulo, String chave) {
         Table linha = new Table();
         TextureAtlas.AtlasRegion region = iconRegion == null ? null : atlas.findRegion(iconRegion);

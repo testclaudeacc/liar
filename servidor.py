@@ -892,6 +892,10 @@ def _montar_payload_sync_stats(p):
 
     # Sem o bestiary (vai so' no evento proprio): nao viaja em todo sync_stats.
     skills = {k: v for k, v in skills.items() if k != 'bestiary' and not str(k).startswith('admin_')} if isinstance(skills, dict) else skills
+    # Regen (a cada 5s) pra aba de status: [base do level, extra dos equipamentos].
+    if isinstance(skills, dict):
+        skills = dict(skills)
+        skills['regen_hp'], skills['regen_mp'] = regen_base_e_itens(p)
     return {
         'skills': skills, 'base_damage': new_dmg, 'defense_value': new_def,
         'level': level, 'exp': p.get('exp', 0), 'kills': p.get('kills', 0),
@@ -7613,6 +7617,16 @@ REGEN_MP_POR_PONTOS = 30.0
 
 # +1 de regen a cada 100 de HP/mana maxima (contando equipamento).
 REGEN_BONUS_A_CADA = 100.0
+
+def regen_base_e_itens(p):
+    """([hp base, hp extra], [mp base, mp extra]): base = so' o HP/mana do
+    level; extra = quanto os equipamentos somam (HP/mana maior -> regen maior)."""
+    total_hp, total_mp = calcular_max_vitais(p)
+    hp_nivel, mp_nivel, _ = calc_level_bonuses(p.get('level', 1), p.get('class_name', 'Knight'))
+    base_hp, base_mp = BASE_MAX_HP + hp_nivel, BASE_MAX_MP + mp_nivel
+    rb_hp, rb_mp = get_regen_amount(base_hp), get_regen_amount(base_mp, REGEN_MP_POR_PONTOS)
+    rt_hp, rt_mp = get_regen_amount(total_hp), get_regen_amount(total_mp, REGEN_MP_POR_PONTOS)
+    return [int(rb_hp), int(max(0, rt_hp - rb_hp))], [int(rb_mp), int(max(0, rt_mp - rb_mp))]
 
 def get_regen_amount(maximo, por_pontos=REGEN_POR_PONTOS):
     m = float(maximo)
