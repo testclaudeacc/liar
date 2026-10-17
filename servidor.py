@@ -4583,8 +4583,8 @@ def _recompensar_morte_mob(mob_id, mob_type_id, mob_data, room, now):
         loot_id = f"loot_{mob_id}_{int(now * 1000)}_{len(owner_sids)}"
         # has_items só reflete itens de verdade (pra sprite dourada da bag);
         # bag só com currency usa a sprite comum mesmo assim.
-        # Bag dourada so' com item de verdade (material/so' moedas: bag comum).
-        has_items = any(ITEM_DB.get(i.get('item'), {}).get('type') != 'Material' for i in itens_rolados)
+        # Bag dourada so' com item de verdade (material/comida/so' moedas: bag comum).
+        has_items = any(ITEM_DB.get(i.get('item'), {}).get('type') not in ('Material', 'Food') for i in itens_rolados)
         # pos/has_items guardados pra recriar a bag de quem relogar.
         ground_loot[loot_id] = {"items": itens_rolados, "currency": currency_rolada, "room": room, "criado_em": now, "owners": {part_name},
                                 "pos": [mob_data.get('pos_x', 0), mob_data.get('pos_y', 0)], "has_items": has_items}
