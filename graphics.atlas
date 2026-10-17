@@ -13500,240 +13500,247 @@ ui/Trash
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/Wolf_Fur
+ui/Wasp_Wing
   rotate: false
   xy: 688, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/XPIcon
+ui/Wolf_Fur
   rotate: false
   xy: 704, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/armas/Bard
+ui/XPIcon
   rotate: false
   xy: 720, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/armas/Knight
+ui/armas/Bard
   rotate: false
   xy: 736, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/armas/Mage
+ui/armas/Knight
   rotate: false
   xy: 752, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/armas/Ranger
+ui/armas/Mage
   rotate: false
   xy: 768, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/buttons/IconBtn
+ui/armas/Ranger
   rotate: false
   xy: 784, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/buttons/IgnoreBtn
+ui/buttons/IconBtn
   rotate: false
   xy: 800, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/currency/BagIcon
+ui/buttons/IgnoreBtn
   rotate: false
   xy: 816, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/currency/BasicBag
+ui/currency/BagIcon
   rotate: false
   xy: 832, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/currency/Copper
+ui/currency/BasicBag
   rotate: false
   xy: 848, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/currency/Gold
+ui/currency/Copper
   rotate: false
   xy: 864, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/currency/GoldBag
+ui/currency/Gold
   rotate: false
   xy: 880, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/currency/Platinum
+ui/currency/GoldBag
   rotate: false
   xy: 896, 896
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/currency/Silver
+ui/currency/Platinum
   rotate: false
   xy: 0, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/items/Arrow1
+ui/currency/Silver
   rotate: false
   xy: 16, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/items/Bleed
+ui/items/Arrow1
   rotate: false
   xy: 32, 912
+  size: 16, 16
+  orig: 16, 16
+  offset: 0, 0
+  index: -1
+ui/items/Bleed
+  rotate: false
+  xy: 48, 912
   size: 9, 8
   orig: 9, 8
   offset: 0, 0
   index: -1
 ui/items/Blood1
   rotate: false
-  xy: 48, 912
+  xy: 64, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Blood2
   rotate: false
-  xy: 64, 912
+  xy: 80, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Blood3
   rotate: false
-  xy: 80, 912
+  xy: 96, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/HitHitbox
   rotate: false
-  xy: 96, 912
+  xy: 112, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Mana_2
   rotate: false
-  xy: 112, 912
+  xy: 128, 912
   size: 16, 9
   orig: 16, 9
   offset: 0, 0
   index: -1
 ui/items/Music1_1
   rotate: false
-  xy: 128, 912
+  xy: 144, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterArrow
   rotate: false
-  xy: 144, 912
+  xy: 160, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterBook
   rotate: false
-  xy: 160, 912
+  xy: 176, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterBow
   rotate: false
-  xy: 176, 912
+  xy: 192, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterFlute
   rotate: false
-  xy: 192, 912
+  xy: 208, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterMusicsheet
   rotate: false
-  xy: 208, 912
+  xy: 224, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterShield
   rotate: false
-  xy: 224, 912
+  xy: 240, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterStaff
   rotate: false
-  xy: 240, 912
+  xy: 256, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterSword
   rotate: false
-  xy: 256, 912
+  xy: 272, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Trade
   rotate: false
-  xy: 272, 912
+  xy: 288, 912
   size: 9, 8
   orig: 9, 8
   offset: 0, 0
   index: -1
 ui/party/Leader
   rotate: false
-  xy: 288, 912
+  xy: 304, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/slots/ShieldSlot
   rotate: false
-  xy: 304, 912
+  xy: 320, 912
   size: 15, 15
   orig: 15, 15
   offset: 0, 0
