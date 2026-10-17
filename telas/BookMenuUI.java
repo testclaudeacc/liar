@@ -379,7 +379,7 @@ public final class BookMenuUI {
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
         colunaDireita.add(scroll).grow().pad(12, 12, 6, 12).row();
         barraCapBag = new BarraUso();
-        capacityLabel.setStyle(estiloNitido(TAM_TEXTO_RODAPE));
+        capacityLabel.setStyle(estiloNitido(TAM_TEXTO_CAP));
         capacityLabel.setFontScale(1f);
         capacityLabel.setColor(Color.WHITE);
         capacityLabel.setAlignment(Align.center);
@@ -1149,6 +1149,8 @@ public final class BookMenuUI {
 
     /** Moedas / barra de cap / rodapes: mesma fonte nitida das descricoes. */
     private static final int TAM_TEXTO_RODAPE = Math.round(15 * FONTE_STATS);
+    /** Texto dentro da barra de cap (Bag/loja/banco): menor que o das moedas. */
+    private static final int TAM_TEXTO_CAP = Math.round(12 * FONTE_STATS);
 
     private Label.LabelStyle estiloNitido(int tamanho) {
         return new Label.LabelStyle(UiSkin.fonteDescricao(skin, tamanho), Color.WHITE);
@@ -3118,7 +3120,7 @@ public final class BookMenuUI {
         scroll.setScrollingDisabled(true, false);
         scroll.setOverscroll(false, false);
 
-        bancoInfo = new LabelPixel("", estiloNitido(TAM_TEXTO_RODAPE));
+        bancoInfo = new LabelPixel("", estiloNitido(TAM_TEXTO_CAP));
         bancoInfo.setAlignment(Align.center);
         bancoAviso = new LabelPixel("", new Label.LabelStyle(fonteBanco(), Color.valueOf("ff6a6a")));
         escalarFonte(bancoAviso, 0.8f);
@@ -3502,7 +3504,7 @@ public final class BookMenuUI {
         lojaAviso.setFontScale(0.8f);
 
         // ---- Buy: grade + barra de capacidade ----
-        lojaInfo = new LabelPixel("", estiloNitido(TAM_TEXTO_RODAPE));
+        lojaInfo = new LabelPixel("", estiloNitido(TAM_TEXTO_CAP));
         barraCapLoja = new BarraUso();
         Table textoBarra = new Table();
         textoBarra.add(lojaInfo).center();
