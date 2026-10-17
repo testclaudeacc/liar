@@ -365,7 +365,7 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Quadro do mob agora: os que voam batem as asas sem parar (cada um num ritmo defasado). */
     private TextureRegion quadroDoMob(MobVisual mob) {
-        if (!mob.morto && voa(mob)) return quadroAsas(mob.animacao, mob.direcao, mob.id.hashCode(), mob.andandoVisual());
+        if (!mob.morto && voa(mob)) return quadroAsas(mob.animacao, mob.direcao, mob.id.hashCode(), andandoVoo(mob));
         return quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
     }
 
@@ -387,7 +387,14 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Quanto subir/descer o quadro do mob que voa (ver quadroAsas). */
     private float dyDoMob(MobVisual mob) {
-        return !mob.morto && voa(mob) ? dyAsas(mob.id.hashCode(), mob.andandoVisual()) : 0f;
+        return !mob.morto && voa(mob) ? dyAsas(mob.id.hashCode(), andandoVoo(mob)) : 0f;
+    }
+
+    /** Mob que voa "andando" (corpo 1px abaixo): enquanto anda e um pouco depois
+     * de parar - entre um SQM e outro ele nao sobe e desce; so' volta pra cima
+     * quando para de verdade (ex: chegou no player pra bater). */
+    private static boolean andandoVoo(MobVisual mob) {
+        return mob.movendo || mob.tempoDesdeParou < 0.45f;
     }
 
     private int faseAsas(int semente) {
@@ -2604,6 +2611,7 @@ public class WorldScreen extends ScreenAdapter {
     private class AtorAlvo extends com.badlogic.gdx.scenes.scene2d.Actor {
         private final List<TextureRegion> quadros = new ArrayList<>();
         private final List<Color> cores = new ArrayList<>();
+        private float dyQuadro = 0f; // em pixels do sprite (mob que voa)
         // null = segue o alvo atual (botao do topo); com nome = sempre esse
         // player (foto da janela do jogador).
         private final String nomeFixo;
@@ -2635,9 +2643,11 @@ public class WorldScreen extends ScreenAdapter {
             if (j == null) j = parado;
             // Alvo possuindo um mob: a foto e' o mob, nao o boneco.
             AnimacaoCorpo animMorphAlvo = nomeFixo == null && j != null ? animacaoMorph(j.nome) : null;
+            dyQuadro = 0f;
             if (mob != null && !mob.morto) {
                 quadros.add(quadroDoMob(mob));
                 cores.add(Color.WHITE);
+                dyQuadro = dyDoMob(mob) / ESCALA_SPRITE; // mob que voa: corpo parado na foto tambem
             } else if (animMorphAlvo != null) {
                 quadros.add(quadroAtual(animMorphAlvo, j.movendo, j.direcao, j.progresso()));
                 cores.add(Color.WHITE);
@@ -2685,7 +2695,7 @@ public class WorldScreen extends ScreenAdapter {
                 TextureRegion q = quadros.get(i);
                 Color c = cores.get(i);
                 batch.setColor(c.r, c.g, c.b, c.a * parentAlpha);
-                batch.draw(q, x, y, w, q.getRegionHeight() * escala);
+                batch.draw(q, x, y + dyQuadro * escala, w, q.getRegionHeight() * escala);
             }
             batch.setColor(anterior);
         }

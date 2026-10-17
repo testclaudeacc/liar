@@ -79,8 +79,8 @@ MOB_DB = {
     # proj = projetil que sai do mob; hit = efeito no player (sprites/spawn).
     # speed_mult: mais rapida que o padrao do mapa (level maior). flap: a
     # sprite "andando" toca o tempo todo (asas batendo), parada tambem.
-    # shadow: sombra no chao desenhada pelo jogo (fica parada enquanto o corpo sobe/desce).
-    "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "shadow": True, "hp": 115, "xp": 17, "attack": 21.5, "attack_min": 20, "attack_max": 23,
+    # shadow: True = sombra no chao desenhada pelo jogo (parada enquanto o corpo sobe/desce).
+    "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "hp": 115, "xp": 17, "attack": 21.5, "attack_min": 20, "attack_max": 23,
              "range": 5, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
              "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                        {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
