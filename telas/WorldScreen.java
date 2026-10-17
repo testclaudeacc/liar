@@ -3135,6 +3135,10 @@ public class WorldScreen extends ScreenAdapter {
             }
         });
 
+        // Admin: players online (Tab do /tp e /faketalk).
+        socket.on("admin_online", (nomeEvt, data) -> {
+            if (data != null && chat != null) chat.definirJogadoresOnline(data.get("names"));
+        });
         socket.on("player_joined", (nomeEvt, data) -> {
             adicionarRemotoSeNovo(data);
             if (data != null) {
@@ -5190,7 +5194,7 @@ public class WorldScreen extends ScreenAdapter {
         float x = ancoraX - largura / 2f;
         // FriendTarget (18x18) em volta do SQM do player marcado - mesmo lugar do Target dos mobs.
         // Possuindo um mob: o player marcado e' alvo de ataque - Target vermelho (o dos mobs).
-        TextureRegion marca = euMorph() && regiaoAlvo != null ? regiaoAlvo : regiaoAlvoAmigo;
+        TextureRegion marca = (euMorph() || morfos.containsKey(j.nome)) && regiaoAlvo != null ? regiaoAlvo : regiaoAlvoAmigo;
         if (j != local && j.nome.equals(amigoMarcado) && marca != null) {
             batch.draw(marca, ancoraX - marca.getRegionWidth() / 2f, ancoraY - 1f);
         }
@@ -5891,6 +5895,27 @@ public class WorldScreen extends ScreenAdapter {
                 String nomeAlvo = alvoJ.nome;
                 socket.emitRaw("morph_attack", GameSocket.obj(jw -> jw.set("target", nomeAlvo)));
                 esperaAtaque = (morphCooldown > 0f ? morphCooldown : INTERVALO_ATAQUE) / multAtaque;
+            }
+        }
+        // Player marcado possuindo um mob: bato nele como num mob (o servidor confere).
+        if (!euMorph() && amigoMarcado != null && morfos.containsKey(amigoMarcado) && !localMorto && !euNaPz
+                && esperaAtaque <= 0f && socket.isConnected()) {
+            Jogador alvoJ = remotos.get(amigoMarcado);
+            if (alvoJ != null && !mapa.propriedades.naZonaProtegida(alvoJ.x, alvoJ.y)) {
+                boolean ranged = classeRanged();
+                boolean alcanca = ranged
+                    ? distanciaSqm(local.x, local.y, alvoJ.x, alvoJ.y) <= ALCANCE_RANGED_SQM && temLinhaDeVisao(local.x, local.y, alvoJ.x, alvoJ.y)
+                    : distanciaSqm(local.x, local.y, alvoJ.x, alvoJ.y) <= 1;
+                if (alcanca) {
+                    String nomeAlvo = alvoJ.nome, efeito = efeitoDaClasse(), projetil = projetilDaClasse();
+                    socket.emitRaw("hit_morph", GameSocket.obj(jw -> {
+                        jw.set("target", nomeAlvo);
+                        jw.set("hit_type", efeito);
+                        jw.set("w_type", ranged ? "Ranged" : "Melee");
+                        jw.set("proj", projetil);
+                    }));
+                    esperaAtaque = INTERVALO_ATAQUE / multAtaque;
+                }
             }
         }
         if (alvoMob == null) return;

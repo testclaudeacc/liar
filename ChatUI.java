@@ -1027,7 +1027,7 @@ public class ChatUI {
             int ultimo = t.lastIndexOf(' ');
             prefixo = t.substring(ultimo + 1);
             base = t.substring(0, ultimo + 1);
-            List<String> args = argumentosAdmin.get(t.substring(1, espaco).toLowerCase());
+            List<String> args = argumentosPara(t.substring(1, espaco).toLowerCase(), contarEspacos(t));
             if (args != null) opcoes.addAll(args);
         }
         for (String o : opcoes) {
@@ -1071,7 +1071,7 @@ public class ChatUI {
             int ultimo = t.lastIndexOf(' ');
             prefixo = t.substring(ultimo + 1);
             base = t.substring(0, ultimo + 1);
-            List<String> args = argumentosAdmin.get(cmd);
+            List<String> args = argumentosPara(cmd, contarEspacos(t));
             if (args != null) opcoes.addAll(args);
         }
         java.util.List<String> casam = new java.util.ArrayList<>();
@@ -1099,6 +1099,34 @@ public class ChatUI {
 
     // Admin: o que o Tab completa depois de cada comando (servidor.py::argumentos_admin).
     private final Map<String, List<String>> argumentosAdmin = new java.util.HashMap<>();
+    // Players online (servidor: admin_online) - "@players" = em qualquer argumento,
+    // "@player1" = so' no 1o (ex: /faketalk <nome> <msg>).
+    private final List<String> jogadoresOnline = new java.util.ArrayList<>();
+
+    public void definirJogadoresOnline(com.badlogic.gdx.utils.JsonValue nomes) {
+        jogadoresOnline.clear();
+        if (nomes == null) return;
+        for (com.badlogic.gdx.utils.JsonValue v = nomes.child; v != null; v = v.next) jogadoresOnline.add(v.asString());
+    }
+
+    private static int contarEspacos(String t) {
+        int n = 0;
+        for (int i = 0; i < t.length(); i++) if (t.charAt(i) == ' ') n++;
+        return n;
+    }
+
+    /** Opcoes do Tab pro argumento numero indice (1 = o 1o depois do comando). */
+    private List<String> argumentosPara(String cmd, int indice) {
+        List<String> args = argumentosAdmin.get(cmd);
+        if (args == null) return null;
+        List<String> out = new java.util.ArrayList<>();
+        for (String a : args) {
+            if ("@players".equals(a)) out.addAll(jogadoresOnline);
+            else if ("@player1".equals(a)) { if (indice == 1) out.addAll(jogadoresOnline); }
+            else out.add(a);
+        }
+        return out;
+    }
 
     public void definirArgumentosAdmin(com.badlogic.gdx.utils.JsonValue dados) {
         argumentosAdmin.clear();

@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.38"
+SERVER_VERSION = "v0.39"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -1377,6 +1377,31 @@ def admin_ghost(p):
     """/ghost do admin: mobs nao miram nele (nem se ele atacar)."""
     return bool((p.get('skills') or {}).get('admin_ghost'))
 
+def invisivel(p):
+    """/ghost: os outros nao veem nem sabem que esta' online (so' ele se ve,
+    meio transparente). Possuindo um mob (morph) volta a aparecer - como o mob."""
+    return bool(p) and admin_ghost(p) and not isinstance(p.get('morph'), dict)
+
+def online_visivel(nome):
+    """Online pros outros players (ghost conta como offline)."""
+    sid = players_by_name.get(nome)
+    p = online_players.get(sid) if sid else None
+    return p is not None and not invisivel(p)
+
+def _avisar_admins_online():
+    """Admins: lista de quem esta' online (Tab do /tp e /faketalk no chat)."""
+    nomes = sorted(o.get('name', '') for o in online_players.values() if o.get('name') and not o.get('corpo_ausente'))
+    for s_adm, o in list(online_players.items()):
+        if eh_admin(o): socketio.emit('admin_online', {'names': nomes}, room=s_adm)
+
+def _atualizar_presenca(sid, p, antes_invisivel):
+    """Ghost ligou/desligou (ou entrou/saiu do morph): some/aparece pros outros."""
+    agora = invisivel(p)
+    if agora == antes_invisivel: return
+    if agora: socketio.emit('player_left', {"name": p.get('name', '')}, skip_sid=sid)
+    else: socketio.emit('player_joined', resumo_player_area(p), skip_sid=sid)
+    marcar_movimento(sid)  # visao: manda o "sumiu" (mh) ou a foto (mb) pra quem esta' perto
+
 def admin_mult(p, chave, maximo):
     """Multiplicador salvo do admin (/speed, /dmg) - 1.0 = normal."""
     try: v = float((p.get('skills') or {}).get(chave, 1.0))
@@ -1780,6 +1805,7 @@ def _avisar_morph(sid, p):
 def _desfazer_morph(sid, p, msg=None):
     m = morph_de(p)
     if not m: return
+    antes_invisivel = invisivel(p)
     p.pop('morph', None)
     max_hp, _ = calcular_max_vitais(p)
     try: hp = float(m.get('hp_antes', -1))
@@ -1787,6 +1813,7 @@ def _desfazer_morph(sid, p, msg=None):
     p['current_hp'] = max_hp if hp < 0 else min(hp, max_hp)
     p['is_dead'] = False
     _avisar_morph(sid, p)
+    _atualizar_presenca(sid, p, antes_invisivel)  # ghost de novo: some pros outros
     if msg: chat_sistema(sid, msg)
 
 @socketio.on('morph_mob')
@@ -1806,12 +1833,15 @@ def handle_morph_mob(data):
         try: hp_antes = float(p.get('current_hp', -1))
         except (TypeError, ValueError): hp_antes = -1.0
         if hp_antes < 0: hp_antes = max_antes
-        p['morph'] = {'type_id': tipo, 'max_hp': max_hp, 'attack': float(info.get('attack', 3.0)),
+        morph_novo = {'type_id': tipo, 'max_hp': max_hp, 'attack': float(info.get('attack', 3.0)),
                       'cooldown': float(m.get('cooldown', MOB_COOLDOWN_PADRAO)),
                       'hit': m.get('hit_effect', 'physical_hit'), 'hp_antes': hp_antes}
+        antes_invisivel = invisivel(p)
+        p['morph'] = morph_novo
         p['current_hp'] = max_hp
         # O mob some (fumaca), conta como morto e renasce normal depois.
         _mob_desaparece_por_perseguicao(mob_id, m, time.time())
+        _atualizar_presenca(sid, p, antes_invisivel)  # possuindo: os outros veem (o mob)
         _avisar_morph(sid, p)
         chat_sistema(sid, f"You possessed a {info.get('name', tipo.capitalize())}. /morph cancel to leave it.")
     except Exception: traceback.print_exc()
@@ -1844,6 +1874,74 @@ def handle_morph_attack(data):
         marcar_batalha(sid, p, now)
         _mob_atacar('morph:' + p.get('name', ''), golpe, alvo_sid, now,
                     ataque=float(m.get('attack', 3.0)) * admin_mult(p, 'admin_dmg', 1000.0))
+    except Exception: traceback.print_exc()
+
+@socketio.on('hit_morph')
+def handle_hit_morph(data):
+    """Player normal batendo num player que possui um mob: igual bater no mob
+    (dano, crit, miss, /dmg, alcance da classe). HP do morph zerou: ele volta
+    a ser fantasma (some pros outros) com o HP de antes."""
+    try:
+        sid = request.sid
+        p = online_players.get(sid)
+        if p is None or p.get('is_dead') or morph_de(p) or not isinstance(data, dict): return
+        alvo_sid = players_by_name.get(str(data.get('target', '')))
+        alvo = online_players.get(alvo_sid) if alvo_sid else None
+        m = morph_de(alvo)
+        if m is None or alvo_sid == sid or alvo.get('is_dead'): return
+        if na_pz(p) or na_pz(alvo): return
+        if int(p.get('floor', 1) or 1) != int(alvo.get('floor', 1) or 1): return
+        if p.get('class_name') in CLASSES_RANGED:
+            if _dist_px(alvo, p) > (ALCANCE_RANGED_SQM + 1) * TILE: return
+        else:
+            tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+            ta = tile_de(alvo.get('pos_x', 0), alvo.get('pos_y', 0))
+            if max(abs(tp[0] - ta[0]), abs(tp[1] - ta[1])) > 2: return
+        now = time.time()
+        cd = ATAQUE_COOLDOWN_SEG / admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
+        if now - p.get('last_attack_time', 0) < cd - min(0.1, cd * 0.3): return
+        p['last_attack_time'] = now
+        hit_type = str(data.get('hit_type', 'physical_hit'))[:80]
+        if hit_type.startswith("res://") and not (hit_type.endswith((".tres", ".res")) and ".." not in hit_type and "::" not in hit_type):
+            hit_type = 'physical_hit'
+        w_type = 'Ranged' if data.get('w_type') == 'Ranged' else 'Melee'
+        proj = str(data.get('proj', ''))
+        if not (proj.startswith('res://') and proj.endswith(('.tres', '.res', '.png')) and '..' not in proj and '::' not in proj): proj = ''
+        # Mesmo calculo do golpe no mob (hit_mob).
+        if len(_slots_com_classe_invalida(p)) > 0:
+            base_dmg = PUNICAO_CLASSE_DANO
+        else:
+            bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}))
+            base_dmg, _ = calc_player_stats(p.get('class_name', 'Knight'), p.get('level', 1), p.get('skills', {}), bonus_dmg=bonus_itens['bonus_damage'])
+        if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
+        min_dano = max(1, int(base_dmg * 0.85))
+        max_dano = max(min_dano, int(base_dmg * 1.15))
+        dano = random.randint(min_dano, max_dano) if max_dano > min_dano else base_dmg
+        critico = random.random() < CRIT_CHANCE
+        if critico: dano *= 2
+        mult_admin = admin_mult(p, 'admin_dmg', 1000.0)
+        if mult_admin != 1.0: dano = max(1, int(round(dano * mult_admin)))
+        errou = random.random() < MISS_CHANCE_PLAYER
+        if errou: dano, critico = 0, False
+        marcar_batalha(sid, p, now)
+        marcar_batalha(alvo_sid, alvo, now)
+        p['last_successful_hit'] = now
+        max_hp = float(m.get('max_hp', 40))
+        try: hp = float(alvo.get('current_hp', -1))
+        except (TypeError, ValueError): hp = -1.0
+        if hp < 0: hp = max_hp
+        hp = max(0.0, hp - dano)
+        evt = {'target_player': alvo.get('name', ''), 'damage': dano, 'new_hp': hp, 'max_hp': max_hp,
+               'hit_type': hit_type, 'attacker_mob_id': '', 'attacker_player': p.get('name', ''),
+               'is_crit': critico, 'is_miss': errou, 'w_type': w_type, 'proj': proj}
+        if hp <= 0:
+            # Os outros veem o golpe final; quem possuia volta a ser fantasma.
+            emit_area('player_damaged', evt, alvo.get('room'), skip_sid=alvo_sid)
+            _desfazer_morph(alvo_sid, alvo, f"Your possessed body was killed by {p.get('name', '')}. You are a ghost again.")
+            return
+        alvo['current_hp'] = hp
+        alvo['_ultimo_hp_broadcast'] = [hp, max_hp]
+        emit_area('player_damaged', evt, alvo.get('room'))
     except Exception: traceback.print_exc()
 
 def _mob_tick(mob_id, m, now):
@@ -2677,9 +2775,10 @@ def handle_disconnect():
             player['corpo_ausente'] = True
             return
         _remover_da_visao(sid)
-        emit('player_left', {"name": p_name}, broadcast=True, include_self=False)
+        if not invisivel(player): emit('player_left', {"name": p_name}, broadcast=True, include_self=False)
         players_by_name.pop(p_name, None)
         del online_players[sid]
+        _avisar_admins_online()
 
 @socketio.on('get_player_info')
 def handle_get_player_info(data):
@@ -2689,7 +2788,7 @@ def handle_get_player_info(data):
     nome = str(data.get('name', '')).strip()[:32]
     if not nome: return
     alvo = online_players.get(players_by_name.get(nome))
-    if alvo and not alvo.get('corpo_ausente'):
+    if alvo and not alvo.get('corpo_ausente') and not invisivel(alvo):
         emit('player_info', {'name': nome, 'online': True, 'last_seen_ago': 0}, room=sid)
         return
     visto = None
@@ -3101,10 +3200,12 @@ def handle_join_game(data):
         # So' o resumo publico (nome/classe/posicao/skin/HP). Antes ia o dict
         # inteiro de cada player (inventario, skills, user_id...): pesado com
         # muita gente online e vazava dado privado pros outros clients.
-        emit('current_players', {o_sid: resumo_player_area(o_p) for o_sid, o_p in online_players.items()}, room=sid)
+        emit('current_players', {o_sid: resumo_player_area(o_p) for o_sid, o_p in online_players.items()
+                                  if o_sid == sid or not invisivel(o_p)}, room=sid)
         # Mercado: o que vendeu/comprou enquanto estava offline (moedas, itens e aviso).
         _entregar_caixa_mercado(sid, data)
-        emit('player_joined', resumo_player_area(data), broadcast=True, include_self=False)
+        if not invisivel(data): emit('player_joined', resumo_player_area(data), broadcast=True, include_self=False)
+        _avisar_admins_online()
 
         emit('sync_area_data', montar_sync_area(sid, room), room=sid)
         
@@ -3331,7 +3432,6 @@ def _tipo_do_mob_pelo_nome(nome):
 # digitar "/" e o Tab completa. (comando, uso, descricao)
 ADMIN_COMANDOS = [
     ("help", "/help", "lista os comandos"),
-    ("tp", "/tp x<X> y<Y>", "teleporta (coordenadas do minimapa, ex: /tp x56 y200)"),
     ("time", "/time day|afternoon|night|<seg>s|<min>m", "muda a hora do mundo (ciclo de 20 min)"),
     ("soul", "/soul on|off", "vira alma de novo / desperta"),
     ("npcs", "/npcs", "NPCs lidos do mapa e se estao ativos"),
@@ -3341,6 +3441,8 @@ ADMIN_COMANDOS = [
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
     ("atkspd", "/atkspd <1-50>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
     ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
+    ("tp", "/tp <nome> [nome]", "sem 2o nome: voce vai ate' ele; com: o 1o vai ate' o 2o (tambem /tp x<X> y<Y>)"),
+    ("faketalk", "/faketalk <nome> <msg>", "fala no chat atual (local, party, canal) como se fosse o player"),
     ("morph", "/morph cancel", "sai do mob possuido (com /ghost on, botao direito num mob possui ele)"),
     ("class", "/class <Knight|Ranger|Mage|Bard>", "troca sua classe (equip separado por classe; recarrega o personagem)"),
     ("fixclass", "/fixclass [nome classe]", "sem nada: lista quem parece ter virado Knight por engano; com nome e classe: corrige"),
@@ -3356,7 +3458,7 @@ def argumentos_admin():
     mobs = [str(i.get('name', t.capitalize())) for t, i in MOB_DB.items()]
     return {
         'summons': mobs, 'bestiary': mobs + ['clear'],
-        'soul': ['on', 'off'], 'ghost': ['on', 'off'], 'morph': ['cancel'],
+        'soul': ['on', 'off'], 'ghost': ['on', 'off'], 'morph': ['cancel'], 'tp': ['@players'], 'faketalk': ['@player1'],
         'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'], 'spells': ['reset'],
         'class': list(CLASSES_VALIDAS),
         'fixclass': list(CLASSES_VALIDAS),
@@ -3426,7 +3528,16 @@ def _comando_fixclass(sid, args):
     finally:
         if conn: db_pool.putconn(conn)
 
-def comando_admin(sid, p, texto):
+def _achar_online(nome):
+    """(sid, p) do player online com esse nome (sem diferenciar maiuscula)."""
+    sid_n = players_by_name.get(nome)
+    if sid_n is None:
+        for n, s_n in players_by_name.items():
+            if n.lower() == nome.lower(): sid_n = s_n; break
+    p_n = online_players.get(sid_n) if sid_n else None
+    return (sid_n, p_n) if p_n is not None else (None, None)
+
+def comando_admin(sid, p, texto, canal='local'):
     partes = texto[1:].split()
     if not partes: return
     cmd = partes[0].lower()
@@ -3462,13 +3573,58 @@ def comando_admin(sid, p, texto):
         socketio.emit('world_time', payload_hora_do_mundo())
         chat_sistema(sid, f"World time set to {alvo:.0f}s ({alvo / 60:.1f} min).")
         return
+    if cmd == 'tp' and len(partes) >= 2 and not re.match(r'^[xXyY]?-?\d+,?$', partes[1]):
+        # /tp Nome: vou ate' ele. /tp Nome Outro: Nome vai ate' Outro.
+        quem_sid, quem = (sid, p)
+        dest_sid, dest = _achar_online(partes[1])
+        if len(partes) >= 3:
+            quem_sid, quem = dest_sid, dest
+            dest_sid, dest = _achar_online(partes[2])
+        if quem is None or dest is None:
+            chat_sistema(sid, "Player not online. Usage: /tp <name> [name]  or  /tp x<X> y<Y>", 'red')
+            return
+        if quem_sid == dest_sid:
+            chat_sistema(sid, "Same player.", 'red')
+            return
+        if quem.get('is_dead'):
+            chat_sistema(sid, f"{quem.get('name')} is dead.", 'red')
+            return
+        _teleportar(quem_sid, quem, tile_de(dest.get('pos_x', 0), dest.get('pos_y', 0)), quem.get('direction', 'down'))
+        if quem_sid == sid: chat_sistema(sid, f"Teleported to {dest.get('name')}.")
+        else: chat_sistema(sid, f"{quem.get('name')} was teleported to {dest.get('name')}.")
+        return
+    if cmd == 'faketalk':
+        # /faketalk Nome mensagem: aparece no chat (onde o comando foi digitado) como se o Nome falasse.
+        if len(partes) < 3:
+            chat_sistema(sid, "Usage: /faketalk <name> <message>", 'red')
+            return
+        alvo_sid, alvo = _achar_online(partes[1])
+        nome_falso = alvo.get('name') if alvo else partes[1][:32]
+        classe = alvo.get('class_name', 'Knight') if alvo else 'Knight'
+        msg = texto[1:].split(None, 2)[2][:200]
+        if canal == 'local':
+            destinos = _visto_por.get(sid, set()) | {sid}
+            if alvo_sid: destinos |= _visto_por.get(alvo_sid, set()) | {alvo_sid}
+            for d in destinos: socketio.emit('c', [nome_falso, msg, classe], room=d)
+        elif canal == 'party':
+            party, _pid = _get_party(sid)
+            if not party:
+                chat_sistema(sid, "You are not in a party.", 'red')
+                return
+            for membro in list(party['members']):
+                if membro in online_players:
+                    socketio.emit('pc', {'name': nome_falso, 'msg': msg, 'class': classe}, room=membro)
+        elif canal in chat_channels:
+            for membro in list(chat_channels[canal]):
+                socketio.emit('cc', {'channel': canal, 'name': nome_falso, 'msg': msg, 'class': classe}, room=membro)
+        return
     if cmd == 'tp':
         # /tp x56 y200 (ou /tp 56 200): mesmo X/Y do minimapa.
         try:
             nums = [int(re.sub(r'^[xXyY]', '', v).strip(',')) for v in partes[1:3]]
             if len(nums) != 2: raise ValueError
         except ValueError:
-            chat_sistema(sid, "Usage: /tp x<X> y<Y>  (ex: /tp x56 y200)", 'red')
+            chat_sistema(sid, "Usage: /tp <name> [name]  or  /tp x<X> y<Y>  (ex: /tp x56 y200)", 'red')
             return
         if p.get('is_dead'):
             chat_sistema(sid, "You are dead.", 'red')
@@ -3654,6 +3810,7 @@ def comando_admin(sid, p, texto):
         if len(partes) < 2 or partes[1].lower() not in ('on', 'off'):
             chat_sistema(sid, f"Ghost: {'on' if admin_ghost(p) else 'off'}. Usage: /ghost on|off")
             return
+        antes_invisivel = invisivel(p)
         if partes[1].lower() == 'on':
             p['skills']['admin_ghost'] = True
             # Quem ja' estava me mirando larga na hora.
@@ -3662,10 +3819,11 @@ def comando_admin(sid, p, texto):
         else:
             p['skills'].pop('admin_ghost', None)
             _desfazer_morph(sid, p)
+        _atualizar_presenca(sid, p, antes_invisivel)
         _queue_save(p)
         # Todo mundo perto (e eu) ve o fantasma meio transparente.
         emit_area('player_status_updated', {'name': p.get('name', ''), 'ghost': admin_ghost(p)}, p.get('room'))
-        chat_sistema(sid, f"Ghost {partes[1].lower()}: mobs {'ignore' if admin_ghost(p) else 'see'} you.")
+        chat_sistema(sid, f"Ghost {partes[1].lower()}: " + ("invisible and offline for other players; mobs ignore you." if admin_ghost(p) else "everyone sees you again."))
         return
     if cmd == 'morph':
         if len(partes) < 2 or partes[1].lower() not in ('cancel', 'off'):
@@ -3841,7 +3999,7 @@ def handle_pm(data):
         destino_nome = str(data.get('to', '')).strip()[:32]
         destino_sid = players_by_name.get(destino_nome)
         if not destino_nome or destino_sid == sid: return
-        if not destino_sid or destino_sid not in online_players:
+        if not destino_sid or destino_sid not in online_players or (invisivel(online_players[destino_sid]) and not eh_admin(p)):
             chat_sistema(sid, "This player is offline.")
             return
         msg = _filtrar_mensagem_chat(sid, p, data.get('msg', ''))
@@ -3867,6 +4025,9 @@ def handle_pc(data):
             chat_sistema(sid, "You are not in a party.")
             return
         p = online_players[sid]
+        if eh_admin(p) and str(data.get('msg', '')).strip().startswith('/'):
+            comando_admin(sid, p, str(data.get('msg', '')).strip()[:200], canal='party')
+            return
         msg = _filtrar_mensagem_chat(sid, p, data.get('msg', ''))
         if msg is None: return
         payload = {'name': p.get('name', ''), 'msg': msg, 'class': p.get('class_name', 'Knight')}
@@ -3885,6 +4046,9 @@ def handle_cc(data):
         canal = data.get('channel')
         if canal not in chat_channels or sid not in chat_channels[canal]: return
         p = online_players[sid]
+        if eh_admin(p) and str(data.get('msg', '')).strip().startswith('/'):
+            comando_admin(sid, p, str(data.get('msg', '')).strip()[:200], canal=canal)
+            return
         msg = _filtrar_mensagem_chat(sid, p, data.get('msg', ''))
         if msg is None: return
         payload = {'channel': canal, 'name': p.get('name', ''), 'msg': msg,
@@ -3895,7 +4059,7 @@ def handle_cc(data):
 
 def _emit_membros_canal(canal):
     membros = chat_channels.get(canal, set())
-    nomes = sorted(online_players[s].get('name', '') for s in membros if s in online_players)
+    nomes = sorted(online_players[s].get('name', '') for s in membros if s in online_players and not invisivel(online_players[s]))
     for s in membros:
         socketio.emit('chat_members', {'channel': canal, 'names': nomes}, room=s)
 
@@ -5021,6 +5185,7 @@ def _flush_visao():
         mx, my = float(pm.get('pos_x', 0)), float(pm.get('pos_y', 0))
         vendo_m = _vendo.setdefault(m, set())
         visto_m = _visto_por.setdefault(m, set())
+        m_invisivel = invisivel(pm)  # /ghost: ninguem ve m (m continua vendo todo mundo)
         # Passos de m montados UMA vez e reaproveitados pra todo mundo que ja' via.
         lista_passos = passos.get(m)
         entradas_m = [[nome_m, x, y, d, 0] for (x, y, d) in lista_passos] if lista_passos else None
@@ -5035,9 +5200,10 @@ def _flush_visao():
                 continue
             dx = abs(mx - float(pv.get('pos_x', 0)))
             dy = abs(my - float(pv.get('pos_y', 0)))
-            dentro = dx <= vx and dy <= vy
-            dentro_margem = dentro or (dx <= vxm and dy <= vym)
+            dentro_real = dx <= vx and dy <= vy
+            margem_real = dentro_real or (dx <= vxm and dy <= vym)
             # -- quem ve m --
+            dentro, dentro_margem = dentro_real and not m_invisivel, margem_real and not m_invisivel
             if v in visto_m:
                 if dentro_margem:
                     if entradas_m is not None:
@@ -5052,6 +5218,8 @@ def _flush_visao():
                 visto_m.add(v); _vendo.setdefault(v, set()).add(m)
                 mandar_foto(v, m, pm)
             # -- o que m ve (m andou: quem esta parado pode entrar/sair) --
+            v_invisivel = invisivel(pv)
+            dentro, dentro_margem = dentro_real and not v_invisivel, margem_real and not v_invisivel
             if v in vendo_m:
                 if not dentro_margem:
                     vendo_m.discard(v); _visto_por.get(v, set()).discard(m)
@@ -5286,8 +5454,9 @@ def _teleportar(sid, p, dest, direcao):
     new_room = get_chunk(x, y, 1)
     old_room = p.get('room')
     if old_room != new_room:
-        if old_room: leave_room(old_room)
-        join_room(new_room)
+        # sid explicito: o /tp do admin tambem leva OUTRO player.
+        if old_room: leave_room(old_room, sid=sid)
+        join_room(new_room, sid=sid)
     p['room'], p['pos_x'], p['pos_y'], p['direction'], p['floor'] = new_room, x, y, direcao, 1
     p['_move_balde'] = MOVE_BALDE_MAX
     p['last_move_time'] = time.time()
@@ -5295,8 +5464,8 @@ def _teleportar(sid, p, dest, direcao):
     # Sem "passo": quem ve o player recebe ele reposicionado direto (foto),
     # em vez de ve-lo andando ate' o destino.
     marcar_movimento(sid)
-    emit('tp_result', {'ok': True, 'pos_x': x, 'pos_y': y, 'direction': direcao}, room=sid)
-    emit('sync_area_data', montar_sync_area(sid, new_room), room=sid)
+    socketio.emit('tp_result', {'ok': True, 'pos_x': x, 'pos_y': y, 'direction': direcao}, room=sid)
+    socketio.emit('sync_area_data', montar_sync_area(sid, new_room), room=sid)
     return dest
 
 @socketio.on('l')
@@ -7004,7 +7173,7 @@ def handle_get_friends_list(data):
             # Skin (aparencia) pra mostrar o amigo mesmo offline (janela do
             # jogador / aba de PV). Mesma validacao do jogo.
             'skins': validar_skins(json.loads(row[5]) if row[5] else {}, row[4] or 'Knight'),
-            'online': row[0] in players_by_name,
+            'online': online_visivel(row[0]),
         } for row in rows]
 
         emit('friends_list', {'friends': friends}, room=sid)
@@ -7281,9 +7450,10 @@ def _remover_corpo_ausente(sid, p):
     _remover_da_visao(sid)
     _queue_save(p)
     p_name = p.get('name', '')
-    socketio.emit('player_left', {"name": p_name})
+    if not invisivel(p): socketio.emit('player_left', {"name": p_name})
     if players_by_name.get(p_name) == sid: players_by_name.pop(p_name, None)
     online_players.pop(sid, None)
+    _avisar_admins_online()
 
 def battle_loop():
     while True:
