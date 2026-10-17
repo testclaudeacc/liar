@@ -425,7 +425,7 @@ ITEM_DB = {
     # spell_skill/_hits: cada uso conta como N golpes na skill (no maximo 1
     # vez por cooldown da magia - nao da' pra abusar com atk speed).
     # A Nyla so' mostra a magia pra quem tem o level e a classe dela.
-    "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 5, "spell_dmg": 75, "spell_area": False, "spell_skill": "magic", "spell_skill_hits": 5, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r73_c11", "cap": 0.0},
+    "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 75, "spell_area": False, "spell_skill": "magic", "spell_skill_hits": 5, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r73_c11", "cap": 0.0},
     # Heavy Cut (Knight): corte (20%) + sangramento: spell_bleed_ticks ticks de
     # spell_bleed_pct% a cada spell_bleed_every s; cada tick da' 1 golpe na
     # skill spell_bleed_skill. spell_range "melee": so' colado no mob.
