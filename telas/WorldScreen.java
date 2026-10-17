@@ -390,9 +390,8 @@ public class WorldScreen extends ScreenAdapter {
         return !mob.morto && voa(mob) ? dyAsas(mob.id.hashCode(), andandoVoo(mob)) : 0f;
     }
 
-    /** Mob que voa "andando" (corpo 1px abaixo): enquanto anda e um pouco depois
-     * de parar - entre um SQM e outro ele nao sobe e desce; so' volta pra cima
-     * quando para de verdade (ex: chegou no player pra bater). */
+    /** Mob que voa "andando" (corpo subindo e descendo): enquanto anda e um
+     * pouco depois de parar - entre um SQM e outro nao troca pro jeito parado. */
     private static boolean andandoVoo(MobVisual mob) {
         return mob.movendo || mob.tempoDesdeParou < 0.45f;
     }
@@ -405,8 +404,8 @@ public class WorldScreen extends ScreenAdapter {
     /** Mob que voa: a sheet tem o quadro parado (corpo em cima) e o "andando"
      * (corpo 1px abaixo, a outra posicao das asas). Parado: alterna os dois,
      * com o "andando" desenhado 1px acima - so' as asas mexem. Andando: alterna
-     * os dois com o parado desenhado 1px abaixo - o corpo fica 1px mais baixo
-     * e as asas continuam batendo. O deslocamento vem de dyAsas. */
+     * os dois como estao - o corpo sobe e desce 1px junto com as asas.
+     * O deslocamento vem de dyAsas. */
     private TextureRegion quadroAsas(AnimacaoCorpo a, String direcao, int semente, boolean andando) {
         boolean usarAndar = (faseAsas(semente) == 0) == andando;
         switch (direcao) {
@@ -419,8 +418,8 @@ public class WorldScreen extends ScreenAdapter {
 
     private float dyAsas(int semente, boolean andando) {
         boolean fase1 = faseAsas(semente) == 1;
-        if (!andando) return fase1 ? ESCALA_SPRITE : 0f;   // quadro "andando" sobe 1px (corpo parado)
-        return fase1 ? -ESCALA_SPRITE : 0f;                 // quadro parado desce 1px (corpo abaixado)
+        if (!andando) return fase1 ? ESCALA_SPRITE : 0f;   // parado: quadro "andando" sobe 1px (so' as asas mexem)
+        return 0f;                                          // andando: sem compensar - o corpo sobe e desce junto com as asas
     }
 
     private void definirNomesMobs(JsonValue nomes) {
