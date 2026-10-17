@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.40"
+SERVER_VERSION = "v0.41"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -413,10 +413,10 @@ ITEM_DB = {
     "res://sprites/items/Ranger/Weapons/RawBow.tres": {"name": "Raw Bow", "type": "Bow", "slot": "MainHand", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "training": True, "ammo_save": 30, "price": 1000, "icon": "sheet/r93_c10", "cap": 15.0},
     # Set Outlander (loja do Luke): todas as classes, level 10. "set" junta as
     # pecas; com todas equipadas da' "set_xp"% de XP extra (bonus_xp_set).
-    "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 10.0},
-    "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Chest", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 15.0},
-    "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 5.0},
-    "res://sprites/items/Outlander/OutlanderBoots.tres": {"name": "Outlander Boots", "type": "Boots", "slot": "Boots", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 2, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 400, "icon": "sheet/r10_c7", "set": "Outlander", "set_xp": 5, "cap": 10.0},
+    "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 10.0},
+    "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Chest", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 15.0},
+    "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 5.0},
+    "res://sprites/items/Outlander/OutlanderBoots.tres": {"name": "Outlander Boots", "type": "Boots", "slot": "Boots", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 400, "icon": "sheet/r10_c7", "set": "Outlander", "set_xp": 5, "cap": 10.0},
 }
 # Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
 # que aparece na descricao.
@@ -435,7 +435,7 @@ ALCANCE_RANGED_SQM = 5
 # Campos do ITEM_DB que o client usa pra exibir os itens (nome, tipo, level,
 # stats e slot) - mandado no sync_local_player, assim o client nao precisa
 # de uma copia propria e o que aparece na tela e' sempre o valor real.
-CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
+CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense", "armour",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
                        "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap", "usable",
                        "regen_hp", "regen_mp", "regen_seg", "price", "sell_price", "set", "set_xp", "training", "ammo_save",
@@ -473,7 +473,10 @@ MAX_STACK_MUNICAO_PADRAO = 100
 CAP_INICIAL = 100.0
 CAP_POR_NIVEL = 10.0
 
-FOURTH_STAT_MULTIPLIERS = {"Magic": 0.5, "Focus": 0.5, "Musicality": 0.5, "Melee": 0.5}
+# "Class": item universal (sets) - vira o ADC da classe de quem veste (o
+# client mostra como Melee/Magic/Focus/Musicality). Magic no Bard aparece
+# como Musicality (o Bard usa os sets do Mage). No dano tudo vale igual 1:2.
+FOURTH_STAT_MULTIPLIERS = {"Magic": 0.5, "Focus": 0.5, "Musicality": 0.5, "Melee": 0.5, "Class": 0.5}
 
 STARTING_EQUIPMENT = {
     "Knight":  [{"item": "res://sprites/items/Knight/Weapons/StarterSword.tres", "slot": "MainHand"}, {"item": "res://sprites/items/Knight/SecondHand/StarterShield.tres", "slot": "Hand"}],
@@ -510,7 +513,9 @@ def obter_dados_item(item_path):
         bonus_damage += adc_value * FOURTH_STAT_MULTIPLIERS.get(adc_type, 0.0)
     return {
         "req_class": dados.get("req_class", "All"),
-        "bonus_damage": bonus_damage, "bonus_defense": dados.get("defense", 0),
+        # Armour (armaduras): 1 = 1 de dano a menos (1:1). Defense dos itens
+        # conta 1:2 em calc_player_stats, entao o armour entra dobrado aqui.
+        "bonus_damage": bonus_damage, "bonus_defense": dados.get("defense", 0) + 2 * dados.get("armour", 0),
         "bonus_hp": dados.get("stamina", 0), "bonus_mp": dados.get("mana", 0),
     }
 

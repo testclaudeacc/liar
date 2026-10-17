@@ -402,7 +402,7 @@ public final class BookMenuUI {
         final String nome, tipo, slot;
         final int reqLevel;
         final String reqClass;
-        final int bonusDamage, defense, stamina, mana, fourthStatValue, manaCost, fullness;
+        final int bonusDamage, defense, armour, stamina, mana, fourthStatValue, manaCost, fullness;
         final int healHp, healMp; // pocao: quanto cura (o que aparece)
         final String fourthStatType, icone;
         final float cap; // peso de 1 unidade (servidor.py::ITEM_DB "cap")
@@ -459,6 +459,7 @@ public final class BookMenuUI {
             this.reqClass = d.getString("req_class", "All");
             this.bonusDamage = d.getInt("bonus_damage", 0);
             this.defense = d.getInt("defense", 0);
+            this.armour = d.getInt("armour", 0);
             this.stamina = d.getInt("stamina", 0);
             this.mana = d.getInt("mana", 0);
             this.fourthStatType = d.getString("fourth_stat_type", "");
@@ -845,6 +846,23 @@ public final class BookMenuUI {
         }
     }
 
+    /** Nome do ADC como aparece pra classe logada: "Class" (sets universais)
+     * vira a skill da classe; Magic no Bard vira Musicality (usa os sets do Mage).
+     * null = item sem ADC. */
+    private String quartoStatExibido(String tipo) {
+        if (tipo == null || tipo.isEmpty() || "None".equals(tipo)) return null;
+        if ("Class".equals(tipo)) {
+            switch (classeJogador) {
+                case "Mage": return "Magic";
+                case "Ranger": return "Focus";
+                case "Bard": return "Musicality";
+                default: return "Melee";
+            }
+        }
+        if ("Magic".equals(tipo) && "Bard".equals(classeJogador)) return "Musicality";
+        return tipo;
+    }
+
     private static Color corQuartoStat(String tipo) {
         if (tipo == null) return Color.WHITE;
         switch (tipo) {
@@ -946,12 +964,13 @@ public final class BookMenuUI {
             classeCerta ? corClasse(dados.reqClass) : Color.valueOf("ff4a4a"))).left().row();
         adicionarLinhaStat(bloco, "Attack", dados.bonusDamage, base == null ? 0 : base.bonusDamage, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Defense", dados.defense, base == null ? 0 : base.defense, comparar, Color.WHITE);
+        adicionarLinhaStat(bloco, "Armour", dados.armour, base == null ? 0 : base.armour, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Stamina", dados.stamina, base == null ? 0 : base.stamina, comparar, COR_STAMINA);
         adicionarLinhaStat(bloco, "Mana", dados.mana, base == null ? 0 : base.mana, comparar, COR_MANA);
-        if (dados.fourthStatType != null && !dados.fourthStatType.isEmpty() && !"None".equals(dados.fourthStatType)) {
-            int anterior = base != null && dados.fourthStatType.equals(base.fourthStatType) ? base.fourthStatValue : 0;
-            adicionarLinhaStat(bloco, dados.fourthStatType, dados.fourthStatValue, anterior, comparar,
-                corQuartoStat(dados.fourthStatType));
+        String quarto = quartoStatExibido(dados.fourthStatType);
+        if (quarto != null) {
+            int anterior = base != null && quarto.equals(quartoStatExibido(base.fourthStatType)) ? base.fourthStatValue : 0;
+            adicionarLinhaStat(bloco, quarto, dados.fourthStatValue, anterior, comparar, corQuartoStat(quarto));
         }
         // Mana gasta por ataque (varinha). Sem "(+n)": nao e' bonus, e' custo.
         if (dados.manaCost > 0) bloco.add(linhaStat(dados.manaCost + " Mana per hit", COR_MANA)).left().row();
