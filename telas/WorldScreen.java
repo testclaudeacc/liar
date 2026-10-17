@@ -355,7 +355,7 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Mobs que voam (MOB_DB "flap"): a sprite andando toca o tempo todo, 2x mais rapido. */
     private final java.util.Set<String> mobsBateAsas = new java.util.HashSet<>();
-    private static final float QUADRO_ASAS_SEG = 0.1f;
+    private static final float QUADRO_ASAS_SEG = 0.15f;
 
     private void definirMobsBateAsas(JsonValue tipos) {
         mobsBateAsas.clear();
@@ -397,12 +397,11 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private int faseAsas(int semente, boolean andando) {
-        // Andando o corpo sobe/desce junto: mais devagar que o bater de asas parado.
-        float seg = andando ? QUADRO_VOO_ANDANDO_SEG : QUADRO_ASAS_SEG;
+        // Mesmo ritmo parado e andando (andando o corpo so' sobe/desce junto).
+        float seg = QUADRO_ASAS_SEG;
         long passo = (com.badlogic.gdx.utils.TimeUtils.millis() + (semente & 0xff)) / (long) (seg * 1000f);
         return (int) (passo % 2);
     }
-    private static final float QUADRO_VOO_ANDANDO_SEG = 0.2f;
 
     /** Mob que voa: a sheet tem o quadro parado (corpo em cima) e o "andando"
      * (corpo 1px abaixo, a outra posicao das asas). Parado: alterna os dois,
