@@ -467,6 +467,7 @@ public class WorldScreen extends ScreenAdapter {
     // Hit fisico (mobs, ex: worm) e de flecha: um pouco mais rapido que os outros.
     private static final float DURACAO_QUADRO_HIT_RAPIDO = 0.07f;
     private static final float DURACAO_QUADRO_HIT_FLECHA = 0.05f;
+    private static final float DURACAO_QUADRO_HIT_ESPADA = 0.06f; // corte do Knight (e o Heavy Cut)
     private static final float DURACAO_QUADRO_HIT_FOGO = 0.08f; // ui/FireAnimation (Igniculus)
     private final List<Efeito> efeitos = new ArrayList<>();
     private final Map<String, TextureRegion[]> cacheEfeitos = new HashMap<>();
@@ -5601,6 +5602,7 @@ public class WorldScreen extends ScreenAdapter {
         // Mana (sprite novo, 7 quadros) na mesma velocidade do fogo.
         e.duracaoQuadro = "Fire".equals(nome) || "Mana".equals(nome) ? DURACAO_QUADRO_HIT_FOGO
             : "Arrow".equals(nome) ? DURACAO_QUADRO_HIT_FLECHA
+            : "Sword".equals(nome) || "SwordInv".equals(nome) ? DURACAO_QUADRO_HIT_ESPADA
             : rapido ? DURACAO_QUADRO_HIT_RAPIDO : DURACAO_QUADRO_HIT;
         efeitos.add(e);
         return e;
