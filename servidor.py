@@ -1394,12 +1394,13 @@ def _avisar_admins_online():
     for s_adm, o in list(online_players.items()):
         if eh_admin(o): socketio.emit('admin_online', {'names': nomes}, room=s_adm)
 
-def _atualizar_presenca(sid, p, antes_invisivel):
-    """Ghost ligou/desligou (ou entrou/saiu do morph): some/aparece pros outros."""
+def _atualizar_presenca(sid, p, antes_invisivel, silencioso=False):
+    """Ghost ligou/desligou (ou entrou/saiu do morph): some/aparece pros outros.
+    silencioso (morph): so' o boneco some/aparece - sem "is online/offline" nos amigos."""
     agora = invisivel(p)
     if agora == antes_invisivel: return
-    if agora: socketio.emit('player_left', {"name": p.get('name', '')}, skip_sid=sid)
-    else: socketio.emit('player_joined', resumo_player_area(p), skip_sid=sid)
+    if agora: socketio.emit('player_left', {"name": p.get('name', ''), "silent": silencioso}, skip_sid=sid)
+    else: socketio.emit('player_joined', {**resumo_player_area(p), "silent": silencioso}, skip_sid=sid)
     marcar_movimento(sid)  # visao: manda o "sumiu" (mh) ou a foto (mb) pra quem esta' perto
 
 def admin_mult(p, chave, maximo):
@@ -1759,7 +1760,7 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
     hp_atual = max(0.0, hp_atual - dano_final)
     # Alvo possuindo um mob: em vez de morrer, volta a ser fantasma com o HP de antes.
     if hp_atual <= 0 and isinstance(target_player.get('morph'), dict):
-        _desfazer_morph(target_sid, target_player, "Your possessed body died. You are a ghost again.")
+        _desfazer_morph(target_sid, target_player, "Your possessed body died. You are a ghost again.", morreu=True)
         hp_atual, max_hp_alvo = hp_publico(target_player)
         emit_area('player_damaged', {'target_player': target_name, 'damage': dano_final, 'new_hp': hp_atual,
                                      'max_hp': max_hp_alvo, 'hit_type': m.get('hit_effect', 'physical_hit'),
@@ -1802,10 +1803,14 @@ def _avisar_morph(sid, p):
     socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
     socketio.emit('sync_vitals', {'current_hp': hp}, room=sid)
 
-def _desfazer_morph(sid, p, msg=None):
+def _desfazer_morph(sid, p, msg=None, morreu=False):
     m = morph_de(p)
     if not m: return
     antes_invisivel = invisivel(p)
+    # Morreu possuindo: cadaver do mob no chao pra todo mundo perto.
+    if morreu:
+        emit_area('morph_died', {'name': p.get('name', ''), 'type': m.get('type_id', ''),
+                                 'pos_x': p.get('pos_x', 0), 'pos_y': p.get('pos_y', 0)}, p.get('room'))
     p.pop('morph', None)
     max_hp, _ = calcular_max_vitais(p)
     try: hp = float(m.get('hp_antes', -1))
@@ -1813,7 +1818,7 @@ def _desfazer_morph(sid, p, msg=None):
     p['current_hp'] = max_hp if hp < 0 else min(hp, max_hp)
     p['is_dead'] = False
     _avisar_morph(sid, p)
-    _atualizar_presenca(sid, p, antes_invisivel)  # ghost de novo: some pros outros
+    _atualizar_presenca(sid, p, antes_invisivel, silencioso=True)  # ghost de novo: some pros outros
     if msg: chat_sistema(sid, msg)
 
 @socketio.on('morph_mob')
@@ -1841,7 +1846,7 @@ def handle_morph_mob(data):
         p['current_hp'] = max_hp
         # O mob some (fumaca), conta como morto e renasce normal depois.
         _mob_desaparece_por_perseguicao(mob_id, m, time.time())
-        _atualizar_presenca(sid, p, antes_invisivel)  # possuindo: os outros veem (o mob)
+        _atualizar_presenca(sid, p, antes_invisivel, silencioso=True)  # possuindo: os outros veem (o mob)
         _avisar_morph(sid, p)
         chat_sistema(sid, f"You possessed a {info.get('name', tipo.capitalize())}. /morph cancel to leave it.")
     except Exception: traceback.print_exc()
@@ -1937,7 +1942,7 @@ def handle_hit_morph(data):
         if hp <= 0:
             # Os outros veem o golpe final; quem possuia volta a ser fantasma.
             emit_area('player_damaged', evt, alvo.get('room'), skip_sid=alvo_sid)
-            _desfazer_morph(alvo_sid, alvo, f"Your possessed body was killed by {p.get('name', '')}. You are a ghost again.")
+            _desfazer_morph(alvo_sid, alvo, f"Your possessed body was killed by {p.get('name', '')}. You are a ghost again.", morreu=True)
             return
         alvo['current_hp'] = hp
         alvo['_ultimo_hp_broadcast'] = [hp, max_hp]
@@ -4307,7 +4312,9 @@ def _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano_final, now, ex
     room = p.get('room')
     atacante_id = p.get('name', '')
     
-    evt_dano = {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'attacker_id': atacante_id, 'owner': ''}
+    evt_dano = {'mob_id': mob_id, 'damage': dano_final, 'new_hp': mob_data['hp'], 'max_hp': mob_data.get('max_hp', mob_data['hp']), 'attacker_id': atacante_id, 'owner': '',
+                # De onde sai o projetil, mesmo pra quem nao ve o atacante (ex: /ghost).
+                'attacker_pos': [p.get('pos_x', 0), p.get('pos_y', 0)]}
     evt_dano.update(extra_evt)
     emit_area('mob_damaged', evt_dano, room)
     

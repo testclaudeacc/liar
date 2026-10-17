@@ -3135,13 +3135,36 @@ public class WorldScreen extends ScreenAdapter {
             }
         });
 
+        // Quem possuia um mob morreu: cadaver do mob no lugar (some com o tempo, igual mob).
+        socket.on("morph_died", (nomeEvt, data) -> {
+            if (data == null) return;
+            String tipo = data.getString("type", "");
+            TextureRegion sprite = tipo.isEmpty() ? null : spriteDoMob(tipo);
+            if (sprite == null) return;
+            String nome = data.getString("name", "");
+            Jogador j = jogadorPorNome(nome);
+            float cx = j != null ? j.x : conversor.rawParaMundoX(data.getFloat("pos_x", 0f));
+            float cy = j != null ? j.y : conversor.rawParaMundoY(data.getFloat("pos_y", 0f));
+            String id = "corpo_morph_" + nome + "_" + System.currentTimeMillis();
+            MobVisual corpo = new MobVisual(id, Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1), cx, cy,
+                criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+            corpo.morto = true;
+            corpo.hp = 0f;
+            corpo.visivel = true;
+            corpo.tempoCorpo = TEMPO_CORPO_MOB;
+            mobs.put(id, corpo);
+            com.badlogic.gdx.utils.Timer.schedule(new com.badlogic.gdx.utils.Timer.Task() {
+                @Override public void run() { mobs.remove(id); }
+            }, TEMPO_CORPO_MOB + 1f);
+        });
         // Admin: players online (Tab do /tp e /faketalk).
         socket.on("admin_online", (nomeEvt, data) -> {
             if (data != null && chat != null) chat.definirJogadoresOnline(data.get("names"));
         });
         socket.on("player_joined", (nomeEvt, data) -> {
             adicionarRemotoSeNovo(data);
-            if (data != null) {
+            // silent: so' o boneco apareceu (admin possuindo um mob) - nao "ficou online".
+            if (data != null && !data.getBoolean("silent", false)) {
                 String nome = data.getString("name", "");
                 if (bookMenu.amigo(nome) != null) hud.notificarTipo(HudVitais.NOTIF_AMIGO, nome + " is online.", COR_NOTIF_ON, null);
                 bookMenu.definirOnline(nome, true);
@@ -3439,8 +3462,16 @@ public class WorldScreen extends ScreenAdapter {
             if (!errou && "Mana".equals(efeito)) numero.cor = new Color(0.29f, 0.62f, 1f, 1f);
             Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
             TextureRegion projetil = regiaoDoCaminho(data.getString("proj", ""));
-            if ("Ranged".equals(data.getString("w_type", "")) && projetil != null && atacante != null) {
-                Projetil pr = new Projetil(projetil, atacante.x, atacante.y + 8f, mob, efeito);
+            // Atacante fora da minha lista (ex: /ghost invisivel): sai da posicao que o servidor mandou.
+            JsonValue posAtk = data.get("attacker_pos");
+            float origemX = Float.NaN, origemY = Float.NaN;
+            if (atacante != null) { origemX = atacante.x; origemY = atacante.y; }
+            else if (posAtk != null && posAtk.size >= 2) {
+                origemX = conversor.rawParaMundoX(posAtk.getFloat(0));
+                origemY = conversor.rawParaMundoY(posAtk.getFloat(1));
+            }
+            if ("Ranged".equals(data.getString("w_type", "")) && projetil != null && !Float.isNaN(origemX)) {
+                Projetil pr = new Projetil(projetil, origemX, origemY + 8f, mob, efeito);
                 pr.numero = numero;
                 numero.sangra = !errou && data.getInt("damage", 0) > 0;
                 projeteis.add(pr);
@@ -3725,10 +3756,11 @@ public class WorldScreen extends ScreenAdapter {
             convitesTrade.remove(data.getString("name", ""));
             convitesPartyEnviados.remove(data.getString("name", ""));
             bookMenu.removerConviteParty(data.getString("name", ""));
-            if (bookMenu.amigo(data.getString("name", "")) != null && !data.getString("name", "").equals(local.nome)) {
+            boolean silencioso = data.getBoolean("silent", false); // so' o boneco sumiu (morph acabou)
+            if (!silencioso && bookMenu.amigo(data.getString("name", "")) != null && !data.getString("name", "").equals(local.nome)) {
                 hud.notificarTipo(HudVitais.NOTIF_AMIGO, data.getString("name", "") + " is offline.", COR_NOTIF_OFF, null);
             }
-            bookMenu.definirOnline(data.getString("name", ""), false);
+            if (!silencioso) bookMenu.definirOnline(data.getString("name", ""), false);
             if (data.getString("name", "").equals(painelJogador.nomeAberto())) painelJogador.fechar();
             skinsJogadores.remove(data.getString("name", ""));
             vidaRemotos.remove(data.getString("name", ""));
@@ -4674,7 +4706,11 @@ public class WorldScreen extends ScreenAdapter {
             nomes.add(nomeVisivel(local.nome));
             // "remotos" ja' e' so' quem esta no raio da tela - os mesmos que
             // recebem as mensagens do chat Local (servidor.py::handle_c).
-            for (Jogador j : remotos.values()) nomes.add(nomeVisivel(j.nome));
+            for (Jogador j : remotos.values()) {
+                // /ghost de outro admin: nao aparece (so' se estiver possuindo um mob).
+                if (fantasmas.contains(j.nome) && !morfos.containsKey(j.nome)) continue;
+                nomes.add(nomeVisivel(j.nome));
+            }
             chat.atualizarJogadores(nomes);
         }
         atualizarVisibilidadeJoystick();
