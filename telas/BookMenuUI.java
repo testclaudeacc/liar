@@ -976,11 +976,33 @@ public final class BookMenuUI {
 
     /** "(bolsinha) 15": quanto de cap 1 unidade do item ocupa. */
     private void adicionarLinhaCap(Table bloco, EquipStats dados) {
+        adicionarLinhaValorNpc(bloco, dados);
         if (dados == null || dados.cap <= 0f) return;
         float total = dados.cap * quantidadeBloco; // pilha: cap total
         String valor = Math.abs(total - Math.round(total)) < 0.001f ? String.valueOf(Math.round(total))
             : String.format(java.util.Locale.US, "%.1f", total);
         bloco.add(linhaComIcone("ui/currency/BagIcon", valor, Color.LIGHT_GRAY)).left().row();
+    }
+
+    /** Quanto o NPC paga (pilha: o total), em moedas: "1 [ouro] 25 [prata] 15 [cobre]". */
+    private void adicionarLinhaValorNpc(Table bloco, EquipStats dados) {
+        if (dados == null) return;
+        long unidade = dados.precoVendaFixo > 0 ? dados.precoVendaFixo : dados.preco > 0 ? Math.max(1, dados.preco / 2) : 0;
+        if (unidade <= 0) return;
+        long total = unidade * quantidadeBloco;
+        Table linha = new Table();
+        for (int i = MOEDAS_TRADE.length - 1; i >= 0; i--) {
+            long q = (total / VALOR_MOEDA[i]) % (i == MOEDAS_TRADE.length - 1 ? Long.MAX_VALUE : 100L);
+            if (q <= 0) continue;
+            linha.add(linhaStat(String.valueOf(q), corMoeda(MOEDAS_TRADE[i]))).padRight(2);
+            TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[i]);
+            if (r != null) {
+                Image img = new Image(new TextureRegionDrawable(r));
+                img.setScaling(Scaling.fit);
+                linha.add(img).size(16f).padRight(6);
+            }
+        }
+        bloco.add(linha).left().padTop(2).row();
     }
 
     private static final Color COR_SET = new Color(0.7f, 0.85f, 1f, 1f); // azul do scroll

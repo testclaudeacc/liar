@@ -4534,7 +4534,8 @@ def _lancar_magia(sid, p, caminho, mob_id):
     mob_data.setdefault('hits_recentes', {})[sid] = now
     marcar_batalha(sid, p, now)
     mob_focar_agressor(mob_id, mob_data, sid)
-    # Dano: % do dano base do player (mesma base do golpe normal), sem crit/miss.
+    # Dano: % do dano base do player (mesma base do golpe normal). Pode critar
+    # (CRIT_CHANCE, dobra) mas nao erra (sem miss).
     if len(_slots_com_classe_invalida(p)) > 0:
         base_dmg = PUNICAO_CLASSE_DANO
     else:
@@ -4543,6 +4544,8 @@ def _lancar_magia(sid, p, caminho, mob_id):
     if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
     base = base_dmg * float(dados.get('spell_dmg', 100) or 100) / 100.0
     dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
+    critico = random.random() < CRIT_CHANCE
+    if critico: dano *= 2
     # Skill da magia (ex: +5 golpes de Magic): no maximo 1 vez por cooldown dela.
     skill_magia = dados.get('spell_skill')
     if skill_magia:
@@ -4553,7 +4556,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
     mob_type_id = mob_data.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
     ticks = int(dados.get('spell_bleed_ticks', 0) or 0)
     cada = float(dados.get('spell_bleed_every', 2) or 2)
-    extra = {'hit_type': dados.get('spell_hit', 'Physical'), 'is_crit': False, 'reduced': False, 'is_miss': False,
+    extra = {'hit_type': dados.get('spell_hit', 'Physical'), 'is_crit': critico, 'reduced': False, 'is_miss': False,
              'w_type': 'Melee' if dados.get('spell_range') == 'melee' else 'Ranged', 'proj': dados.get('spell_proj', '')}
     dot = dados.get('spell_dot', 'bleed')
     if ticks > 0: extra[dot + '_secs'] = ticks * cada
@@ -4593,7 +4596,9 @@ def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, 
             if m is not mob_ref or m.get('hp', 0) <= 0 or p is None or p.get('is_dead'): return
             base = base_dmg * pct / 100.0
             dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
-            _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, time.time(), dict(extra))
+            critico = random.random() < CRIT_CHANCE  # cada flecha sorteia o proprio crit
+            if critico: dano *= 2
+            _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, time.time(), {**extra, 'is_crit': critico})
             if skill: _dar_hits_skill(sid, p, skill, 1)
     except Exception: traceback.print_exc()
 
