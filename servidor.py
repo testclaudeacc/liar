@@ -77,12 +77,14 @@ MOB_DB = {
     # (range: 5 SQMs igual a arma a distancia do player, com linha de visao);
     # longe disso ela segue o player ate' alcancar de novo. "wasp2" ferroa colado.
     # proj = projetil que sai do mob; hit = efeito no player (sprites/spawn).
-    "wasp": {"name": "Venom Wasp", "hp": 115, "xp": 17, "attack": 21.5, "attack_min": 20, "attack_max": 23,
+    # speed_mult: mais rapida que o padrao do mapa (level maior). flap: a
+    # sprite "andando" toca o tempo todo (asas batendo), parada tambem.
+    "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "hp": 115, "xp": 17, "attack": 21.5, "attack_min": 20, "attack_max": 23,
              "range": 5, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
              "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                        {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
              "currency": {"min": 7, "max": 14}},
-    "wasp2": {"name": "Razor Hornet", "hp": 130, "xp": 19, "attack": 25.0, "attack_min": 23, "attack_max": 27,
+    "wasp2": {"name": "Razor Hornet", "speed_mult": 1.15, "flap": True, "hp": 130, "xp": 19, "attack": 25.0, "attack_min": 23, "attack_max": 27,
               "hit": "PoisonPhysATK",
               "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                         {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
@@ -1725,7 +1727,8 @@ def _duracao_passo_mob(m, origem, destino):
     fator = 0.5 / max(0.05, vel.get(origem, 1.0)) + 0.5 / max(0.05, vel.get(destino, 1.0))
     # Preso nas vinhas (Small Vines): anda na metade da velocidade.
     if m.get('lento_ate', 0) > time.time(): fator *= MOB_LENTO_MULT
-    return fator / max(0.1, float(m.get('speed', MOB_SPEED_PADRAO)))
+    mult = float(MOB_DB.get(m.get('type_id'), {}).get('speed_mult', 1.0) or 1.0)  # mob de level maior: um pouco mais rapido
+    return fator / max(0.1, float(m.get('speed', MOB_SPEED_PADRAO)) * mult)
 
 def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
     # ate_adjacente: perseguindo um player (para em volta dele, ver
@@ -3255,7 +3258,8 @@ def handle_join_game(data):
         extra_admin = {'admin_commands': [{'cmd': c, 'usage': u, 'desc': d} for c, u, d in ADMIN_COMANDOS],
                        'admin_args': argumentos_admin()} if eh_admin(data) else {}
         emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(),
-                                        'mob_names': {t: i.get('name', t.capitalize()) for t, i in MOB_DB.items()}, 'soul': eh_alma(data), 'admin': eh_admin(data),
+                                        'mob_names': {t: i.get('name', t.capitalize()) for t, i in MOB_DB.items()},
+                                        'mob_flap': [t for t, i in MOB_DB.items() if i.get('flap')], 'soul': eh_alma(data), 'admin': eh_admin(data),
                                    'ghost': admin_ghost(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)

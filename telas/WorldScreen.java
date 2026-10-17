@@ -339,6 +339,33 @@ public class WorldScreen extends ScreenAdapter {
         return n != null ? n : Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1);
     }
 
+    /** Mobs que voam (MOB_DB "flap"): a sprite andando toca o tempo todo, 2x mais rapido. */
+    private final java.util.Set<String> mobsBateAsas = new java.util.HashSet<>();
+    private static final float QUADRO_ASAS_SEG = 0.1f;
+
+    private void definirMobsBateAsas(JsonValue tipos) {
+        mobsBateAsas.clear();
+        if (tipos == null) return;
+        for (JsonValue t = tipos.child; t != null; t = t.next) mobsBateAsas.add(t.asString().toLowerCase());
+    }
+
+    /** Quadro do mob agora: os que voam batem as asas sem parar (cada um num ritmo defasado). */
+    private TextureRegion quadroDoMob(MobVisual mob) {
+        if (!mob.morto && mobsBateAsas.contains(tipoDoIdMob(mob.id))) return quadroAsas(mob.animacao, mob.direcao, mob.id.hashCode());
+        return quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
+    }
+
+    private TextureRegion quadroAsas(AnimacaoCorpo a, String direcao, int semente) {
+        long passo = (com.badlogic.gdx.utils.TimeUtils.millis() + (semente & 0xff)) / (long) (QUADRO_ASAS_SEG * 1000f);
+        int i = (int) (passo % 2);
+        switch (direcao) {
+            case "up": return a.andarCima[i];
+            case "left": return a.andarEsquerda[i];
+            case "right": return a.andarDireita[i];
+            default: return a.andarBaixo[i];
+        }
+    }
+
     private void definirNomesMobs(JsonValue nomes) {
         if (nomes == null) return;
         for (JsonValue e = nomes.child; e != null; e = e.next) nomesMobs.put(e.name.toLowerCase(), e.asString());
@@ -2558,7 +2585,7 @@ public class WorldScreen extends ScreenAdapter {
             // Alvo possuindo um mob: a foto e' o mob, nao o boneco.
             AnimacaoCorpo animMorphAlvo = nomeFixo == null && j != null ? animacaoMorph(j.nome) : null;
             if (mob != null && !mob.morto) {
-                quadros.add(quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso));
+                quadros.add(quadroDoMob(mob));
                 cores.add(Color.WHITE);
             } else if (animMorphAlvo != null) {
                 quadros.add(quadroAtual(animMorphAlvo, j.movendo, j.direcao, j.progresso()));
@@ -3171,6 +3198,7 @@ public class WorldScreen extends ScreenAdapter {
                 hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
                 bookMenu.carregarItemDb(data.get("item_db"));
                 definirNomesMobs(data.get("mob_names"));
+                definirMobsBateAsas(data.get("mob_flap"));
                 bookMenu.atualizarInventario(data.get("inventory"));
                 if (data.has("hotbar")) bookMenu.definirHotbar(data.get("hotbar"));
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
@@ -5317,7 +5345,9 @@ public class WorldScreen extends ScreenAdapter {
         // Possuindo um mob: desenha o mob no lugar do boneco (solido, mesmo no ghost).
         AnimacaoCorpo animMob = animacaoMorph(j.nome);
         if (animMob != null) {
+            String tipoMorph = morfos.get(j.nome);
             TextureRegion q = estaMorto(j) && animMob.morte != null ? animMob.morte
+                : tipoMorph != null && mobsBateAsas.contains(tipoMorph) ? quadroAsas(animMob, j.direcao, j.nome.hashCode())
                 : quadroAtual(animMob, j.movendo, j.direcao, j.progresso());
             float lm = q.getRegionWidth() * ESCALA_SPRITE, am = q.getRegionHeight() * ESCALA_SPRITE;
             batch.draw(q, ancoraX - lm / 2f, ancoraY, lm, am);
@@ -5453,7 +5483,7 @@ public class WorldScreen extends ScreenAdapter {
     private void desenharMob(MobVisual mob) {
         if (!mob.visivel || (mob.morto && mob.tempoCorpo <= 0f)) return;
         TextureRegion quadro = mob.morto ? mob.quadroMorto
-            : quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
+            : quadroDoMob(mob);
         // Mob 32x32 (ou maior): mais largo, centralizado no SQM do mesmo jeito.
         float largura = quadro.getRegionWidth() * ESCALA_SPRITE;
         float altura = quadro.getRegionHeight() * ESCALA_SPRITE;
@@ -6349,7 +6379,7 @@ public class WorldScreen extends ScreenAdapter {
     /** Nome do mob acima da barra de vida, na cor da vida (verde -> vermelho). */
     private void desenharNomeMob(MobVisual mob) {
         if (!mob.visivel || mob.morto) return;
-        TextureRegion quadro = quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
+        TextureRegion quadro = quadroDoMob(mob);
         float altura = quadro.getRegionHeight() * ESCALA_SPRITE;
         float ancoraX = Math.round(mob.x / camera.zoom) * camera.zoom;
         float ancoraY = Math.round(mob.y / camera.zoom) * camera.zoom;
