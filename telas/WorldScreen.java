@@ -315,6 +315,7 @@ public class WorldScreen extends ScreenAdapter {
     private float esperaAtaque = 0f;
     /** Velocidade de ataque (servidor: sync_stats "atk_speed"; /atkspd do admin). */
     private float multAtaque = 1f;
+    private long ultimaSkillAtaqueMs = 0L; // TimeUtils.millis() do ultimo register_skill_hit do ataque basico
     /** Possuindo um mob (/ghost + botao direito): intervalo e efeito do golpe dele (sync_stats). */
     private float morphCooldown = 0f;
     private String morphHit = "";
@@ -522,6 +523,7 @@ public class WorldScreen extends ScreenAdapter {
     private static final float DURACAO_QUADRO_HIT_FLECHA = 0.05f;
     private static final float DURACAO_QUADRO_HIT_ESPADA = 0.06f; // corte do Knight (e o Heavy Cut)
     private static final float DURACAO_QUADRO_HIT_FOGO = 0.08f; // ui/FireAnimation (Igniculus)
+    private static final float DURACAO_QUADRO_HIT_MORDIDA = 0.13f; // sprites/spawn/BiteAtk (Wolf) - mais lenta, pesada
     private final List<Efeito> efeitos = new ArrayList<>();
     private final Map<String, TextureRegion[]> cacheEfeitos = new HashMap<>();
 
@@ -3313,7 +3315,7 @@ public class WorldScreen extends ScreenAdapter {
             // Id do servidor: o mob_died que vem logo depois (bag de loot) acha o cadaver.
             String id = data.getString("corpse_id", "corpo_morph_" + nome + "_" + System.currentTimeMillis());
             MobVisual corpo = new MobVisual(id, nomeDoTipoMob(tipo), cx, cy,
-                criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+                criarAnimacao(sprite), quadroMorte(sprite));
             corpo.tipo = tipo.toLowerCase();
             corpo.morto = true;
             corpo.hp = 0f;
@@ -5308,7 +5310,27 @@ public class WorldScreen extends ScreenAdapter {
         a.andarEsquerda = regioes(tex, FRAME_ANDAR_ESQUERDA);
         a.andarDireita = regioes(tex, FRAME_ANDAR_DIREITA);
         if (tex.getRegionWidth() >= (FRAME_MORTE + 1) * larguraQuadro(tex)) a.morte = regiao(tex, FRAME_MORTE);
+        if (quadrosNaSheet(tex) == QUADROS_SHEET_LADOS_EXTRA) {
+            // Sheet de 13 (ex: SpiderMushroom): esquerda/direita com 2 quadros
+            // de andar proprios (idle, andar1, andar2) em vez de idle + 1.
+            a.idleEsquerda = regiao(tex, 6);
+            a.andarEsquerda = regioes(tex, new int[] {7, 8});
+            a.idleDireita = regiao(tex, 9);
+            a.andarDireita = regioes(tex, new int[] {10, 11});
+            a.morte = regiao(tex, 12);
+        }
         return a;
+    }
+
+    private static final int QUADROS_SHEET_LADOS_EXTRA = 13;
+
+    private static int quadrosNaSheet(TextureRegion tex) {
+        return tex.getRegionWidth() / larguraQuadro(tex);
+    }
+
+    /** Quadro do cadaver: o ultimo da sheet de 13, senao FRAME_MORTE. */
+    private TextureRegion quadroMorte(TextureRegion tex) {
+        return regiao(tex, quadrosNaSheet(tex) == QUADROS_SHEET_LADOS_EXTRA ? 12 : FRAME_MORTE);
     }
 
     /** Escolhe o quadro certo (parado/andando x 4 direcoes) pro instante
@@ -5371,7 +5393,7 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion sprite = spriteDoMob(tipo);
         if (sprite == null) return atual;
         MobVisual novo = new MobVisual(id, nomeDoTipoMob(tipo), atual != null ? atual.x : 0f, atual != null ? atual.y : 0f,
-            criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+            criarAnimacao(sprite), quadroMorte(sprite));
         novo.tipo = tipo.toLowerCase();
         if (atual != null) {
             novo.hp = atual.hp; novo.maxHp = atual.maxHp; novo.morto = atual.morto;
@@ -5389,7 +5411,7 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion sprite = spriteDoMob(tipoMob);
         if (sprite == null) return null;
         String nomeMob = nomeDoTipoMob(tipoMob);
-        MobVisual mob = new MobVisual(id, nomeMob, 0f, 0f, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+        MobVisual mob = new MobVisual(id, nomeMob, 0f, 0f, criarAnimacao(sprite), quadroMorte(sprite));
         mob.tipo = tipoMob.toLowerCase();
         mobs.put(id, mob);
         return mob;
@@ -5542,7 +5564,7 @@ public class WorldScreen extends ScreenAdapter {
             Gdx.app.log("WorldScreen", "Mob criado: " + id + " (spawn_range=" + spawn.spawnRange
                 + ", respawn_time=" + spawn.respawnTime + ")");
             String nome = nomeDoTipoMob(spawn.mobId);
-            MobVisual novo = new MobVisual(id, nome, spawn.worldX, spawn.worldY, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+            MobVisual novo = new MobVisual(id, nome, spawn.worldX, spawn.worldY, criarAnimacao(sprite), quadroMorte(sprite));
             novo.tipo = spawn.mobId.toLowerCase();
             mobs.put(id, novo);
         }
@@ -5554,6 +5576,13 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion sprite = atlas.findRegion("sprites/mobs/" + mobId);
         if (sprite == null && !mobId.isEmpty()) {
             sprite = atlas.findRegion("sprites/mobs/" + Character.toUpperCase(mobId.charAt(0)) + mobId.substring(1));
+        }
+        if (sprite == null && !mobId.isEmpty()) {
+            // Tipo do servidor vem minusculo ("spidermushroom" -> SpiderMushroom).
+            String alvo = "sprites/mobs/" + mobId;
+            for (TextureAtlas.AtlasRegion r : atlas.getRegions()) {
+                if (r.name.equalsIgnoreCase(alvo)) { sprite = r; break; }
+            }
         }
         return sprite;
     }
@@ -5666,6 +5695,7 @@ public class WorldScreen extends ScreenAdapter {
             case "PhysATK": tira = atlas.findRegion("sprites/spawn/PhysATK"); break;   // mob fisico no player
             case "PoisonCloud": tira = atlas.findRegion("sprites/spawn/PoisonCloud"); break;     // Venom Wasp (cuspe)
             case "PoisonPhysATK": tira = atlas.findRegion("sprites/spawn/PoisonPhysATK"); break; // Razor Hornet (ferrao)
+            case "BiteAtk": tira = atlas.findRegion("sprites/spawn/BiteAtk"); break;             // Wolf (mordida)
             default: tira = atlas.findRegion("ui/items/Physical"); break;
         }
         if (tira == null) tira = atlas.findRegion("ui/items/Physical");
@@ -5695,6 +5725,7 @@ public class WorldScreen extends ScreenAdapter {
         // Mana (sprite novo, 7 quadros) na mesma velocidade do fogo.
         e.duracaoQuadro = "Fire".equals(nome) || "Mana".equals(nome) ? DURACAO_QUADRO_HIT_FOGO
             : "Arrow".equals(nome) ? DURACAO_QUADRO_HIT_FLECHA
+            : "BiteAtk".equals(nome) ? DURACAO_QUADRO_HIT_MORDIDA
             : "Sword".equals(nome) || "SwordInv".equals(nome) ? DURACAO_QUADRO_HIT_ESPADA
             : rapido ? DURACAO_QUADRO_HIT_RAPIDO : DURACAO_QUADRO_HIT;
         efeitos.add(e);
@@ -5784,6 +5815,8 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Efeito e projetil de cada classe (o servidor repassa pros outros clients). */
     private String efeitoDaClasse() {
+        String daArma = bookMenu.efeitoArmaEquipada(); // ex: Ruby Staff = fogo
+        if (daArma != null && !daArma.isEmpty()) return daArma;
         switch (local.classe) {
             case "Mage": return "Mana";
             case "Bard": return "Music1";
@@ -5793,6 +5826,8 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private String projetilDaClasse() {
+        String daArma = bookMenu.projetilArmaEquipada();
+        if (daArma != null && !daArma.isEmpty()) return daArma;
         switch (local.classe) {
             case "Mage": return "res://ui/items/Mana_2.png";
             case "Bard": return "res://ui/items/Music1_1.png";
@@ -6274,6 +6309,11 @@ public class WorldScreen extends ScreenAdapter {
         }));
         esperaAtaque = INTERVALO_ATAQUE / multAtaque;
         // Progresso da skill principal da classe (o servidor conta e avisa o level up).
+        // Arma rapida (adaga 1.5x): a skill sobe no ritmo normal, nao a cada golpe.
+        long agoraMs = com.badlogic.gdx.utils.TimeUtils.millis();
+        float multArma = bookMenu.velocidadeArmaEquipada();
+        if (multArma > 1f && agoraMs - ultimaSkillAtaqueMs < (long) ((INTERVALO_ATAQUE * multArma / multAtaque - 0.05f) * 1000f)) return;
+        ultimaSkillAtaqueMs = agoraMs;
         String skill = skillDaClasse();
         socket.emitRaw("register_skill_hit", GameSocket.obj(jw -> jw.set("skill", skill)));
     }

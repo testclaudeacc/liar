@@ -424,6 +424,8 @@ public final class BookMenuUI {
 
         final boolean treino;  // arma de treino (servidor.py::dano_arma_treino)
         final int economiaFlecha; // % de chance de nao gastar flecha
+        final float velocidadeAtaque; // "atk_speed" (Basic Dagger = 1.5); 1 = normal
+        final String efeitoAtaque, projetilAtaque; // "atk_hit"/"atk_proj": no lugar do da classe (Ruby Staff = fogo)
         final String conjunto; // set (ex: "Outlander"); null = nenhum
         final int conjuntoXp;  // % de XP extra com o set completo
 
@@ -443,6 +445,9 @@ public final class BookMenuUI {
             this.magiaSlot = d.getString("spell_slot", "orange");
             this.treino = d.getBoolean("training", false);
             this.economiaFlecha = d.getInt("ammo_save", 0);
+            this.velocidadeAtaque = d.getFloat("atk_speed", 1f);
+            this.efeitoAtaque = d.getString("atk_hit", null);
+            this.projetilAtaque = d.getString("atk_proj", null);
             this.conjunto = d.getString("set", null);
             this.conjuntoXp = d.getInt("set_xp", 0);
             this.cap = d.getFloat("cap", 0f);
@@ -863,6 +868,30 @@ public final class BookMenuUI {
         return tipo;
     }
 
+    private String skillDaMinhaClasse() { return quartoStatExibido("Class"); }
+
+    /** Arma da mao principal: efeito/projetil do ataque basico (null = o da classe). */
+    public String efeitoArmaEquipada() {
+        EquipStats d = armaEquipada();
+        return d == null ? null : d.efeitoAtaque;
+    }
+
+    public String projetilArmaEquipada() {
+        EquipStats d = armaEquipada();
+        return d == null ? null : d.projetilAtaque;
+    }
+
+    /** "atk_speed" da arma equipada (1 = normal). */
+    public float velocidadeArmaEquipada() {
+        EquipStats d = armaEquipada();
+        return d == null ? 1f : d.velocidadeAtaque;
+    }
+
+    private EquipStats armaEquipada() {
+        String caminho = equippedItemPaths.get("MainHand");
+        return caminho == null ? null : ITEM_STATS.get(caminho);
+    }
+
     private static Color corQuartoStat(String tipo) {
         if (tipo == null) return Color.WHITE;
         switch (tipo) {
@@ -970,7 +999,16 @@ public final class BookMenuUI {
         String quarto = quartoStatExibido(dados.fourthStatType);
         if (quarto != null) {
             int anterior = base != null && quarto.equals(quartoStatExibido(base.fourthStatType)) ? base.fourthStatValue : 0;
-            adicionarLinhaStat(bloco, quarto, dados.fourthStatValue, anterior, comparar, corQuartoStat(quarto));
+            // ADC de outra classe (ex: Ruby Ring de Focus num Knight) nao conta: cinza.
+            Color corAdc = quarto.equals(skillDaMinhaClasse()) ? corQuartoStat(quarto) : Color.GRAY;
+            adicionarLinhaStat(bloco, quarto, dados.fourthStatValue, anterior, comparar, corAdc);
+        }
+        // Arma rapida (adaga): espadinha + quanto mais rapido bate.
+        if (dados.velocidadeAtaque != 1f) {
+            String mult = Math.abs(dados.velocidadeAtaque - Math.round(dados.velocidadeAtaque)) < 0.01f
+                ? String.valueOf(Math.round(dados.velocidadeAtaque))
+                : String.format(java.util.Locale.US, "%.1f", dados.velocidadeAtaque);
+            bloco.add(linhaComIcone("ui/items/StarterSword", mult + "x Atk Speed", Color.WHITE)).left().row();
         }
         // Mana gasta por ataque (varinha). Sem "(+n)": nao e' bonus, e' custo.
         if (dados.manaCost > 0) bloco.add(linhaStat(dados.manaCost + " Mana per hit", COR_MANA)).left().row();

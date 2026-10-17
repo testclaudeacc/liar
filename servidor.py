@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.41"
+SERVER_VERSION = "v0.42"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -90,6 +90,21 @@ MOB_DB = {
               "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                         {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
               "currency": {"min": 7, "max": 14}},
+    # Hunt 10-15 (tabela por caverna): Mushroom Spider = melee comum, Wolf = forte.
+    # "one_of": UMA rolagem com essa chance; se cair, sorteia um item da lista
+    # (anel/colar de Ruby com ADC aleatorio).
+    "spidermushroom": {"name": "Mushroom Spider", "hp": 200, "xp": 22, "attack": 34.0, "attack_min": 32, "attack_max": 36,
+                       "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.05},
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.01},
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.01}],
+                       "currency": {"min": 10, "max": 18}},
+    "wolf": {"name": "Wolf", "speed_mult": 1.15, "hp": 260, "xp": 28, "attack": 39.0, "attack_min": 37, "attack_max": 41, "hit": "BiteAtk",
+             "drops": [{"item": "res://sprites/items/Materials/WolfFur.tres", "chance": 0.05},
+                       {"item": "res://sprites/items/Knight/Weapons/BasicDagger.tres", "chance": 0.01},
+                       {"item": "res://sprites/items/Mage/Weapons/RubyStaff.tres", "chance": 0.01},
+                       {"item": "res://sprites/items/Bard/Weapons/WoodenRattle.tres", "chance": 0.01},
+                       {"item": "res://sprites/items/Ranger/Weapons/IronBow.tres", "chance": 0.01}],
+             "currency": {"min": 12, "max": 22}},
 }
 
 # ---------------------------------------------------------------------------
@@ -130,11 +145,14 @@ def montar_bestiario(p):
         if nivel >= 3:
             loot = []
             for d in info.get("drops", []):
-                item = validate_item(d.get("item"))
-                if not item: continue
-                linha = {"item": item}
-                if nivel >= 4: linha["chance"] = float(d.get("chance", 0.0))
-                loot.append(linha)
+                # "one_of": cada variacao aparece com a chance dividida entre elas.
+                opcoes = d.get("one_of") or [d.get("item")]
+                for opcao in opcoes:
+                    item = validate_item(opcao)
+                    if not item: continue
+                    linha = {"item": item}
+                    if nivel >= 4: linha["chance"] = float(d.get("chance", 0.0)) / len(opcoes)
+                    loot.append(linha)
             e["loot"] = loot
             faixa = info.get("currency") or {}
             if int(faixa.get("max", 0) or 0) > 0:
@@ -271,7 +289,8 @@ def rolar_loot(mob_type_id):
     drops = MOB_DB.get(mob_type_id, {}).get("drops", [])
     itens_rolados = []
     for entrada in drops:
-        item_path = validate_item(entrada.get("item"))
+        opcoes = entrada.get("one_of")
+        item_path = validate_item(random.choice(opcoes) if opcoes else entrada.get("item"))
         if not item_path:
             continue
         chance = float(entrada.get("chance", 0.0))
@@ -413,6 +432,25 @@ ITEM_DB = {
     "res://sprites/items/Ranger/Weapons/RawBow.tres": {"name": "Raw Bow", "type": "Bow", "slot": "MainHand", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "training": True, "ammo_save": 30, "price": 1000, "icon": "sheet/r93_c10", "cap": 15.0},
     # Set Outlander (loja do Luke): todas as classes, level 10. "set" junta as
     # pecas; com todas equipadas da' "set_xp"% de XP extra (bonus_xp_set).
+    # Hunt lv 10-15 (Mushroom Spider / Wolf). Anel/colar: o drop sorteia o ADC
+    # (uma variacao por skill, mesmo nome/icone - ver "one_of" no MOB_DB).
+    "res://sprites/items/Jewelry/RubyRingMelee.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5},
+    "res://sprites/items/Jewelry/RubyRingMagic.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Magic", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5},
+    "res://sprites/items/Jewelry/RubyRingFocus.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5},
+    "res://sprites/items/Jewelry/RubyRingMusicality.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5},
+    "res://sprites/items/Jewelry/RubyNecklaceMelee.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
+    "res://sprites/items/Jewelry/RubyNecklaceMagic.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Magic", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
+    "res://sprites/items/Jewelry/RubyNecklaceFocus.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
+    "res://sprites/items/Jewelry/RubyNecklaceMusicality.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
+    # Armas lv 10: 6 de ADC e 2 de Atk (o dobro de uma peca de set). Basic Dagger:
+    # metade do ADC de uma espada, mas bate 1.5x mais rapido ("atk_speed").
+    "res://sprites/items/Knight/Weapons/BasicDagger.tres": {"name": "Basic Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 10, "req_class": "Knight", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "atk_speed": 1.5, "price": 1000, "icon": "sheet/r98_c3", "cap": 8.0},
+    # atk_hit/atk_proj: efeito e projetil do ataque basico (no lugar do da classe).
+    "res://sprites/items/Mage/Weapons/RubyStaff.tres": {"name": "Ruby Staff", "type": "Staff", "slot": "MainHand", "req_level": 10, "req_class": "Mage", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Magic", "fourth_stat_value": 6, "mana_cost": 5, "atk_hit": "Fire", "atk_proj": "res://ui/FireProjectile.png", "price": 1000, "icon": "sheet/r104_c8", "cap": 15.0},
+    "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "mana_cost": 2, "price": 1000, "icon": "sheet/r110_c1", "cap": 10.0},
+    "res://sprites/items/Ranger/Weapons/IronBow.tres": {"name": "Iron Bow", "type": "Bow", "slot": "MainHand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r93_c9", "cap": 15.0},
+    "res://sprites/items/Materials/WolfFur.tres": {"name": "Wolf Fur", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 15, "icon": "ui/Wolf_Fur", "stackable": True, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Food/RedMushroom.tres": {"name": "Red Mushroom", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 1, "regen_hp": 1, "regen_mp": 0, "regen_seg": 10, "sound": "*Munch*", "sell_price": 5, "icon": "ui/Red Mushroom", "stackable": True, "max_stack": 9999, "cap": 0.1},
     "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 10.0},
     "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Chest", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 15.0},
     "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 5.0},
@@ -441,7 +479,8 @@ CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage",
                        "regen_hp", "regen_mp", "regen_seg", "price", "sell_price", "set", "set_xp", "training", "ammo_save",
                        "spell", "spell_mana", "spell_cd", "spell_dmg", "spell_desc", "spell_area",
                        "spell_bleed_ticks", "spell_bleed_pct", "spell_bleed_every", "spell_slot",
-                       "spell_hits", "spell_hit_every", "spell_dot", "spell_slow")
+                       "spell_hits", "spell_hit_every", "spell_dot", "spell_slow",
+                       "atk_speed", "atk_hit", "atk_proj")
 
 def montar_item_db_cliente():
     db = {}
@@ -504,11 +543,17 @@ def montar_kit_inicial(class_name):
         if item_path: inventory.append(criar_instancia_item(item_path, qty))
     return inventory, equipped
 
-def obter_dados_item(item_path):
+# Skill que cada ADC alimenta por classe: o ADC so' conta pra quem tem essa
+# skill ("Class" vale pra todos; Magic tambem vale pro Bard, que usa os sets do Mage).
+ADC_DA_CLASSE = {"Knight": ("Melee",), "Mage": ("Magic",), "Ranger": ("Focus",), "Bard": ("Musicality", "Magic")}
+
+def obter_dados_item(item_path, classe=None):
     dados = ITEM_DB.get(item_path, {})
     bonus_damage = dados.get("bonus_damage", 0)
     adc_type = dados.get("fourth_stat_type", "None")
     adc_value = dados.get("fourth_stat_value", 0)
+    if classe and adc_type not in ("None", "Class") and adc_type not in ADC_DA_CLASSE.get(classe, (adc_type,)):
+        adc_value = 0  # ex: Ruby Ring de Focus num Knight
     if adc_type != "None" and adc_value:
         bonus_damage += adc_value * FOURTH_STAT_MULTIPLIERS.get(adc_type, 0.0)
     return {
@@ -537,12 +582,12 @@ def bonus_xp_set(p):
             total += float(ITEM_DB[do_set[0]].get('set_xp', 0))
     return total
 
-def somar_bonus_combate_equipados(equipped_items):
+def somar_bonus_combate_equipados(equipped_items, classe=None):
     total = {"bonus_damage": 0, "bonus_defense": 0.0, "bonus_hp": 0.0, "bonus_mp": 0.0}
     if not isinstance(equipped_items, dict): return total
     for inst in equipped_items.values():
         if not isinstance(inst, dict): continue
-        dados = obter_dados_item(inst.get("item"))
+        dados = obter_dados_item(inst.get("item"), classe)
         total["bonus_damage"] += dados.get("bonus_damage", 0)
         total["bonus_defense"] += dados.get("bonus_defense", 0.0)
         total["bonus_hp"] += dados.get("bonus_hp", 0.0)
@@ -623,6 +668,14 @@ def custo_mana_arma(p):
 def arma_principal(p):
     inst = p.get('equipped_items', {}).get('MainHand')
     return ITEM_DB.get(inst.get('item'), {}) if isinstance(inst, dict) else {}
+
+def mult_ataque(p):
+    """Velocidade do ataque basico: /atkspd do admin x "atk_speed" da arma
+    (Basic Dagger = 1.5). Possuindo um mob vale so' o do admin (golpe do mob)."""
+    mult = admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
+    if morph_de(p): return mult
+    try: return mult * max(0.1, float(arma_principal(p).get('atk_speed', 1.0) or 1.0))
+    except (TypeError, ValueError): return mult
 
 # Arma de treino: 1% do HP maximo do alvo, ignorando defesa; em mob no
 # maximo TREINO_DANO_MAX_MOB (num boss nao bate mais que um set normal).
@@ -795,7 +848,7 @@ def _montar_payload_sync_stats(p):
     p_class = p.get('class_name', 'Knight')
     level = p.get('level', 1)
     skills = p.get('skills', {})
-    bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}))
+    bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}), p.get('class_name'))
     punido = len(_slots_com_classe_invalida(p)) > 0
     new_dmg, new_def = calc_player_stats(p_class, level, skills, bonus_dmg=bonus_itens['bonus_damage'], bonus_def=bonus_itens['bonus_defense'])
     hp_bonus, mp_bonus, speed_multiplier = calc_level_bonuses(level, p_class)
@@ -817,7 +870,7 @@ def _montar_payload_sync_stats(p):
         # Velocidade de andar pelo level (o client multiplica no passo).
         'move_speed': mult_velocidade_level(p),
         # Velocidade de ataque (1 = normal; /atkspd do admin).
-        'atk_speed': admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX),
+        'atk_speed': mult_ataque(p),
         # Possuindo um mob (morph): intervalo e efeito do golpe dele (0/"" = normal).
         'morph_cd': float((p.get('morph') or {}).get('cooldown', 0)) if isinstance(p.get('morph'), dict) else 0.0,
         'morph_hit': (p.get('morph') or {}).get('hit', '') if isinstance(p.get('morph'), dict) else '',
@@ -840,7 +893,7 @@ def calcular_max_vitais(p):
     p_class = p.get('class_name', 'Knight')
     level = p.get('level', 1)
     hp_bonus_nivel, mp_bonus_nivel, _ = calc_level_bonuses(level, p_class)
-    bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}))
+    bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}), p.get('class_name'))
     max_hp = BASE_MAX_HP + hp_bonus_nivel + bonus_itens['bonus_hp']
     max_mp = BASE_MAX_MP + mp_bonus_nivel + bonus_itens['bonus_mp']
     return max_hp, max_mp
@@ -1832,7 +1885,7 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
         a_min, a_max = a_min * ataque / base_tipo, a_max * ataque / base_tipo
     golpe = random.uniform(a_min, a_max)
     p_class = target_player.get('class_name', 'Knight')
-    bonus_itens = somar_bonus_combate_equipados(target_player.get('equipped_items', {}))
+    bonus_itens = somar_bonus_combate_equipados(target_player.get('equipped_items', {}), target_player.get('class_name'))
     _, def_value = calc_player_stats(p_class, target_player.get('level', 1), target_player.get('skills', {}), bonus_def=bonus_itens['bonus_defense'])
     critico = False
     if random.random() < BLOCK_CHANCE:
@@ -2018,7 +2071,7 @@ def handle_hit_morph(data):
             ta = tile_de(alvo.get('pos_x', 0), alvo.get('pos_y', 0))
             if max(abs(tp[0] - ta[0]), abs(tp[1] - ta[1])) > 2: return
         now = time.time()
-        cd = ATAQUE_COOLDOWN_SEG / admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
+        cd = ATAQUE_COOLDOWN_SEG / mult_ataque(p)
         if now - p.get('last_attack_time', 0) < cd - min(0.1, cd * 0.3): return
         p['last_attack_time'] = now
         hit_type = str(data.get('hit_type', 'physical_hit'))[:80]
@@ -2031,7 +2084,7 @@ def handle_hit_morph(data):
         if len(_slots_com_classe_invalida(p)) > 0:
             base_dmg = PUNICAO_CLASSE_DANO
         else:
-            bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}))
+            bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}), p.get('class_name'))
             base_dmg, _ = calc_player_stats(p.get('class_name', 'Knight'), p.get('level', 1), p.get('skills', {}), bonus_dmg=bonus_itens['bonus_damage'])
         if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
         min_dano = max(1, int(base_dmg * 0.85))
@@ -4600,7 +4653,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
     if len(_slots_com_classe_invalida(p)) > 0:
         base_dmg = PUNICAO_CLASSE_DANO
     else:
-        bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}))
+        bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}), p.get('class_name'))
         base_dmg, _ = calc_player_stats(p.get('class_name', 'Knight'), p.get('level', 1), p.get('skills', {}), bonus_dmg=bonus_itens['bonus_damage'])
     if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
     base = base_dmg * float(dados.get('spell_dmg', 100) or 100) / 100.0
@@ -4715,7 +4768,7 @@ def handle_hit_mob(data):
         # Pequena folga (0.1s) pra latencia: o client manda a cada ~2.4s.
         # /atkspd do admin divide o intervalo entre golpes.
         morph = morph_de(p)
-        cd = (float(morph.get('cooldown', MOB_COOLDOWN_PADRAO)) if morph else ATAQUE_COOLDOWN_SEG) / admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
+        cd = (float(morph.get('cooldown', MOB_COOLDOWN_PADRAO)) if morph else ATAQUE_COOLDOWN_SEG) / mult_ataque(p)
         if now - p.get('last_attack_time', 0) < cd - min(0.1, cd * 0.3): return
         p['last_attack_time'] = now
         
@@ -4797,7 +4850,7 @@ def handle_hit_mob(data):
         elif len(_slots_com_classe_invalida(p)) > 0:
             base_dmg = PUNICAO_CLASSE_DANO
         else:
-            bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}))
+            bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}), p.get('class_name'))
             base_dmg, _ = calc_player_stats(p_class, p.get('level', 1), skills, bonus_dmg=bonus_itens['bonus_damage'])
         if esta_com_fome(p) and not morph: base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
         
