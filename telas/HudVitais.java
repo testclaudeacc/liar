@@ -813,6 +813,9 @@ public final class HudVitais {
      * aoClicar (pode ser null) roda ao clicar nela, ex: abrir a aba Party. */
     public void notificar(String texto, Color cor, Runnable aoClicar) {
         if (texto == null || texto.isEmpty()) return;
+        // Mesmo aviso ja' na tela ou na fila (ex: apertar a mesma coisa varias
+        // vezes seguidas): nao repete.
+        if (repetida(texto)) return;
         Notificacao n = new Notificacao(texto, cor != null ? cor : Color.WHITE, aoClicar);
         if (notificacaoAtual == null) {
             mostrarNotificacao(n);
@@ -821,6 +824,14 @@ public final class HudVitais {
         // Fila curta: se encher, descarta a mais antiga que esta esperando.
         if (filaNotificacoes.size() >= MAX_FILA_NOTIFICACOES) filaNotificacoes.pollFirst();
         filaNotificacoes.addLast(n);
+    }
+
+    private boolean repetida(String texto) {
+        if (notificacaoAtual != null && notificacaoAtual.moedas < 0 && texto.equals(notificacaoAtual.texto)) return true;
+        for (Notificacao f : filaNotificacoes) {
+            if (f.moedas < 0 && texto.equals(f.texto)) return true;
+        }
+        return false;
     }
 
     public void notificar(String texto) { notificar(texto, null, null); }

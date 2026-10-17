@@ -1435,10 +1435,8 @@ public class WorldScreen extends ScreenAdapter {
             String caminho = bookMenu.atalhos()[indice];
             // Magia: precisa de um mob mirado (vai no "target"); cooldown avisa aqui mesmo.
             if (bookMenu.ehMagia(caminho)) {
-                if (CooldownPocao.restanteMagia(caminho) > 0f) {
-                    hud.notificar(bookMenu.nomeExibicao(caminho) + " is not ready yet.", COR_NOTIF_AVISO, null);
-                    return;
-                }
+                // Em cooldown: o proprio slot ja' mostra o tempo, sem notificacao.
+                if (CooldownPocao.restanteMagia(caminho) > 0f) return;
                 MobVisual alvo = alvoMob == null ? null : mobs.get(alvoMob);
                 if (alvo == null || alvo.morto || !alvo.visivel) {
                     hud.notificar("Select a target first.", COR_NOTIF_AVISO, null);
@@ -3809,7 +3807,7 @@ public class WorldScreen extends ScreenAdapter {
             String msg;
             switch (motivo) {
                 case "level": msg = "Your level is too low to use " + nome + "."; break;
-                case "cooldown": msg = nome + " is not ready yet."; break;
+                case "cooldown": return; // o slot ja' mostra o cooldown
                 case "no_target": msg = "Select a target first."; break;
                 case "range": msg = "Your target is out of reach."; break;
                 case "pz": msg = "You can't attack in a protection zone."; break;
