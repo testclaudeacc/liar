@@ -1813,7 +1813,7 @@ def handle_morph_mob(data):
         # O mob some (fumaca), conta como morto e renasce normal depois.
         _mob_desaparece_por_perseguicao(mob_id, m, time.time())
         _avisar_morph(sid, p)
-        chat_sistema(sid, f"You possessed a {info.get('name', tipo.capitalize())}. /morph off to leave it.")
+        chat_sistema(sid, f"You possessed a {info.get('name', tipo.capitalize())}. /morph cancel to leave it.")
     except Exception: traceback.print_exc()
 
 @socketio.on('morph_attack')
@@ -3341,7 +3341,7 @@ ADMIN_COMANDOS = [
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
     ("atkspd", "/atkspd <1-50>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
     ("ghost", "/ghost on|off", "mobs te ignoram, mesmo se voce atacar (fica salvo)"),
-    ("morph", "/morph off", "sai do mob possuido (com /ghost on, botao direito num mob possui ele)"),
+    ("morph", "/morph cancel", "sai do mob possuido (com /ghost on, botao direito num mob possui ele)"),
     ("class", "/class <Knight|Ranger|Mage|Bard>", "troca sua classe (equip separado por classe; recarrega o personagem)"),
     ("fixclass", "/fixclass [nome classe]", "sem nada: lista quem parece ter virado Knight por engano; com nome e classe: corrige"),
     ("spells", "/spells reset", "esquece todas as magias aprendidas (da' pra comprar de novo)"),
@@ -3356,7 +3356,7 @@ def argumentos_admin():
     mobs = [str(i.get('name', t.capitalize())) for t, i in MOB_DB.items()]
     return {
         'summons': mobs, 'bestiary': mobs + ['clear'],
-        'soul': ['on', 'off'], 'ghost': ['on', 'off'], 'morph': ['off'],
+        'soul': ['on', 'off'], 'ghost': ['on', 'off'], 'morph': ['cancel'],
         'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'], 'spells': ['reset'],
         'class': list(CLASSES_VALIDAS),
         'fixclass': list(CLASSES_VALIDAS),
@@ -3668,6 +3668,9 @@ def comando_admin(sid, p, texto):
         chat_sistema(sid, f"Ghost {partes[1].lower()}: mobs {'ignore' if admin_ghost(p) else 'see'} you.")
         return
     if cmd == 'morph':
+        if len(partes) < 2 or partes[1].lower() not in ('cancel', 'off'):
+            chat_sistema(sid, f"Morph: {'on' if morph_de(p) else 'off'}. Usage: /morph cancel")
+            return
         if not morph_de(p):
             chat_sistema(sid, "You are not possessing a creature. With /ghost on, right-click a creature.")
             return
@@ -4620,6 +4623,7 @@ def handle_register_map(data):
         if p_reg.get('pos_x') == -1 and p_reg.get('pos_y') == -1:
             p_reg['pos_x'], p_reg['pos_y'] = _spawn_do_player(p_reg)
             marcar_movimento(sid)
+            _corrigir_posicao(sid, p_reg)  # o client nasce onde o servidor mandou
             nova_sala = get_chunk(p_reg['pos_x'], p_reg['pos_y'], 1)
             if p_reg.get('room') != nova_sala:
                 if p_reg.get('room'): leave_room(p_reg['room'])
@@ -5326,7 +5330,8 @@ def handle_request_area_sync(data):
         # Antes o client escolhia qualquer x/y/andar (teleporte livre). Agora:
         # morto -> vai pro spawn do mapa (respawn); vivo -> so' aceita um
         # ajuste pequeno (ate' 2 SQMs) da posicao que o servidor ja' conhece.
-        if p.get('is_dead'):
+        renasceu = bool(p.get('is_dead'))
+        if renasceu:
             x, y = _spawn_do_player(p)
             floor = 1
         else:
@@ -5375,6 +5380,8 @@ def handle_request_area_sync(data):
         p['room'], p['pos_x'], p['pos_y'], p['floor'] = new_room, x, y, floor
         room = new_room
         marcar_movimento(sid)
+        # Respawn: o spawn e' do servidor - o client pode ter chutado outro ponto.
+        if renasceu: _corrigir_posicao(sid, p)
         
         if not room: return
 

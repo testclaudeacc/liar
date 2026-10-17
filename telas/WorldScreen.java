@@ -334,6 +334,13 @@ public class WorldScreen extends ScreenAdapter {
         if (nome.equals(local.nome)) { alvoMob = null; amigoMarcado = null; }
     }
 
+    /** Nome do mob possuido ("rotworm" -> "Rotworm"), no lugar do nick. */
+    private String nomeDoMorph(String nome) {
+        String tipo = morfos.get(nome);
+        if (tipo == null || tipo.isEmpty()) return nomeVisivel(nome);
+        return Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1);
+    }
+
     private AnimacaoCorpo animacaoMorph(String nome) {
         String tipo = morfos.get(nome);
         if (tipo == null) return null;
@@ -879,6 +886,9 @@ public class WorldScreen extends ScreenAdapter {
         // que exista, ja que so' tem 1 cadastrado hoje. So' cai pro ponto
         // hardcoded antigo se o mapa nao tiver NENHUM SpawnPoint.
         Vector2 spawnMapa = mapa.propriedades.spawns.get("initial");
+        // Personagem novo nasce no first_temple (Decaying Realm); o servidor
+        // corrige se for outro (sync_local_player).
+        if (spawnMapa == null) spawnMapa = mapa.propriedades.spawns.get("first_temple");
         if (spawnMapa == null && !mapa.propriedades.spawns.isEmpty()) {
             spawnMapa = mapa.propriedades.spawns.values().iterator().next();
         }
@@ -5179,8 +5189,10 @@ public class WorldScreen extends ScreenAdapter {
         float ancoraY = Math.round(j.y / camera.zoom) * camera.zoom;
         float x = ancoraX - largura / 2f;
         // FriendTarget (18x18) em volta do SQM do player marcado - mesmo lugar do Target dos mobs.
-        if (j != local && j.nome.equals(amigoMarcado) && regiaoAlvoAmigo != null) {
-            batch.draw(regiaoAlvoAmigo, ancoraX - regiaoAlvoAmigo.getRegionWidth() / 2f, ancoraY - 1f);
+        // Possuindo um mob: o player marcado e' alvo de ataque - Target vermelho (o dos mobs).
+        TextureRegion marca = euMorph() && regiaoAlvo != null ? regiaoAlvo : regiaoAlvoAmigo;
+        if (j != local && j.nome.equals(amigoMarcado) && marca != null) {
+            batch.draw(marca, ancoraX - marca.getRegionWidth() / 2f, ancoraY - 1f);
         }
         // Possuindo um mob: desenha o mob no lugar do boneco (solido, mesmo no ghost).
         AnimacaoCorpo animMob = animacaoMorph(j.nome);
@@ -6350,6 +6362,9 @@ public class WorldScreen extends ScreenAdapter {
      * legivel. */
     private void desenharNome(Jogador j) {
         float altura = quadroAtual(animacaoBase, j).getRegionHeight() * ESCALA_SPRITE;
+        // Possuindo um mob: nome e altura do mob (igual desenharNomeMob).
+        AnimacaoCorpo animMob = animacaoMorph(j.nome);
+        if (animMob != null) altura = quadroAtual(animMob, j.movendo, j.direcao, j.progresso()).getRegionHeight() * ESCALA_SPRITE + 3f;
         // Mesmo snap de ancoraX/Y que desenharJogador() usa (Math.round(v/zoom)*zoom)
         // - precisa bater exatamente, senao o nome treme independente do sprite.
         float ancoraX = Math.round(j.x / camera.zoom) * camera.zoom;
@@ -6368,7 +6383,7 @@ public class WorldScreen extends ScreenAdapter {
         // acontecia por coincidencia nos raros frames em que o resto caia
         // num multiplo exato). Mesmo padrao Math.round(v/zoom)*zoom usado em
         // todo o resto do arquivo (ancoraX/Y, camera.position).
-        String nomeVisivel = nomeVisivel(j.nome);
+        String nomeVisivel = animMob != null ? nomeDoMorph(j.nome) : nomeVisivel(j.nome);
         layout.setText(font, nomeVisivel);
         float nomeXBruto = ancoraX - layout.width / 2f;
         // Gap acima da cabeca reduzido de 14 pra 4 - o +14 antigo era
