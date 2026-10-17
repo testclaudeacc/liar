@@ -463,8 +463,11 @@ ITEM_DB = {
     #   Peca de set (helm/chest/gloves/boots): ADC 3T, Armour 1T, Stamina 5T
     #   Arma (mao principal): ADC 6T, Atk 2T, Stamina/Mana 10(T+1)
     #     (Knight/Ranger: stamina; Mage: mana; Bard: metade de cada)
-    #   Segunda mao (shield/book/sheet/flecha): Defense 6T, Armour 2T, Stamina/Mana 15T
+    #   Segunda mao (shield/book/sheet/flecha): ADC 6T, Defense 6T, Armour 2T, Stamina/Mana 15T
     #     (inicial, T=0: defense/ADC 3)
+    #   Anel / colar: ADC 3T, Stamina 10T
+    #   Total por tier com tudo novo: 4x3 (set) + 2x3 (joias) + 6 (arma) + 6 (segunda
+    #   mao) = 30 de ADC = +15 de dano (ADC conta 1:2).
     #     (shield: stamina; book: mana; sheet: metade de cada)
     #   Linear de proposito: o HP/mana base do level tambem e' linear
     #   (knight +15 HP/level), entao o equipamento fica sempre ~10% do total.
