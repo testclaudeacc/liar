@@ -82,12 +82,14 @@ MOB_DB = {
     # shadow: True = sombra no chao desenhada pelo jogo (parada enquanto o corpo sobe/desce).
     "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "hp": 115, "xp": 15, "attack": 21.5, "attack_min": 20, "attack_max": 23,
              "range": 5, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
-             "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
+             "drops": [{"item": "res://sprites/items/Mage/SecondHand/CrimsonTome.tres", "chance": 0.02}, {"item": "res://sprites/items/Bard/SecondHand/AzureScore.tres", "chance": 0.02}, {"item": "res://sprites/items/Knight/SecondHand/IronboundShield.tres", "chance": 0.02},
+                       {"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                        {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
              "currency": {"min": 14, "max": 28}},
     "wasp2": {"name": "Razor Hornet", "speed_mult": 1.15, "flap": True, "hp": 130, "xp": 17, "attack": 25.0, "attack_min": 23, "attack_max": 27,
               "hit": "PoisonPhysATK",
-              "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
+              "drops": [{"item": "res://sprites/items/Mage/SecondHand/CrimsonTome.tres", "chance": 0.02}, {"item": "res://sprites/items/Bard/SecondHand/AzureScore.tres", "chance": 0.02}, {"item": "res://sprites/items/Knight/SecondHand/IronboundShield.tres", "chance": 0.02},
+                       {"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                         {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
               "currency": {"min": 14, "max": 28}},
     # Hunt 10-15 (tabela por caverna): Mushroom Spider = melee comum, Wolf = forte.
@@ -205,7 +207,7 @@ NPC_DB = {
         "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres",
         "res://sprites/spells/ArrowBarrage.tres", "res://sprites/spells/SmallVines.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
-        "res://sprites/items/Ranger/SecondHand/StarterArrow.tres",
+        "res://sprites/items/Ranger/SecondHand/StarterArrow.tres", "res://sprites/items/Ranger/SecondHand/FlintArrow.tres",
         "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
         "res://sprites/items/Bard/Weapons/RawFlute.tres", "res://sprites/items/Ranger/Weapons/RawBow.tres",
         "res://sprites/items/Outlander/OutlanderHelm.tres", "res://sprites/items/Outlander/OutlanderCape.tres",
@@ -479,6 +481,12 @@ ITEM_DB = {
     "res://sprites/items/Mage/Weapons/RubyStaff.tres": {"name": "Ruby Staff", "type": "Staff", "slot": "MainHand", "req_level": 10, "req_class": "Mage", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 20, "fourth_stat_type": "Magic", "fourth_stat_value": 6, "mana_cost": 5, "atk_hit": "Fire", "atk_proj": "res://ui/FireProjectile.png", "price": 1000, "icon": "sheet/r104_c8", "cap": 15.0},
     "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 2, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "mana_cost": 2, "price": 1000, "icon": "ui/armas/wooden rattle", "cap": 10.0},
     "res://sprites/items/Ranger/Weapons/IronBow.tres": {"name": "Iron Bow", "type": "Bow", "slot": "MainHand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 2, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r93_c9", "cap": 15.0},
+    # Segunda mao lv 10 (drop das 2 vespas, 2% cada; a flecha vende no Luke):
+    # ADC 6, Stamina/Mana 15 (shield tambem Defense 6 + Armour 2).
+    "res://sprites/items/Mage/SecondHand/CrimsonTome.tres": {"name": "Crimson Tome", "type": "Book", "slot": "Hand", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 15, "fourth_stat_type": "Magic", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r60_c10", "cap": 15.0},
+    "res://sprites/items/Bard/SecondHand/AzureScore.tres": {"name": "Azure Score", "type": "Music Sheet", "slot": "Hand", "req_level": 10, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 8, "mana": 7, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r51_c3", "cap": 15.0},
+    "res://sprites/items/Knight/SecondHand/IronboundShield.tres": {"name": "Ironbound Shield", "type": "Shield", "slot": "Hand", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 6, "armour": 2, "stamina": 15, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r71_c2", "cap": 20.0},
+    "res://sprites/items/Ranger/SecondHand/FlintArrow.tres": {"name": "Flint Arrow", "type": "Arrow", "slot": "Hand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 6, "ammo": True, "price": 2, "max_stack": 9999, "atk_proj": "res://ui/FlintArrowProjectile.png", "icon": "sheet/r90_c7", "cap": 0.1},
     "res://sprites/items/Materials/WolfFur.tres": {"name": "Wolf Fur", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 15, "icon": "ui/Wolf_Fur", "stackable": True, "max_stack": 9999, "cap": 0.1},
     "res://sprites/items/Food/RedMushroom.tres": {"name": "Red Mushroom", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 1, "regen_hp": 1, "regen_mp": 0, "regen_seg": 10, "sound": "*Munch*", "sell_price": 5, "icon": "ui/Red Mushroom", "stackable": True, "max_stack": 9999, "cap": 0.1},
     "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 10.0},

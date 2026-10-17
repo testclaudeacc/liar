@@ -876,7 +876,11 @@ public final class BookMenuUI {
 
     public String projetilArmaEquipada() {
         EquipStats d = armaEquipada();
-        return d == null ? null : d.projetilAtaque;
+        if (d != null && d.projetilAtaque != null) return d.projetilAtaque;
+        // Flecha com projetil proprio (Flint Arrow) na segunda mao.
+        String flecha = equippedItemPaths.get("Hand");
+        EquipStats f = flecha == null ? null : ITEM_STATS.get(flecha);
+        return f == null ? null : f.projetilAtaque;
     }
 
     /** "atk_speed" da arma equipada (1 = normal). */
@@ -3902,7 +3906,12 @@ public final class BookMenuUI {
             w.set("item", it.item);
             w.set("qty", v);
         }));
-        if (max == 1) {
+        // Equipamento (nao empilha): ninguem compra 2 capacetes - vai direto no
+        // "Are you sure?" do botao, 1 unidade. Janelinha de quantidade so' pra
+        // pocao/comida/flecha.
+        EquipStats dadosCompra = ITEM_STATS.get(it.item);
+        boolean umSo = max == 1 || dadosCompra == null || !dadosCompra.empilhavel;
+        if (umSo) {
             // Sem janelinha: o proprio botao pede confirmacao.
             if (!compraArmada) {
                 compraArmada = true;
