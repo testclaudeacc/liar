@@ -1127,6 +1127,8 @@ PATH_RECALC_SEG = 0.3
 LEASH_SQM = 25
 ALCANCE_RECALC_SEG = 0.5
 MOB_TICK_SEG = 0.05
+# Quanto antes do fim do passo o proximo e' decidido (> 1 tick + folga de rede).
+MOB_PASSO_ANTECIPA = 0.12
 DIR_TO_INT = {'down': 0, 'up': 1, 'left': 2, 'right': 3}
 ASTAR_LIMITE_NOS = 4000
 MOB_SPEED_PADRAO = 1.0
@@ -1765,7 +1767,8 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
     _virar_para(m, origem, proximo)
     m['pos_x'], m['pos_y'] = centro_tile(proximo)
     passo = _duracao_passo_mob(m, origem, proximo)
-    m['move_until'] = now + passo
+    # Encadeado: comeca quando o passo anterior termina (sem buraco entre eles).
+    m['move_until'] = max(now, m.get('move_until', 0)) + passo
     m['path']['caminho'] = caminho[1:]
     m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
     _mob_emitir_estado(mob_id, m, passo)
@@ -2043,7 +2046,11 @@ def _mob_tick(mob_id, m, now):
             _mob_encarar(mob_id, m, origem, t_alvo)  # a virada chega antes do ataque
             _mob_atacar(mob_id, m, alvo_sid, now)
 
-    if now < m.get('move_until', 0): return
+    # Decide o proximo passo um pouco ANTES do atual acabar (e ele comeca
+    # exatamente no fim do atual, ver _mob_dar_passo): o client ja' tem o
+    # passo seguinte na fila e o mob anda sem parar a cada SQM. Antes ele so'
+    # era decidido no 1o tick depois do fim (ate' 50ms) + a latencia da rede.
+    if now < m.get('move_until', 0) - MOB_PASSO_ANTECIPA: return
 
     if m.get('returning'):
         spawn = m['spawn']
@@ -2147,7 +2154,7 @@ def _mob_passear(mob_id, m, origem, now):
         _virar_para(m, origem, destino)
         m['pos_x'], m['pos_y'] = centro_tile(destino)
         passo = _duracao_passo_mob(m, origem, destino)
-        m['move_until'] = now + passo
+        m['move_until'] = max(now, m.get('move_until', 0)) + passo
         m['path'] = None
         m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
         _mob_emitir_estado(mob_id, m, passo)
