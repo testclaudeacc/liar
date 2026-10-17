@@ -95,15 +95,15 @@ MOB_DB = {
     # (anel/colar de Ruby com ADC aleatorio).
     "spidermushroom": {"name": "Mushroom Spider", "hp": 200, "xp": 22, "attack": 34.0, "attack_min": 32, "attack_max": 36,
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.05},
-                                 {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.01},
-                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.01}],
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02}],
                        "currency": {"min": 10, "max": 18}},
     "wolf": {"name": "Wolf", "speed_mult": 1.15, "hp": 260, "xp": 28, "attack": 39.0, "attack_min": 37, "attack_max": 41, "hit": "BiteAtk",
              "drops": [{"item": "res://sprites/items/Materials/WolfFur.tres", "chance": 0.05},
-                       {"item": "res://sprites/items/Knight/Weapons/BasicDagger.tres", "chance": 0.01},
-                       {"item": "res://sprites/items/Mage/Weapons/RubyStaff.tres", "chance": 0.01},
-                       {"item": "res://sprites/items/Bard/Weapons/WoodenRattle.tres", "chance": 0.01},
-                       {"item": "res://sprites/items/Ranger/Weapons/IronBow.tres", "chance": 0.01}],
+                       {"item": "res://sprites/items/Knight/Weapons/BasicDagger.tres", "chance": 0.02},
+                       {"item": "res://sprites/items/Mage/Weapons/RubyStaff.tres", "chance": 0.02},
+                       {"item": "res://sprites/items/Bard/Weapons/WoodenRattle.tres", "chance": 0.02},
+                       {"item": "res://sprites/items/Ranger/Weapons/IronBow.tres", "chance": 0.02}],
              "currency": {"min": 12, "max": 22}},
 }
 

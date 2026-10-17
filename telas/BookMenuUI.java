@@ -201,9 +201,9 @@ public final class BookMenuUI {
             new Color(0.125f, 0.125f, 0.125f, 0.98f), UiSkin.COR_BORDA_PAINEL, 1));
         mainWindow.pad(14);
         mainWindow.top().left();
-        tituloSecao = new Label("Bag", skin, "subtitulo");
-        capacityLabel = new Label("Capacity 0/0", skin, "hud");
-        actionStatus = new Label("", skin, "hud");
+        tituloSecao = new LabelPixel("Bag", skin.get("subtitulo", Label.LabelStyle.class));
+        capacityLabel = new LabelPixel("Capacity 0/0", skin.get("hud", Label.LabelStyle.class));
+        actionStatus = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
         construirPaginaBag(skin);
         construirPaginaEquip(skin);
         atualizarEquipados(null);
@@ -365,7 +365,7 @@ public final class BookMenuUI {
         for (String tipo : tiposMoeda) {
             Image icone = new Image(new TextureRegionDrawable(atlas.findRegion("ui/currency/" + tipo)));
             icone.setScaling(Scaling.fit);
-            Label quantidade = new Label("0", skin, "hud");
+            Label quantidade = new LabelPixel("0", skin.get("hud", Label.LabelStyle.class));
             escalarFonte(quantidade, 0.7f * FONTE_STATS);
             quantidade.setColor(corMoeda(tipo));
             moedas.add(icone).size(24).padRight(4);
@@ -1308,12 +1308,12 @@ public final class BookMenuUI {
     /** Uma linha do topo: [nome][nivel] .... [icone][barra com %]. */
     private BarraSkill criarBarraSkill(Table pai, String iconRegion, String nome, Color corTexto,
                                        Color corBarra, Color corPercentual, boolean comNivel) {
-        Label nomeLabel = new Label(nome, skin, "hud");
+        Label nomeLabel = new LabelPixel(nome, skin.get("hud", Label.LabelStyle.class));
         nomeLabel.setColor(corTexto);
         Label nivelLabel = null;
         pai.add(nomeLabel).left().width(LARGURA_NOME_SKILL);
         if (comNivel) {
-            nivelLabel = new Label("1", skin, "hud");
+            nivelLabel = new LabelPixel("1", skin.get("hud", Label.LabelStyle.class));
             nivelLabel.setColor(corTexto);
             pai.add(nivelLabel).left().expandX();
         } else {
@@ -1339,7 +1339,7 @@ public final class BookMenuUI {
         Image preenchimento = criarPreenchimentoBarra(corBarra);
         alinhador.add(preenchimento).size(0f, ALTURA_BARRA_SKILL - 2f);
         pilha.add(alinhador);
-        Label percentLabel = new Label("0%", skin, "hud");
+        Label percentLabel = new LabelPixel("0%", skin.get("hud", Label.LabelStyle.class));
         percentLabel.setColor(corPercentual);
         percentLabel.setAlignment(Align.center);
         pilha.add(percentLabel);
@@ -1546,8 +1546,8 @@ public final class BookMenuUI {
         } else {
             linha.add().size(TAMANHO_ICONE_STATUS).padRight(8);
         }
-        Label r = new Label(rotulo, skin, "hud");
-        Label v = new Label("", skin, "hud");
+        Label r = new LabelPixel(rotulo, skin.get("hud", Label.LabelStyle.class));
+        Label v = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
         linha.add(r).left().width(LARGURA_ROTULO_STATUS);
         linha.add(v).left();
         linha.padBottom(8);
@@ -1758,7 +1758,7 @@ public final class BookMenuUI {
             Image icone = iconeSkin(caminho, escolhida != null ? escolhida[1] : null);
             if (icone != null) aba.add(icone).size(36).padLeft(6).padRight(8);
             else aba.add().size(36).padLeft(6).padRight(8);
-            Label nome = new Label(nomeCategoriaVanity(cat), skin, "hud");
+            Label nome = new LabelPixel(nomeCategoriaVanity(cat), skin.get("hud", Label.LabelStyle.class));
             escalarFonte(nome, 0.8f);
             aba.add(nome).left().expandX();
             // Categoria sem nada pra essa classe fica apagada (igual a asa da print).
@@ -2211,9 +2211,9 @@ public final class BookMenuUI {
         // textos de explicacao.
         Label.LabelStyle estiloTitulo = new Label.LabelStyle(fonteBanco(), Color.WHITE);
         // Textos antigos (passos/resumo) ficam fora da tela.
-        resumoTrade = new Label("", estiloTitulo);
-        passoTrade = new Label("", estiloTitulo);
-        passoConfirm = new Label("", estiloTitulo);
+        resumoTrade = new LabelPixel("", estiloTitulo);
+        passoTrade = new LabelPixel("", estiloTitulo);
+        passoConfirm = new LabelPixel("", estiloTitulo);
 
         // ---- Tela 1: escolher itens ----
         tradeGrid.top().left();
@@ -2231,7 +2231,7 @@ public final class BookMenuUI {
         esquerda.add(tradeDetalhes).grow().top().left().pad(8).row();
         esquerda.add(botaoEnviarTrade).width(COLUNA_BAG - 14f).height(44).pad(6);
 
-        tituloTrade = new Label("", estiloTitulo);
+        tituloTrade = new LabelPixel("", estiloTitulo);
         ScrollPane scroll = new ScrollPane(tradeGrid, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
@@ -2263,10 +2263,10 @@ public final class BookMenuUI {
         esquerda2.add(confirmDetalhes).grow().top().left().pad(8).row();
         esquerda2.add(botaoAceitarTrade).width(COLUNA_BAG - 14f).height(44).pad(6);
 
-        tituloMinhaOferta = new Label("", estiloTitulo);
-        tituloOfertaOutro = new Label("", estiloTitulo);
-        statusTradeConfirm = new Label("", estiloTitulo);
-        statusMeuAceite = new Label("", estiloTitulo);
+        tituloMinhaOferta = new LabelPixel("", estiloTitulo);
+        tituloOfertaOutro = new LabelPixel("", estiloTitulo);
+        statusTradeConfirm = new LabelPixel("", estiloTitulo);
+        statusMeuAceite = new LabelPixel("", estiloTitulo);
         statusMeuAceite.setColor(COR_TRADE_SELECIONADO);
         gradeMinhaOferta.top().left();
         gradeOfertaOutro.top().left();
@@ -2460,7 +2460,7 @@ public final class BookMenuUI {
         String chave = PREFIXO_MOEDA + tipo;
         tradeDetalhes.clearChildren();
         tradeDetalhes.top().left();
-        Label nome = new Label(tipo + " Coins", skin, "hud");
+        Label nome = new LabelPixel(tipo + " Coins", skin.get("hud", Label.LabelStyle.class));
         escalarFonte(nome, 0.74f * FONTE_STATS);
         nome.setColor(corMoeda(tipo));
         tradeDetalhes.add(nome).left().padBottom(1).row();
@@ -2491,7 +2491,7 @@ public final class BookMenuUI {
         caixa.setBackground(UiSkin.retangulo(COR_POPUP_FUNDO, COR_POPUP_BORDA, 2));
         caixa.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         caixa.pad(16, 18, 16, 18);
-        Label rotulo = new Label(titulo, skin, "hud");
+        Label rotulo = new LabelPixel(titulo, skin.get("hud", Label.LabelStyle.class));
         escalarFonte(rotulo, 0.8f * FONTE_STATS);
         // Moeda: nome na cor dela (Copper laranja etc).
         for (String tipo : MOEDAS_TRADE) if (titulo.equals(tipo + " Coins")) rotulo.setColor(corMoeda(tipo));
@@ -2501,7 +2501,7 @@ public final class BookMenuUI {
         proximoPopupPedeCerteza = false;
         proximoPopupRodape = null;
         final boolean[] perguntou = {false};
-        Label limite = new Label("", skin, "hud");
+        Label limite = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
         escalarFonte(limite, 0.6f * FONTE_STATS);
         limite.setColor(Color.LIGHT_GRAY);
         final BarraQuantidade[] barraQtd = new BarraQuantidade[1];
@@ -2615,7 +2615,7 @@ public final class BookMenuUI {
     /** "Your coins:" com as moedas que o player tem (maior primeiro). */
     private Table linhaMinhasMoedas() {
         Table t = new Table();
-        Label rot = new Label("Your coins:", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.75f), Color.LIGHT_GRAY));
+        Label rot = new LabelPixel("Your coins:", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.75f), Color.LIGHT_GRAY));
         t.add(rot).padRight(8);
         boolean algum = false;
         for (int i = MOEDAS_TRADE.length - 1; i >= 0; i--) {
@@ -2628,11 +2628,11 @@ public final class BookMenuUI {
                 img.setScaling(Scaling.fit);
                 t.add(img).size(20).padRight(3);
             }
-            Label n = new Label(String.valueOf(q), new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.8f), Color.WHITE));
+            Label n = new LabelPixel(String.valueOf(q), new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.8f), Color.WHITE));
             n.setColor(corMoeda(MOEDAS_TRADE[i]));
             t.add(n).padRight(10);
         }
-        if (!algum) t.add(new Label("0", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.8f), Color.WHITE)));
+        if (!algum) t.add(new LabelPixel("0", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.8f), Color.WHITE)));
         return t;
     }
 
@@ -2921,7 +2921,7 @@ public final class BookMenuUI {
                 tradeFoco = chave;
                 confirmDetalhes.clearChildren();
                 confirmDetalhes.top().left();
-                Label nome = new Label(tipo + " Coins", skin, "hud");
+                Label nome = new LabelPixel(tipo + " Coins", skin.get("hud", Label.LabelStyle.class));
                 escalarFonte(nome, 0.74f * FONTE_STATS);
                 nome.setColor(corMoeda(tipo));
                 confirmDetalhes.add(nome).left().padBottom(1).row();
@@ -3110,9 +3110,9 @@ public final class BookMenuUI {
         scroll.setScrollingDisabled(true, false);
         scroll.setOverscroll(false, false);
 
-        bancoInfo = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
+        bancoInfo = new LabelPixel("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
         bancoInfo.setAlignment(Align.center);
-        bancoAviso = new Label("", new Label.LabelStyle(fonteBanco(), Color.valueOf("ff6a6a")));
+        bancoAviso = new LabelPixel("", new Label.LabelStyle(fonteBanco(), Color.valueOf("ff6a6a")));
         escalarFonte(bancoAviso, 0.8f);
         barraUsoBanco = new BarraUso();
         Table textoBarra = new Table();
@@ -3327,7 +3327,7 @@ public final class BookMenuUI {
         String textoBloqueado = "";
         if (moeda >= 0) {
             String tipo = MOEDAS_TRADE[moeda];
-            Label nome = new Label(tipo + " Coins", skin, "hud");
+            Label nome = new LabelPixel(tipo + " Coins", skin.get("hud", Label.LabelStyle.class));
             escalarFonte(nome, 0.74f * FONTE_STATS);
             nome.setColor(corMoeda(tipo));
             bancoDetalhes.add(nome).left().padBottom(1).row();
@@ -3490,11 +3490,11 @@ public final class BookMenuUI {
         abas.add(fechar).size(42);
 
         Label.LabelStyle estiloTexto = new Label.LabelStyle(fonteBanco(), Color.WHITE);
-        lojaAviso = new Label("", new Label.LabelStyle(fonteBanco(), Color.valueOf("ff6a6a")));
+        lojaAviso = new LabelPixel("", new Label.LabelStyle(fonteBanco(), Color.valueOf("ff6a6a")));
         lojaAviso.setFontScale(0.8f);
 
         // ---- Buy: grade + barra de capacidade ----
-        lojaInfo = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
+        lojaInfo = new LabelPixel("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
         barraCapLoja = new BarraUso();
         Table textoBarra = new Table();
         textoBarra.add(lojaInfo).center();
@@ -3516,11 +3516,11 @@ public final class BookMenuUI {
         conteudoCompra.add(new Stack(barraCapLoja, textoBarra)).growX().height(24).padTop(4);
 
         // ---- Sell: em cima o que vai vender, embaixo os meus itens ----
-        Label tituloVendendo = new Label("Selling", estiloTexto);
-        Label tituloMeus = new Label("Your items", estiloTexto);
+        Label tituloVendendo = new LabelPixel("Selling", estiloTexto);
+        Label tituloMeus = new LabelPixel("Your items", estiloTexto);
         tituloVendendo.setColor(Color.LIGHT_GRAY);
         tituloMeus.setColor(Color.LIGHT_GRAY);
-        lojaTotal = new Label("0", new Label.LabelStyle(fonteBanco(), Color.WHITE));
+        lojaTotal = new LabelPixel("0", new Label.LabelStyle(fonteBanco(), Color.WHITE));
         iconeTotalLoja = new Image();
         iconeTotalLoja.setScaling(Scaling.fit);
         botaoVender = botaoComIcone("Sell", "ui/currency/Gold", estiloPlano(COR_ABA_SELL, Color.WHITE));
@@ -3808,11 +3808,11 @@ public final class BookMenuUI {
                 img.setScaling(Scaling.fit);
                 linhaTotal.add(img).size(22).padRight(4);
             }
-            Label n = new Label(String.valueOf(q), new Label.LabelStyle(fonteBanco(), Color.WHITE));
+            Label n = new LabelPixel(String.valueOf(q), new Label.LabelStyle(fonteBanco(), Color.WHITE));
             n.setColor(corMoeda(MOEDAS_TRADE[i]));
             linhaTotal.add(n).padRight(10);
         }
-        if (!algum) linhaTotal.add(new Label("0", new Label.LabelStyle(fonteBanco(), Color.WHITE)));
+        if (!algum) linhaTotal.add(new LabelPixel("0", new Label.LabelStyle(fonteBanco(), Color.WHITE)));
         totalLoja.setActor(linhaTotal);
         botaoVender.setDisabled(total <= 0);
         if (vendaArmada) {
@@ -3977,7 +3977,7 @@ public final class BookMenuUI {
                 else sairDaParty();
             }
         });
-        bonusParty = new Label("", skin, "hud");
+        bonusParty = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
         escalarFonte(bonusParty, 0.6f);
         bonusParty.setColor(COR_BONUS);
 
@@ -4018,7 +4018,7 @@ public final class BookMenuUI {
                 () -> responderConviteParty(quem, true))).growX().height(40).padBottom(3).row();
         }
         if (ordenados.isEmpty() && convitesParty.isEmpty()) {
-            Label vazio = new Label("You are not in a party.", skin, "hud");
+            Label vazio = new LabelPixel("You are not in a party.", skin.get("hud", Label.LabelStyle.class));
             escalarFonte(vazio, 0.6f);
             listaParty.add(vazio).pad(10);
         }
@@ -4033,10 +4033,10 @@ public final class BookMenuUI {
         linha.setBackground(UiSkin.retangulo(fundo, new Color(0.12f, 0.12f, 0.12f, 1f), 1));
         linha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         if (classe != null) linha.add(iconeAtlas("ui/OnlineIcon", 26f)).size(26f).padLeft(8).padRight(8);
-        Label rotulo = new Label(nome, skin, "hud");
+        Label rotulo = new LabelPixel(nome, skin.get("hud", Label.LabelStyle.class));
         escalarFonte(rotulo, 0.75f);
         linha.add(rotulo).left().padLeft(classe != null ? 0 : 8);
-        Label lv = new Label("Lv " + level, skin, "hud");
+        Label lv = new LabelPixel("Lv " + level, skin.get("hud", Label.LabelStyle.class));
         escalarFonte(lv, 0.6f);
         lv.setColor(COR_LV);
         linha.add(lv).left().padLeft(16).expandX();
@@ -4202,7 +4202,7 @@ public final class BookMenuUI {
                 mostrarCampoAdicionar(true);
             }
         });
-        statusAmigos = new Label("", skin, "hud");
+        statusAmigos = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
         escalarFonte(statusAmigos, 0.6f);
         rodapeAmigos.add(statusAmigos).expandX().left();
         rodapeAmigos.add(remover).width(110).height(44).padRight(6);
@@ -4253,7 +4253,7 @@ public final class BookMenuUI {
         ordenados.sort((a, b) -> a.online != b.online ? (a.online ? -1 : 1) : a.nome.compareToIgnoreCase(b.nome));
         for (AmigoInfo a : ordenados) listaAmigos.add(linhaAmigo(a)).growX().height(40).padBottom(3).row();
         if (ordenados.isEmpty()) {
-            Label vazio = new Label("No friends yet.", skin, "hud");
+            Label vazio = new LabelPixel("No friends yet.", skin.get("hud", Label.LabelStyle.class));
             escalarFonte(vazio, 0.6f);
             listaAmigos.add(vazio).pad(10);
         }
@@ -4264,7 +4264,7 @@ public final class BookMenuUI {
         linha.setBackground(UiSkin.retangulo(new Color(0.17f, 0.17f, 0.17f, 1f), new Color(0.12f, 0.12f, 0.12f, 1f), 1));
         linha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         linha.add(iconeAtlas(a.online ? "ui/OnlineIcon" : "ui/OfflineIcon", 26f)).size(26f).padLeft(8).padRight(8);
-        Label nome = new Label(a.nome, skin, "hud");
+        Label nome = new LabelPixel(a.nome, skin.get("hud", Label.LabelStyle.class));
         escalarFonte(nome, 0.75f);
         linha.add(nome).expandX().left();
         if (a.seller) linha.add(iconeAtlas("ui/SellerIcon", 26f)).size(26f).padRight(4);
@@ -5249,7 +5249,7 @@ public final class BookMenuUI {
         caixa.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.3f, 0.3f, 0.3f, 1f), 1));
         caixa.top();
         caixa.add(scroll).grow().pad(4);
-        Label aviso = new Label("Rankings update every hour.", skin, "hud");
+        Label aviso = new LabelPixel("Rankings update every hour.", skin.get("hud", Label.LabelStyle.class));
         escalarFonte(aviso, 0.5f * FONTE_STATS);
         aviso.setColor(Color.GRAY);
         rankPage.add(abas).left().padBottom(6).row();
@@ -5329,7 +5329,7 @@ public final class BookMenuUI {
                     eu ? new Color(0.22f, 0.18f, 0.05f, 1f) : pos % 2 == 0 ? new Color(0.12f, 0.12f, 0.12f, 1f) : new Color(0.09f, 0.09f, 0.09f, 1f),
                     eu ? Color.valueOf("f5d328") : new Color(0.16f, 0.16f, 0.16f, 1f), 1));
                 // Top 3 em ouro/prata/bronze.
-                Label posicao = new Label("#" + pos, skin, "hud");
+                Label posicao = new LabelPixel("#" + pos, skin.get("hud", Label.LabelStyle.class));
                 escalarFonte(posicao, 0.6f * FONTE_STATS);
                 posicao.setColor(pos == 1 ? Color.valueOf("f5d328") : pos == 2 ? Color.valueOf("c8d0d8")
                     : pos == 3 ? Color.valueOf("d08a4a") : Color.GRAY);
@@ -5340,20 +5340,20 @@ public final class BookMenuUI {
                     i.setScaling(Scaling.fit);
                     linha.add(i).size(24).padRight(8);
                 }
-                Label rotuloNome = new Label(nome, skin, "hud");
+                Label rotuloNome = new LabelPixel(nome, skin.get("hud", Label.LabelStyle.class));
                 escalarFonte(rotuloNome, 0.7f * FONTE_STATS);
                 rotuloNome.setColor(com.teste.game.ChatUI.corDaClasse(classe));
                 linha.add(rotuloNome).left().expandX();
                 if (porLevel) {
-                    Label xp = new Label(formatarNumero(e.getLong("exp", 0)) + " XP", skin, "hud");
+                    Label xp = new LabelPixel(formatarNumero(e.getLong("exp", 0)) + " XP", skin.get("hud", Label.LabelStyle.class));
                     escalarFonte(xp, 0.55f * FONTE_STATS);
                     xp.setColor(Color.LIGHT_GRAY);
                     linha.add(xp).right().padRight(12);
-                    Label lv = new Label("Lv " + e.getInt("level", 1), skin, "hud");
+                    Label lv = new LabelPixel("Lv " + e.getInt("level", 1), skin.get("hud", Label.LabelStyle.class));
                     escalarFonte(lv, 0.7f * FONTE_STATS);
                     linha.add(lv).right().width(70).padRight(6);
                 } else {
-                    Label valor = new Label(String.valueOf(e.getInt("value", 10)), skin, "hud");
+                    Label valor = new LabelPixel(String.valueOf(e.getInt("value", 10)), skin.get("hud", Label.LabelStyle.class));
                     escalarFonte(valor, 0.7f * FONTE_STATS);
                     linha.add(valor).right().width(70).padRight(6);
                 }
@@ -5374,7 +5374,7 @@ public final class BookMenuUI {
             }
         }
         if (pos == 0) {
-            Label vazio = new Label("No players yet.", skin, "hud");
+            Label vazio = new LabelPixel("No players yet.", skin.get("hud", Label.LabelStyle.class));
             escalarFonte(vazio, 0.6f * FONTE_STATS);
             vazio.setColor(Color.GRAY);
             listaRank.add(vazio).padTop(20);
@@ -5510,7 +5510,7 @@ public final class BookMenuUI {
         if (tira != null) camadaImagem.add(new MobAnimado(tira)).size(SLOT_BESTIARIO * 0.62f).padTop(6);
         Table camadaNumero = new Table();
         camadaNumero.top().left();
-        Label numero = new Label(String.valueOf(id), skin, "hud");
+        Label numero = new LabelPixel(String.valueOf(id), skin.get("hud", Label.LabelStyle.class));
         escalarFonte(numero, 0.65f);
         camadaNumero.add(numero).pad(2, 4, 0, 0);
         Table camadaMedalha = new Table();
@@ -5544,7 +5544,7 @@ public final class BookMenuUI {
         fichaBestiario.clearChildren();
         JsonValue e = entradaBestiario(bestiarioSelecionado);
         if (e == null || e.getInt("tier", 0) < 1) {
-            Label vazio = new Label("Defeat monsters to\nfill your bestiary.", skin, "hud");
+            Label vazio = new LabelPixel("Defeat monsters to\nfill your bestiary.", skin.get("hud", Label.LabelStyle.class));
             escalarFonte(vazio, 0.6f * FONTE_STATS);
             vazio.setAlignment(Align.center);
             vazio.setColor(Color.GRAY);
@@ -5581,7 +5581,7 @@ public final class BookMenuUI {
             i.setScaling(Scaling.fit);
             cantoKills.add(i).size(20).padRight(4);
         }
-        Label kills = new Label(String.valueOf(e.getInt("kills", 0)), skin, "hud");
+        Label kills = new LabelPixel(String.valueOf(e.getInt("kills", 0)), skin.get("hud", Label.LabelStyle.class));
         escalarFonte(kills, 0.75f * FONTE_STATS);
         cantoKills.add(kills);
         cantoKills.pad(0, 6, 4, 0);
@@ -5596,7 +5596,7 @@ public final class BookMenuUI {
         rolagem.setOverscroll(false, false);
         rolagem.setForceScroll(false, true); // barra sempre ali, mesmo sem passar do espaco
 
-        Label nome = new Label(e.getString("name", "?"), skin, "hud");
+        Label nome = new LabelPixel(e.getString("name", "?"), skin.get("hud", Label.LabelStyle.class));
         escalarFonte(nome, 1.0f * FONTE_STATS);
         info.add(nome).left().padLeft(10).padTop(6).row();
 
@@ -5608,7 +5608,7 @@ public final class BookMenuUI {
                 i.setScaling(Scaling.fit);
                 linhaHp.add(i).size(ICONE_FICHA).padRight(6);
             }
-            Label hp = new Label(String.valueOf(e.getInt("hp", 0)), skin, "hud");
+            Label hp = new LabelPixel(String.valueOf(e.getInt("hp", 0)), skin.get("hud", Label.LabelStyle.class));
             escalarFonte(hp, 0.75f * FONTE_STATS);
             hp.setColor(1f, 0.55f, 0.55f, 1f); // vermelho claro
             linhaHp.add(hp);
@@ -5623,7 +5623,7 @@ public final class BookMenuUI {
                 if (!comBonus) i.setColor(0.4f, 0.4f, 0.4f, 0.7f);
                 linhaBonus.add(i).size(ICONE_FICHA).padRight(6);
             }
-            Label bonus = new Label("5% Extra DMG/DEF", skin, "hud");
+            Label bonus = new LabelPixel("5% Extra DMG/DEF", skin.get("hud", Label.LabelStyle.class));
             escalarFonte(bonus, 0.65f * FONTE_STATS);
             bonus.setColor(comBonus ? Color.valueOf("f5d328") : Color.GRAY);
             linhaBonus.add(bonus);
@@ -5640,7 +5640,7 @@ public final class BookMenuUI {
                 i.setScaling(Scaling.fit);
                 linhaTitulo.add(i).size(ICONE_FICHA).padRight(6);
             }
-            Label titulo = new Label("Loot", skin, "hud");
+            Label titulo = new LabelPixel("Loot", skin.get("hud", Label.LabelStyle.class));
             escalarFonte(titulo, 0.75f * FONTE_STATS);
             titulo.setColor(Color.LIGHT_GRAY);
             linhaTitulo.add(titulo);
@@ -5652,12 +5652,12 @@ public final class BookMenuUI {
                 Table linhaMoeda = new Table();
                 String[] min = moedaFormatada(moeda.getLong("min", 0)), max = moedaFormatada(moeda.getLong("max", 0));
                 adicionarMoedaLoot(linhaMoeda, min);
-                Label traco = new Label(" - ", skin, "hud");
+                Label traco = new LabelPixel(" - ", skin.get("hud", Label.LabelStyle.class));
                 escalarFonte(traco, 0.7f * FONTE_STATS);
                 linhaMoeda.add(traco);
                 adicionarMoedaLoot(linhaMoeda, max);
                 if (comChance) {
-                    Label cem = new Label("  100%", skin, "hud");
+                    Label cem = new LabelPixel("  100%", skin.get("hud", Label.LabelStyle.class));
                     escalarFonte(cem, 0.65f * FONTE_STATS);
                     cem.setColor(Color.LIGHT_GRAY);
                     linhaMoeda.add(cem);
@@ -5679,7 +5679,7 @@ public final class BookMenuUI {
                 }
                 celula.add(quadro).size(38).row();
                 if (comChance && d.has("chance")) {
-                    Label chance = new Label(formatarChance(d.getFloat("chance", 0f)), skin, "hud");
+                    Label chance = new LabelPixel(formatarChance(d.getFloat("chance", 0f)), skin.get("hud", Label.LabelStyle.class));
                     escalarFonte(chance, 0.6f * FONTE_STATS);
                     celula.add(chance).padTop(1);
                 }
@@ -5688,7 +5688,7 @@ public final class BookMenuUI {
             }
             if (n > 0) info.add(itens).left().padLeft(8).padTop(4).row();
             else if (moeda == null) {
-                Label nada = new Label("Nothing", skin, "hud");
+                Label nada = new LabelPixel("Nothing", skin.get("hud", Label.LabelStyle.class));
                 escalarFonte(nada, 0.7f * FONTE_STATS);
                 nada.setColor(Color.GRAY);
                 info.add(nada).left().padLeft(10).row();
@@ -5704,7 +5704,7 @@ public final class BookMenuUI {
             i.setScaling(Scaling.fit);
             linha.add(i).size(ICONE_FICHA).padRight(4);
         }
-        Label v = new Label(moeda[1], skin, "hud");
+        Label v = new LabelPixel(moeda[1], skin.get("hud", Label.LabelStyle.class));
         escalarFonte(v, 0.75f * FONTE_STATS);
         v.setColor(corMoeda(moeda[0]));
         linha.add(v);
@@ -6039,7 +6039,7 @@ public final class BookMenuUI {
             if (temCooldown(caminho)) pilha.add(sobreposicaoCooldown(caminho));
         }
         if (tecla != null) {
-            Label numeroTecla = new Label(tecla, skin, "hud");
+            Label numeroTecla = new LabelPixel(tecla, skin.get("hud", Label.LabelStyle.class));
             escalarFonte(numeroTecla, 0.5f);
             numeroTecla.setColor(1f, 1f, 1f, 0.5f);
             Table cantoTecla = new Table();
