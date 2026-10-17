@@ -4476,9 +4476,25 @@ public class WorldScreen extends ScreenAdapter {
     private void atualizarAreaNomeada() {
         String novaArea = mapa.propriedades.areaEm(local.x, local.y);
         if (java.util.Objects.equals(novaArea, areaAtual)) return;
+        long agora = com.badlogic.gdx.utils.TimeUtils.millis();
+        if (novaArea == null && areaAtual != null) {
+            // Saiu: lembra qual era (area feita de varios blocos com o mesmo id).
+            ultimaAreaNomeada = areaAtual;
+            saiuDaAreaEmMs = agora;
+        }
         areaAtual = novaArea;
-        if (novaArea != null) areaNomeUI.mostrar(novaArea);
+        if (novaArea == null) return;
+        // Voltou pro mesmo id logo depois (passou pelo vao entre 2 blocos da
+        // mesma area): sem banner de novo.
+        if (novaArea.equals(ultimaAreaNomeada) && agora - saiuDaAreaEmMs < VOLTA_MESMA_AREA_MS) return;
+        ultimaAreaNomeada = novaArea;
+        areaNomeUI.mostrar(novaArea);
     }
+
+    private String ultimaAreaNomeada;
+    private long saiuDaAreaEmMs = 0L;
+    /** Fora da area por menos que isso e voltou pro mesmo id: nao repete o nome. */
+    private static final long VOLTA_MESMA_AREA_MS = 8000L;
 
     /** Fecha o dialogo sozinho se o jogador andar pra fora do raio de
      * interacao do NPC com quem esta conversando (a pedido do usuario: andar
