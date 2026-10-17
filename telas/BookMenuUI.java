@@ -1464,8 +1464,10 @@ public final class BookMenuUI {
         long totalExp = skills != null ? skills.getLong("total_exp", exp) : exp;
 
         valoresStatus.get("class").setText(classeJogador);
-        valoresStatus.get("exp").setText(formatarNumero(exp));
-        valoresStatus.get("next").setText(formatarNumero(expProximo));
+        // XP so' do level atual (o acumulado de todos fica no Total Exp):
+        // "Experience" = quanto ja' fez nesse level, "Next Level" = quanto o level pede.
+        valoresStatus.get("exp").setText(formatarNumero(Math.max(0, exp - expAtualNivel)));
+        valoresStatus.get("next").setText(formatarNumero(Math.max(0, expProximo - expAtualNivel)));
         valoresStatus.get("crit").setText(formatarPercentual(crit));
         valoresStatus.get("block").setText(formatarPercentual(block));
         atualizarTextoCapacidade();
