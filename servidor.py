@@ -1360,11 +1360,40 @@ def spawn_do_mob_id(mob_id):
     try: return tile_de(float(partes[1]), float(partes[2]))
     except (IndexError, ValueError): return None
 
+_avisos_tipo_mob = set()
+
+def resolver_tipos_mob(texto):
+    """mob_id do Tiled -> tipos do MOB_DB. Aceita a chave ("wasp2") ou o nome
+    ("Razor Hornet"), sem diferenciar maiuscula; "A/B" = sorteia entre os dois
+    a cada (re)nascimento. Nome que nao existe e' ignorado (com aviso no log)."""
+    tipos = []
+    for parte in str(texto or '').split('/'):
+        nome = parte.strip().lower()
+        if not nome: continue
+        achado = nome if nome in MOB_DB else next(
+            (t for t, i in MOB_DB.items() if str(i.get('name', '')).strip().lower() == nome), None)
+        if achado: tipos.append(achado)
+        elif nome not in _avisos_tipo_mob:
+            _avisos_tipo_mob.add(nome)
+            print(f"[MOBS] '{parte.strip()}' (mob_id '{texto}') nao existe no MOB_DB - ignorado")
+    return tipos
+
+def _aplicar_tipo_mob(m, tipo):
+    """Troca o tipo do mob (spawn com sorteio): vida, velocidade e golpe do novo."""
+    info = MOB_DB.get(tipo, {})
+    m['type_id'] = tipo
+    m['max_hp'] = m['hp'] = info.get('hp', 40)
+    if 'speed' in info: m['speed'] = info['speed']
+    if 'cooldown' in info: m['cooldown'] = info['cooldown']
+
 def obter_ou_criar_mob(mob_id, mob_type_id=None, room=None):
     # Cria a entrada do mob com HP do MOB_DB e posição = spawn (tirado do id).
     mob_data = active_mobs.get(mob_id)
     if mob_data is None:
         tipo = (mob_type_id or tipo_do_mob_id(mob_id)).lower()
+        # "Venom Wasp/Razor Hornet" (ou chaves): sorteia um; nome do MOB_DB vira a chave.
+        sorteio = resolver_tipos_mob(tipo)
+        if sorteio: tipo = random.choice(sorteio)
         max_hp = MOB_DB.get(tipo, {}).get("hp", 40)
         spawn = spawn_do_mob_id(mob_id)
         mob_data = {"hp": max_hp, "max_hp": max_hp, "type_id": tipo, "dmg_tracker": {},
@@ -1372,7 +1401,8 @@ def obter_ou_criar_mob(mob_id, mob_type_id=None, room=None):
                     "move_until": 0.0, "next_attack": 0.0, "sem_caminho": 0.0, "last_tick": time.time(),
                     "speed": MOB_DB.get(tipo, {}).get("speed", MOB_SPEED_PADRAO),
                     "cooldown": MOB_DB.get(tipo, {}).get("cooldown", MOB_COOLDOWN_PADRAO),
-                    "hit_effect": "physical_hit", "mapa": None, "path": None, "alcance": {}}
+                    "hit_effect": "physical_hit", "mapa": None, "path": None, "alcance": {},
+                    "tipos_sorteio": sorteio if len(sorteio) > 1 else None}
         if spawn is not None:
             mob_data['pos_x'], mob_data['pos_y'] = centro_tile(spawn)
             mob_data['room'] = get_chunk(mob_data['pos_x'], mob_data['pos_y'], MOB_FLOOR)
@@ -2263,6 +2293,7 @@ def montar_sync_area(sid, room):
         }
         # Mob do /summons nao tem ponto no mapa: o client cria o visual pelo tipo.
         if m_data.get('summon'): mob_payload["summon_type"] = m_data.get('type_id', '')
+        mob_payload["type"] = m_data.get('type_id', '')  # spawn com sorteio: o client cria/troca o visual
         if morto:
             # Há quantos segundos morreu: o client só mostra o cadáver pelo
             # tempo que falta dos 60s (antes todo relog recriava o corpo).
@@ -7753,7 +7784,8 @@ def mob_cleanup_loop():
                                                     'seconds': max(0.0, falta)},
                               get_chunk(ax, ay, MOB_FLOOR))
             if falta > 0: continue
-            # Renasce no spawn com tudo zerado.
+            # Renasce no spawn com tudo zerado (spawn com sorteio: sorteia o tipo de novo).
+            if m_data.get('tipos_sorteio'): _aplicar_tipo_mob(m_data, random.choice(m_data['tipos_sorteio']))
             m_data['hp'] = m_data.get('max_hp', 40)
             m_data.pop('died_at', None)
             m_data['returning'] = False
@@ -7778,10 +7810,10 @@ def mob_cleanup_loop():
                 m_data['room'] = get_chunk(m_data['pos_x'], m_data['pos_y'], MOB_FLOOR)
             m_room = m_data.get('room')
             if m_room:
-                emit_area('mob_respawn', {'mob_id': m_id}, m_room)
+                emit_area('mob_respawn', {'mob_id': m_id, 'type': m_data.get('type_id', '')}, m_room)
                 emit_area('mob_pos', payload_mob_pos(m_id, m_data), m_room)
             else:
-                socketio.emit('mob_respawn', {'mob_id': m_id})
+                socketio.emit('mob_respawn', {'mob_id': m_id, 'type': m_data.get('type_id', '')})
 
 carregar_mapas()
 

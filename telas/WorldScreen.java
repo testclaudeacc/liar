@@ -3878,7 +3878,8 @@ public class WorldScreen extends ScreenAdapter {
         });
         socket.on("mob_respawn", (nomeEvt, data) -> {
             if (data == null) return;
-            MobVisual mob = mobs.get(data.getString("mob_id", ""));
+            // Spawn com sorteio ("A/B" no Tiled): pode renascer como o outro mob.
+            MobVisual mob = garantirTipoMob(data.getString("mob_id", ""), data.getString("type", ""));
             if (mob == null) return;
             mob.morto = false;
             mob.hp = mob.maxHp;
@@ -3903,6 +3904,7 @@ public class WorldScreen extends ScreenAdapter {
                 MobVisual mob = mobs.get(info.getString("mob_id", ""));
                 // Mob do /summons que este client ainda nao conhecia (entrou
                 // depois, relogou...): cria o visual pelo tipo.
+                if (info.has("type")) mob = garantirTipoMob(info.getString("mob_id", ""), info.getString("type", ""));
                 if (mob == null && info.has("summon_type")) mob = criarMobAvulso(info.getString("mob_id", ""), info.getString("summon_type", ""));
                 if (mob == null) continue;
                 mob.maxHp = Math.max(1f, info.getFloat("max_hp", mob.maxHp));
@@ -5362,6 +5364,25 @@ public class WorldScreen extends ScreenAdapter {
     // Godot (player.gd::snap_to_tile_center ancora Y no fundo do tile, nao no
     // centro) - por isso o sprite cresce PRA CIMA a partir daqui, nunca
     // centralizado, senao ele fica visualmente "no meio de 2 SQMs".
+    /** Mob com o tipo que o servidor diz (spawn "A/B" sorteia a cada nascimento):
+     * cria o visual se nao existe, ou troca sprite/nome se renasceu como o outro. */
+    private MobVisual garantirTipoMob(String id, String tipo) {
+        MobVisual atual = mobs.get(id);
+        if (id.isEmpty() || tipo == null || tipo.isEmpty()) return atual;
+        if (atual != null && tipo.equalsIgnoreCase(atual.tipo)) return atual;
+        TextureRegion sprite = spriteDoMob(tipo);
+        if (sprite == null) return atual;
+        MobVisual novo = new MobVisual(id, nomeDoTipoMob(tipo), atual != null ? atual.x : 0f, atual != null ? atual.y : 0f,
+            criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+        novo.tipo = tipo.toLowerCase();
+        if (atual != null) {
+            novo.hp = atual.hp; novo.maxHp = atual.maxHp; novo.morto = atual.morto;
+            novo.visivel = atual.visivel; novo.direcao = atual.direcao; novo.tempoCorpo = atual.tempoCorpo;
+        }
+        mobs.put(id, novo);
+        return novo;
+    }
+
     /** Visual de um mob sem ponto no mapa (/summons). null se nao tiver sprite. */
     private MobVisual criarMobAvulso(String id, String tipoMob) {
         if (id.isEmpty() || tipoMob == null || tipoMob.isEmpty()) return null;
@@ -5515,7 +5536,8 @@ public class WorldScreen extends ScreenAdapter {
         for (MapaPropriedades.MobSpawn spawn : mapa.propriedades.mobSpawns) {
             TextureRegion sprite = spriteDoMob(spawn.mobId);
             if (sprite == null) {
-                Gdx.app.error("WorldScreen", "Spritesheet de mob nao encontrada: sprites/mobs/" + spawn.mobId);
+                // "A/B" (sorteio) ou nome de exibicao: o visual nasce quando o servidor diz o tipo (sync_area_data).
+                if (!spawn.mobId.contains("/")) Gdx.app.error("WorldScreen", "Spritesheet de mob nao encontrada: sprites/mobs/" + spawn.mobId);
                 continue;
             }
             String id = idDoMob(spawn);
