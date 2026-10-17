@@ -288,12 +288,24 @@ LOOT_EXPIRA_SEG = 300
 # Quanto tempo a bag fica visível no chão (TEMPO_DESPAWN_SEG do loot_bag.gd).
 LOOT_BAG_VISIVEL_SEG = float(LOOT_EXPIRA_SEG)  # bag visivel enquanto existir (5 min)
 
-def rolar_loot(mob_type_id):
+# "one_of" com ADC (Ruby Ring/Necklace): essa chance de vir o da classe de
+# quem ganhou a bag; o resto sorteia entre as outras variacoes.
+CHANCE_ADC_DA_CLASSE = 1.0 / 3.0
+
+def _sortear_variante(opcoes, classe):
+    da_classe = ADC_DA_CLASSE.get(classe, ("",))[0] if classe else ""
+    minhas = [o for o in opcoes if ITEM_DB.get(o, {}).get("fourth_stat_type") == da_classe]
+    outras = [o for o in opcoes if o not in minhas]
+    if minhas and outras:
+        return random.choice(minhas if random.random() < CHANCE_ADC_DA_CLASSE else outras)
+    return random.choice(opcoes)
+
+def rolar_loot(mob_type_id, classe=None):
     drops = MOB_DB.get(mob_type_id, {}).get("drops", [])
     itens_rolados = []
     for entrada in drops:
         opcoes = entrada.get("one_of")
-        item_path = validate_item(random.choice(opcoes) if opcoes else entrada.get("item"))
+        item_path = validate_item(_sortear_variante(opcoes, classe) if opcoes else entrada.get("item"))
         if not item_path:
             continue
         chance = float(entrada.get("chance", 0.0))
@@ -4578,7 +4590,7 @@ def _recompensar_morte_mob(mob_id, mob_type_id, mob_data, room, now):
     for participant_sid in mob_data['dmg_tracker']:
         if participant_sid not in online_players: continue
         part_name = online_players[participant_sid].get('name', '')
-        itens_rolados = rolar_loot(mob_type_id)
+        itens_rolados = rolar_loot(mob_type_id, online_players[participant_sid].get('class_name'))
         currency_rolada = rolar_currency(mob_type_id)
         loot_id = f"loot_{mob_id}_{int(now * 1000)}_{len(owner_sids)}"
         # has_items só reflete itens de verdade (pra sprite dourada da bag);
