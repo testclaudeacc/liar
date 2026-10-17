@@ -318,6 +318,15 @@ public class WorldScreen extends ScreenAdapter {
     /** Possuindo um mob (/ghost + botao direito): intervalo e efeito do golpe dele (sync_stats). */
     private float morphCooldown = 0f;
     private String morphHit = "";
+    private int morphAlcance = 1;        // SQMs do mob possuido (1 = corpo a corpo)
+    private String morphProjetil = "";   // projetil dele (mob a distancia)
+
+    /** Possuindo um mob: o golpe dele alcanca esse ponto? (a distancia: circulo + linha de visao) */
+    private boolean morphAlcanca(float x, float y) {
+        if (morphAlcance <= 1) return distanciaSqm(local.x, local.y, x, y) <= 1;
+        float dx = local.x - x, dy = local.y - y, r = morphAlcance * Jogador.TILE;
+        return dx * dx + dy * dy <= r * r && temLinhaDeVisao(local.x, local.y, x, y);
+    }
     /** Players possuindo um mob: nome -> tipo do mob (desenhados com o sprite dele). */
     private final Map<String, String> morfos = new HashMap<>();
     private final Map<String, AnimacaoCorpo> animacoesMorph = new HashMap<>();
@@ -4114,7 +4123,12 @@ public class WorldScreen extends ScreenAdapter {
             multFome = comFome ? FOME_MULT_VELOCIDADE : 1f;
             if (data.has("move_speed")) multLevel = Math.max(0.1f, data.getFloat("move_speed", 1f));
             if (data.has("atk_speed")) multAtaque = Math.max(0.1f, data.getFloat("atk_speed", 1f));
-            if (data.has("morph_cd")) { morphCooldown = data.getFloat("morph_cd", 0f); morphHit = data.getString("morph_hit", ""); }
+            if (data.has("morph_cd")) {
+                morphCooldown = data.getFloat("morph_cd", 0f);
+                morphHit = data.getString("morph_hit", "");
+                morphAlcance = Math.max(1, data.getInt("morph_range", 1));
+                morphProjetil = data.getString("morph_proj", "");
+            }
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
@@ -5121,7 +5135,7 @@ public class WorldScreen extends ScreenAdapter {
     /** Mob vivo no SQM (onde esta ou pra onde esta indo) bloqueia o passo -
      * o servidor tambem recusa (servidor.py::handle_m). */
     private boolean mobOcupaTile(float mundoX, float mundoY) {
-        if (fantasmas.contains(local.nome)) return false; // /ghost: atravessa mob
+        if (fantasmas.contains(local.nome) && !euMorph()) return false; // /ghost atravessa mob; possuindo um, colide
         int tileX = (int) Math.floor(mundoX / Jogador.TILE);
         int tileY = (int) Math.floor((mundoY - 1f) / Jogador.TILE);
         for (MobVisual mob : mobs.values()) {
@@ -6074,7 +6088,7 @@ public class WorldScreen extends ScreenAdapter {
         if (euMorph() && amigoMarcado != null && !localMorto && !euNaPz && esperaAtaque <= 0f && socket.isConnected()) {
             Jogador alvoJ = remotos.get(amigoMarcado);
             if (alvoJ != null && !remotosMortos.contains(alvoJ.nome) && !mapa.propriedades.naZonaProtegida(alvoJ.x, alvoJ.y)
-                    && distanciaSqm(local.x, local.y, alvoJ.x, alvoJ.y) <= 1) {
+                    && morphAlcanca(alvoJ.x, alvoJ.y)) {
                 String nomeAlvo = alvoJ.nome;
                 socket.emitRaw("morph_attack", GameSocket.obj(jw -> jw.set("target", nomeAlvo)));
                 esperaAtaque = (morphCooldown > 0f ? morphCooldown : INTERVALO_ATAQUE) / multAtaque;
@@ -6117,7 +6131,7 @@ public class WorldScreen extends ScreenAdapter {
         // (servidor.py: DETECCAO_SQM + PERSISTE_SQM), ou o mob ja' desistiu
         // (voltando pra casa) e ficou fora do alcance do meu ataque.
         int distAlvo = distanciaSqm(local.x, local.y, alvo.x, alvo.y);
-        int alcanceAtaque = classeRanged() ? ALCANCE_RANGED_SQM : 1;
+        int alcanceAtaque = euMorph() ? morphAlcance : classeRanged() ? ALCANCE_RANGED_SQM : 1;
         if (distAlvo > DISTANCIA_PERDE_ALVO_SQM || (alvo.voltando && distAlvo > alcanceAtaque)) {
             alvoMob = null;
             return;
@@ -6127,14 +6141,17 @@ public class WorldScreen extends ScreenAdapter {
         if (euNaPz || mapa.propriedades.naZonaProtegida(alvo.x, alvo.y)) return;
         // Possuindo um mob: golpe dele (corpo a corpo, sem flecha/mana/skill).
         if (euMorph()) {
-            if (distanciaSqm(local.x, local.y, alvo.x, alvo.y) > 1) return;
+            // Condicao de ataque do mob possuido: alcance, projetil e efeito dele.
+            if (!morphAlcanca(alvo.x, alvo.y)) return;
             String idM = alvo.id, efeitoM = morphHit.isEmpty() ? "physical_hit" : morphHit;
+            boolean rangedM = morphAlcance > 1;
+            String projM = rangedM ? morphProjetil : "";
             socket.emitRaw("hit_mob", GameSocket.obj(jw -> {
                 jw.set("mob_id", idM);
                 jw.set("mob_type_id", idM);
                 jw.set("hit_type", efeitoM);
-                jw.set("w_type", "Melee");
-                jw.set("proj", "");
+                jw.set("w_type", rangedM ? "Ranged" : "Melee");
+                jw.set("proj", projM);
             }));
             esperaAtaque = (morphCooldown > 0f ? morphCooldown : INTERVALO_ATAQUE) / multAtaque;
             return;

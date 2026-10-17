@@ -815,6 +815,8 @@ def _montar_payload_sync_stats(p):
         # Possuindo um mob (morph): intervalo e efeito do golpe dele (0/"" = normal).
         'morph_cd': float((p.get('morph') or {}).get('cooldown', 0)) if isinstance(p.get('morph'), dict) else 0.0,
         'morph_hit': (p.get('morph') or {}).get('hit', '') if isinstance(p.get('morph'), dict) else '',
+        'morph_range': alcance_morph(p),
+        'morph_proj': MOB_DB.get((p.get('morph') or {}).get('type_id'), {}).get('proj', '') if isinstance(p.get('morph'), dict) else '',
         'classe_penalizada': punido,
         'cap_atual': calcular_cap_usado(p), 'cap_maximo': calcular_cap_maximo(level),
         # Vitais pra barra de HP/MP do client.
@@ -1669,7 +1671,7 @@ def _tiles_ocupados(excluir_mob=None, excluir_sid=None, sala=None):
     sids = _sids_perto(sala) if sala else online_players.keys()
     for o_sid in sids:
         p = online_players.get(o_sid)
-        if p is None or o_sid == excluir_sid or p.get('is_dead') or admin_ghost(p): continue
+        if p is None or o_sid == excluir_sid or p.get('is_dead') or invisivel(p): continue
         if int(p.get('floor', 1) or 1) != MOB_FLOOR: continue
         ocupados.add(tile_de(p.get('pos_x', 0), p.get('pos_y', 0)))
     return ocupados
@@ -1844,6 +1846,22 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
 # ---------------------------------------------------------------------------
 MORPH_ALCANCE_SQM = 10
 
+def alcance_morph(p):
+    """SQMs que o mob possuido alcanca (1 = corpo a corpo)."""
+    m = p.get('morph') if p else None
+    if not isinstance(m, dict): return 1
+    return int(MOB_DB.get(m.get('type_id'), {}).get('range', 1) or 1)
+
+def _morph_alcanca(p, alvo):
+    """Golpe do mob possuido chega no alvo? A distancia: circulo + linha de visao (+1 de folga pro passo)."""
+    tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+    ta = tile_de(alvo.get('pos_x', 0), alvo.get('pos_y', 0))
+    alcance = alcance_morph(p)
+    if alcance <= 1: return max(abs(tp[0] - ta[0]), abs(tp[1] - ta[1])) <= 2
+    if math.hypot(tp[0] - ta[0], tp[1] - ta[1]) > alcance + 1: return False
+    grade = mapas_colisao.get(p.get('mapa'))
+    return grade is None or int(p.get('floor', 1) or 1) != 1 or linha_de_visao(grade, tp, ta)
+
 def morph_de(p):
     m = p.get('morph') if p else None
     return m if isinstance(m, dict) else None
@@ -1902,7 +1920,7 @@ def handle_morph_mob(data):
         if hp_antes < 0: hp_antes = max_antes
         morph_novo = {'type_id': tipo, 'max_hp': max_hp, 'attack': float(info.get('attack', 3.0)),
                       'cooldown': float(m.get('cooldown', MOB_COOLDOWN_PADRAO)),
-                      'hit': m.get('hit_effect', 'physical_hit'), 'hp_antes': hp_antes}
+                      'hit': info.get('hit') or m.get('hit_effect', 'physical_hit'), 'hp_antes': hp_antes}
         antes_invisivel = invisivel(p)
         p['morph'] = morph_novo
         p['current_hp'] = max_hp
@@ -1929,9 +1947,7 @@ def handle_morph_attack(data):
         except (TypeError, ValueError): pass
         if na_pz(p) or na_pz(alvo): return
         if int(p.get('floor', 1) or 1) != int(alvo.get('floor', 1) or 1): return
-        tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
-        ta = tile_de(alvo.get('pos_x', 0), alvo.get('pos_y', 0))
-        if max(abs(tp[0] - ta[0]), abs(tp[1] - ta[1])) > 2: return  # do lado (+1 de folga pro passo)
+        if not _morph_alcanca(p, alvo): return  # alcance do mob possuido (corpo a corpo ou a distancia)
         now = time.time()
         cd = float(m.get('cooldown', MOB_COOLDOWN_PADRAO)) / admin_mult(p, 'admin_atkspd', ADMIN_ATKSPD_MAX)
         if now - p.get('last_attack_time', 0) < cd - min(0.1, cd * 0.3): return
@@ -3837,8 +3853,10 @@ def comando_admin(sid, p, texto, canal='local'):
             novo, tirados = so_da_classe(guardado, alvo)
         else:
             novo, tirados = {}, None   # 1a vez nessa classe: kit inicial inteiro
+        # Slot do kit inicial vazio (1a vez, item de outra classe tirado, ou um
+        # equip guardado vazio de antes): veste o item inicial da classe.
         for slot, inst in montar_kit_inicial(alvo)[1].items():
-            if tirados is None or (slot in tirados and slot not in novo): novo[slot] = inst
+            if slot not in novo: novo[slot] = inst
         p['equipped_items'] = novo
         # A skill principal vai junto (ex: Melee 30 vira Magic 30).
         de, para = SKILL_DA_CLASSE.get(atual), SKILL_DA_CLASSE.get(alvo)
@@ -4680,7 +4698,10 @@ def handle_hit_mob(data):
         # conhecida nao pode ser validado - nega o golpe em vez de liberar
         # de qualquer distancia.
         if 'pos_x' not in mob_data: return
-        if p.get('class_name') in CLASSES_RANGED and not morph:
+        if morph:
+            # Possuindo um mob: alcance/linha de visao do mob, nao da classe.
+            if not _morph_alcanca(p, mob_data): return
+        elif p.get('class_name') in CLASSES_RANGED:
             if _dist_px(mob_data, p) > (ALCANCE_RANGED_SQM + 1) * TILE: return
             # Parede no meio: a flecha/magia nao passa.
             if int(p.get('floor', 1) or 1) == 1 and not linha_de_visao(
@@ -5469,7 +5490,7 @@ def handle_m(data):
                              and tile_de(npc.get('pos_x', 0), npc.get('pos_y', 0)) == destino_tile
                              for npc in active_npcs.values())
         # Mob vivo tambem bloqueia o SQM (nao da pra atravessar).
-        mob_no_caminho = andar_p == MOB_FLOOR and not admin_ghost(p) and any(
+        mob_no_caminho = andar_p == MOB_FLOOR and not invisivel(p) and any(  # ghost atravessa; possuindo um mob, colide
             o.get('hp', 1) > 0 and 'pos_x' in o and tile_do_mob(o) == destino_tile
             for _, o in (_mobs_perto(p['room']) if p.get('room') else active_mobs.items()))
         # Outro player vivo no mesmo andar tambem bloqueia (pra passar por quem
