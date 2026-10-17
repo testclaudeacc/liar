@@ -1772,6 +1772,7 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
     passo = _duracao_passo_mob(m, origem, proximo)
     # Encadeado: comeca quando o passo anterior termina (sem buraco entre eles).
     m['move_until'] = max(now, m.get('move_until', 0)) + passo
+    m['passo_dur'] = passo
     m['path']['caminho'] = caminho[1:]
     m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
     _mob_emitir_estado(mob_id, m, passo)
@@ -2059,7 +2060,11 @@ def _mob_tick(mob_id, m, now):
     alvo_combate = _player_alvo_valido(alvo_sid, m) if alvo_sid else None
     if alvo_combate is not None and not m.get('returning'):
         t_alvo = tile_de(alvo_combate.get('pos_x', 0), alvo_combate.get('pos_y', 0))
-        if _mob_no_alcance(m, origem, t_alvo, alvo_combate) and now >= m.get('next_attack', 0) and now >= m.get('move_until', 0):
+        # Pode bater a partir da metade do passo em que chega do lado (o player
+        # tambem acerta o mob chegando): os dois reagem igual - antes o mob so'
+        # batia depois de terminar o passo e o player tinha uns frames de vantagem.
+        meio_passo = m.get('move_until', 0) - 0.5 * float(m.get('passo_dur', 0) or 0)
+        if _mob_no_alcance(m, origem, t_alvo, alvo_combate) and now >= m.get('next_attack', 0) and now >= meio_passo:
             _mob_encarar(mob_id, m, origem, t_alvo)  # a virada chega antes do ataque
             _mob_atacar(mob_id, m, alvo_sid, now)
 

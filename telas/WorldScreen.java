@@ -393,13 +393,16 @@ public class WorldScreen extends ScreenAdapter {
     /** Mob que voa "andando" (corpo subindo e descendo): enquanto anda e um
      * pouco depois de parar - entre um SQM e outro nao troca pro jeito parado. */
     private static boolean andandoVoo(MobVisual mob) {
-        return mob.movendo || mob.tempoDesdeParou < 0.45f;
+        return mob.movendo || mob.tempoDesdeParou < 0.15f;
     }
 
-    private int faseAsas(int semente) {
-        long passo = (com.badlogic.gdx.utils.TimeUtils.millis() + (semente & 0xff)) / (long) (QUADRO_ASAS_SEG * 1000f);
+    private int faseAsas(int semente, boolean andando) {
+        // Andando o corpo sobe/desce junto: mais devagar que o bater de asas parado.
+        float seg = andando ? QUADRO_VOO_ANDANDO_SEG : QUADRO_ASAS_SEG;
+        long passo = (com.badlogic.gdx.utils.TimeUtils.millis() + (semente & 0xff)) / (long) (seg * 1000f);
         return (int) (passo % 2);
     }
+    private static final float QUADRO_VOO_ANDANDO_SEG = 0.2f;
 
     /** Mob que voa: a sheet tem o quadro parado (corpo em cima) e o "andando"
      * (corpo 1px abaixo, a outra posicao das asas). Parado: alterna os dois,
@@ -407,7 +410,7 @@ public class WorldScreen extends ScreenAdapter {
      * os dois como estao - o corpo sobe e desce 1px junto com as asas.
      * O deslocamento vem de dyAsas. */
     private TextureRegion quadroAsas(AnimacaoCorpo a, String direcao, int semente, boolean andando) {
-        boolean usarAndar = (faseAsas(semente) == 0) == andando;
+        boolean usarAndar = (faseAsas(semente, andando) == 0) == andando;
         switch (direcao) {
             case "up": return usarAndar ? a.andarCima[0] : a.idleCima;
             case "left": return usarAndar ? a.andarEsquerda[0] : a.idleEsquerda;
@@ -417,7 +420,7 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private float dyAsas(int semente, boolean andando) {
-        boolean fase1 = faseAsas(semente) == 1;
+        boolean fase1 = faseAsas(semente, andando) == 1;
         if (!andando) return fase1 ? ESCALA_SPRITE : 0f;   // parado: quadro "andando" sobe 1px (so' as asas mexem)
         return 0f;                                          // andando: sem compensar - o corpo sobe e desce junto com as asas
     }
