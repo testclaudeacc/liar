@@ -119,7 +119,7 @@ public class WorldScreen extends ScreenAdapter {
      * (ver MapaPropriedades). */
     private static class MobVisual {
         final String id;
-        final String nome;
+        String nome;   // nome de exibicao (servidor: mob_names; ate' chegar, o tipo com maiuscula)
         final AnimacaoCorpo animacao;
         final TextureRegion quadroMorto;
         float x, y;
@@ -323,6 +323,31 @@ public class WorldScreen extends ScreenAdapter {
 
     private boolean euMorph() { return morfos.containsKey(local.nome); }
 
+    /** Nome de exibicao de cada tipo de mob (servidor.py MOB_DB "name"), ex: wasp2 -> Razor Hornet. */
+    private final Map<String, String> nomesMobs = new HashMap<>();
+
+    /** "wasp2_10_20" -> "wasp2" (tipo e' tudo antes dos 2 ultimos "_"). */
+    private static String tipoDoIdMob(String id) {
+        int ultimo = id.lastIndexOf('_');
+        int penultimo = ultimo > 0 ? id.lastIndexOf('_', ultimo - 1) : -1;
+        return (penultimo > 0 ? id.substring(0, penultimo) : id).toLowerCase();
+    }
+
+    private String nomeDoTipoMob(String tipo) {
+        if (tipo == null || tipo.isEmpty()) return "";
+        String n = nomesMobs.get(tipo.toLowerCase());
+        return n != null ? n : Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1);
+    }
+
+    private void definirNomesMobs(JsonValue nomes) {
+        if (nomes == null) return;
+        for (JsonValue e = nomes.child; e != null; e = e.next) nomesMobs.put(e.name.toLowerCase(), e.asString());
+        for (MobVisual mob : mobs.values()) {
+            String n = nomesMobs.get(tipoDoIdMob(mob.id));
+            if (n != null) mob.nome = n;
+        }
+    }
+
     /** Settings > Show HP bar: 0 = todos, 1 = so' o alvo, 2 = so' inimigos. */
     private int modoBarraHp = Controles.modoBarraHp();
 
@@ -366,7 +391,7 @@ public class WorldScreen extends ScreenAdapter {
     private String nomeDoMorph(String nome) {
         String tipo = morfos.get(nome);
         if (tipo == null || tipo.isEmpty()) return nomeVisivel(nome);
-        return Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1);
+        return nomeDoTipoMob(tipo);
     }
 
     private AnimacaoCorpo animacaoMorph(String nome) {
@@ -3145,6 +3170,7 @@ public class WorldScreen extends ScreenAdapter {
                 hud.definir(hpJoin < 0f ? maxHp : hpJoin, maxHp, mpJoin < 0f ? maxMp : mpJoin, maxMp);
                 hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
                 bookMenu.carregarItemDb(data.get("item_db"));
+                definirNomesMobs(data.get("mob_names"));
                 bookMenu.atualizarInventario(data.get("inventory"));
                 if (data.has("hotbar")) bookMenu.definirHotbar(data.get("hotbar"));
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
@@ -3191,7 +3217,7 @@ public class WorldScreen extends ScreenAdapter {
             float cy = j != null ? j.y : conversor.rawParaMundoY(data.getFloat("pos_y", 0f));
             // Id do servidor: o mob_died que vem logo depois (bag de loot) acha o cadaver.
             String id = data.getString("corpse_id", "corpo_morph_" + nome + "_" + System.currentTimeMillis());
-            MobVisual corpo = new MobVisual(id, Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1), cx, cy,
+            MobVisual corpo = new MobVisual(id, nomeDoTipoMob(tipo), cx, cy,
                 criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
             corpo.morto = true;
             corpo.hp = 0f;
@@ -3423,7 +3449,7 @@ public class WorldScreen extends ScreenAdapter {
             MobVisual mob = mobs.get(data.getString("mob_id", ""));
             String tipoMorto = data.getString("mob_type", "monster");
             String nomeMob = mob != null ? mob.nome
-                : tipoMorto.isEmpty() ? "monster" : Character.toUpperCase(tipoMorto.charAt(0)) + tipoMorto.substring(1);
+                : tipoMorto.isEmpty() ? "monster" : nomeDoTipoMob(tipoMorto);
             chat.adicionarMensagemSistema(nomeVisivel(data.getString("name", "")) + " was killed by " + nomeMob + ".",
                 new Color(1f, 0.25f, 0.25f, 1f));
             // Eu morri: mostra quem matou na tela de morte.
@@ -3544,6 +3570,16 @@ public class WorldScreen extends ScreenAdapter {
                 pr.aoChegar = () -> mostrarGolpeNoJogador(alvoJ, data);
                 projeteis.add(pr);
                 j = null; // o golpe aparece na chegada
+            }
+            // Mob a distancia (ex: Venom Wasp): o cuspe sai do mob e o golpe aparece quando chega.
+            TextureRegion projetilMob = regiaoDoCaminho(data.getString("proj", ""));
+            if (j != null && mob != null && mob.visivel && projetilMob != null && "Ranged".equals(data.getString("w_type", ""))) {
+                Projetil pr = new Projetil(projetilMob, mob.x, mob.y + 8f, null, null);
+                pr.alvoJogador = j;
+                final Jogador alvoM = j;
+                pr.aoChegar = () -> mostrarGolpeNoJogador(alvoM, data);
+                projeteis.add(pr);
+                j = null;
             }
             if (j != null) mostrarGolpeNoJogador(j, data);
             if (!alvo.equals(local.nome) && data.has("new_hp")) {
@@ -5233,7 +5269,7 @@ public class WorldScreen extends ScreenAdapter {
         if (existente != null) return existente;
         TextureRegion sprite = spriteDoMob(tipoMob);
         if (sprite == null) return null;
-        String nomeMob = Character.toUpperCase(tipoMob.charAt(0)) + tipoMob.substring(1);
+        String nomeMob = nomeDoTipoMob(tipoMob);
         MobVisual mob = new MobVisual(id, nomeMob, 0f, 0f, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
         mobs.put(id, mob);
         return mob;
@@ -5379,7 +5415,7 @@ public class WorldScreen extends ScreenAdapter {
             String id = idDoMob(spawn);
             Gdx.app.log("WorldScreen", "Mob criado: " + id + " (spawn_range=" + spawn.spawnRange
                 + ", respawn_time=" + spawn.respawnTime + ")");
-            String nome = Character.toUpperCase(spawn.mobId.charAt(0)) + spawn.mobId.substring(1);
+            String nome = nomeDoTipoMob(spawn.mobId);
             mobs.put(id, new MobVisual(id, nome, spawn.worldX, spawn.worldY, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE)));
         }
     }
@@ -5498,6 +5534,8 @@ public class WorldScreen extends ScreenAdapter {
             case "Arrow": tira = atlas.findRegion("ui/items/Arrow"); break;
             case "Fire": tira = atlas.findRegion("ui/FireAnimation"); break;   // Igniculus
             case "PhysATK": tira = atlas.findRegion("sprites/spawn/PhysATK"); break;   // mob fisico no player
+            case "PoisonCloud": tira = atlas.findRegion("sprites/spawn/PoisonCloud"); break;     // Venom Wasp (cuspe)
+            case "PoisonPhysATK": tira = atlas.findRegion("sprites/spawn/PoisonPhysATK"); break; // Razor Hornet (ferrao)
             default: tira = atlas.findRegion("ui/items/Physical"); break;
         }
         if (tira == null) tira = atlas.findRegion("ui/items/Physical");

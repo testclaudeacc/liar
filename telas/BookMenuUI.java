@@ -407,6 +407,7 @@ public final class BookMenuUI {
         final String fourthStatType, icone;
         final float cap; // peso de 1 unidade (servidor.py::ITEM_DB "cap")
         final int regenHp, regenMp, regenSeg, preco; // comida com buff de regen; preco em copper
+        final int precoVendaFixo; // material: quanto o NPC paga (servidor "sell_price"); 0 = metade do preco
         final boolean usavel; // scroll etc: botao Use na Bag
         final boolean empilhavel;
         final String magia;    // id da magia (servidor.py "spell"); null = item normal
@@ -467,6 +468,7 @@ public final class BookMenuUI {
             this.healHp = d.getInt("heal_hp", 0);
             this.healMp = d.getInt("heal_mp", 0);
             this.icone = d.getString("icon", null);
+            this.precoVendaFixo = d.getInt("sell_price", 0);
         }
 
         boolean ehPocao() { return healHp > 0 || healMp > 0; }
@@ -889,6 +891,12 @@ public final class BookMenuUI {
         if (dados == null) return;
         EquipStats base = compararCom == null ? null : ITEM_STATS.get(compararCom);
         boolean comparar = compararCom != null;
+        // Material (drop de mob): so' o nome, "Material" e o cap.
+        if ("Material".equals(dados.tipo)) {
+            bloco.add(linhaStat("Material", new Color(0.6f, 0.6f, 0.6f, 1f))).left().row();
+            adicionarLinhaCap(bloco, dados);
+            return;
+        }
         if (dados.fullness > 0) {
             // Comida: coxinha + Fullness; HP/MP com o regen extra (buff).
             bloco.add(linhaComIcone(ICONE_FULLNESS, "Fullness " + dados.fullness, COR_FOME)).left().row();
@@ -3528,6 +3536,7 @@ public final class BookMenuUI {
         ItemLoja daLoja = itemLoja(caminho);
         if (daLoja != null) return daLoja.venda;
         EquipStats dados = ITEM_STATS.get(caminho);
+        if (dados != null && dados.precoVendaFixo > 0) return dados.precoVendaFixo;
         return dados == null || dados.preco <= 0 ? 0 : Math.max(1, dados.preco / 2);
     }
 

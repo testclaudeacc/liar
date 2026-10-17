@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.39"
+SERVER_VERSION = "v0.40"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -71,8 +71,21 @@ except Exception as e:
 
 MOB_DB = {
     # attack_min/attack_max: faixa do golpe (sem elas: attack -15%..+15%, igual o
-    # player). Defesa do player tira 1:1 (Knight lv1 = 20, outras classes = 10).
-    "rotworm": {"hp": 50, "xp": 15, "attack": 14.0, "attack_min": 13, "attack_max": 15, "drops": [], "currency": {"min": 5, "max": 10}},
+    # player). Defesa do player tira 1:1 (Knight lv1 = 12.5, outras classes = 10).
+    "rotworm": {"name": "Rotworm", "hp": 50, "xp": 15, "attack": 14.0, "attack_min": 13, "attack_max": 15, "drops": [], "currency": {"min": 5, "max": 10}},
+    # Caverna 6-10 (pos-rotworm): 2 vespas. "wasp" cospe veneno de longe
+    # (range: SQMs, precisa de linha de visao); "wasp2" ferroa colado.
+    # proj = projetil que sai do mob; hit = efeito no player (sprites/spawn).
+    "wasp": {"name": "Venom Wasp", "hp": 115, "xp": 17, "attack": 21.5, "attack_min": 20, "attack_max": 23,
+             "range": 3, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
+             "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
+                       {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
+             "currency": {"min": 7, "max": 14}},
+    "wasp2": {"name": "Razor Hornet", "hp": 130, "xp": 19, "attack": 25.0, "attack_min": 23, "attack_max": 27,
+              "hit": "PoisonPhysATK",
+              "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
+                        {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
+              "currency": {"min": 7, "max": 14}},
 }
 
 # ---------------------------------------------------------------------------
@@ -339,6 +352,9 @@ ITEM_DB = {
     "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 15.0},
     "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "price": 1, "max_stack": 9999, "cap": 0.1},
     # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
+    # Materiais (drop de mob): so' nome, "Material" e cap na descricao; o NPC paga sell_price.
+    "res://sprites/items/Materials/WaspWing.tres": {"name": "Wasp Wing", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 5, "icon": "ui/Wasp_Wing", "stackable": True, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Materials/WaspStinger.tres": {"name": "Wasp Stinger", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 5, "icon": "sheet/r13_c4", "stackable": True, "max_stack": 9999, "cap": 0.1},
     "res://sprites/items/Food/Cookie.tres": {"name": "Cookie", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 5, "regen_hp": 1, "regen_mp": 1, "regen_seg": 10, "sound": "*Crunch*", "stackable": True, "max_stack": 9999, "cap": 0.1},
     # Comidas do Syron (loja). "regen_hp"/"regen_mp" = quanto a mais o regen
     # natural cura em cada tique, durante "regen_seg" segundos (buff de comida, ver
@@ -418,7 +434,7 @@ ALCANCE_RANGED_SQM = 5
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
                        "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap", "usable",
-                       "regen_hp", "regen_mp", "regen_seg", "price", "set", "set_xp", "training", "ammo_save",
+                       "regen_hp", "regen_mp", "regen_seg", "price", "sell_price", "set", "set_xp", "training", "ammo_save",
                        "spell", "spell_mana", "spell_cd", "spell_dmg", "spell_desc", "spell_area",
                        "spell_bleed_ticks", "spell_bleed_pct", "spell_bleed_every", "spell_slot",
                        "spell_hits", "spell_hit_every", "spell_dot", "spell_slow")
@@ -1757,6 +1773,10 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
     target_player = online_players.get(target_sid)
     if target_player is None: return
     target_name = target_player.get('name', '')
+    info_tipo = MOB_DB.get(m.get('type_id'), {})
+    efeito_hit = info_tipo.get('hit') or m.get('hit_effect', 'physical_hit')
+    ranged = int(info_tipo.get('range', 1) or 1) > 1
+    extra_golpe = {'w_type': 'Ranged', 'proj': info_tipo.get('proj', '')} if ranged else {}
     m['next_attack'] = now + max(0.3, float(m.get('cooldown', MOB_COOLDOWN_PADRAO)))
     m['ultimo_golpe'] = now
     # Faixa do golpe (fork, igual o player) - no morph escalada pelo dano dele (/dmg).
@@ -1789,16 +1809,16 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
         _desfazer_morph(target_sid, target_player, "Your possessed body died. You are a ghost again.", morreu=True)
         hp_atual, max_hp_alvo = hp_publico(target_player)
         emit_area('player_damaged', {'target_player': target_name, 'damage': dano_final, 'new_hp': hp_atual,
-                                     'max_hp': max_hp_alvo, 'hit_type': m.get('hit_effect', 'physical_hit'),
-                                     'attacker_mob_id': mob_id, 'is_crit': critico}, target_player.get('room'))
+                                     'max_hp': max_hp_alvo, 'hit_type': efeito_hit,
+                                     'attacker_mob_id': mob_id, 'is_crit': critico, **extra_golpe}, target_player.get('room'))
         return
     target_player['current_hp'] = hp_atual
     target_player['_ultimo_hp_broadcast'] = [hp_atual, max_hp_alvo]
     target_player['last_hit_by_mob'] = now  # libera o treino de defense (register_skill_hit)
 
     emit_area('player_damaged', {'target_player': target_name, 'damage': dano_final, 'new_hp': hp_atual,
-                                 'max_hp': max_hp_alvo, 'hit_type': m.get('hit_effect', 'physical_hit'),
-                                 'attacker_mob_id': mob_id, 'is_crit': critico}, target_player.get('room'))
+                                 'max_hp': max_hp_alvo, 'hit_type': efeito_hit,
+                                 'attacker_mob_id': mob_id, 'is_crit': critico, **extra_golpe}, target_player.get('room'))
     if hp_atual <= 0:
         target_player['is_dead'] = True
         sair_da_batalha(target_sid, target_player)
@@ -1987,6 +2007,15 @@ def handle_hit_morph(data):
         emit_area('player_damaged', evt, alvo.get('room'))
     except Exception: traceback.print_exc()
 
+def _mob_no_alcance(m, origem, t_alvo, alvo):
+    """Mob consegue bater daqui? Corpo a corpo: do lado. A distancia (MOB_DB
+    "range"): ate' range SQMs com linha de visao."""
+    alcance = int(MOB_DB.get(m.get('type_id'), {}).get('range', 1) or 1)
+    if alcance <= 1: return _adjacente(origem, t_alvo)
+    if max(abs(origem[0] - t_alvo[0]), abs(origem[1] - t_alvo[1])) > alcance: return False
+    grade = mapas_colisao.get(alvo.get('mapa')) if alvo else None
+    return linha_de_visao(grade, origem, t_alvo) if grade is not None else True
+
 def _mob_tick(mob_id, m, now):
     if m.get('hp', 1) <= 0 or m.get('spawn') is None or 'pos_x' not in m: return
     dt = min(0.5, max(0.0, now - m.get('last_tick', now)))
@@ -2004,7 +2033,7 @@ def _mob_tick(mob_id, m, now):
     alvo_combate = _player_alvo_valido(alvo_sid, m) if alvo_sid else None
     if alvo_combate is not None and not m.get('returning'):
         t_alvo = tile_de(alvo_combate.get('pos_x', 0), alvo_combate.get('pos_y', 0))
-        if _adjacente(origem, t_alvo) and now >= m.get('next_attack', 0) and now >= m.get('move_until', 0):
+        if _mob_no_alcance(m, origem, t_alvo, alvo_combate) and now >= m.get('next_attack', 0) and now >= m.get('move_until', 0):
             _mob_encarar(mob_id, m, origem, t_alvo)  # a virada chega antes do ataque
             _mob_atacar(mob_id, m, alvo_sid, now)
 
@@ -2040,7 +2069,8 @@ def _mob_tick(mob_id, m, now):
             _mob_desaparece_por_perseguicao(mob_id, m, now)
             return
         t_alvo = tile_de(alvo.get('pos_x', 0), alvo.get('pos_y', 0))
-        if _adjacente(origem, t_alvo):
+        # Ja' alcanca (do lado, ou a distancia pro mob ranged): para e encara.
+        if _mob_no_alcance(m, origem, t_alvo, alvo):
             m['sem_caminho'] = 0.0
             m['bloqueado_criatura'] = 0.0
             _mob_encarar(mob_id, m, origem, t_alvo)
@@ -3221,7 +3251,8 @@ def handle_join_game(data):
         max_hp_join, max_mp_join = calcular_max_vitais(data)
         extra_admin = {'admin_commands': [{'cmd': c, 'usage': u, 'desc': d} for c, u, d in ADMIN_COMANDOS],
                        'admin_args': argumentos_admin()} if eh_admin(data) else {}
-        emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(), 'soul': eh_alma(data), 'admin': eh_admin(data),
+        emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(),
+                                        'mob_names': {t: i.get('name', t.capitalize()) for t, i in MOB_DB.items()}, 'soul': eh_alma(data), 'admin': eh_admin(data),
                                    'ghost': admin_ghost(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
@@ -6601,7 +6632,9 @@ SHOP_DISTANCIA_SQM = NPC_PAY_DISTANCIA_SQM
 SHOP_QTD_MAX = 1000
 
 def preco_venda_npc(item_path):
-    return max(1, int(ITEM_DB.get(item_path, {}).get('price', 0)) // 2)
+    dados = ITEM_DB.get(item_path, {})
+    if 'sell_price' in dados: return max(1, int(dados['sell_price']))  # material: valor fixo
+    return max(1, int(dados.get('price', 0)) // 2)
 
 def _perto_do_npc(p, npc_id):
     tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
@@ -6686,7 +6719,8 @@ def handle_shop_sell(data):
         inst = encontrar_instancia(inventario, iid)
         # Qualquer NPC de loja compra qualquer item da bag que tenha preco
         # (nao precisa andar ate' o vendedor certo); sem preco nao vende.
-        if inst is None or int(ITEM_DB.get(inst.get('item'), {}).get('price', 0) or 0) <= 0: return
+        dados_v = ITEM_DB.get(inst.get('item'), {}) if inst is not None else {}
+        if inst is None or (int(dados_v.get('price', 0) or 0) <= 0 and int(dados_v.get('sell_price', 0) or 0) <= 0): return
         maximo = int(inst.get('qty', 1)) if eh_empilhavel(inst.get('item')) else 1
         try: qtd = int(e.get('qty', 1))
         except (TypeError, ValueError): return
