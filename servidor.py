@@ -4583,8 +4583,10 @@ def _lancar_magia(sid, p, caminho, mob_id):
         token = uuid.uuid4().hex
         mob_data['sangria'] = token
         dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_bleed_pct', 0) or 0) / 100.0)))
+        # A magia critou (mesmo a sem golpe, ex: Small Vines): todos os ticks vem critados.
+        if critico: dano_tick *= 2
         socketio.start_background_task(_sangrar, sid, mob_id, mob_data, token, ticks, cada, dano_tick,
-                                       dados.get('spell_bleed_skill'), mob_type_id, dot)
+                                       dados.get('spell_bleed_skill'), mob_type_id, dot, critico)
 
 def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, mob_type_id):
     """Flechas seguintes da Arrow Barrage. Param se o mob morrer ou o player sair."""
@@ -4602,7 +4604,7 @@ def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, 
             if skill: _dar_hits_skill(sid, p, skill, 1)
     except Exception: traceback.print_exc()
 
-def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id, dot='bleed'):
+def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id, dot='bleed', critico=False):
     """Ticks do sangramento (Heavy Cut). Para se o mob morrer/renascer, se
     outro sangramento substituir esse ou se quem lancou sair do jogo."""
     try:
@@ -4613,7 +4615,7 @@ def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_typ
             if m is not mob_ref or m.get('sangria') != token or m.get('hp', 0) <= 0 or p is None: return
             restante = (ticks - i - 1) * cada
             _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano_tick, time.time(),
-                              {'hit_type': '', 'is_crit': False, 'reduced': False, 'is_miss': False,
+                              {'hit_type': '', 'is_crit': critico, 'reduced': False, 'is_miss': False,
                                'w_type': 'Melee', 'proj': '', 'is_' + dot: True, dot + '_secs': restante})
             if skill: _dar_hits_skill(sid, p, skill, 1)
             if m.get('hp', 0) <= 0: return

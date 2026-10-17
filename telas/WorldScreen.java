@@ -3539,12 +3539,14 @@ public class WorldScreen extends ScreenAdapter {
             if (data.has("poison_secs")) mob.venenoAteMs = System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L;
             // Tick de veneno (Small Vines): so' o numero (as vinhas ja' estao no mob).
             if (data.getBoolean("is_poison", false)) {
-                NumeroDano n = new NumeroDano(mob.x, mob.y, String.valueOf(data.getInt("damage", 0)), false);
+                boolean tickCrit = data.getBoolean("is_crit", false); // a magia critou: os ticks tambem
+                NumeroDano n = new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (tickCrit ? "!" : ""), tickCrit);
                 numerosDano.add(n);
                 return;
             }
             if (data.getBoolean("is_bleed", false)) {
-                NumeroDano n = new NumeroDano(mob.x, mob.y, String.valueOf(data.getInt("damage", 0)), false);
+                boolean tickCrit = data.getBoolean("is_crit", false); // a magia critou: os ticks tambem
+                NumeroDano n = new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (tickCrit ? "!" : ""), tickCrit);
                 numerosDano.add(n);
                 tocarEfeitoNoMob("PhysATK", mob); // mesmo efeito do golpe do rotworm
                 if (data.getInt("damage", 0) > 0) sangrar(mob.x, mob.y);
