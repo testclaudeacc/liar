@@ -1106,7 +1106,7 @@ def broadcast_hp(sid, p):
 # rebalancear esses numeros e' decisao separada, nao mexi neles aqui.
 TILE = 16
 MOB_FLOOR = 1
-DETECCAO_SQM = 3  # SQMs pra cada lado (quadrado: 3 = area 7x7)
+DETECCAO_SQM = 5  # SQMs pra cada lado (quadrado: 5 = area 11x11), igual ALCANCE_RANGED_SQM
 # +4 SQMs de folga: dá tempo do mob perseguir até a escada/transição em vez de
 # desistir na hora só porque o alvo mudou de andar no meio da perseguição.
 PERSISTE_SQM = 8
