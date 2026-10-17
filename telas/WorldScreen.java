@@ -3537,16 +3537,14 @@ public class WorldScreen extends ScreenAdapter {
             // Sangramento (Heavy Cut): icone Bleed enquanto durar; tick = so' o numero vermelho.
             if (data.has("bleed_secs")) mob.sangraAteMs = System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L;
             if (data.has("poison_secs")) mob.venenoAteMs = System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L;
-            // Tick de veneno (Small Vines): so' o numero verde (as vinhas ja' estao no mob).
+            // Tick de veneno (Small Vines): so' o numero (as vinhas ja' estao no mob).
             if (data.getBoolean("is_poison", false)) {
                 NumeroDano n = new NumeroDano(mob.x, mob.y, String.valueOf(data.getInt("damage", 0)), false);
-                n.cor = new Color(0.42f, 0.71f, 0.09f, 1f);
                 numerosDano.add(n);
                 return;
             }
             if (data.getBoolean("is_bleed", false)) {
                 NumeroDano n = new NumeroDano(mob.x, mob.y, String.valueOf(data.getInt("damage", 0)), false);
-                n.cor = new Color(0.85f, 0.08f, 0.08f, 1f);
                 numerosDano.add(n);
                 tocarEfeitoNoMob("PhysATK", mob); // mesmo efeito do golpe do rotworm
                 if (data.getInt("damage", 0) > 0) sangrar(mob.x, mob.y);
@@ -3561,10 +3559,7 @@ public class WorldScreen extends ScreenAdapter {
             if (data.getBoolean("reduced", false)) numero.cor = new Color(1f, 0.9f, 0.1f, 1f);
             // Efeito de hit; a distancia, primeiro o projetil sai do atacante.
             String efeito = data.getString("hit_type", "physical_hit");
-            // Dano de fogo (Igniculus): numero laranja (igual verde do veneno e vermelho do sangramento).
-            if (!errou && "Fire".equals(efeito)) numero.cor = new Color(1f, 0.46f, 0f, 1f);
-            // Dano de mana (ataque do Mage): numero azul, igual o sprite da bolinha de mana.
-            if (!errou && "Mana".equals(efeito)) numero.cor = new Color(0.29f, 0.62f, 1f, 1f);
+            // Dano de qualquer elemento: mesmo vermelho (so' Miss/reduzido em amarelo).
             Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
             TextureRegion projetil = regiaoDoCaminho(data.getString("proj", ""));
             // Atacante fora da minha lista (ex: /ghost invisivel): sai da posicao que o servidor mandou.
@@ -5984,19 +5979,21 @@ public class WorldScreen extends ScreenAdapter {
      * canto inferior direito (na cor da moeda; branca pra item). */
     private void desenharLootsFlutuantes() {
         Color anterior = new Color(font.getColor());
-        final float tamanho = 12f, espaco = 2f;
+        final float tamanho = 12f;
         for (LootFlutuante l : lootsFlutuantes) {
             float t = l.tempo / DURACAO_LOOT_FLUTUANTE;
             float subida = 14f * (1f - (1f - t) * (1f - t));
             float alfa = Math.max(0f, t < 0.7f ? 1f : 1f - (t - 0.7f) / 0.3f);
             float ancoraX = Math.round(l.x / camera.zoom) * camera.zoom;
-            float y = Math.round((l.y + 12f + subida) / camera.zoom) * camera.zoom;
+            float yBase = Math.round((l.y + 12f + subida) / camera.zoom) * camera.zoom;
             int n = l.icones.size();
-            float larguraTotal = n * tamanho + Math.max(0, n - 1) * espaco;
-            float x = Math.round((ancoraX - larguraTotal / 2f) / camera.zoom) * camera.zoom;
+            // Um em cima do outro (com folga), centralizados, subindo juntos.
+            float x = Math.round((ancoraX - tamanho / 2f) / camera.zoom) * camera.zoom;
+            final float espacoVertical = 3f;
             font.getData().setScale(NOME_ESCALA_BASE * 0.8f);
             for (int i = 0; i < n; i++) {
-                float xi = x + i * (tamanho + espaco);
+                float xi = x;
+                float y = yBase + i * (tamanho + espacoVertical);
                 TextureRegion icone = l.icones.get(i);
                 if (icone != null) {
                     batch.setColor(1f, 1f, 1f, alfa);
@@ -6017,7 +6014,8 @@ public class WorldScreen extends ScreenAdapter {
                 layout.setText(font, "Not enough capacity");
                 font.setColor(1f, 0.3f, 0.3f, alfa);
                 font.draw(batch, "Not enough capacity",
-                    Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom, y + tamanho + 8f);
+                    Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom,
+                    yBase + Math.max(1, n) * (tamanho + 3f) + 6f);
             }
         }
         font.setColor(anterior);
