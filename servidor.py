@@ -74,10 +74,11 @@ MOB_DB = {
     # player). Defesa do player tira 1:1 (Knight lv1 = 12.5, outras classes = 10).
     "rotworm": {"name": "Rotworm", "hp": 50, "xp": 15, "attack": 14.0, "attack_min": 13, "attack_max": 15, "drops": [], "currency": {"min": 5, "max": 10}},
     # Caverna 6-10 (pos-rotworm): 2 vespas. "wasp" cospe veneno de longe
-    # (range: SQMs, precisa de linha de visao); "wasp2" ferroa colado.
+    # (range: 5 SQMs igual a arma a distancia do player, com linha de visao);
+    # longe disso ela segue o player ate' alcancar de novo. "wasp2" ferroa colado.
     # proj = projetil que sai do mob; hit = efeito no player (sprites/spawn).
     "wasp": {"name": "Venom Wasp", "hp": 115, "xp": 17, "attack": 21.5, "attack_min": 20, "attack_max": 23,
-             "range": 3, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
+             "range": 5, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
              "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                        {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
              "currency": {"min": 7, "max": 14}},
@@ -2009,10 +2010,12 @@ def handle_hit_morph(data):
 
 def _mob_no_alcance(m, origem, t_alvo, alvo):
     """Mob consegue bater daqui? Corpo a corpo: do lado. A distancia (MOB_DB
-    "range"): ate' range SQMs com linha de visao."""
+    "range"): ate' range SQMs em linha reta (circulo, igual a arma a distancia
+    do player) com linha de visao. Fora disso o mob anda atras (perseguicao
+    normal: desiste com a flag se o player for longe demais)."""
     alcance = int(MOB_DB.get(m.get('type_id'), {}).get('range', 1) or 1)
     if alcance <= 1: return _adjacente(origem, t_alvo)
-    if max(abs(origem[0] - t_alvo[0]), abs(origem[1] - t_alvo[1])) > alcance: return False
+    if math.hypot(origem[0] - t_alvo[0], origem[1] - t_alvo[1]) > alcance: return False
     grade = mapas_colisao.get(alvo.get('mapa')) if alvo else None
     return linha_de_visao(grade, origem, t_alvo) if grade is not None else True
 
