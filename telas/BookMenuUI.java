@@ -5683,6 +5683,12 @@ public final class BookMenuUI {
                     i.setScaling(Scaling.fit);
                     quadro.add(i).size(30);
                 }
+                // Mouse em cima / dedo segurando: popup com nome, level e stats.
+                List<String> variantes = new ArrayList<>();
+                JsonValue vs = d.get("variants");
+                if (vs != null && vs.isArray()) for (JsonValue v = vs.child; v != null; v = v.next) variantes.add(v.asString());
+                if (variantes.isEmpty()) variantes.add(d.getString("item", ""));
+                ligarPopupItem(quadro, variantes);
                 celula.add(quadro).size(38).row();
                 if (comChance && d.has("chance")) {
                     Label chance = new LabelPixel(formatarChance(d.getFloat("chance", 0f)), skin.get("hud", Label.LabelStyle.class));
@@ -5701,6 +5707,87 @@ public final class BookMenuUI {
             }
         }
         fichaBestiario.add(rolagem).grow().padBottom(6);
+    }
+
+    // ===== Popup de item do bestiary =====
+    private Table popupItem;
+    private static final float LARGURA_POPUP_ITEM = 230f;
+    private static final float TROCA_VARIANTE_SEG = 1f; // anel/colar: alterna o ADC sorteado
+
+    /** Mouse em cima (PC) ou dedo segurando (celular) mostra o popup do item;
+     * com mais de uma variacao (Ruby Ring de Melee/Magic/...) alterna a cada 1s. */
+    private void ligarPopupItem(final com.badlogic.gdx.scenes.scene2d.Actor ancora, final List<String> caminhos) {
+        ancora.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        ancora.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int ponteiro,
+                                        com.badlogic.gdx.scenes.scene2d.Actor de) {
+                if (ponteiro == -1) mostrarPopupItem(ancora, caminhos); // -1 = mouse sem botao
+            }
+            @Override public void exit(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int ponteiro,
+                                       com.badlogic.gdx.scenes.scene2d.Actor para) {
+                if (ponteiro == -1) esconderPopupItem();
+            }
+            @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int ponteiro, int botao) {
+                mostrarPopupItem(ancora, caminhos);
+                return true;
+            }
+            @Override public void touchUp(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int ponteiro, int botao) {
+                // Celular: some ao soltar. PC: continua enquanto o mouse estiver em cima.
+                if (Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android) esconderPopupItem();
+            }
+        });
+    }
+
+    private void mostrarPopupItem(final com.badlogic.gdx.scenes.scene2d.Actor ancora, final List<String> caminhos) {
+        esconderPopupItem();
+        final Stage stage = root.getStage();
+        if (caminhos.isEmpty() || stage == null) return;
+        final Table caixa = new Table();
+        caixa.setBackground(UiSkin.retangulo(COR_POPUP_FUNDO, COR_POPUP_BORDA, 2));
+        caixa.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+        final Table bloco = new Table();
+        caixa.add(bloco).width(LARGURA_POPUP_ITEM).pad(8);
+        final int[] indice = {0};
+        final Runnable preencher = () -> {
+            preencherBlocoStats(bloco, caminhos.get(indice[0] % caminhos.size()), null);
+            caixa.pack();
+            posicionarPopupItem(caixa, ancora);
+        };
+        preencher.run();
+        // Some sozinho se o livro fechar / a ficha for refeita com ele aberto.
+        caixa.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.forever(
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.run(() -> {
+                if (ancora.getStage() == null || !root.isVisible()) esconderPopupItem();
+            })));
+        if (caminhos.size() > 1) {
+            caixa.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.forever(
+                com.badlogic.gdx.scenes.scene2d.actions.Actions.sequence(
+                    com.badlogic.gdx.scenes.scene2d.actions.Actions.delay(TROCA_VARIANTE_SEG),
+                    com.badlogic.gdx.scenes.scene2d.actions.Actions.run(() -> { indice[0]++; preencher.run(); }))));
+        }
+        popupItem = caixa;
+        stage.addActor(caixa);
+    }
+
+    /** Do lado direito do icone (ou do esquerdo, se nao couber), dentro da tela. */
+    private void posicionarPopupItem(Table caixa, com.badlogic.gdx.scenes.scene2d.Actor ancora) {
+        Stage stage = root.getStage();
+        if (stage == null) return;
+        com.badlogic.gdx.math.Vector2 p = ancora.localToStageCoordinates(new com.badlogic.gdx.math.Vector2(0f, 0f));
+        float w = caixa.getWidth(), h = caixa.getHeight();
+        float x = p.x + ancora.getWidth() + 6f;
+        if (x + w > stage.getWidth()) x = p.x - w - 6f;
+        float y = p.y + ancora.getHeight() - h;
+        x = Math.max(0f, Math.min(x, stage.getWidth() - w));
+        y = Math.max(0f, Math.min(y, stage.getHeight() - h));
+        caixa.setPosition(Math.round(x), Math.round(y));
+    }
+
+    private void esconderPopupItem() {
+        if (popupItem != null) {
+            popupItem.remove();
+            popupItem = null;
+        }
     }
 
     private void adicionarMoedaLoot(Table linha, String[] moeda) {

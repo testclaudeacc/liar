@@ -152,6 +152,8 @@ def montar_bestiario(p):
                 item = validate_item((d.get("one_of") or [d.get("item")])[0])
                 if not item: continue
                 linha = {"item": item}
+                # Variacoes (o popup do client alterna os stats delas).
+                if d.get("one_of"): linha["variants"] = [v for v in d["one_of"] if validate_item(v)]
                 if nivel >= 4: linha["chance"] = float(d.get("chance", 0.0))
                 loot.append(linha)
             e["loot"] = loot
