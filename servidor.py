@@ -1679,6 +1679,7 @@ def _mob_desaparece_por_perseguicao(mob_id, m, now):
     m['dmg_tracker'] = {}
     m['hp'] = 0
     m['died_at'] = now
+    m['sumiu_em'] = now  # sem cadaver: o sync de area nao recria o corpo
     room = m.get('room')
     if room:
         emit_area('mob_vanish', {'mob_id': mob_id, 'pos_x': m.get('pos_x', 0), 'pos_y': m.get('pos_y', 0)}, room)
@@ -2176,6 +2177,9 @@ def montar_sync_area(sid, room):
             # Há quantos segundos morreu: o client só mostra o cadáver pelo
             # tempo que falta dos 60s (antes todo relog recriava o corpo).
             mob_payload["dead_for"] = max(0.0, time.time() - m_data.get('died_at', time.time()))
+            # Sumiu (perseguicao longa ou possuido no /ghost): nunca teve cadaver.
+            if m_data.get('sumiu_em') is not None and m_data.get('sumiu_em') == m_data.get('died_at'):
+                mob_payload["dead_for"] = 1e6
         if 'pos_x' in m_data and 'pos_y' in m_data:
             mob_payload["pos_x"] = m_data["pos_x"]
             mob_payload["pos_y"] = m_data["pos_y"]

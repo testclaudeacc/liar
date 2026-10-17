@@ -198,6 +198,15 @@ public final class Controles {
     /** Auto target (botao do meio do mouse): 0 = qualquer mob, 1 = ignora os
      * que estao focando outro player, 2 = so' os que me focam, 3 = os que
      * focam eu ou a minha party. */
+    /** Barra de vida em cima: 0 = todos, 1 = so' o alvo, 2 = so' inimigos (mobs). */
+    public static int modoBarraHp() { return prefs().getInteger("hp_bar", 2); }
+
+    public static void definirModoBarraHp(int modo) {
+        Preferences p = prefs();
+        p.putInteger("hp_bar", modo);
+        p.flush();
+    }
+
     public static int modoAutoTarget() { return prefs().getInteger("auto_target", 1); }
 
     public static void definirModoAutoTarget(int modo) {

@@ -323,6 +323,34 @@ public class WorldScreen extends ScreenAdapter {
 
     private boolean euMorph() { return morfos.containsKey(local.nome); }
 
+    /** Settings > Show HP bar: 0 = todos, 1 = so' o alvo, 2 = so' inimigos. */
+    private int modoBarraHp = Controles.modoBarraHp();
+
+    private boolean mostrarBarraMob(MobVisual mob) {
+        return modoBarraHp != 1 || mob.id.equals(alvoMob);
+    }
+
+    /** Players: no "todos"; o alvo marcado; e quem possui um mob conta como inimigo. */
+    private boolean mostrarBarraJogador(Jogador j) {
+        boolean alvo = j != local && j.nome.equals(amigoMarcado);
+        boolean inimigo = j != local && morfos.containsKey(j.nome);
+        if (modoBarraHp == 0) return true;
+        if (modoBarraHp == 1) return alvo;
+        return inimigo;
+    }
+
+    /** Barrinha de vida (14px) com fundo preto, igual a dos mobs. */
+    private void desenharBarraVida(float ancoraX, float barraY, float pct) {
+        float barraLargura = 14f;
+        float barraX = ancoraX - barraLargura / 2f;
+        pct = Math.max(0f, Math.min(1f, pct));
+        batch.setColor(0f, 0f, 0f, 0.8f);
+        batch.draw(pixelBranco, barraX - 0.5f, barraY - 0.5f, barraLargura + 1f, 3f);
+        batch.setColor(corDaVida(pct));
+        batch.draw(pixelBranco, barraX, barraY, barraLargura * pct, 2f);
+        batch.setColor(Color.WHITE);
+    }
+
     private void definirMorph(String nome, String tipo) {
         if (nome == null || nome.isEmpty()) return;
         String antes = morfos.get(nome);
@@ -2771,6 +2799,11 @@ public class WorldScreen extends ScreenAdapter {
         int atual = java.util.Arrays.asList(chavesStat).indexOf(Controles.statRetrato());
         secao.add(linhaDeEscolha("Portrait ring", nomesStat, Math.max(0, atual),
             i -> Controles.definirStatRetrato(chavesStat[i]))).left().padTop(6).row();
+        String[] nomesBarra = {"Always", "Only target", "Only enemies"};
+        secao.add(linhaDeEscolha("Show HP bar", nomesBarra, modoBarraHp, i -> {
+            modoBarraHp = i;
+            Controles.definirModoBarraHp(i);
+        })).left().padTop(6).row();
         // Auto target (botao do meio do mouse) - so' no PC.
         if (!mobile) {
             String[] nomesAuto = {"All", "Not others'", "Only mine", "Mine + party"};
@@ -5408,7 +5441,7 @@ public class WorldScreen extends ScreenAdapter {
             batch.draw(regiaoTargetHit, ancoraX - regiaoTargetHit.getRegionWidth() / 2f, ancoraY);
         }
         // Barra de vida (logo acima da cabeca; o nome vai por cima dela).
-        if (!mob.morto) {
+        if (!mob.morto && mostrarBarraMob(mob)) {
             float barraLargura = 14f;
             float barraX = ancoraX - barraLargura / 2f;
             float barraY = ancoraY + altura + 1f;
@@ -6453,7 +6486,19 @@ public class WorldScreen extends ScreenAdapter {
         float altura = quadroAtual(animacaoBase, j).getRegionHeight() * ESCALA_SPRITE;
         // Possuindo um mob: nome e altura do mob (igual desenharNomeMob).
         AnimacaoCorpo animMob = animacaoMorph(j.nome);
-        if (animMob != null) altura = quadroAtual(animMob, j.movendo, j.direcao, j.progresso()).getRegionHeight() * ESCALA_SPRITE + 3f;
+        if (animMob != null) altura = quadroAtual(animMob, j.movendo, j.direcao, j.progresso()).getRegionHeight() * ESCALA_SPRITE;
+        // Barra de vida (Settings > Show HP bar): logo acima da cabeca, o nome sobe um pouco.
+        boolean comBarra = !estaMorto(j) && mostrarBarraJogador(j);
+        if (comBarra) {
+            float pctBarra = 1f;
+            if (j == local) pctBarra = hud.hpMax() > 0f ? hud.hpAtual() / hud.hpMax() : 1f;
+            else {
+                float[] vidaB = vidaRemotos.get(j.nome);
+                if (vidaB != null && vidaB[1] > 0f) pctBarra = vidaB[0] / vidaB[1];
+            }
+            desenharBarraVida(Math.round(j.x / camera.zoom) * camera.zoom, Math.round(j.y / camera.zoom) * camera.zoom + altura + 1f, pctBarra);
+        }
+        if (comBarra || animMob != null) altura += 3f;
         // Mesmo snap de ancoraX/Y que desenharJogador() usa (Math.round(v/zoom)*zoom)
         // - precisa bater exatamente, senao o nome treme independente do sprite.
         float ancoraX = Math.round(j.x / camera.zoom) * camera.zoom;
