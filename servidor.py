@@ -1207,6 +1207,10 @@ MOB_TICK_SEG = 0.05
 MOB_PASSO_ANTECIPA = 0.12
 DIR_TO_INT = {'down': 0, 'up': 1, 'left': 2, 'right': 3}
 ASTAR_LIMITE_NOS = 4000
+# Perseguicao: o mob larga o alvo a DETECCAO+PERSISTE (13 SQMs), entao um
+# caminho de verdade nunca precisa varrer mais que isso; busca que falha
+# (alvo cercado) para aqui em vez de ir ate' 4000 nos (~10ms cada).
+ASTAR_LIMITE_PERSEGUICAO = 800
 MOB_SPEED_PADRAO = 1.0
 # Intervalo entre golpes (player e mob): uma "cadencia" de ataque.
 ATAQUE_COOLDOWN_SEG = 2.385
@@ -1793,7 +1797,7 @@ def _alcanca(m, sid, origem, destino, now):
     c = m['alcance'].get(sid)
     if c and c[1] == origem and c[2] == destino and now - c[0] < ALCANCE_RECALC_SEG:
         return c[3]
-    ok = astar(mapas_colisao.get(m.get('mapa')), origem, destino) is not None
+    ok = astar(mapas_colisao.get(m.get('mapa')), origem, destino, limite=ASTAR_LIMITE_PERSEGUICAO) is not None
     m['alcance'][sid] = (now, origem, destino, ok)
     return ok
 
@@ -1855,14 +1859,20 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
         livres = ocupados - {destino}
     cache = m.get('path')
     caminho = None
-    if cache and cache['fim'] == destino and cache.get('adj') == ate_adjacente and cache['caminho'] and cache['caminho'][0] == origem and now - cache['t'] < PATH_RECALC_SEG:
+    mesmo_pedido = cache and cache['fim'] == destino and cache.get('adj') == ate_adjacente
+    if mesmo_pedido and cache['caminho'] and cache['caminho'][0] == origem and now - cache['t'] < PATH_RECALC_SEG:
         caminho = cache['caminho']
+    elif mesmo_pedido and not cache['caminho'] and cache.get('origem') == origem and now - cache['t'] < PATH_RECALC_SEG:
+        # Sem caminho ha' pouco (alvo cercado por outros mobs, corredor
+        # trancado): nao refaz o A* a cada tick (20x/s) - era o que mais
+        # pesava num lure, cada busca falha varre ate' o limite de nos.
+        return False
     else:
         if ate_adjacente:
-            caminho = astar_ate_adjacente(grade, origem, destino, ocupados)
+            caminho = astar_ate_adjacente(grade, origem, destino, ocupados, limite=ASTAR_LIMITE_PERSEGUICAO)
         else:
-            caminho = astar(grade, origem, destino, livres)
-        m['path'] = {'fim': destino, 'adj': ate_adjacente, 'caminho': caminho, 't': now}
+            caminho = astar(grade, origem, destino, livres, limite=ASTAR_LIMITE_PERSEGUICAO)
+        m['path'] = {'fim': destino, 'adj': ate_adjacente, 'caminho': caminho, 't': now, 'origem': origem}
     if not caminho or len(caminho) < 2: return False
     proximo = caminho[1]
     if proximo in ocupados:
