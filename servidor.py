@@ -79,7 +79,8 @@ MOB_DB = {
     # proj = projetil que sai do mob; hit = efeito no player (sprites/spawn).
     # speed_mult: mais rapida que o padrao do mapa (level maior). flap: a
     # sprite "andando" toca o tempo todo (asas batendo), parada tambem.
-    "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "hp": 115, "xp": 17, "attack": 21.5, "attack_min": 20, "attack_max": 23,
+    # shadow: sombra no chao desenhada pelo jogo (fica parada enquanto o corpo sobe/desce).
+    "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "shadow": True, "hp": 115, "xp": 17, "attack": 21.5, "attack_min": 20, "attack_max": 23,
              "range": 5, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
              "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                        {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
@@ -3282,7 +3283,8 @@ def handle_join_game(data):
                        'admin_args': argumentos_admin()} if eh_admin(data) else {}
         emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(),
                                         'mob_names': {t: i.get('name', t.capitalize()) for t, i in MOB_DB.items()},
-                                        'mob_flap': [t for t, i in MOB_DB.items() if i.get('flap')], 'soul': eh_alma(data), 'admin': eh_admin(data),
+                                        'mob_flap': [t for t, i in MOB_DB.items() if i.get('flap')],
+                                        'mob_shadow': [t for t, i in MOB_DB.items() if i.get('shadow')], 'soul': eh_alma(data), 'admin': eh_admin(data),
                                    'ghost': admin_ghost(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)

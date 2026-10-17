@@ -371,6 +371,20 @@ public class WorldScreen extends ScreenAdapter {
 
     private boolean voa(MobVisual mob) { return mobsBateAsas.contains(tipoDe(mob)); }
 
+    /** Mobs com sombra desenhada pelo jogo (MOB_DB "shadow"): fica parada no chao. */
+    private final java.util.Set<String> mobsComSombra = new java.util.HashSet<>();
+    private static final Color COR_SOMBRA_VOO = new Color(24 / 255f, 20 / 255f, 37 / 255f, 1f);
+
+    /** Sombra oval (4/6/4 px) no chao, centrada no SQM - igual a que vinha desenhada na sheet. */
+    private void desenharSombraVoo(float ancoraX, float ancoraY) {
+        batch.setColor(COR_SOMBRA_VOO);
+        float e = ESCALA_SPRITE;
+        batch.draw(pixelBranco, ancoraX - 2f * e, ancoraY + 2f * e, 4f * e, e);
+        batch.draw(pixelBranco, ancoraX - 3f * e, ancoraY + e, 6f * e, e);
+        batch.draw(pixelBranco, ancoraX - 2f * e, ancoraY, 4f * e, e);
+        batch.setColor(Color.WHITE);
+    }
+
     /** Quanto subir/descer o quadro do mob que voa (ver quadroAsas). */
     private float dyDoMob(MobVisual mob) {
         return !mob.morto && voa(mob) ? dyAsas(mob.id.hashCode(), mob.andandoVisual()) : 0f;
@@ -3236,6 +3250,9 @@ public class WorldScreen extends ScreenAdapter {
                 bookMenu.carregarItemDb(data.get("item_db"));
                 definirNomesMobs(data.get("mob_names"));
                 definirMobsBateAsas(data.get("mob_flap"));
+                mobsComSombra.clear();
+                JsonValue sombras = data.get("mob_shadow");
+                if (sombras != null) for (JsonValue t = sombras.child; t != null; t = t.next) mobsComSombra.add(t.asString().toLowerCase());
                 bookMenu.atualizarInventario(data.get("inventory"));
                 if (data.has("hotbar")) bookMenu.definirHotbar(data.get("hotbar"));
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
@@ -5392,6 +5409,7 @@ public class WorldScreen extends ScreenAdapter {
                 : voaMorph ? quadroAsas(animMob, j.direcao, j.nome.hashCode(), j.movendo)
                 : quadroAtual(animMob, j.movendo, j.direcao, j.progresso());
             float dyMorph = voaMorph ? dyAsas(j.nome.hashCode(), j.movendo) : 0f;
+            if (!estaMorto(j) && tipoMorph != null && mobsComSombra.contains(tipoMorph)) desenharSombraVoo(ancoraX, ancoraY);
             float lm = q.getRegionWidth() * ESCALA_SPRITE, am = q.getRegionHeight() * ESCALA_SPRITE;
             batch.draw(q, ancoraX - lm / 2f, ancoraY + dyMorph, lm, am);
             return;
@@ -5540,6 +5558,7 @@ public class WorldScreen extends ScreenAdapter {
             batch.draw(regiaoAlvo, ancoraX - regiaoAlvo.getRegionWidth() / 2f, ancoraY - 1f);
         }
         float dyVoo = dyDoMob(mob); // mob que voa: corpo parado/abaixado enquanto as asas batem
+        if (!mob.morto && mobsComSombra.contains(tipoDe(mob))) desenharSombraVoo(ancoraX, ancoraY);
         if (mob.morto) {
             // Cadaver some aos poucos nos ultimos FADE_CORPO segundos (inclusive
             // quando o SpawnWarning encurta o tempo dele, ver mob_spawn_warning).
