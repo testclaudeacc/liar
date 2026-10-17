@@ -5422,6 +5422,12 @@ public final class BookMenuUI {
         if (tipo == null || tipo.isEmpty()) return null;
         TextureAtlas.AtlasRegion tira = atlas.findRegion("sprites/mobs/" + tipo);
         if (tira == null) tira = atlas.findRegion("sprites/mobs/" + Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1));
+        if (tira == null) {
+            // Tipo vem minusculo do servidor ("spidermushroom" -> SpiderMushroom).
+            for (TextureAtlas.AtlasRegion r : atlas.getRegions()) {
+                if (r.name.equalsIgnoreCase("sprites/mobs/" + tipo)) return r;
+            }
+        }
         return tira;
     }
 

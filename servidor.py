@@ -91,15 +91,16 @@ MOB_DB = {
                         {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
               "currency": {"min": 7, "max": 14}},
     # Hunt 10-15 (tabela por caverna): Mushroom Spider = melee comum, Wolf = forte.
-    # XP buffado (22->38, 28->48): no lv 14 eram ~360 aranhas por level, agora ~210.
+    # XP buffado (22->57, 28->72): lv 14 -> 15 em ~30 min (~140 aranhas a ~13s cada).
+    # Proximas hunts: ~40-50 min por level so' la' pelo lv 18-19.
     # "one_of": UMA rolagem com essa chance; se cair, sorteia um item da lista
     # (anel/colar de Ruby com ADC aleatorio).
-    "spidermushroom": {"name": "Mushroom Spider", "hp": 200, "xp": 38, "attack": 34.0, "attack_min": 32, "attack_max": 36,
+    "spidermushroom": {"name": "Mushroom Spider", "hp": 200, "xp": 57, "attack": 34.0, "attack_min": 32, "attack_max": 36,
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.05},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02}],
                        "currency": {"min": 10, "max": 18}},
-    "wolf": {"name": "Wolf", "speed_mult": 1.15, "hp": 260, "xp": 48, "attack": 39.0, "attack_min": 37, "attack_max": 41, "hit": "BiteAtk",
+    "wolf": {"name": "Wolf", "speed_mult": 1.15, "hp": 260, "xp": 72, "attack": 39.0, "attack_min": 37, "attack_max": 41, "hit": "BiteAtk",
              "drops": [{"item": "res://sprites/items/Materials/WolfFur.tres", "chance": 0.05},
                        {"item": "res://sprites/items/Knight/Weapons/BasicDagger.tres", "chance": 0.02},
                        {"item": "res://sprites/items/Mage/Weapons/RubyStaff.tres", "chance": 0.02},
@@ -146,14 +147,13 @@ def montar_bestiario(p):
         if nivel >= 3:
             loot = []
             for d in info.get("drops", []):
-                # "one_of": cada variacao aparece com a chance dividida entre elas.
-                opcoes = d.get("one_of") or [d.get("item")]
-                for opcao in opcoes:
-                    item = validate_item(opcao)
-                    if not item: continue
-                    linha = {"item": item}
-                    if nivel >= 4: linha["chance"] = float(d.get("chance", 0.0)) / len(opcoes)
-                    loot.append(linha)
+                # "one_of" (anel/colar com ADC sorteado): aparece uma vez so',
+                # com a primeira variacao e a chance inteira.
+                item = validate_item((d.get("one_of") or [d.get("item")])[0])
+                if not item: continue
+                linha = {"item": item}
+                if nivel >= 4: linha["chance"] = float(d.get("chance", 0.0))
+                loot.append(linha)
             e["loot"] = loot
             faixa = info.get("currency") or {}
             if int(faixa.get("max", 0) or 0) > 0:
