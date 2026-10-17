@@ -365,19 +365,41 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Quadro do mob agora: os que voam batem as asas sem parar (cada um num ritmo defasado). */
     private TextureRegion quadroDoMob(MobVisual mob) {
-        if (!mob.morto && mobsBateAsas.contains(tipoDe(mob))) return quadroAsas(mob.animacao, mob.direcao, mob.id.hashCode());
+        if (!mob.morto && voa(mob)) return quadroAsas(mob.animacao, mob.direcao, mob.id.hashCode(), mob.andandoVisual());
         return quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
     }
 
-    private TextureRegion quadroAsas(AnimacaoCorpo a, String direcao, int semente) {
+    private boolean voa(MobVisual mob) { return mobsBateAsas.contains(tipoDe(mob)); }
+
+    /** Quanto subir/descer o quadro do mob que voa (ver quadroAsas). */
+    private float dyDoMob(MobVisual mob) {
+        return !mob.morto && voa(mob) ? dyAsas(mob.id.hashCode(), mob.andandoVisual()) : 0f;
+    }
+
+    private int faseAsas(int semente) {
         long passo = (com.badlogic.gdx.utils.TimeUtils.millis() + (semente & 0xff)) / (long) (QUADRO_ASAS_SEG * 1000f);
-        int i = (int) (passo % 2);
+        return (int) (passo % 2);
+    }
+
+    /** Mob que voa: a sheet tem o quadro parado (corpo em cima) e o "andando"
+     * (corpo 1px abaixo, a outra posicao das asas). Parado: alterna os dois,
+     * com o "andando" desenhado 1px acima - so' as asas mexem. Andando: alterna
+     * os dois com o parado desenhado 1px abaixo - o corpo fica 1px mais baixo
+     * e as asas continuam batendo. O deslocamento vem de dyAsas. */
+    private TextureRegion quadroAsas(AnimacaoCorpo a, String direcao, int semente, boolean andando) {
+        boolean usarAndar = (faseAsas(semente) == 0) == andando;
         switch (direcao) {
-            case "up": return a.andarCima[i];
-            case "left": return a.andarEsquerda[i];
-            case "right": return a.andarDireita[i];
-            default: return a.andarBaixo[i];
+            case "up": return usarAndar ? a.andarCima[0] : a.idleCima;
+            case "left": return usarAndar ? a.andarEsquerda[0] : a.idleEsquerda;
+            case "right": return usarAndar ? a.andarDireita[0] : a.idleDireita;
+            default: return usarAndar ? a.andarBaixo[0] : a.idleBaixo;
         }
+    }
+
+    private float dyAsas(int semente, boolean andando) {
+        boolean fase1 = faseAsas(semente) == 1;
+        if (!andando) return fase1 ? ESCALA_SPRITE : 0f;   // quadro "andando" sobe 1px (corpo parado)
+        return fase1 ? -ESCALA_SPRITE : 0f;                 // quadro parado desce 1px (corpo abaixado)
     }
 
     private void definirNomesMobs(JsonValue nomes) {
@@ -5365,11 +5387,13 @@ public class WorldScreen extends ScreenAdapter {
         AnimacaoCorpo animMob = animacaoMorph(j.nome);
         if (animMob != null) {
             String tipoMorph = morfos.get(j.nome);
+            boolean voaMorph = !estaMorto(j) && tipoMorph != null && mobsBateAsas.contains(tipoMorph);
             TextureRegion q = estaMorto(j) && animMob.morte != null ? animMob.morte
-                : tipoMorph != null && mobsBateAsas.contains(tipoMorph) ? quadroAsas(animMob, j.direcao, j.nome.hashCode())
+                : voaMorph ? quadroAsas(animMob, j.direcao, j.nome.hashCode(), j.movendo)
                 : quadroAtual(animMob, j.movendo, j.direcao, j.progresso());
+            float dyMorph = voaMorph ? dyAsas(j.nome.hashCode(), j.movendo) : 0f;
             float lm = q.getRegionWidth() * ESCALA_SPRITE, am = q.getRegionHeight() * ESCALA_SPRITE;
-            batch.draw(q, ancoraX - lm / 2f, ancoraY, lm, am);
+            batch.draw(q, ancoraX - lm / 2f, ancoraY + dyMorph, lm, am);
             return;
         }
         // /ghost do admin: o boneco inteiro meio transparente.
@@ -5515,6 +5539,7 @@ public class WorldScreen extends ScreenAdapter {
         if (!mob.morto && mob.id.equals(alvoMob) && regiaoAlvo != null) {
             batch.draw(regiaoAlvo, ancoraX - regiaoAlvo.getRegionWidth() / 2f, ancoraY - 1f);
         }
+        float dyVoo = dyDoMob(mob); // mob que voa: corpo parado/abaixado enquanto as asas batem
         if (mob.morto) {
             // Cadaver some aos poucos nos ultimos FADE_CORPO segundos (inclusive
             // quando o SpawnWarning encurta o tempo dele, ver mob_spawn_warning).
@@ -5522,7 +5547,7 @@ public class WorldScreen extends ScreenAdapter {
             batch.draw(quadro, x, ancoraY, largura, altura);
             batch.setColor(Color.WHITE);
         } else {
-            batch.draw(quadro, x, ancoraY, largura, altura);
+            batch.draw(quadro, x, ancoraY + dyVoo, largura, altura);
         }
         if (!mob.morto && mob.tempoTargetHit > 0f && regiaoTargetHit != null) {
             batch.draw(regiaoTargetHit, ancoraX - regiaoTargetHit.getRegionWidth() / 2f, ancoraY);
