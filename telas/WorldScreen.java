@@ -120,6 +120,7 @@ public class WorldScreen extends ScreenAdapter {
     private static class MobVisual {
         final String id;
         String nome;   // nome de exibicao (servidor: mob_names; ate' chegar, o tipo com maiuscula)
+        String tipo;   // tipo do MOB_DB (ex: "wasp") - o /summons tem id "summonN", sem o tipo
         final AnimacaoCorpo animacao;
         final TextureRegion quadroMorto;
         float x, y;
@@ -333,6 +334,10 @@ public class WorldScreen extends ScreenAdapter {
         return (penultimo > 0 ? id.substring(0, penultimo) : id).toLowerCase();
     }
 
+    private static String tipoDe(MobVisual mob) {
+        return mob.tipo != null ? mob.tipo : tipoDoIdMob(mob.id);
+    }
+
     private String nomeDoTipoMob(String tipo) {
         if (tipo == null || tipo.isEmpty()) return "";
         String n = nomesMobs.get(tipo.toLowerCase());
@@ -351,7 +356,7 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Quadro do mob agora: os que voam batem as asas sem parar (cada um num ritmo defasado). */
     private TextureRegion quadroDoMob(MobVisual mob) {
-        if (!mob.morto && mobsBateAsas.contains(tipoDoIdMob(mob.id))) return quadroAsas(mob.animacao, mob.direcao, mob.id.hashCode());
+        if (!mob.morto && mobsBateAsas.contains(tipoDe(mob))) return quadroAsas(mob.animacao, mob.direcao, mob.id.hashCode());
         return quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
     }
 
@@ -370,7 +375,7 @@ public class WorldScreen extends ScreenAdapter {
         if (nomes == null) return;
         for (JsonValue e = nomes.child; e != null; e = e.next) nomesMobs.put(e.name.toLowerCase(), e.asString());
         for (MobVisual mob : mobs.values()) {
-            String n = nomesMobs.get(tipoDoIdMob(mob.id));
+            String n = nomesMobs.get(tipoDe(mob));
             if (n != null) mob.nome = n;
         }
     }
@@ -3247,6 +3252,7 @@ public class WorldScreen extends ScreenAdapter {
             String id = data.getString("corpse_id", "corpo_morph_" + nome + "_" + System.currentTimeMillis());
             MobVisual corpo = new MobVisual(id, nomeDoTipoMob(tipo), cx, cy,
                 criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+            corpo.tipo = tipo.toLowerCase();
             corpo.morto = true;
             corpo.hp = 0f;
             corpo.visivel = true;
@@ -5299,6 +5305,7 @@ public class WorldScreen extends ScreenAdapter {
         if (sprite == null) return null;
         String nomeMob = nomeDoTipoMob(tipoMob);
         MobVisual mob = new MobVisual(id, nomeMob, 0f, 0f, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+        mob.tipo = tipoMob.toLowerCase();
         mobs.put(id, mob);
         return mob;
     }
@@ -5446,7 +5453,9 @@ public class WorldScreen extends ScreenAdapter {
             Gdx.app.log("WorldScreen", "Mob criado: " + id + " (spawn_range=" + spawn.spawnRange
                 + ", respawn_time=" + spawn.respawnTime + ")");
             String nome = nomeDoTipoMob(spawn.mobId);
-            mobs.put(id, new MobVisual(id, nome, spawn.worldX, spawn.worldY, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE)));
+            MobVisual novo = new MobVisual(id, nome, spawn.worldX, spawn.worldY, criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
+            novo.tipo = spawn.mobId.toLowerCase();
+            mobs.put(id, novo);
         }
     }
 
