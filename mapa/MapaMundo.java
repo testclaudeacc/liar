@@ -419,14 +419,14 @@ public class MapaMundo {
                         TiledMapTileLayer.Cell cell = camada.getCell(x, y);
                         if (cell == null || cell.getTile() == null) continue;
                         int c = corDoTile(cell.getTile(), cache, fontes);
-                        if (c != 0) cores[y * w + x] = c;
+                        if (c != 0) cores[y * w + x] = misturarCobertura(cores[y * w + x], c, cell.getTile());
                     }
                 }
             }
             for (MapaPropriedades.CelulaOverlay c : propriedades.celulasOverlay) {
                 if (c.cx < 0 || c.cy < 0 || c.cx >= w || c.cy >= h) continue;
                 int cor = corDoTile(c.tile, cache, fontes);
-                if (cor != 0) cores[c.cy * w + c.cx] = cor;
+                if (cor != 0) cores[c.cy * w + c.cx] = misturarCobertura(cores[c.cy * w + c.cx], cor, c.tile);
             }
         } finally {
             for (Pixmap p : fontes.values()) if (p != null) p.dispose();
@@ -445,6 +445,22 @@ public class MapaMundo {
             }
         }
         return pm;
+    }
+
+    /** Quanto do tile e' opaco (0-1): adorno pequeno (flor) cobre pouco. */
+    private final Map<TiledMapTile, Float> coberturaMiniMapa = new HashMap<>();
+
+    /** Cor do tile por cima da que ja' tinha no SQM, na proporcao do quanto
+     * ele cobre: flor espalhada na grama so' puxa um pouco a cor (antes o
+     * tile de flor inteiro virava rosa no minimapa). */
+    private int misturarCobertura(int embaixo, int cor, TiledMapTile tile) {
+        Float cobre = coberturaMiniMapa.get(tile);
+        float a = cobre == null ? 1f : cobre;
+        if (embaixo == 0 || a >= 0.95f) return cor;
+        int r = Math.round(((embaixo >>> 24) & 0xff) * (1f - a) + ((cor >>> 24) & 0xff) * a);
+        int g = Math.round(((embaixo >>> 16) & 0xff) * (1f - a) + ((cor >>> 16) & 0xff) * a);
+        int b = Math.round(((embaixo >>> 8) & 0xff) * (1f - a) + ((cor >>> 8) & 0xff) * a);
+        return r << 24 | g << 16 | b << 8 | 0xff;
     }
 
     /** RGBA8888 da cor media do tile (0 = todo transparente). */
@@ -478,6 +494,8 @@ public class MapaMundo {
                     }
                 }
                 if (n > 0) resultado = (int) ((r / n) << 24 | (g / n) << 16 | (b / n) << 8 | 0xff);
+                int total = regiao.getRegionWidth() * regiao.getRegionHeight();
+                if (total > 0) coberturaMiniMapa.put(tile, n / (float) total);
             }
         }
         cache.put(tile, resultado);
