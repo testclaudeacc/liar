@@ -72,7 +72,7 @@ except Exception as e:
 MOB_DB = {
     # attack_min/attack_max: faixa do golpe (sem elas: attack -15%..+15%, igual o
     # player). Defesa do player tira 1:1 (Knight lv1 = 20, outras classes = 10).
-    "rotworm": {"hp": 50, "xp": 15, "attack": 24.0, "attack_min": 23, "attack_max": 25, "drops": [], "currency": {"min": 5, "max": 10}},
+    "rotworm": {"hp": 50, "xp": 15, "attack": 14.0, "attack_min": 13, "attack_max": 15, "drops": [], "currency": {"min": 5, "max": 10}},
 }
 
 # ---------------------------------------------------------------------------
@@ -332,7 +332,7 @@ SLOTS_VALIDOS = {"Helm", "Gloves", "Chest", "Boots", "Necklace", "Ring", "MainHa
 ITEM_DB = {
     "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"name": "Wooden Flute", "type": "Flute", "req_level": 0, "req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "mana_cost": 2, "cap": 15.0},
     "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"name": "Basic Music Sheet", "type": "Music Sheet", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 15.0},
-    "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 15.0},
+    "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 15.0},
     "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 5, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 15.0},
     "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "mana_cost": 3, "cap": 15.0},
     "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 5, "cap": 15.0},
@@ -742,7 +742,9 @@ def calc_level_bonuses(level, player_class):
 
 def calc_player_stats(player_class, level, skills, bonus_dmg=0, bonus_def=0):
     dmg = ((level - 1) * 0.5) + bonus_dmg
-    defense = 0.0 + bonus_def
+    # Defesa dos itens conta 1:2 (5 de defesa no escudo = 2.5 de reducao);
+    # a skill defense conta 1:1 (mais abaixo).
+    defense = 0.0 + bonus_def * 0.5
     adc = skills.get("adc", 0)
     dmg += adc * 0.5
     defense += adc * 0.5
