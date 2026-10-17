@@ -4841,9 +4841,16 @@ public final class BookMenuUI {
         if (mercadoBusca == null) return;
         mercadoLista.clearChildren();
         List<String> itens = new ArrayList<>();
+        java.util.Set<String> gruposVistos = new java.util.HashSet<>();
         for (Map.Entry<String, EquipStats> e : ITEM_STATS.entrySet()) {
             if (ehMagia(e.getKey()) || e.getValue().nome.isEmpty()) continue;
-            if (passaFiltrosMercado(e.getKey(), e.getValue())) itens.add(e.getKey());
+            if (!passaFiltrosMercado(e.getKey(), e.getValue())) continue;
+            // Anel/colar com ADC sorteado: uma linha so' (a variacao da minha classe).
+            List<String> variantes = variantesMercado(e.getKey());
+            if (variantes.size() > 1) {
+                if (!gruposVistos.add(variantes.get(0))) continue;
+                itens.add(varianteDaClasse(variantes, classeJogador));
+            } else itens.add(e.getKey());
         }
         itens.sort((a, b) -> nomeExibicao(a).compareToIgnoreCase(nomeExibicao(b)));
         for (String caminho : itens) mercadoLista.add(gavetaItemMercado(caminho)).growX().padBottom(3).row();
@@ -4852,7 +4859,7 @@ public final class BookMenuUI {
 
     /** Gaveta da lista: icone + nome (+ level); clicar abre as ofertas dele. */
     private Button gavetaItemMercado(String caminho) {
-        boolean escolhido = caminho.equals(mercadoItem);
+        boolean escolhido = variantesMercado(caminho).contains(mercadoItem);
         Button.ButtonStyle estilo = new Button.ButtonStyle();
         estilo.up = UiSkin.retangulo(new Color(0.11f, 0.11f, 0.11f, 1f), escolhido ? Color.valueOf("ffd56b") : new Color(0.25f, 0.25f, 0.25f, 1f), 1);
         estilo.over = UiSkin.retangulo(new Color(0.16f, 0.16f, 0.16f, 1f), escolhido ? Color.valueOf("ffd56b") : new Color(0.4f, 0.4f, 0.4f, 1f), 1);
@@ -4882,6 +4889,55 @@ public final class BookMenuUI {
             }
         });
         return g;
+    }
+
+    /** Variacoes do mesmo item universal que so' mudam o ADC (Ruby Ring de
+     * Melee/Magic/Focus/Musicality): mesmo nome e tipo. Item comum: so' ele. */
+    private List<String> variantesMercado(String caminho) {
+        List<String> out = new ArrayList<>();
+        EquipStats d = caminho == null ? null : ITEM_STATS.get(caminho);
+        if (d == null || !"All".equals(d.reqClass) || adcDeClasse(d.fourthStatType) == null) {
+            if (caminho != null) out.add(caminho);
+            return out;
+        }
+        for (Map.Entry<String, EquipStats> e : ITEM_STATS.entrySet()) {
+            EquipStats o = e.getValue();
+            if (o.nome.equals(d.nome) && o.tipo.equals(d.tipo) && "All".equals(o.reqClass)
+                    && adcDeClasse(o.fourthStatType) != null) out.add(e.getKey());
+        }
+        out.sort(String::compareTo);
+        return out;
+    }
+
+    /** ADC que alimenta a classe (servidor.py::ADC_DA_CLASSE, o principal). */
+    private static String adcDaClasse(String classe) {
+        switch (classe == null ? "" : classe) {
+            case "Mage": return "Magic";
+            case "Ranger": return "Focus";
+            case "Bard": return "Musicality";
+            default: return "Melee";
+        }
+    }
+
+    /** Classe dona do ADC (null = nao e' ADC de classe). */
+    private static String adcDeClasse(String adc) {
+        if (adc == null) return null;
+        switch (adc) {
+            case "Melee": return "Knight";
+            case "Magic": return "Mage";
+            case "Focus": return "Ranger";
+            case "Musicality": return "Bard";
+            default: return null;
+        }
+    }
+
+    private String varianteDaClasse(List<String> variantes, String classe) {
+        String adc = adcDaClasse(classe);
+        for (String v : variantes) {
+            EquipStats d = ITEM_STATS.get(v);
+            if (d != null && adc.equals(d.fourthStatType)) return v;
+        }
+        return variantes.isEmpty() ? null : variantes.get(0);
     }
 
     /** "1g 50s" (igual servidor.py::formatar_moedas). */
@@ -4950,6 +5006,26 @@ public final class BookMenuUI {
         nomes.add(linhaStat("In your bag: " + mercadoTenho, Color.LIGHT_GRAY)).left().row();
         cab.add(nomes).left();
         mercadoDetalhe.add(cab).left().padBottom(6).row();
+        // Item universal com ADC de cada classe (Ruby Ring...): escolhe qual.
+        List<String> variantes = variantesMercado(caminho);
+        if (variantes.size() > 1) {
+            Table filtro = new Table();
+            filtro.left();
+            for (String classe : new String[]{"Knight", "Mage", "Ranger", "Bard"}) {
+                String variante = varianteDaClasse(variantes, classe);
+                if (variante == null || !adcDaClasse(classe).equals(ITEM_STATS.get(variante).fourthStatType)) continue;
+                filtro.add(botaoSpells(classe, variante.equals(caminho) ? "verde" : "default", () -> {
+                    if (variante.equals(mercadoItem)) return;
+                    mercadoItem = variante;
+                    mercadoOfertas = null;
+                    mercadoAviso = "";
+                    atualizarListaMercado();
+                    atualizarDetalheMercado();
+                    emitirMercado("market_item", w -> w.set("item", variante));
+                })).width(96).height(30).padRight(4);
+            }
+            mercadoDetalhe.add(filtro).left().padBottom(6).row();
+        }
         // Abas: Sell offers (outros vendendo) / Buy offers (outros comprando).
         Table abas = new Table();
         abas.left();
