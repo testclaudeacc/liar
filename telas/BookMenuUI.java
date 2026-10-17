@@ -868,8 +868,6 @@ public final class BookMenuUI {
         return tipo;
     }
 
-    private String skillDaMinhaClasse() { return quartoStatExibido("Class"); }
-
     /** Arma da mao principal: efeito/projetil do ataque basico (null = o da classe). */
     public String efeitoArmaEquipada() {
         EquipStats d = armaEquipada();
@@ -999,9 +997,7 @@ public final class BookMenuUI {
         String quarto = quartoStatExibido(dados.fourthStatType);
         if (quarto != null) {
             int anterior = base != null && quarto.equals(quartoStatExibido(base.fourthStatType)) ? base.fourthStatValue : 0;
-            // ADC de outra classe (ex: Ruby Ring de Focus num Knight) nao conta: cinza.
-            Color corAdc = quarto.equals(skillDaMinhaClasse()) ? corQuartoStat(quarto) : Color.GRAY;
-            adicionarLinhaStat(bloco, quarto, dados.fourthStatValue, anterior, comparar, corAdc);
+            adicionarLinhaStat(bloco, quarto, dados.fourthStatValue, anterior, comparar, corQuartoStat(quarto));
         }
         // Arma rapida (adaga): espadinha + quanto mais rapido bate.
         if (dados.velocidadeAtaque != 1f) {
@@ -2018,7 +2014,29 @@ public final class BookMenuUI {
         return skin.getDrawable(name);
     }
 
+    /** Icone sem "sangria": com a tela ampliada (escala quebrada) o filtro
+     * Nearest pegava 1 pixel do sprite vizinho no atlas e aparecia uma linha
+     * fina na borda do slot. Recua a UV 1/4 de texel em cada lado. */
+    private final Map<TextureAtlas.AtlasRegion, TextureAtlas.AtlasRegion> iconesSemSangria = new java.util.HashMap<>();
+
+    private TextureAtlas.AtlasRegion semSangria(TextureAtlas.AtlasRegion r) {
+        if (r == null) return null;
+        TextureAtlas.AtlasRegion pronto = iconesSemSangria.get(r);
+        if (pronto != null) return pronto;
+        pronto = new TextureAtlas.AtlasRegion(r);
+        float du = 0.25f / r.getTexture().getWidth(), dv = 0.25f / r.getTexture().getHeight();
+        pronto.setRegion(r.getU() + du, r.getV() + dv, r.getU2() - du, r.getV2() - dv);
+        pronto.packedWidth = r.packedWidth;
+        pronto.packedHeight = r.packedHeight;
+        iconesSemSangria.put(r, pronto);
+        return pronto;
+    }
+
     public TextureAtlas.AtlasRegion iconeDoItem(String caminhoItem) {
+        return semSangria(iconeDoItemBruto(caminhoItem));
+    }
+
+    private TextureAtlas.AtlasRegion iconeDoItemBruto(String caminhoItem) {
         // Item com "icon" no ITEM_DB (ex: pocoes) usa essa regiao do atlas.
         EquipStats comIcone = caminhoItem == null ? null : ITEM_STATS.get(caminhoItem);
         if (comIcone != null && comIcone.icone != null) {

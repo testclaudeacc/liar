@@ -84,6 +84,7 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion idleCima, idleBaixo, idleDireita, idleEsquerda;
         TextureRegion[] andarCima, andarBaixo, andarDireita, andarEsquerda;
         TextureRegion morte; // quadro 10; null se a tira nao tiver (skin sem quadro de morte)
+        int ciclosPorPasso = 1; // quantas vezes os quadros de andar tocam por SQM (patas: 2)
     }
 
     // SpawnPoint (jogo/world.tscn, Marker2D "SpawnPoint") - posicao CRUA (antes
@@ -5318,6 +5319,8 @@ public class WorldScreen extends ScreenAdapter {
             a.idleDireita = regiao(tex, 9);
             a.andarDireita = regioes(tex, new int[] {10, 11});
             a.morte = regiao(tex, 12);
+            // Muitas patas (aranha): pernas mexem o dobro por SQM, nao igual bipede.
+            a.ciclosPorPasso = 2;
         }
         return a;
     }
@@ -5371,7 +5374,8 @@ public class WorldScreen extends ScreenAdapter {
                 default: return a.idleBaixo;
             }
         }
-        int indiceFrame = Math.min(1, (int) (progresso * 2f));
+        int quadros = 2 * a.ciclosPorPasso;
+        int indiceFrame = Math.min(quadros - 1, (int) (progresso * quadros)) % 2;
         switch (direcao) {
             case "up": return a.andarCima[indiceFrame];
             case "left": return a.andarEsquerda[indiceFrame];
