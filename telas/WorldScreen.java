@@ -391,6 +391,7 @@ public class WorldScreen extends ScreenAdapter {
         final TextureRegion regiao;
         final float x0, y0;
         final MobVisual alvo;   // persegue o mob (ele pode estar andando)
+        Jogador alvoJogador;    // ou um player (ex: possuindo um mob)
         final String efeitoHit;
         NumeroDano numero;      // dano que aparece quando o projetil chega
         Runnable aoChegar;      // ex: Small Vines - as vinhas brotam quando a semente chega
@@ -402,8 +403,8 @@ public class WorldScreen extends ScreenAdapter {
         Projetil(TextureRegion regiao, float x0, float y0, MobVisual alvo, String efeitoHit) {
             this.regiao = regiao; this.x0 = x0; this.y0 = y0; this.alvo = alvo; this.efeitoHit = efeitoHit;
         }
-        float x1() { return alvo.x; }
-        float y1() { return alvo.y + 8f; }
+        float x1() { return alvoJogador != null ? alvoJogador.x : alvo.x; }
+        float y1() { return (alvoJogador != null ? alvoJogador.y : alvo.y) + 8f; }
     }
     private final List<Projetil> projeteis = new ArrayList<>();
     private static final float DURACAO_PROJETIL = 0.12f;
@@ -2404,6 +2405,7 @@ public class WorldScreen extends ScreenAdapter {
     /** Botao de alvo do topo: com um player marcado, abre a janela dele. */
     private void abrirPainelDoAlvo() {
         if (amigoMarcado == null || !remotos.containsKey(amigoMarcado)) return;
+        if (morfos.containsKey(amigoMarcado)) return; // mob possuido: nao abre a janela do player
         abrirPainelDe(amigoMarcado);
     }
 
@@ -2496,8 +2498,13 @@ public class WorldScreen extends ScreenAdapter {
             // fora da tela (a skin dele continua guardada).
             if (j == null && nomeFixo != null) j = remotosForaDeVisao.get(nomeFixo);
             if (j == null) j = parado;
+            // Alvo possuindo um mob: a foto e' o mob, nao o boneco.
+            AnimacaoCorpo animMorphAlvo = nomeFixo == null && j != null ? animacaoMorph(j.nome) : null;
             if (mob != null && !mob.morto) {
                 quadros.add(quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso));
+                cores.add(Color.WHITE);
+            } else if (animMorphAlvo != null) {
+                quadros.add(quadroAtual(animMorphAlvo, j.movendo, j.direcao, j.progresso()));
                 cores.add(Color.WHITE);
             } else if (j != null) {
                 List<CamadaSkin> camadas = skinsJogadores.get(j.nome);
@@ -3145,7 +3152,8 @@ public class WorldScreen extends ScreenAdapter {
             Jogador j = jogadorPorNome(nome);
             float cx = j != null ? j.x : conversor.rawParaMundoX(data.getFloat("pos_x", 0f));
             float cy = j != null ? j.y : conversor.rawParaMundoY(data.getFloat("pos_y", 0f));
-            String id = "corpo_morph_" + nome + "_" + System.currentTimeMillis();
+            // Id do servidor: o mob_died que vem logo depois (bag de loot) acha o cadaver.
+            String id = data.getString("corpse_id", "corpo_morph_" + nome + "_" + System.currentTimeMillis());
             MobVisual corpo = new MobVisual(id, Character.toUpperCase(tipo.charAt(0)) + tipo.substring(1), cx, cy,
                 criarAnimacao(sprite), regiao(sprite, FRAME_MORTE));
             corpo.morto = true;
@@ -3488,20 +3496,19 @@ public class WorldScreen extends ScreenAdapter {
             if (mob != null) mob.tempoTargetHit = 1.1f;
             String alvo = data.getString("target_player", "");
             Jogador j = jogadorPorNome(alvo);
-            if (j != null) {
-                int dano = data.getInt("damage", 0);
-                // Dano 0 = o player desviou (servidor.py: BLOCK_CHANCE, agora "Dodge"):
-                // "Miss" em amarelo.
-                NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? "Miss" : String.valueOf(dano), false);
-                if (dano <= 0) nd.cor = new Color(1f, 0.9f, 0.1f, 1f);
-                numerosDano.add(nd);
-                if (dano > 0) sangrar(j.x, j.y);
-                // Golpe fisico de mob (ex: rotworm): efeito proprio, PhysATK.
-                String hitMob = data.getString("hit_type", "physical_hit");
-                if ("physical_hit".equals(hitMob) || "Physical".equals(hitMob)) hitMob = "PhysATK";
-                Efeito e = tocarEfeito(hitMob, j.x, j.y);
-                if (e != null) e.jogadorAlvo = j;
+            // Player batendo a distancia (no mob possuido): o projetil sai dele e
+            // o numero/efeito so' aparecem quando chega.
+            Jogador atirador = jogadorPorNome(data.getString("attacker_player", ""));
+            TextureRegion projetilPlayer = regiaoDoCaminho(data.getString("proj", ""));
+            if (j != null && atirador != null && projetilPlayer != null && "Ranged".equals(data.getString("w_type", ""))) {
+                Projetil pr = new Projetil(projetilPlayer, atirador.x, atirador.y + 8f, null, null);
+                pr.alvoJogador = j;
+                final Jogador alvoJ = j;
+                pr.aoChegar = () -> mostrarGolpeNoJogador(alvoJ, data);
+                projeteis.add(pr);
+                j = null; // o golpe aparece na chegada
             }
+            if (j != null) mostrarGolpeNoJogador(j, data);
             if (!alvo.equals(local.nome) && data.has("new_hp")) {
                 vidaRemotos.put(alvo, new float[]{data.getFloat("new_hp", 1f), data.getFloat("max_hp", 1f)});
             }
@@ -5546,6 +5553,23 @@ public class WorldScreen extends ScreenAdapter {
         efeitos.add(e);
     }
 
+    /** Golpe num player (mob, ou player batendo no mob possuido): numero
+     * (Miss amarelo), sangue e o efeito do hit em cima dele. */
+    private void mostrarGolpeNoJogador(Jogador j, JsonValue data) {
+        int dano = data.getInt("damage", 0);
+        boolean critico = data.getBoolean("is_crit", false);
+        // Dano 0 = o player desviou (servidor.py: BLOCK_CHANCE, agora "Dodge"): "Miss" em amarelo.
+        NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? "Miss" : dano + (critico ? "!" : ""), critico);
+        if (dano <= 0) nd.cor = new Color(1f, 0.9f, 0.1f, 1f);
+        numerosDano.add(nd);
+        if (dano > 0) sangrar(j.x, j.y);
+        // Golpe fisico de mob (ex: rotworm): efeito proprio, PhysATK.
+        String hitMob = data.getString("hit_type", "physical_hit");
+        if ("physical_hit".equals(hitMob) || "Physical".equals(hitMob)) hitMob = "PhysATK";
+        Efeito e = tocarEfeito(hitMob, j.x, j.y);
+        if (e != null) e.jogadorAlvo = j;
+    }
+
     /** Hit que acompanha o sprite do mob enquanto ele anda. */
     private void tocarEfeitoNoMob(String nome, MobVisual mob) {
         Efeito e = tocarEfeito(nome, mob.x, mob.y);
@@ -5891,9 +5915,9 @@ public class WorldScreen extends ScreenAdapter {
             pr.tempo += delta;
             if (pr.tempo >= pr.duracao) {
                 projeteis.remove(i);
-                if (pr.efeitoHit != null) tocarEfeitoNoMob(pr.efeitoHit, pr.alvo);
+                if (pr.efeitoHit != null && pr.alvo != null) tocarEfeitoNoMob(pr.efeitoHit, pr.alvo);
                 if (pr.aoChegar != null) pr.aoChegar.run();
-                if (pr.numero != null) {
+                if (pr.numero != null && pr.alvo != null) {
                     // Numero no lugar onde o mob esta agora (ele pode ter andado).
                     NumeroDano n = new NumeroDano(pr.alvo.x, pr.alvo.y, pr.numero.texto, pr.numero.critico);
                     n.cor = pr.numero.cor;

@@ -1803,14 +1803,23 @@ def _avisar_morph(sid, p):
     socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
     socketio.emit('sync_vitals', {'current_hp': hp}, room=sid)
 
-def _desfazer_morph(sid, p, msg=None, morreu=False):
+def _desfazer_morph(sid, p, msg=None, morreu=False, matador_sid=None):
     m = morph_de(p)
     if not m: return
     antes_invisivel = invisivel(p)
-    # Morreu possuindo: cadaver do mob no chao pra todo mundo perto.
+    # Morreu possuindo: cadaver do mob no chao pra todo mundo perto (um "mob"
+    # morto com id proprio) e, se foi player, XP/loot/bestiario igual mob.
     if morreu:
-        emit_area('morph_died', {'name': p.get('name', ''), 'type': m.get('type_id', ''),
+        agora = time.time()
+        corpo_id = f"morphc_{p.get('name', '')}_{int(agora * 1000)}"
+        tipo = m.get('type_id', '')
+        emit_area('morph_died', {'name': p.get('name', ''), 'type': tipo, 'corpse_id': corpo_id,
                                  'pos_x': p.get('pos_x', 0), 'pos_y': p.get('pos_y', 0)}, p.get('room'))
+        tracker = {s_: d for s_, d in (m.get('dmg_tracker') or {}).items() if s_ in online_players and s_ != sid}
+        if tracker and tipo in MOB_DB:
+            falso = {'type_id': tipo, 'hp': 0, 'max_hp': float(m.get('max_hp', 40)), 'dmg_tracker': tracker,
+                     'pos_x': p.get('pos_x', 0), 'pos_y': p.get('pos_y', 0)}
+            _recompensar_morte_mob(corpo_id, tipo, falso, p.get('room'), agora)
     p.pop('morph', None)
     max_hp, _ = calcular_max_vitais(p)
     try: hp = float(m.get('hp_antes', -1))
@@ -1935,6 +1944,9 @@ def handle_hit_morph(data):
         try: hp = float(alvo.get('current_hp', -1))
         except (TypeError, ValueError): hp = -1.0
         if hp < 0: hp = max_hp
+        if dano > 0:
+            trk = m.setdefault('dmg_tracker', {})
+            trk[sid] = trk.get(sid, 0) + min(dano, hp)  # XP/loot de quem bateu (igual mob)
         hp = max(0.0, hp - dano)
         evt = {'target_player': alvo.get('name', ''), 'damage': dano, 'new_hp': hp, 'max_hp': max_hp,
                'hit_type': hit_type, 'attacker_mob_id': '', 'attacker_player': p.get('name', ''),
@@ -4319,76 +4331,81 @@ def _aplicar_dano_mob(sid, p, mob_id, mob_type_id, mob_data, dano_final, now, ex
     emit_area('mob_damaged', evt_dano, room)
     
     if is_dead:
-        xp_total = MOB_DB.get(mob_type_id, {}).get("xp", 40)
-        xp_por_participante = _calcular_xp_por_participante(mob_data, xp_total)
+        _recompensar_morte_mob(mob_id, mob_type_id, mob_data, room, now)
 
-        for participant_sid, xp_gained in xp_por_participante.items():
-            if participant_sid not in online_players: continue
+def _recompensar_morte_mob(mob_id, mob_type_id, mob_data, room, now):
+    """Mob morreu: XP (dmg_tracker/party), bestiario, bag de loot de quem bateu
+    e o mob_died pra area. Tambem usado pelo mob possuido (morph) morto por player."""
+    xp_total = MOB_DB.get(mob_type_id, {}).get("xp", 40)
+    xp_por_participante = _calcular_xp_por_participante(mob_data, xp_total)
 
-            part_p = online_players[participant_sid]
-            # Set completo equipado (ex: Outlander): XP extra.
-            pct_set = bonus_xp_set(part_p)
-            if pct_set > 0: xp_gained = int(xp_gained * (1.0 + pct_set / 100.0) + 0.5)
-            bestiario_registrar_kill(participant_sid, part_p, mob_data.get('type_id', mob_type_id))
+    for participant_sid, xp_gained in xp_por_participante.items():
+        if participant_sid not in online_players: continue
 
-            current_exp = part_p.get('exp', 0) + xp_gained
-            current_level = part_p.get('level', 1)
-            part_p['kills'] = part_p.get('kills', 0) + 1
-            char_leveled_up = False
-            
-            while current_exp >= get_exp_for_level(current_level + 1):
-                current_level += 1
-                char_leveled_up = True
-                
-            part_p['exp'] = current_exp
-            part_p['level'] = current_level
-            
-            if char_leveled_up and not part_p.get('is_dead'):
-                max_hp_novo, max_mp_novo = calcular_max_vitais(part_p)
-                part_p['current_hp'] = max_hp_novo
-                part_p['current_mp'] = max_mp_novo
-                socketio.emit('sync_vitals', {'current_hp': part_p['current_hp'], 'current_mp': part_p['current_mp']}, room=participant_sid)
-                broadcast_hp(participant_sid, part_p)
-            
-            _queue_save(part_p) 
-            socketio.emit('xp_gained', {'amount': xp_gained}, room=participant_sid)
-            
-            stats_payload = _montar_payload_sync_stats(part_p)
-            stats_payload['leveled_up'] = False
-            stats_payload['char_leveled_up'] = char_leveled_up
-            stats_payload['new_char_level'] = current_level
-            socketio.emit('sync_stats', stats_payload, room=participant_sid)
-            
-            if char_leveled_up:
-                # Área toda (chunks vizinhos) de quem upou; antes ia só pro
-                # chunk de quem bateu e os outros não viam o "Level X".
-                # Vai pro próprio player também: todo mundo perto (ele
-                # incluso) recebe o aviso "X has reached Level N!" no chat.
-                emit_area('player_leveled_up', {'name': part_p.get('name', ''), 'level': current_level}, part_p.get('room') or room)
+        part_p = online_players[participant_sid]
+        # Set completo equipado (ex: Outlander): XP extra.
+        pct_set = bonus_xp_set(part_p)
+        if pct_set > 0: xp_gained = int(xp_gained * (1.0 + pct_set / 100.0) + 0.5)
+        bestiario_registrar_kill(participant_sid, part_p, mob_data.get('type_id', mob_type_id))
+
+        current_exp = part_p.get('exp', 0) + xp_gained
+        current_level = part_p.get('level', 1)
+        part_p['kills'] = part_p.get('kills', 0) + 1
+        char_leveled_up = False
         
-        owner_sids = []
-        for participant_sid in mob_data['dmg_tracker']:
-            if participant_sid not in online_players: continue
-            part_name = online_players[participant_sid].get('name', '')
-            itens_rolados = rolar_loot(mob_type_id)
-            currency_rolada = rolar_currency(mob_type_id)
-            loot_id = f"loot_{mob_id}_{int(now * 1000)}_{len(owner_sids)}"
-            # has_items só reflete itens de verdade (pra sprite dourada da bag);
-            # bag só com currency usa a sprite comum mesmo assim.
-            has_items = len(itens_rolados) > 0
-            # pos/has_items guardados pra recriar a bag de quem relogar.
-            ground_loot[loot_id] = {"items": itens_rolados, "currency": currency_rolada, "room": room, "criado_em": now, "owners": {part_name},
-                                    "pos": [mob_data.get('pos_x', 0), mob_data.get('pos_y', 0)], "has_items": has_items}
-            socketio.emit('mob_died', {'mob_id': mob_id, 'loot_id': loot_id, 'has_items': has_items,
-                              'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room=participant_sid)
-            owner_sids.append(participant_sid)
-        emit_area('mob_died', {'mob_id': mob_id, 'loot_id': '', 'has_items': False,
-                               'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room, skip_sid=owner_sids)
-        mob_data['died_at'] = now
-        mob_data.pop('sangria', None)  # sangramento acaba com a morte
-        mob_data['target_sid'] = None
-        mob_data['returning'] = False
-        mob_data['path'] = None
+        while current_exp >= get_exp_for_level(current_level + 1):
+            current_level += 1
+            char_leveled_up = True
+            
+        part_p['exp'] = current_exp
+        part_p['level'] = current_level
+        
+        if char_leveled_up and not part_p.get('is_dead'):
+            max_hp_novo, max_mp_novo = calcular_max_vitais(part_p)
+            part_p['current_hp'] = max_hp_novo
+            part_p['current_mp'] = max_mp_novo
+            socketio.emit('sync_vitals', {'current_hp': part_p['current_hp'], 'current_mp': part_p['current_mp']}, room=participant_sid)
+            broadcast_hp(participant_sid, part_p)
+        
+        _queue_save(part_p) 
+        socketio.emit('xp_gained', {'amount': xp_gained}, room=participant_sid)
+        
+        stats_payload = _montar_payload_sync_stats(part_p)
+        stats_payload['leveled_up'] = False
+        stats_payload['char_leveled_up'] = char_leveled_up
+        stats_payload['new_char_level'] = current_level
+        socketio.emit('sync_stats', stats_payload, room=participant_sid)
+        
+        if char_leveled_up:
+            # Área toda (chunks vizinhos) de quem upou; antes ia só pro
+            # chunk de quem bateu e os outros não viam o "Level X".
+            # Vai pro próprio player também: todo mundo perto (ele
+            # incluso) recebe o aviso "X has reached Level N!" no chat.
+            emit_area('player_leveled_up', {'name': part_p.get('name', ''), 'level': current_level}, part_p.get('room') or room)
+    
+    owner_sids = []
+    for participant_sid in mob_data['dmg_tracker']:
+        if participant_sid not in online_players: continue
+        part_name = online_players[participant_sid].get('name', '')
+        itens_rolados = rolar_loot(mob_type_id)
+        currency_rolada = rolar_currency(mob_type_id)
+        loot_id = f"loot_{mob_id}_{int(now * 1000)}_{len(owner_sids)}"
+        # has_items só reflete itens de verdade (pra sprite dourada da bag);
+        # bag só com currency usa a sprite comum mesmo assim.
+        has_items = len(itens_rolados) > 0
+        # pos/has_items guardados pra recriar a bag de quem relogar.
+        ground_loot[loot_id] = {"items": itens_rolados, "currency": currency_rolada, "room": room, "criado_em": now, "owners": {part_name},
+                                "pos": [mob_data.get('pos_x', 0), mob_data.get('pos_y', 0)], "has_items": has_items}
+        socketio.emit('mob_died', {'mob_id': mob_id, 'loot_id': loot_id, 'has_items': has_items,
+                          'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room=participant_sid)
+        owner_sids.append(participant_sid)
+    emit_area('mob_died', {'mob_id': mob_id, 'loot_id': '', 'has_items': False,
+                           'pos_x': mob_data.get('pos_x', 0), 'pos_y': mob_data.get('pos_y', 0)}, room, skip_sid=owner_sids)
+    mob_data['died_at'] = now
+    mob_data.pop('sangria', None)  # sangramento acaba com a morte
+    mob_data['target_sid'] = None
+    mob_data['returning'] = False
+    mob_data['path'] = None
 
 def _lancar_magia(sid, p, caminho, mob_id):
     """Magia de dano num mob (ex: Igniculus): valida tudo, gasta mana, poe o
@@ -5376,6 +5393,7 @@ def handle_m(data):
         # Na Protection Zone players se atravessam.
         player_no_caminho = not na_pz(p, destino_tile) and any(
             o_sid != sid and not online_players[o_sid].get('is_dead')
+            and not invisivel(online_players[o_sid])  # /ghost: nao ocupa o SQM pros outros
             and int(online_players[o_sid].get('floor', 1) or 1) == andar_p
             and tile_de(online_players[o_sid].get('pos_x', 0), online_players[o_sid].get('pos_y', 0)) == destino_tile
             for o_sid in (_sids_perto(p['room']) if p.get('room') else list(online_players.keys())))
