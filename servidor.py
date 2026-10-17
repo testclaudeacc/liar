@@ -84,12 +84,12 @@ MOB_DB = {
              "range": 5, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
              "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                        {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
-             "currency": {"min": 7, "max": 14}},
+             "currency": {"min": 14, "max": 28}},
     "wasp2": {"name": "Razor Hornet", "speed_mult": 1.15, "flap": True, "hp": 130, "xp": 17, "attack": 25.0, "attack_min": 23, "attack_max": 27,
               "hit": "PoisonPhysATK",
               "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                         {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
-              "currency": {"min": 7, "max": 14}},
+              "currency": {"min": 14, "max": 28}},
     # Hunt 10-15 (tabela por caverna): Mushroom Spider = melee comum, Wolf = forte.
     # XP buffado (22->54, 28->68): lv 14 -> 15 em ~30 min (~145 aranhas a ~13s cada).
     # speed_mult: mob padrao anda 1 SQM/s; player 2.2 SQM/s +1%/level (lv 15 ~2.5).
@@ -101,14 +101,14 @@ MOB_DB = {
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.05},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02}],
-                       "currency": {"min": 10, "max": 18}},
+                       "currency": {"min": 20, "max": 35}},
     "wolf": {"name": "Wolf", "speed_mult": 2.2, "hp": 260, "xp": 68, "attack": 39.0, "attack_min": 37, "attack_max": 41, "hit": "BiteAtk",
              "drops": [{"item": "res://sprites/items/Materials/WolfFur.tres", "chance": 0.05},
                        {"item": "res://sprites/items/Knight/Weapons/BasicDagger.tres", "chance": 0.02},
                        {"item": "res://sprites/items/Mage/Weapons/RubyStaff.tres", "chance": 0.02},
                        {"item": "res://sprites/items/Bard/Weapons/WoodenRattle.tres", "chance": 0.02},
                        {"item": "res://sprites/items/Ranger/Weapons/IronBow.tres", "chance": 0.02}],
-             "currency": {"min": 12, "max": 22}},
+             "currency": {"min": 25, "max": 42}},
 }
 
 # ---------------------------------------------------------------------------
@@ -7595,8 +7595,12 @@ def handle_get_friends_list(data):
 # com pouco HP, recuperava proporcionalmente demais e tankava muito.
 REGEN_POR_PONTOS = 50.0
 
-def get_regen_amount(maximo):
-    return max(1.0, math.floor(float(maximo) / REGEN_POR_PONTOS))
+# Mana regenera mais: 1 ponto por 30 de mana maxima (mage lv 17 ~300 de
+# mana: 10 a cada 5s, quase paga o ataque basico da varinha). HP fica no 50.
+REGEN_MP_POR_PONTOS = 30.0
+
+def get_regen_amount(maximo, por_pontos=REGEN_POR_PONTOS):
+    return max(1.0, math.floor(float(maximo) / por_pontos))
 
 # =========================================================================
 # FOME (Fullness) e BATTLE
@@ -7922,7 +7926,7 @@ def regen_loop():
                 extra_hp = int(buff.get('hp', 0)) if buff else 0
                 extra_mp = int(buff.get('mp', 0)) if buff else 0
                 if current_hp < max_hp: current_hp = min(max_hp, current_hp + get_regen_amount(max_hp) + extra_hp); p['current_hp'] = current_hp; curou = True
-                if current_mp < max_mp: current_mp = min(max_mp, current_mp + get_regen_amount(max_mp) + extra_mp); p['current_mp'] = current_mp; curou = True
+                if current_mp < max_mp: current_mp = min(max_mp, current_mp + get_regen_amount(max_mp, REGEN_MP_POR_PONTOS) + extra_mp); p['current_mp'] = current_mp; curou = True
 
                 if curou:
                     socketio.emit('sync_vitals', {'current_hp': current_hp, 'current_mp': current_mp,
