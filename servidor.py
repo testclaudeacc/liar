@@ -80,27 +80,29 @@ MOB_DB = {
     # speed_mult: mais rapida que o padrao do mapa (level maior). flap: a
     # sprite "andando" toca o tempo todo (asas batendo), parada tambem.
     # shadow: True = sombra no chao desenhada pelo jogo (parada enquanto o corpo sobe/desce).
-    "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "hp": 115, "xp": 17, "attack": 21.5, "attack_min": 20, "attack_max": 23,
+    "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "hp": 115, "xp": 15, "attack": 21.5, "attack_min": 20, "attack_max": 23,
              "range": 5, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
              "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                        {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
              "currency": {"min": 7, "max": 14}},
-    "wasp2": {"name": "Razor Hornet", "speed_mult": 1.15, "flap": True, "hp": 130, "xp": 19, "attack": 25.0, "attack_min": 23, "attack_max": 27,
+    "wasp2": {"name": "Razor Hornet", "speed_mult": 1.15, "flap": True, "hp": 130, "xp": 17, "attack": 25.0, "attack_min": 23, "attack_max": 27,
               "hit": "PoisonPhysATK",
               "drops": [{"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                         {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
               "currency": {"min": 7, "max": 14}},
     # Hunt 10-15 (tabela por caverna): Mushroom Spider = melee comum, Wolf = forte.
-    # XP buffado (22->57, 28->72): lv 14 -> 15 em ~30 min (~140 aranhas a ~13s cada).
+    # XP buffado (22->54, 28->68): lv 14 -> 15 em ~30 min (~145 aranhas a ~13s cada).
+    # speed_mult: mob padrao anda 1 SQM/s; player 2.2 SQM/s +1%/level (lv 15 ~2.5).
+    # Aranha 2.0 e lobo 2.2: acompanham quase o player, so' vao ficando pra tras.
     # Proximas hunts: ~40-50 min por level so' la' pelo lv 18-19.
     # "one_of": UMA rolagem com essa chance; se cair, sorteia um item da lista
     # (anel/colar de Ruby com ADC aleatorio).
-    "spidermushroom": {"name": "Mushroom Spider", "hp": 200, "xp": 57, "attack": 34.0, "attack_min": 32, "attack_max": 36,
+    "spidermushroom": {"name": "Mushroom Spider", "speed_mult": 2.0, "hp": 200, "xp": 54, "attack": 34.0, "attack_min": 32, "attack_max": 36,
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.05},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02}],
                        "currency": {"min": 10, "max": 18}},
-    "wolf": {"name": "Wolf", "speed_mult": 1.15, "hp": 260, "xp": 72, "attack": 39.0, "attack_min": 37, "attack_max": 41, "hit": "BiteAtk",
+    "wolf": {"name": "Wolf", "speed_mult": 2.2, "hp": 260, "xp": 68, "attack": 39.0, "attack_min": 37, "attack_max": 41, "hit": "BiteAtk",
              "drops": [{"item": "res://sprites/items/Materials/WolfFur.tres", "chance": 0.05},
                        {"item": "res://sprites/items/Knight/Weapons/BasicDagger.tres", "chance": 0.02},
                        {"item": "res://sprites/items/Mage/Weapons/RubyStaff.tres", "chance": 0.02},
@@ -423,20 +425,20 @@ ITEM_DB = {
     # spell_skill/_hits: cada uso conta como N golpes na skill (no maximo 1
     # vez por cooldown da magia - nao da' pra abusar com atk speed).
     # A Nyla so' mostra a magia pra quem tem o level e a classe dela.
-    "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 6, "spell_dmg": 75, "spell_area": False, "spell_skill": "magic", "spell_skill_hits": 5, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r73_c11", "cap": 0.0},
+    "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 5, "spell_dmg": 75, "spell_area": False, "spell_skill": "magic", "spell_skill_hits": 5, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 5000, "icon": "sheet/r73_c11", "cap": 0.0},
     # Heavy Cut (Knight): corte (20%) + sangramento: spell_bleed_ticks ticks de
     # spell_bleed_pct% a cada spell_bleed_every s; cada tick da' 1 golpe na
     # skill spell_bleed_skill. spell_range "melee": so' colado no mob.
     # spell_slot: cor do slot da magia no client (orange/red).
-    "res://sprites/spells/HeavyCut.tres": {"name": "Heavy Cut", "type": "Spell", "spell": "heavy_cut", "spell_words": "Incisio Cruenta", "spell_desc": "A brutal cut that leaves the target bleeding.", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 15, "spell_cd": 6, "spell_dmg": 20, "spell_area": False, "spell_range": "melee", "spell_bleed_ticks": 3, "spell_bleed_pct": 15, "spell_bleed_every": 2, "spell_bleed_skill": "melee", "spell_hit": "SwordInv", "spell_proj": "", "spell_color": "ff4a4a", "spell_slot": "red", "price": 3000, "icon": "sheet/r77_c8", "cap": 0.0},
+    "res://sprites/spells/HeavyCut.tres": {"name": "Heavy Cut", "type": "Spell", "spell": "heavy_cut", "spell_words": "Incisio Cruenta", "spell_desc": "A brutal cut that leaves the target bleeding.", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 15, "spell_cd": 5, "spell_dmg": 20, "spell_area": False, "spell_range": "melee", "spell_bleed_ticks": 3, "spell_bleed_pct": 15, "spell_bleed_every": 2, "spell_bleed_skill": "melee", "spell_hit": "SwordInv", "spell_proj": "", "spell_color": "ff4a4a", "spell_slot": "red", "price": 3000, "icon": "sheet/r77_c8", "cap": 0.0},
     # Arrow Barrage (Ranger): spell_hits flechas seguidas (spell_hit_every s
     # entre elas), cada uma com spell_dmg% (3 x 21.5 = 64.5%); cada flecha da'
     # 1 golpe na skill spell_hit_skill. spell_slot aceita cor hex.
-    "res://sprites/spells/ArrowBarrage.tres": {"name": "Arrow Barrage", "type": "Spell", "spell": "arrow_barrage", "spell_words": "Sequentia Iaculorum", "spell_desc": "Fires three arrows in quick succession.", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 6, "spell_dmg": 21.5, "spell_hits": 3, "spell_hit_every": 0.3, "spell_hit_skill": "distance", "spell_area": False, "spell_hit": "Arrow", "spell_proj": "res://ui/items/Arrow1.png", "spell_color": "4fd1a5", "spell_slot": "00604b", "price": 4000, "icon": "sheet/r77_c12", "cap": 0.0},
+    "res://sprites/spells/ArrowBarrage.tres": {"name": "Arrow Barrage", "type": "Spell", "spell": "arrow_barrage", "spell_words": "Sequentia Iaculorum", "spell_desc": "Fires three arrows in quick succession.", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 21.5, "spell_hits": 3, "spell_hit_every": 0.3, "spell_hit_skill": "distance", "spell_area": False, "spell_hit": "Arrow", "spell_proj": "res://ui/items/Arrow1.png", "spell_color": "4fd1a5", "spell_slot": "00604b", "price": 4000, "icon": "sheet/r77_c12", "cap": 0.0},
     # Small Vines (Bard): vinhas prendem o mob (efeito "Vines" no client, ~2s
     # fechadas): veneno de spell_bleed_ticks ticks (spell_dot "poison") e o mob
     # fica lento (spell_slow s). Sem golpe inicial (spell_dmg 0).
-    "res://sprites/spells/SmallVines.tres": {"name": "Small Vines", "type": "Spell", "spell": "small_vines", "spell_words": "Vineolae", "spell_desc": "Vines burst from the ground, slowing and poisoning the target.", "req_level": 10, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 6, "spell_dmg": 0, "spell_area": False, "spell_dot": "poison", "spell_bleed_ticks": 3, "spell_bleed_pct": 20, "spell_bleed_every": 0.67, "spell_bleed_skill": "musicality", "spell_slow": 2.0, "spell_effect": "Vines", "spell_hit": "", "spell_proj": "res://ui/ThornSeed.png", "spell_color": "8cd612", "spell_slot": "376d03", "price": 4000, "icon": "sheet/r75_c8", "cap": 0.0},
+    "res://sprites/spells/SmallVines.tres": {"name": "Small Vines", "type": "Spell", "spell": "small_vines", "spell_words": "Vineolae", "spell_desc": "Vines burst from the ground, slowing and poisoning the target.", "req_level": 10, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 0, "spell_area": False, "spell_dot": "poison", "spell_bleed_ticks": 3, "spell_bleed_pct": 20, "spell_bleed_every": 0.67, "spell_bleed_skill": "musicality", "spell_slow": 2.0, "spell_effect": "Vines", "spell_hit": "", "spell_proj": "res://ui/ThornSeed.png", "spell_color": "8cd612", "spell_slot": "376d03", "price": 4000, "icon": "sheet/r75_c8", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
