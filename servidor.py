@@ -70,7 +70,9 @@ except Exception as e:
     print(f"Erro fatal ao conectar ao PostgreSQL: {e}")
 
 MOB_DB = {
-    "rotworm": {"hp": 50, "xp": 15, "attack": 3.0, "drops": [], "currency": {"min": 5, "max": 10}},
+    # attack_min/attack_max: faixa do golpe (sem elas: attack -15%..+15%, igual o
+    # player). Defesa do player tira 1:1 (Knight lv1 = 20, outras classes = 10).
+    "rotworm": {"hp": 50, "xp": 15, "attack": 24.0, "attack_min": 23, "attack_max": 25, "drops": [], "currency": {"min": 5, "max": 10}},
 }
 
 # ---------------------------------------------------------------------------
@@ -301,6 +303,15 @@ CLASS_EXP_BONUS_PER_DISTINCT_CLASS = 5
 
 MOB_DESPAWN_CORPO_SEG = 60.0
 MOB_RESPAWN_SEG = 120.0
+
+# Golpe de mob: chance de critico (dano em dobro, depois da defesa).
+MOB_CRIT_CHANCE = 0.05
+
+def faixa_ataque_mob(tipo):
+    """(min, max) do golpe do mob - igual o fork de dano do player."""
+    info = MOB_DB.get(tipo, {})
+    base = float(info.get('attack', 3.0))
+    return float(info.get('attack_min', base * 0.85)), float(info.get('attack_max', base * 1.15))
 
 def get_exp_for_level(level):
     if level <= 1: return 0
@@ -1746,14 +1757,26 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
     target_name = target_player.get('name', '')
     m['next_attack'] = now + max(0.3, float(m.get('cooldown', MOB_COOLDOWN_PADRAO)))
     m['ultimo_golpe'] = now
-    mob_attack_damage = ataque if ataque is not None else MOB_DB.get(m.get('type_id'), {}).get("attack", 3.0)
+    # Faixa do golpe (fork, igual o player) - no morph escalada pelo dano dele (/dmg).
+    a_min, a_max = faixa_ataque_mob(m.get('type_id'))
+    base_tipo = float(MOB_DB.get(m.get('type_id'), {}).get("attack", 3.0)) or 1.0
+    if ataque is not None:
+        a_min, a_max = a_min * ataque / base_tipo, a_max * ataque / base_tipo
+    golpe = random.uniform(a_min, a_max)
     p_class = target_player.get('class_name', 'Knight')
     bonus_itens = somar_bonus_combate_equipados(target_player.get('equipped_items', {}))
     _, def_value = calc_player_stats(p_class, target_player.get('level', 1), target_player.get('skills', {}), bonus_def=bonus_itens['bonus_defense'])
-    dano_final = 0 if random.random() < BLOCK_CHANCE else max(1.0, mob_attack_damage - def_value)
+    critico = False
+    if random.random() < BLOCK_CHANCE:
+        dano_final = 0
+    else:
+        # Defesa tira 1:1; critico dobra o que passou.
+        dano_final = max(1, int(round(golpe - def_value)))
+        critico = random.random() < MOB_CRIT_CHANCE
+        if critico: dano_final *= 2
     # Medalha de ouro no bestiary desse mob: -5% do dano recebido dele.
     if dano_final > 0 and bestiario_ouro(target_player, m.get('type_id')):
-        dano_final = max(1.0, dano_final * (1.0 - BESTIARIO_BONUS_OURO))
+        dano_final = max(1, int(round(dano_final * (1.0 - BESTIARIO_BONUS_OURO))))
 
     max_hp_alvo, _ = calcular_max_vitais(target_player)
     hp_atual = float(target_player.get('current_hp', -1))
@@ -1765,7 +1788,7 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
         hp_atual, max_hp_alvo = hp_publico(target_player)
         emit_area('player_damaged', {'target_player': target_name, 'damage': dano_final, 'new_hp': hp_atual,
                                      'max_hp': max_hp_alvo, 'hit_type': m.get('hit_effect', 'physical_hit'),
-                                     'attacker_mob_id': mob_id}, target_player.get('room'))
+                                     'attacker_mob_id': mob_id, 'is_crit': critico}, target_player.get('room'))
         return
     target_player['current_hp'] = hp_atual
     target_player['_ultimo_hp_broadcast'] = [hp_atual, max_hp_alvo]
@@ -1773,7 +1796,7 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
 
     emit_area('player_damaged', {'target_player': target_name, 'damage': dano_final, 'new_hp': hp_atual,
                                  'max_hp': max_hp_alvo, 'hit_type': m.get('hit_effect', 'physical_hit'),
-                                 'attacker_mob_id': mob_id}, target_player.get('room'))
+                                 'attacker_mob_id': mob_id, 'is_crit': critico}, target_player.get('room'))
     if hp_atual <= 0:
         target_player['is_dead'] = True
         sair_da_batalha(target_sid, target_player)
