@@ -734,6 +734,7 @@ public class WorldScreen extends ScreenAdapter {
     // e' o caminho relativo a assets-raw/graphics SEM extensao (ex:
     // "sprites/body/Knight") - ver mesmo comentario em AuthScreen.java.
     private final TextureAtlas atlas;
+    private final boolean atlasDaPrecarga; // atlas da Precarga fica guardado pra proxima entrada
     private TextureRegion spriteBase;
     private AnimacaoCorpo animacaoBase;
 
@@ -920,7 +921,10 @@ public class WorldScreen extends ScreenAdapter {
         camera.position.set(local.x, local.y, 0);
         camera.update();
 
-        atlas = new TextureAtlas(Gdx.files.internal("graphics/graphics.atlas"));
+        // Ja' carregado aos poucos na tela de loading (Precarga); senao, aqui mesmo.
+        TextureAtlas atlasPre = Precarga.atlas();
+        atlasDaPrecarga = atlasPre != null;
+        atlas = atlasPre != null ? atlasPre : new TextureAtlas(Gdx.files.internal("graphics/graphics.atlas"));
         batch = new SpriteBatch();
         font = criarFonteNome();
         fonteDestaque = criarFonteDestaque();
@@ -6549,7 +6553,7 @@ public class WorldScreen extends ScreenAdapter {
         for (Pixmap p : pixmapsAtlas.values()) if (p != null) p.dispose();
         uiStage.dispose();
         skin.dispose();
-        atlas.dispose();
+        if (!atlasDaPrecarga) atlas.dispose();
         if(iluminacao != null) iluminacao.dispose();
     }
 }

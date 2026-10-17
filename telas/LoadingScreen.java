@@ -37,8 +37,16 @@ public class LoadingScreen extends ScreenAdapter {
     private static final int BOLINHAS = 3;
     private static final float CICLO_SEG = 1.1f;
 
-    public LoadingScreen(Runnable trabalhoPesado) {
+    // true: antes do trabalho pesado, espera a Precarga (mapa/atlas) terminar -
+    // ela carrega aos poucos a cada frame, entao as bolinhas continuam animando.
+    private final boolean precarregar;
+
+    public LoadingScreen(Runnable trabalhoPesado) { this(trabalhoPesado, false); }
+
+    public LoadingScreen(Runnable trabalhoPesado, boolean precarregar) {
         this.trabalhoPesado = trabalhoPesado;
+        this.precarregar = precarregar;
+        if (precarregar) Precarga.iniciar();
     }
 
     @Override
@@ -65,6 +73,7 @@ public class LoadingScreen extends ScreenAdapter {
         }
         formas.end();
 
+        if (precarregar && !Precarga.atualizar()) return;
         frame++;
         if (frame >= 2 && !disparado) {
             disparado = true;

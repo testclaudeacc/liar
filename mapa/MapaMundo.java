@@ -64,8 +64,13 @@ public class MapaMundo {
     private int indicePillars = -1;
     private int[] somentePillars;
 
+    // Mapa veio da Precarga (AssetManager cuida das texturas dele).
+    private final boolean mapaDaPrecarga;
+
     public MapaMundo() {
-        mapa = new TmxMapLoader().load("maps/World.tmx");
+        TiledMap pre = com.teste.game.telas.Precarga.tomarMapa();
+        mapaDaPrecarga = pre != null;
+        mapa = pre != null ? pre : new TmxMapLoader().load("maps/World.tmx");
         // Todos os tilesets numa textura so' (menos troca de textura = bem
         // mais rapido no celular, ver UnificadorTilesets).
         UnificadorTilesets.unificar(mapa);
@@ -622,7 +627,7 @@ public class MapaMundo {
     }
 
     public void dispose() {
-        mapa.dispose();
+        if (!mapaDaPrecarga) mapa.dispose();
         renderer.dispose();
     }
 }

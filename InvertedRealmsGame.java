@@ -98,7 +98,8 @@ public class InvertedRealmsGame extends Game {
         // tempo de resposta do servidor, exatamente o freeze que o usuario
         // reportou (queria uma transicao igual o fade+loading do Global.gd
         // do jogo Godot, ver LoadingScreen).
-        setScreen(new LoadingScreen(() -> {}));
+        // Ja' comeca a carregar mapa/atlas enquanto conecta (bolinhas animando).
+        setScreen(new LoadingScreen(() -> {}, true));
         socket = new GameSocket();
         // Outra pessoa entrou nesta mesma conta: o servidor manda isso antes
         // de derrubar a conexao - volta pro menu com o aviso certo (em vez de
@@ -153,7 +154,7 @@ public class InvertedRealmsGame extends Game {
                         w.pop();
                     });
                     socket.emitRaw("join_game", payload);
-                }));
+                }, true)); // espera a Precarga (mapa/atlas) antes de montar o mundo
             }
 
             @Override
