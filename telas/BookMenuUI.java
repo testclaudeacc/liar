@@ -365,8 +365,8 @@ public final class BookMenuUI {
         for (String tipo : tiposMoeda) {
             Image icone = new Image(new TextureRegionDrawable(atlas.findRegion("ui/currency/" + tipo)));
             icone.setScaling(Scaling.fit);
-            Label quantidade = new LabelPixel("0", skin.get("hud", Label.LabelStyle.class));
-            escalarFonte(quantidade, 0.7f * FONTE_STATS);
+            // Mesma fonte das descricoes (a "hud" reduzida ficava borrada do lado delas).
+            Label quantidade = new LabelPixel("0", estiloNitido(TAM_TEXTO_RODAPE));
             quantidade.setColor(corMoeda(tipo));
             moedas.add(icone).size(24).padRight(4);
             moedas.add(quantidade).left().padRight(10);
@@ -379,7 +379,7 @@ public final class BookMenuUI {
             new Color(0.165f, 0.165f, 0.165f, 1f), new Color(0.165f, 0.165f, 0.165f, 1f), 1));
         colunaDireita.add(scroll).grow().pad(12, 12, 6, 12).row();
         barraCapBag = new BarraUso();
-        capacityLabel.setStyle(new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
+        capacityLabel.setStyle(estiloNitido(TAM_TEXTO_RODAPE));
         capacityLabel.setFontScale(1f);
         capacityLabel.setColor(Color.WHITE);
         capacityLabel.setAlignment(Align.center);
@@ -1146,6 +1146,13 @@ public final class BookMenuUI {
     }
 
     private final java.util.Set<com.badlogic.gdx.graphics.g2d.BitmapFont> fontesHud = new java.util.HashSet<>();
+
+    /** Moedas / barra de cap / rodapes: mesma fonte nitida das descricoes. */
+    private static final int TAM_TEXTO_RODAPE = Math.round(15 * FONTE_STATS);
+
+    private Label.LabelStyle estiloNitido(int tamanho) {
+        return new Label.LabelStyle(UiSkin.fonteDescricao(skin, tamanho), Color.WHITE);
+    }
 
     private Label linhaStat(String texto, Color cor) {
         // LabelPixel: origem presa no pixel de tela (senao a letra caia entre 2 pixels e embacava).
@@ -2615,7 +2622,8 @@ public final class BookMenuUI {
     /** "Your coins:" com as moedas que o player tem (maior primeiro). */
     private Table linhaMinhasMoedas() {
         Table t = new Table();
-        Label rot = new LabelPixel("Your coins:", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.75f), Color.LIGHT_GRAY));
+        Label rot = new LabelPixel("Your coins:", estiloNitido(TAM_TEXTO_RODAPE));
+        rot.setColor(Color.LIGHT_GRAY);
         t.add(rot).padRight(8);
         boolean algum = false;
         for (int i = MOEDAS_TRADE.length - 1; i >= 0; i--) {
@@ -2628,11 +2636,11 @@ public final class BookMenuUI {
                 img.setScaling(Scaling.fit);
                 t.add(img).size(20).padRight(3);
             }
-            Label n = new LabelPixel(String.valueOf(q), new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.8f), Color.WHITE));
+            Label n = new LabelPixel(String.valueOf(q), estiloNitido(TAM_TEXTO_RODAPE));
             n.setColor(corMoeda(MOEDAS_TRADE[i]));
             t.add(n).padRight(10);
         }
-        if (!algum) t.add(new LabelPixel("0", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.8f), Color.WHITE)));
+        if (!algum) t.add(new LabelPixel("0", estiloNitido(TAM_TEXTO_RODAPE)));
         return t;
     }
 
@@ -3110,7 +3118,7 @@ public final class BookMenuUI {
         scroll.setScrollingDisabled(true, false);
         scroll.setOverscroll(false, false);
 
-        bancoInfo = new LabelPixel("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
+        bancoInfo = new LabelPixel("", estiloNitido(TAM_TEXTO_RODAPE));
         bancoInfo.setAlignment(Align.center);
         bancoAviso = new LabelPixel("", new Label.LabelStyle(fonteBanco(), Color.valueOf("ff6a6a")));
         escalarFonte(bancoAviso, 0.8f);
@@ -3494,7 +3502,7 @@ public final class BookMenuUI {
         lojaAviso.setFontScale(0.8f);
 
         // ---- Buy: grade + barra de capacidade ----
-        lojaInfo = new LabelPixel("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f * FONTE_STATS), Color.WHITE));
+        lojaInfo = new LabelPixel("", estiloNitido(TAM_TEXTO_RODAPE));
         barraCapLoja = new BarraUso();
         Table textoBarra = new Table();
         textoBarra.add(lojaInfo).center();
