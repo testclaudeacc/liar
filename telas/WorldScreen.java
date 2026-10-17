@@ -2677,6 +2677,10 @@ public class WorldScreen extends ScreenAdapter {
                 alturaQuadro = Math.max(alturaQuadro, q.getRegionHeight());
                 larguraQ = Math.max(larguraQ, q.getRegionWidth());
             }
+            // Altura de referencia em multiplos de 16: sprite com 1px a mais (ex:
+            // vespa de 17px) fica do mesmo tamanho e no mesmo lugar que um de 16 -
+            // o pixel extra so' sobra em cima.
+            alturaQuadro = Math.max(16f, (float) Math.floor(alturaQuadro / 16f) * 16f);
             float escala = Math.min(getWidth() / larguraQ, getHeight() / alturaQuadro);
             // Botao do alvo: quadro alto (sprite com folga em cima) deixava o
             // boneco minusculo - ali o que manda e' a largura (a folga vazia
