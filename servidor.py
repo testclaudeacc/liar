@@ -388,9 +388,9 @@ ITEM_DB = {
     "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 15.0},
     "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 3, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 15.0},
     "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "mana_cost": 3, "cap": 15.0},
-    "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 5, "cap": 15.0},
+    "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 3, "cap": 15.0},
     "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 15.0},
-    "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "ammo": True, "price": 1, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 3, "ammo": True, "price": 1, "max_stack": 9999, "cap": 0.1},
     # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
     # Materiais (drop de mob): so' nome, "Material" e cap na descricao; o NPC paga sell_price.
     "res://sprites/items/Materials/WaspWing.tres": {"name": "Wasp Wing", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 5, "icon": "ui/Wasp_Wing", "stackable": True, "max_stack": 9999, "cap": 0.1},
@@ -463,10 +463,11 @@ ITEM_DB = {
     #   Peca de set (helm/chest/gloves/boots): ADC 3T, Armour 1T, Stamina 5T
     #   Arma (mao principal): ADC 6T, Atk 2T, Stamina/Mana 10(T+1)
     #     (Knight/Ranger: stamina; Mage: mana; Bard: metade de cada)
-    #   Segunda mao (shield/book/sheet): Defense 6T, Armour 2T, Stamina/Mana 20T
+    #   Segunda mao (shield/book/sheet/flecha): Defense 6T, Armour 2T, Stamina/Mana 15T
+    #     (inicial, T=0: defense/ADC 3)
     #     (shield: stamina; book: mana; sheet: metade de cada)
     #   Linear de proposito: o HP/mana base do level tambem e' linear
-    #   (knight +15 HP/level), entao o equipamento fica sempre ~10-15% do total.
+    #   (knight +15 HP/level), entao o equipamento fica sempre ~10% do total.
     # Armas lv 10: 6 de ADC e 2 de Atk (o dobro de uma peca de set). Basic Dagger:
     # metade do ADC de uma espada, mas bate 1.1x mais rapido ("atk_speed") -
     # mais que isso o Knight passa o DPS do Mage (a velocidade multiplica o golpe todo).
