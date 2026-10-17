@@ -5934,6 +5934,13 @@ public class WorldScreen extends ScreenAdapter {
                 contagem.merge(caminho, Math.max(1, item.getInt("qty", 1)), Integer::sum);
             }
         }
+        // Empilhaveis (materiais, flechas...) vem a parte - a bag deles chega no inventory_synced.
+        JsonValue pilhas = data.get("stacked_items");
+        if (pilhas != null) {
+            for (JsonValue item = pilhas.child; item != null; item = item.next) {
+                contagem.merge(item.getString("item", ""), Math.max(1, item.getInt("qty", 1)), Integer::sum);
+            }
+        }
         for (Map.Entry<String, Integer> e : contagem.entrySet()) {
             loot.adicionar(bookMenu.iconeDoItem(e.getKey()), e.getValue() > 1 ? String.valueOf(e.getValue()) : "", Color.WHITE);
         }

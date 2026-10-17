@@ -4466,7 +4466,8 @@ def _recompensar_morte_mob(mob_id, mob_type_id, mob_data, room, now):
         loot_id = f"loot_{mob_id}_{int(now * 1000)}_{len(owner_sids)}"
         # has_items só reflete itens de verdade (pra sprite dourada da bag);
         # bag só com currency usa a sprite comum mesmo assim.
-        has_items = len(itens_rolados) > 0
+        # Bag dourada so' com item de verdade (material/so' moedas: bag comum).
+        has_items = any(ITEM_DB.get(i.get('item'), {}).get('type') != 'Material' for i in itens_rolados)
         # pos/has_items guardados pra recriar a bag de quem relogar.
         ground_loot[loot_id] = {"items": itens_rolados, "currency": currency_rolada, "room": room, "criado_em": now, "owners": {part_name},
                                 "pos": [mob_data.get('pos_x', 0), mob_data.get('pos_y', 0)], "has_items": has_items}
@@ -5035,6 +5036,7 @@ def _coletar_loot(sid, p, loot_id):
 
         novas_instancias = []
         itens_restantes = []
+        empilhaveis_pegos = []  # so' pra mostrar subindo na cabeca (a bag vem no inventory_synced)
         houve_municao = False
         cap_bloqueado = False
 
@@ -5052,6 +5054,7 @@ def _coletar_loot(sid, p, loot_id):
                     adicionar_municao_ao_jogador(p, item_path, qty_pegar)
                     cap_disponivel -= qty_pegar * cap_unit
                     houve_municao = True
+                    empilhaveis_pegos.append({"item": item_path, "qty": qty_pegar})
                 qty_sobrou = qty - qty_pegar
                 if qty_sobrou > 0:
                     itens_restantes.append({"item": item_path, "qty": qty_sobrou})
@@ -5082,7 +5085,7 @@ def _coletar_loot(sid, p, loot_id):
         _queue_save(p)
         
         emit('loot_collected', {
-            'loot_id': loot_id, 'items': novas_instancias, 'currency_gained': currency_ganha,
+            'loot_id': loot_id, 'items': novas_instancias, 'stacked_items': empilhaveis_pegos, 'currency_gained': currency_ganha,
             'currency_total': novo_total, 'already_taken': False,
             'cap_bloqueado': cap_bloqueado, 'bag_esvaziada': bag_esvaziada,
         }, room=sid)
