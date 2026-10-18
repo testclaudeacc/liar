@@ -4829,6 +4829,8 @@ public class WorldScreen extends ScreenAdapter {
         if (mapa.noVoid(MiniMapa.AREA_VOID, local.x, local.y + 1f)) Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         else Gdx.gl.glClearColor(MiniMapa.COR_AGUA.r, MiniMapa.COR_AGUA.g, MiniMapa.COR_AGUA.b, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        // Tochas (tile_at_day): apagadas de dia, acesas quando comeca a escurecer.
+        mapa.atualizarTrocasDia(iluminacao.fatorNoite() <= 0.02f);
         mapa.desenharMapa(camera);
         // Vagalumes etc (appear_at_night): aparecem conforme escurece.
         mapa.desenharNoturnos(camera, iluminacao.fatorNoite());

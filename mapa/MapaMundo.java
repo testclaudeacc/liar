@@ -312,6 +312,22 @@ public class MapaMundo {
         b.end();
     }
 
+    private Boolean trocasDeDia = null;
+
+    /** Tochas etc (tile_at_day): de dia o tile apagado, a noite o original.
+     * So' mexe nas celulas quando muda (1x no amanhecer, 1x no anoitecer). */
+    public void atualizarTrocasDia(boolean dia) {
+        if (propriedades.trocasDia.isEmpty() || (trocasDeDia != null && trocasDeDia == dia)) return;
+        trocasDeDia = dia;
+        for (MapaPropriedades.TrocaDia t : propriedades.trocasDia) {
+            TiledMapTileLayer.Cell cell = t.camada.getCell(t.cx, t.cy);
+            if (cell == null) continue;
+            TiledMapTile atual = cell.getTile();
+            if (atual != t.noite && atual != t.dia) continue; // trocada por outra coisa (quest...)
+            cell.setTile(dia ? t.dia : t.noite);
+        }
+    }
+
     /** Tira os appear_at_night das camadas (o render normal desenharia sempre). */
     private void separarNoturnos() {
         for (MapaPropriedades.CelulaAcima c : propriedades.celulasNoturnas) {

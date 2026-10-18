@@ -172,6 +172,34 @@ public class MapaPropriedades {
      * (MapaMundo.desenharNoturnos). */
     public final List<CelulaAcima> celulasNoturnas = new ArrayList<>();
 
+    /** Tile com a property tile_at_day = "<tile_id>" (ex: tocha acesa ->
+     * "off_torch"): de dia vira o tile que tem tile_id igual, a noite volta
+     * (MapaMundo.atualizarTrocasDia). */
+    public static class TrocaDia {
+        public final TiledMapTileLayer camada;
+        public final int cx, cy;
+        public final TiledMapTile noite, dia;
+        TrocaDia(TiledMapTileLayer camada, int cx, int cy, TiledMapTile noite, TiledMapTile dia) {
+            this.camada = camada; this.cx = cx; this.cy = cy; this.noite = noite; this.dia = dia;
+        }
+    }
+    public final List<TrocaDia> trocasDia = new ArrayList<>();
+    private Map<String, TiledMapTile> tilesPorId;
+
+    /** Tile com a property tile_id = id em qualquer tileset (null se nao tem). */
+    private TiledMapTile tilePorId(String id) {
+        if (tilesPorId == null) {
+            tilesPorId = new HashMap<>();
+            for (com.badlogic.gdx.maps.tiled.TiledMapTileSet ts : mapa.getTileSets()) {
+                for (TiledMapTile t : ts) {
+                    Object v = t.getProperties().get("tile_id");
+                    if (v != null && !tilesPorId.containsKey(v.toString())) tilesPorId.put(v.toString(), t);
+                }
+            }
+        }
+        return tilesPorId.get(id);
+    }
+
     public static class CelulaAcima {
         public final TiledMapTileLayer camada;
         public final int cx, cy;
@@ -464,8 +492,16 @@ public class MapaPropriedades {
                     Color cor = props.get("light_color", Color.WHITE, Color.class);
                     float raio = props.get("light_radius", 32f, Float.class);
                     Luz luz = new Luz(worldCellX + offsetX, worldCellY + offsetY, cor, raio);
-                    luz.soNoite = propriedadeTrue(props, "appear_at_night");
+                    // appear_at_night ou tocha que apaga de dia (tile_at_day): a luz
+                    // acompanha a noite.
+                    luz.soNoite = propriedadeTrue(props, "appear_at_night") || props.get("tile_at_day") != null;
                     luzes.add(luz);
+                }
+                Object idDia = props.get("tile_at_day");
+                if (idDia != null && !idDia.toString().isEmpty()) {
+                    TiledMapTile dia = tilePorId(idDia.toString());
+                    if (dia != null) trocasDia.add(new TrocaDia(camada, cx, cy, tile, dia));
+                    else com.badlogic.gdx.Gdx.app.error("Mapa", "tile_at_day: nenhum tile com tile_id=" + idDia);
                 }
                 if (propriedadeTrue(props, "appear_at_night")) {
                     celulasNoturnas.add(new CelulaAcima(camada, cx, cy, worldCellX, worldCellY, tile));
