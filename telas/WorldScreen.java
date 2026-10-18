@@ -3661,6 +3661,9 @@ public class WorldScreen extends ScreenAdapter {
             // Dano de qualquer elemento: mesmo vermelho (so' Miss/reduzido em amarelo).
             Jogador atacante = jogadorPorNome(data.getString("attacker_id", ""));
             TextureRegion projetil = regiaoDoCaminho(data.getString("proj", ""));
+            // Projetil novo que ainda nao esta no atlas (ex: flecha nova): usa a flecha
+            // padrao em vez de sumir com o tiro.
+            if (projetil == null && "Arrow".equals(data.getString("hit_type", ""))) projetil = regiaoDoCaminho("res://ui/items/Arrow1.png");
             // Atacante fora da minha lista (ex: /ghost invisivel): sai da posicao que o servidor mandou.
             JsonValue posAtk = data.get("attacker_pos");
             float origemX = Float.NaN, origemY = Float.NaN;
@@ -5715,8 +5718,21 @@ public class WorldScreen extends ScreenAdapter {
         String nome = caminho.startsWith("res://") ? caminho.substring(6) : caminho;
         int ponto = nome.lastIndexOf('.');
         if (ponto > nome.lastIndexOf('/')) nome = nome.substring(0, ponto);
-        return atlas.findRegion(nome);
+        TextureRegion r = atlas.findRegion(nome);
+        if (r != null) return r;
+        // Nao achou no caminho exato (ex: o png entrou em outra pasta do atlas):
+        // procura pelo nome do arquivo em qualquer pasta, sem ligar pra maiuscula.
+        if (regiaoPorArquivo.containsKey(nome)) return regiaoPorArquivo.get(nome);
+        String arquivo = nome.substring(nome.lastIndexOf('/') + 1);
+        for (TextureAtlas.AtlasRegion a : atlas.getRegions()) {
+            String n = a.name.substring(a.name.lastIndexOf('/') + 1);
+            if (n.equalsIgnoreCase(arquivo)) { r = a; break; }
+        }
+        if (r == null) Gdx.app.error("WorldScreen", "Regiao nao encontrada no atlas: " + nome);
+        regiaoPorArquivo.put(nome, r);
+        return r;
     }
+    private final Map<String, TextureRegion> regiaoPorArquivo = new java.util.HashMap<>();
 
     /** Efeito de hit pelo nome que vai no hit_type (o mesmo pra todo client):
      * Sword/Mana/Music1/Arrow (armas das classes), PhysATK (mob fisico
