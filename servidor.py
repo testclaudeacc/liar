@@ -388,7 +388,7 @@ ITEM_DB = {
     "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"name": "Wooden Flute", "type": "Flute", "req_level": 0, "req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "mana_cost": 2, "cap": 15.0},
     "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"name": "Basic Music Sheet", "type": "Music Sheet", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 15.0},
     "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 15.0},
-    "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 3, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 15.0},
+    "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 0, "defense": 3, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 15.0},
     "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "mana_cost": 3, "cap": 15.0},
     "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 3, "cap": 15.0},
     "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 15.0},
@@ -434,9 +434,9 @@ ITEM_DB = {
     # spell_slot: cor do slot da magia no client (orange/red).
     "res://sprites/spells/HeavyCut.tres": {"name": "Heavy Cut", "type": "Spell", "spell": "heavy_cut", "spell_words": "Incisio Cruenta", "spell_desc": "A brutal cut that leaves the target bleeding.", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 15, "spell_cd": 5, "spell_dmg": 20, "spell_area": False, "spell_range": "melee", "spell_bleed_ticks": 3, "spell_bleed_pct": 15, "spell_bleed_every": 2, "spell_bleed_skill": "melee", "spell_hit": "SwordInv", "spell_proj": "", "spell_color": "ff4a4a", "spell_slot": "red", "price": 3000, "icon": "sheet/r77_c8", "cap": 0.0},
     # Arrow Barrage (Ranger): spell_hits flechas seguidas (spell_hit_every s
-    # entre elas), cada uma com spell_dmg% (3 x 21.5 = 64.5%); cada flecha da'
+    # entre elas), cada uma com spell_dmg% (3 x 23.333 = 70%); cada flecha da'
     # 1 golpe na skill spell_hit_skill. spell_slot aceita cor hex.
-    "res://sprites/spells/ArrowBarrage.tres": {"name": "Arrow Barrage", "type": "Spell", "spell": "arrow_barrage", "spell_words": "Sequentia Iaculorum", "spell_desc": "Fires three arrows in quick succession.", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 21.5, "spell_hits": 3, "spell_hit_every": 0.3, "spell_hit_skill": "distance", "spell_area": False, "spell_hit": "Arrow", "spell_proj": "res://ui/items/Arrow1.png", "spell_color": "4fd1a5", "spell_slot": "00604b", "price": 4000, "icon": "sheet/r77_c12", "cap": 0.0},
+    "res://sprites/spells/ArrowBarrage.tres": {"name": "Arrow Barrage", "type": "Spell", "spell": "arrow_barrage", "spell_words": "Sequentia Iaculorum", "spell_desc": "Fires three arrows in quick succession.", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 23.333, "spell_hits": 3, "spell_hit_every": 0.3, "spell_hit_skill": "distance", "spell_area": False, "spell_hit": "Arrow", "spell_proj": "res://ui/items/Arrow1.png", "spell_color": "4fd1a5", "spell_slot": "00604b", "price": 4000, "icon": "sheet/r77_c12", "cap": 0.0},
     # Small Vines (Bard): vinhas prendem o mob (efeito "Vines" no client, ~2s
     # fechadas): veneno de spell_bleed_ticks ticks (spell_dot "poison") e o mob
     # fica lento (spell_slow s). Sem golpe inicial (spell_dmg 0).
@@ -525,6 +525,14 @@ def montar_item_db_cliente():
     for item_path, dados in ITEM_DB.items():
         entrada = {k: dados[k] for k in CAMPOS_ITEM_CLIENTE if k in dados}
         entrada["slot"] = slot_do_item(item_path)
+        if dados.get("spell"):
+            # Quantos golpes na skill a magia da' por uso (gaveta "+N Magic EXP").
+            if dados.get("spell_skill"):
+                entrada["spell_exp_skill"], entrada["spell_exp"] = dados["spell_skill"], int(dados.get("spell_skill_hits", 0) or 0)
+            elif dados.get("spell_hit_skill"):
+                entrada["spell_exp_skill"], entrada["spell_exp"] = dados["spell_hit_skill"], int(dados.get("spell_hits", 1) or 1)
+            elif dados.get("spell_bleed_skill"):
+                entrada["spell_exp_skill"], entrada["spell_exp"] = dados["spell_bleed_skill"], int(dados.get("spell_bleed_ticks", 0) or 0)
         db[item_path] = entrada
     return db
 

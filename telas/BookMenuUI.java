@@ -421,6 +421,8 @@ public final class BookMenuUI {
         final String magiaDot;               // "bleed" ou "poison"
         final float magiaLento;              // segundos de lentidao no mob
         final String magiaSlot; // cor do slot: "orange" (padrao) ou "red"
+        final String magiaExpSkill; // skill que a magia treina (magic/melee/distance/musicality)
+        final int magiaExp;         // golpes na skill por uso
 
         final boolean treino;  // arma de treino (servidor.py::dano_arma_treino)
         final int economiaFlecha; // % de chance de nao gastar flecha
@@ -443,6 +445,8 @@ public final class BookMenuUI {
             this.magiaDot = d.getString("spell_dot", "bleed");
             this.magiaLento = d.getFloat("spell_slow", 0f);
             this.magiaSlot = d.getString("spell_slot", "orange");
+            this.magiaExpSkill = d.getString("spell_exp_skill", null);
+            this.magiaExp = d.getInt("spell_exp", 0);
             this.treino = d.getBoolean("training", false);
             this.economiaFlecha = d.getInt("ammo_save", 0);
             this.velocidadeAtaque = d.getFloat("atk_speed", 1f);
@@ -1300,6 +1304,16 @@ public final class BookMenuUI {
             case "Mage": return new String[]{"magic", "Magic"};
             case "Bard": return new String[]{"musicality", "Musicality"};
             default: return new String[]{"melee", "Melee"};
+        }
+    }
+
+    /** {icone, nome} da skill que a magia treina (chave do servidor). */
+    private String[] skillDaMagia(String chave) {
+        switch (chave) {
+            case "distance": return new String[]{"ui/FocusIcon", "Focus"};
+            case "magic": return new String[]{"ui/items/StarterStaff", "Magic"};
+            case "musicality": return new String[]{"ui/MusicalityIcon", "Musicality"};
+            default: return new String[]{atlas.findRegion("ui/MeeleIcon") != null ? "ui/MeeleIcon" : "ui/MeleeIcon", "Melee"};
         }
     }
 
@@ -6002,8 +6016,9 @@ public final class BookMenuUI {
             if (escolhendoMagias) {
                 // Uma "gaveta" por magia: icone, nome, mana, descricao e dano.
                 for (String magia : magiasConhecidas) {
+                    // padRight: a borda da direita da gaveta ficava cortada pela rolagem.
                     conteudo.add(gavetaMagia(magia, magia.equals(atalhos[slot]), () -> escolherAtalho(slot, magia)))
-                        .growX().padBottom(6).row();
+                        .growX().padBottom(6).padRight(3).row();
                 }
                 if (magiasConhecidas.isEmpty()) conteudo.add(linhaStat("You don't know any spells yet.", Color.GRAY)).left();
             } else {
@@ -6188,6 +6203,21 @@ public final class BookMenuUI {
             texto.add(linhaPreco).left().padTop(2).row();
         }
         gaveta.add(texto).growX().center().left();
+        // Canto inferior direito: "+ (icone) 3 Focus EXP" - golpes na skill por uso.
+        if (dados != null && dados.magiaExp > 0 && dados.magiaExpSkill != null) {
+            String[] sk = skillDaMagia(dados.magiaExpSkill);
+            Table exp = new Table();
+            Color cor = corSkillPrincipal(dados.magiaExpSkill);
+            exp.add(linhaStat("+", cor)).padRight(3);
+            TextureAtlas.AtlasRegion r = atlas.findRegion(sk[0]);
+            if (r != null) {
+                Image ic = new Image(new TextureRegionDrawable(r));
+                ic.setScaling(Scaling.fit);
+                exp.add(ic).size(16).padRight(3);
+            }
+            exp.add(linhaStat(dados.magiaExp + " " + sk[1] + " EXP", cor));
+            gaveta.add(exp).bottom().right().padLeft(10);
+        }
         gaveta.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
         });
