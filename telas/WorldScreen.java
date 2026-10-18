@@ -5764,6 +5764,7 @@ public class WorldScreen extends ScreenAdapter {
             case "PoisonCloud": tira = atlas.findRegion("sprites/spawn/PoisonCloud"); break;     // Venom Wasp (cuspe)
             case "PoisonPhysATK": tira = atlas.findRegion("sprites/spawn/PoisonPhysATK"); break; // Razor Hornet (ferrao)
             case "BiteAtk": tira = atlas.findRegion("sprites/spawn/BiteAtk"); break;             // Wolf (mordida)
+            case "RattleHit": tira = (TextureAtlas.AtlasRegion) regiaoDoCaminho("ui/items/RattleHit"); break; // Wooden Rattle (Bard)
             default: tira = atlas.findRegion("ui/items/Physical"); break;
         }
         if (tira == null) tira = atlas.findRegion("ui/items/Physical");
@@ -5789,7 +5790,8 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion[] quadros = quadrosEfeito(nome);
         if (quadros == null) return null;
         Efeito e = new Efeito(quadros, x, y);
-        boolean rapido = !"Sword".equals(nome) && !"SwordInv".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome); // Arrow ou Physical
+        boolean rapido = !"Sword".equals(nome) && !"SwordInv".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome)
+            && !"RattleHit".equals(nome); // Arrow ou Physical
         // Mana (sprite novo, 7 quadros) na mesma velocidade do fogo.
         e.duracaoQuadro = "Fire".equals(nome) || "Mana".equals(nome) ? DURACAO_QUADRO_HIT_FOGO
             : "Arrow".equals(nome) ? DURACAO_QUADRO_HIT_FLECHA
