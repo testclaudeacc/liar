@@ -465,11 +465,12 @@ ITEM_DB = {
     #   Peca de set (helm/chest/gloves/boots): ADC 3T, Armour 1T, Stamina 5T
     #   Arma (mao principal): ADC 6T, Atk 2T, Stamina/Mana 10(T+1)
     #     (Knight/Ranger: stamina; Mage: mana; Bard: metade de cada)
-    #   Segunda mao (shield/book/sheet/flecha): ADC 6T, Defense 6T, Armour 2T, Stamina/Mana 15T
+    #   Segunda mao (shield/book/sheet/flecha): ADC 6T (shield: so' 3T, ele ja' da' a defesa),
+    #     Defense 6T, Armour 2T, Stamina/Mana 15T
     #     (inicial, T=0: defense/ADC 3)
     #   Anel / colar: ADC 3T, Stamina 10T
     #   Total por tier com tudo novo: 4x3 (set) + 2x3 (joias) + 6 (arma) + 6 (segunda
-    #   mao) = 30 de ADC = +15 de dano (ADC conta 1:2).
+    #   mao; knight 3) = 30 de ADC = +15 de dano (knight 27 = +13.5, compensado pela defesa).
     #     (shield: stamina; book: mana; sheet: os dois cheios, igual a inicial 10/10)
     #   Linear de proposito: o HP/mana base do level tambem e' linear
     #   (knight +15 HP/level), entao o equipamento fica sempre ~10% do total.
@@ -485,7 +486,7 @@ ITEM_DB = {
     # ADC 6, Stamina/Mana 15 (shield tambem Defense 6 + Armour 2).
     "res://sprites/items/Mage/SecondHand/CrimsonTome.tres": {"name": "Crimson Tome", "type": "Book", "slot": "Hand", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 15, "fourth_stat_type": "Magic", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r60_c10", "cap": 15.0},
     "res://sprites/items/Bard/SecondHand/AzureScore.tres": {"name": "Azure Sheet", "type": "Music Sheet", "slot": "Hand", "req_level": 10, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 15, "mana": 15, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r51_c3", "cap": 15.0},
-    "res://sprites/items/Knight/SecondHand/IronboundShield.tres": {"name": "Ironbound Shield", "type": "Shield", "slot": "Hand", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 6, "armour": 2, "stamina": 15, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r71_c2", "cap": 20.0},
+    "res://sprites/items/Knight/SecondHand/IronboundShield.tres": {"name": "Ironbound Shield", "type": "Shield", "slot": "Hand", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 6, "armour": 2, "stamina": 15, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "price": 1000, "icon": "sheet/r71_c2", "cap": 20.0},
     "res://sprites/items/Ranger/SecondHand/FlintArrow.tres": {"name": "Flint Arrow", "type": "Arrow", "slot": "Hand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 6, "ammo": True, "price": 2, "max_stack": 9999, "atk_proj": "res://ui/FlintArrowProjectile.png", "icon": "sheet/r90_c7", "cap": 0.1},
     "res://sprites/items/Materials/WolfFur.tres": {"name": "Wolf Fur", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 15, "icon": "ui/Wolf_Fur", "stackable": True, "max_stack": 9999, "cap": 0.1},
     "res://sprites/items/Food/RedMushroom.tres": {"name": "Red Mushroom", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 1, "regen_hp": 1, "regen_mp": 0, "regen_seg": 10, "sound": "*Munch*", "sell_price": 5, "icon": "ui/Red Mushroom", "stackable": True, "max_stack": 9999, "cap": 0.1},
