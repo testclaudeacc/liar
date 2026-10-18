@@ -5764,7 +5764,7 @@ public class WorldScreen extends ScreenAdapter {
             case "PoisonCloud": tira = atlas.findRegion("sprites/spawn/PoisonCloud"); break;     // Venom Wasp (cuspe)
             case "PoisonPhysATK": tira = atlas.findRegion("sprites/spawn/PoisonPhysATK"); break; // Razor Hornet (ferrao)
             case "BiteAtk": tira = atlas.findRegion("sprites/spawn/BiteAtk"); break;             // Wolf (mordida)
-            case "RattleHit": tira = (TextureAtlas.AtlasRegion) regiaoDoCaminho("ui/items/RattleHit"); break; // Wooden Rattle (Bard)
+            case "RattleHit": tira = regiaoDoCaminho("ui/items/RattleHit"); break; // Wooden Rattle (Bard)
             default: tira = atlas.findRegion("ui/items/Physical"); break;
         }
         if (tira == null) tira = atlas.findRegion("ui/items/Physical");
