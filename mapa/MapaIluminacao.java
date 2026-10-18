@@ -88,6 +88,9 @@ public class MapaIluminacao implements Disposable {
         float brilho = (corCicloTmp.r + corCicloTmp.g + corCicloTmp.b) / 3f;
         float noite = (NOITE.r + NOITE.g + NOITE.b) / 3f;
         float f = (1f - brilho) / (1f - noite);
+        // A tarde dourada ja' e' ~0.36 escura: so' comeca a aparecer depois dela
+        // (crepusculo), cheio na noite, e some durante o amanhecer.
+        f = (f - 0.36f) / (1f - 0.36f);
         return Math.max(0f, Math.min(1f, f));
     }
 
