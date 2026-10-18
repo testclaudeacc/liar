@@ -766,11 +766,22 @@ public final class BookMenuUI {
             Button slotBtn = novoBotaoSlotEquip();
             slotBtn.setChecked(indice == selectedEquipCandidate);
             TextureAtlas.AtlasRegion textura = iconeDoItem(item.itemPath);
+            Stack conteudoEquip = new Stack();
             if (textura != null) {
                 Image icone = new Image(new TextureRegionDrawable(textura));
                 icone.setScaling(Scaling.fit);
-                slotBtn.add(icone).grow().pad(6);
+                Table moldura = new Table();
+                moldura.add(icone).grow().pad(4);
+                conteudoEquip.add(moldura);
             }
+            // Pilha (flecha): quantidade no canto, igual a Bag.
+            if (item.quantity > 1) {
+                Table marcadores = new Table();
+                marcadores.bottom();
+                adicionarQuantidade(marcadores, item.quantity);
+                conteudoEquip.add(marcadores);
+            }
+            slotBtn.add(conteudoEquip).grow().pad(2);
             slotBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     selectedEquipCandidate = (selectedEquipCandidate == indice) ? -1 : indice;
