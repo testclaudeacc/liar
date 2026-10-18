@@ -538,6 +538,7 @@ public class WorldScreen extends ScreenAdapter {
         NumeroDano numero;      // dano que aparece quando o projetil chega
         Runnable aoChegar;      // ex: Small Vines - as vinhas brotam quando a semente chega
         float escala = 1f;      // tamanho na tela (a pixel art continua a mesma)
+        boolean gira = true;    // false: sempre de pe' (nota musical nao vira de ponta-cabeca)
         float tempo = 0f;
         // Tempo fixo (a velocidade cresce com a distancia): sempre chega logo,
         // e so' entao aparecem o hit e o numero de dano.
@@ -3674,6 +3675,7 @@ public class WorldScreen extends ScreenAdapter {
             }
             if ("Ranged".equals(data.getString("w_type", "")) && projetil != null && !Float.isNaN(origemX)) {
                 Projetil pr = new Projetil(projetil, origemX, origemY + 8f, mob, efeito);
+                pr.gira = !data.getString("proj", "").contains("Rattle");
                 pr.numero = numero;
                 numero.sangra = !errou && data.getInt("damage", 0) > 0;
                 projeteis.add(pr);
@@ -5790,8 +5792,7 @@ public class WorldScreen extends ScreenAdapter {
         TextureRegion[] quadros = quadrosEfeito(nome);
         if (quadros == null) return null;
         Efeito e = new Efeito(quadros, x, y);
-        boolean rapido = !"Sword".equals(nome) && !"SwordInv".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome)
-            && !"RattleHit".equals(nome); // Arrow ou Physical
+        boolean rapido = !"Sword".equals(nome) && !"SwordInv".equals(nome) && !"Mana".equals(nome) && !"Music1".equals(nome); // Arrow, Physical, RattleHit
         // Mana (sprite novo, 7 quadros) na mesma velocidade do fogo.
         e.duracaoQuadro = "Fire".equals(nome) || "Mana".equals(nome) ? DURACAO_QUADRO_HIT_FOGO
             : "Arrow".equals(nome) ? DURACAO_QUADRO_HIT_FLECHA
@@ -6480,12 +6481,12 @@ public class WorldScreen extends ScreenAdapter {
             float t = Math.min(1f, pr.tempo / pr.duracao);
             float x = pr.x0 + (pr.x1() - pr.x0) * t;
             float y = pr.y0 + (pr.y1() - pr.y0) * t;
-            float angulo = (float) Math.toDegrees(Math.atan2(pr.y1() - pr.y0, pr.x1() - pr.x0));
+            float angulo = pr.gira ? (float) Math.toDegrees(Math.atan2(pr.y1() - pr.y0, pr.x1() - pr.x0)) : 0f;
             float w = pr.regiao.getRegionWidth(), h = pr.regiao.getRegionHeight();
             // A "cabeca" do projetil (fogo/mana) fica na frente do sprite: quem
             // segue o caminho e chega no centro do mob e' ela, nao o meio do
             // sprite (senao some com a cabeca ja' passada do mob).
-            float recuo = w * pr.escala * 0.22f, rad = angulo * com.badlogic.gdx.math.MathUtils.degreesToRadians;
+            float recuo = pr.gira ? w * pr.escala * 0.22f : 0f, rad = angulo * com.badlogic.gdx.math.MathUtils.degreesToRadians;
             x -= com.badlogic.gdx.math.MathUtils.cos(rad) * recuo;
             y -= com.badlogic.gdx.math.MathUtils.sin(rad) * recuo;
             batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, pr.escala, pr.escala, angulo);
