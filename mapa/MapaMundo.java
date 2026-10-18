@@ -93,6 +93,7 @@ public class MapaMundo {
         // das layers originais, entao renderer.render(indicesCamadas) ja
         // deixa de desenha-las sozinho (elas so' saem via desenharOverlays).
         propriedades = new MapaPropriedades(mapa, tileWidth, tileHeight);
+        separarNoturnos();
 
         indicesCamadas = new int[]{
                 mapa.getLayers().getIndex("Ground"),
@@ -289,6 +290,34 @@ public class MapaMundo {
     public void desenharMapa(OrthographicCamera camera) {
         prepararView(camera);
         renderer.render(indicesChao);
+    }
+
+    /** Tiles appear_at_night (vagalume...): alpha = fatorNoite (0 de dia). Logo
+     * depois de desenharMapa, fora de qualquer batch.begin(). */
+    public void desenharNoturnos(OrthographicCamera camera, float alpha) {
+        java.util.List<MapaPropriedades.CelulaAcima> lista = propriedades.celulasNoturnas;
+        if (lista.isEmpty() || alpha <= 0.01f) return;
+        Batch b = renderer.getBatch();
+        float meiaL = camera.viewportWidth * camera.zoom / 2f + tileWidth * 2f;
+        float meiaA = camera.viewportHeight * camera.zoom / 2f + tileHeight * 2f;
+        b.setProjectionMatrix(camera.combined);
+        b.begin();
+        b.setColor(1f, 1f, 1f, alpha);
+        for (MapaPropriedades.CelulaAcima c : lista) {
+            if (Math.abs(c.worldX - camera.position.x) > meiaL || Math.abs(c.worldY - camera.position.y) > meiaA) continue;
+            TextureRegion regiao = c.tile.getTextureRegion();
+            b.draw(regiao, c.worldX, c.worldY, regiao.getRegionWidth(), regiao.getRegionHeight());
+        }
+        b.setColor(Color.WHITE);
+        b.end();
+    }
+
+    /** Tira os appear_at_night das camadas (o render normal desenharia sempre). */
+    private void separarNoturnos() {
+        for (MapaPropriedades.CelulaAcima c : propriedades.celulasNoturnas) {
+            TiledMapTileLayer.Cell cell = c.camada.getCell(c.cx, c.cy);
+            if (cell != null && cell.getTile() == c.tile) c.camada.setCell(c.cx, c.cy, null);
+        }
     }
 
     /** Tiles com a property Above_Player=true: desenhados de novo por cima

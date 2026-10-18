@@ -4830,6 +4830,8 @@ public class WorldScreen extends ScreenAdapter {
         else Gdx.gl.glClearColor(MiniMapa.COR_AGUA.r, MiniMapa.COR_AGUA.g, MiniMapa.COR_AGUA.b, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         mapa.desenharMapa(camera);
+        // Vagalumes etc (appear_at_night): aparecem conforme escurece.
+        mapa.desenharNoturnos(camera, iluminacao.fatorNoite());
         if (perf != null) perf.marca("map");
 
         batch.setProjectionMatrix(camera.combined);

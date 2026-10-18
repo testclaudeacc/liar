@@ -79,6 +79,18 @@ public class MapaIluminacao implements Disposable {
 
     public float tempoCiclo() { return tempoCiclo; }
 
+    private final Color corCicloTmp = new Color();
+
+    /** 0 = dia claro, 1 = noite fechada (pelo brilho da cor do ciclo): o que
+     * e' appear_at_night vai aparecendo enquanto escurece e some no amanhecer. */
+    public float fatorNoite() {
+        corDoCiclo(tempoCiclo, corCicloTmp);
+        float brilho = (corCicloTmp.r + corCicloTmp.g + corCicloTmp.b) / 3f;
+        float noite = (NOITE.r + NOITE.g + NOITE.b) / 3f;
+        float f = (1f - brilho) / (1f - noite);
+        return Math.max(0f, Math.min(1f, f));
+    }
+
     /** Cor ambiente do campo naquele momento do ciclo. */
     public static Color corDoCiclo(float t, Color saida) {
         for (int i = 0; i < MARCAS.length - 1; i++) {
@@ -143,7 +155,11 @@ public class MapaIluminacao implements Disposable {
         float cx = camera.position.x, cy = camera.position.y;
         for (MapaPropriedades.Luz luz : luzes) {
             if (Math.abs(luz.x - cx) > meiaL + luz.raio || Math.abs(luz.y - cy) > meiaA + luz.raio) continue;
-            batch.setColor(luz.cor);
+            if (luz.soNoite) {
+                float f = fatorNoite();
+                if (f <= 0.01f) continue;
+                batch.setColor(luz.cor.r, luz.cor.g, luz.cor.b, luz.cor.a * f);
+            } else batch.setColor(luz.cor);
             float diametro = luz.raio * 2f;
             batch.draw(regiaoLuz, luz.x - luz.raio, luz.y - luz.raio, diametro, diametro);
         }

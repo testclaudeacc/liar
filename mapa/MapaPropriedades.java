@@ -42,6 +42,8 @@ public class MapaPropriedades {
         public float x, y;
         public final Color cor;
         public final float raio;
+        /** Tile appear_at_night: a luz acende/apaga junto com a noite. */
+        public boolean soNoite = false;
 
         public Luz(float x, float y, Color cor, float raio) {
             this.x = x;
@@ -165,6 +167,10 @@ public class MapaPropriedades {
     /** Tiles com a property Above_Dynamic=true: por cima ou por baixo do
      * player conforme de onde ele veio (MapaMundo.atualizarAcimaDinamico). */
     public final List<CelulaAcima> celulasAcimaDinamicas = new ArrayList<>();
+    /** Tiles com a property appear_at_night=true (ex: vagalume): tirados da
+     * camada e desenhados por cima do chao com alpha = quanto e' noite
+     * (MapaMundo.desenharNoturnos). */
+    public final List<CelulaAcima> celulasNoturnas = new ArrayList<>();
 
     public static class CelulaAcima {
         public final TiledMapTileLayer camada;
@@ -457,7 +463,12 @@ public class MapaPropriedades {
                     // "#AARRGGBB" do .tsx sozinho.
                     Color cor = props.get("light_color", Color.WHITE, Color.class);
                     float raio = props.get("light_radius", 32f, Float.class);
-                    luzes.add(new Luz(worldCellX + offsetX, worldCellY + offsetY, cor, raio));
+                    Luz luz = new Luz(worldCellX + offsetX, worldCellY + offsetY, cor, raio);
+                    luz.soNoite = propriedadeTrue(props, "appear_at_night");
+                    luzes.add(luz);
+                }
+                if (propriedadeTrue(props, "appear_at_night")) {
+                    celulasNoturnas.add(new CelulaAcima(camada, cx, cy, worldCellX, worldCellY, tile));
                 }
 
                 if (propriedadeTrue(props, "Above_Player")) {
