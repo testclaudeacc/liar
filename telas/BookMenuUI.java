@@ -6174,10 +6174,11 @@ public final class BookMenuUI {
         if (dados != null) {
             texto.add(linhaComIcone("ui/MPIcon", dados.magiaMana + " Mana", COR_MANA)).left().row();
             if (dados.magiaDescricao != null && !dados.magiaDescricao.isEmpty()) {
-                // Aba Spells: numa linha so' (a janela alarga, ajustarLarguraDetalhes).
+                // Quebra na largura da gaveta (loja e aba Spells): numa linha so' a
+                // gaveta ficava mais larga que a rolagem e cortava a borda da direita.
                 Label desc = linhaStat(dados.magiaDescricao, Color.LIGHT_GRAY);
-                if (preco > 0) { desc.setWrap(true); texto.add(desc).growX().left().row(); }
-                else texto.add(desc).left().row();
+                desc.setWrap(true);
+                texto.add(desc).growX().left().row();
             }
             Table linhaDano = new Table();
             linhaDano.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET));
@@ -6202,8 +6203,8 @@ public final class BookMenuUI {
             linhaPreco.add(numero);
             texto.add(linhaPreco).left().padTop(2).row();
         }
-        gaveta.add(texto).growX().center().left();
-        // Canto inferior direito: "+ (icone) 3 Focus EXP" - golpes na skill por uso.
+        // Canto inferior direito: "+ (icone) 3 Focus EXP" - golpes na skill por uso
+        // (ultima linha do texto, alinhada a' direita: nao alarga a gaveta).
         if (dados != null && dados.magiaExp > 0 && dados.magiaExpSkill != null) {
             String[] sk = skillDaMagia(dados.magiaExpSkill);
             Table exp = new Table();
@@ -6216,8 +6217,9 @@ public final class BookMenuUI {
                 exp.add(ic).size(16).padRight(3);
             }
             exp.add(linhaStat(dados.magiaExp + " " + sk[1] + " EXP", cor));
-            gaveta.add(exp).bottom().right().padLeft(10);
+            texto.add(exp).right().padTop(2).row();
         }
+        gaveta.add(texto).growX().center().left();
         gaveta.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
         });
