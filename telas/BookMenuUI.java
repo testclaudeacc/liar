@@ -1455,8 +1455,20 @@ public final class BookMenuUI {
     }
 
     private void atualizarBarra(BarraSkill barra, int nivel, float percentual) {
+        atualizarBarra(barra, nivel, percentual, 0f);
+    }
+
+    /** bonusItens > 0: "35+12" (o que os equipamentos somam nessa skill). */
+    private void atualizarBarra(BarraSkill barra, int nivel, float percentual, float bonusItens) {
         float pct = Math.max(0f, Math.min(1f, percentual));
-        if (barra.nivelLabel != null) barra.nivelLabel.setText(String.valueOf(nivel));
+        if (barra.nivelLabel != null) {
+            String extra = "";
+            if (bonusItens > 0.001f) {
+                extra = "+" + (Math.abs(bonusItens - Math.round(bonusItens)) < 0.01f
+                    ? String.valueOf(Math.round(bonusItens)) : String.format(java.util.Locale.US, "%.1f", bonusItens));
+            }
+            barra.nivelLabel.setText(nivel + extra);
+        }
         barra.percentLabel.setText(barra.casasDecimais
             ? String.format(java.util.Locale.US, "%.2f%%", pct * 100f)
             : String.format(java.util.Locale.US, "%.0f%%", pct * 100f));
@@ -1529,14 +1541,14 @@ public final class BookMenuUI {
         int hitsPrincipal = skills != null ? skills.getInt(principal[0] + "_hits", 0) : 0;
         int necessarioPrincipal = getHitsToLevel(nivelPrincipal + 1, getSkillMultiplier(classeJogador, false));
         float pctPrincipal = necessarioPrincipal > 0 ? (float) hitsPrincipal / necessarioPrincipal : 0f;
-        atualizarBarra(barraPrincipal, nivelPrincipal, pctPrincipal);
+        atualizarBarra(barraPrincipal, nivelPrincipal, pctPrincipal, skills != null ? skills.getFloat("adc_itens", 0f) : 0f);
         fracaoPrincipal = Math.max(0f, Math.min(1f, pctPrincipal));
 
         int nivelDefesa = skills != null ? skills.getInt("defense", 10) : 10;
         int hitsDefesa = skills != null ? skills.getInt("defense_hits", 0) : 0;
         int necessarioDefesa = getHitsToLevel(nivelDefesa + 1, getSkillMultiplier(classeJogador, true));
         float pctDefesa = necessarioDefesa > 0 ? (float) hitsDefesa / necessarioDefesa : 0f;
-        atualizarBarra(barraDefesa, nivelDefesa, pctDefesa);
+        atualizarBarra(barraDefesa, nivelDefesa, pctDefesa, skills != null ? skills.getFloat("def_itens", 0f) : 0f);
         fracaoDefesa = Math.max(0f, Math.min(1f, pctDefesa));
 
         float fullness = skills != null ? skills.getFloat("fullness", FULLNESS_MAX) : FULLNESS_MAX;

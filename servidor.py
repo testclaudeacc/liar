@@ -904,6 +904,9 @@ def _montar_payload_sync_stats(p):
     if isinstance(skills, dict):
         skills = dict(skills)
         skills['regen_hp'], skills['regen_mp'] = regen_base_e_itens(p)
+        # Aba de skills: "35+12" (skill + ADC dos equips que valem pra classe) e
+        # "24+5" (defense + o que os itens tiram de dano: defense 1:2 + armour 1:1).
+        skills['adc_itens'], skills['def_itens'] = bonus_itens_skills(p)
     return {
         'skills': skills, 'base_damage': new_dmg, 'defense_value': new_def,
         'level': level, 'exp': p.get('exp', 0), 'kills': p.get('kills', 0),
@@ -7625,6 +7628,20 @@ REGEN_MP_POR_PONTOS = 30.0
 
 # +1 de regen a cada 100 de HP/mana maxima (contando equipamento).
 REGEN_BONUS_A_CADA = 100.0
+
+def bonus_itens_skills(p):
+    classe = p.get('class_name', 'Knight')
+    adc, defesa = 0, 0.0
+    equipados = p.get('equipped_items', {})
+    if isinstance(equipados, dict):
+        for inst in equipados.values():
+            if not isinstance(inst, dict): continue
+            d = ITEM_DB.get(inst.get('item'), {})
+            tipo = d.get("fourth_stat_type", "None")
+            if tipo != "None" and (tipo == "Class" or tipo in ADC_DA_CLASSE.get(classe, (tipo,))):
+                adc += int(d.get("fourth_stat_value", 0) or 0)
+            defesa += float(d.get("defense", 0) or 0) * 0.5 + float(d.get("armour", 0) or 0)
+    return adc, defesa
 
 def regen_base_e_itens(p):
     """([hp base, hp extra], [mp base, mp extra]): base = so' o HP/mana do
