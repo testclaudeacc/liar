@@ -144,6 +144,7 @@ public class WorldScreen extends ScreenAdapter {
         boolean movendo = false;
         float origemX, origemY, destinoX, destinoY, duracao = 1f, progresso = 1f;
         String direcaoPendente = null;
+        float ultimaDuracaoPasso = 0.45f; // duracao do ultimo passo de verdade (pra suavizar correcoes)
         // Depois de um passo, espera um tiquinho antes do quadro parado - o
         // proximo passo do servidor costuma chegar logo e o mob nao "pisca"
         // parado entre um SQM e outro (mob.gd: timer de 0.12s).
@@ -183,7 +184,7 @@ public class WorldScreen extends ScreenAdapter {
                 return;
             }
             // Pulou passos (entrou na area agora / perdeu pacote): vai direto.
-            if (Math.abs(nx - ux) + Math.abs(ny - uy) > Jogador.TILE * 1.5f || fila.size() >= 4) {
+            if (Math.abs(nx - ux) + Math.abs(ny - uy) > Jogador.TILE * 2.5f || fila.size() >= 6) {
                 posicionar(nx, ny, dir);
                 return;
             }
@@ -209,7 +210,10 @@ public class WorldScreen extends ScreenAdapter {
             destinoY = (Float) passo[1];
             direcao = (String) passo[2];
             float dur = (Float) passo[3];
-            duracao = dur > 0f ? dur : 1f;
+            if (dur > 0f) ultimaDuracaoPasso = dur;
+            // Passo sem duracao (correcao/virada que mudou de SQM): na velocidade
+            // do ultimo passo, nunca "teleporte" nem 1s arrastado.
+            duracao = dur > 0f ? dur : ultimaDuracaoPasso;
             // Atrasado em relacao ao servidor: anda um pouco mais rapido.
             if (!fila.isEmpty()) duracao *= 0.75f;
             progresso = 0f;
@@ -5653,6 +5657,11 @@ public class WorldScreen extends ScreenAdapter {
             // Sync de area com o mob ja indo pra esse SQM: deixa o passo terminar
             // (mob.gd::posicionar faz o mesmo), sem "tp" no meio do caminho.
             if (!mob.movendo) mob.direcao = direcao;
+        } else if (posicaoAbsoluta && mob.visivel && !mob.morto
+                && Math.abs(mx - mob.destinoFinalX()) + Math.abs(my - mob.destinoFinalY()) <= Jogador.TILE * 1.5f) {
+            // Posicao absoluta a 1 SQM do que eu ja' tinha (ex: o servidor ja'
+            // decidiu o proximo passo): anda ate' la' em vez de teleportar.
+            mob.receberPasso(mx, my, direcao, duracaoPasso > 0f ? duracaoPasso : mob.ultimaDuracaoPasso);
         } else if (posicaoAbsoluta || !mob.visivel) {
             mob.posicionar(mx, my, direcao);
         } else {
