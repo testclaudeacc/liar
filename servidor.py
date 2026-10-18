@@ -1225,10 +1225,13 @@ def broadcast_hp(sid, p):
 # rebalancear esses numeros e' decisao separada, nao mexi neles aqui.
 TILE = 16
 MOB_FLOOR = 1
-DETECCAO_SQM = 5  # SQMs pra cada lado (quadrado: 5 = area 11x11), igual ALCANCE_RANGED_SQM
+# 4 = area 9x9. Um a menos que o alcance da arma a distancia (5): o mob nao
+# ve quem esta no 5o SQM, mas se levar golpe de la' foca no atacante
+# (mob_focar_agressor aceita ate' DETECCAO + PERSISTE).
+DETECCAO_SQM = 4
 # +4 SQMs de folga: dá tempo do mob perseguir até a escada/transição em vez de
 # desistir na hora só porque o alvo mudou de andar no meio da perseguição.
-PERSISTE_SQM = 8
+PERSISTE_SQM = 9  # detecao + isso = 13 SQMs (o client usa 13 pra perder o alvo)
 SEM_CAMINHO_SEG = 1.5
 # Focando o mesmo alvo esse tempo sem conseguir bater: o próximo player que
 # bater no mob rouba o foco (anti-abuso).

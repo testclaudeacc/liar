@@ -498,7 +498,7 @@ public class WorldScreen extends ScreenAdapter {
     private static final float INTERVALO_ATAQUE = 2.4f;
     // HP {atual, maximo} dos players remotos, pra cor do nome.
     private final Map<String, float[]> vidaRemotos = new HashMap<>();
-    // Igual servidor.py::ALCANCE_RANGED_SQM = DETECCAO_SQM: arma a distancia
+    // Igual servidor.py::ALCANCE_RANGED_SQM (5, um a mais que DETECCAO_SQM): arma a distancia
     // alcanca o mesmo raio (em linha reta) em que o mob detecta o player.
     private static final int ALCANCE_RANGED_SQM = 5;
 
@@ -2530,7 +2530,7 @@ public class WorldScreen extends ScreenAdapter {
     private static final Color COR_NOTIF_PARTY = Color.valueOf("f5e02a");
     /** Mesmos valores de servidor.py::FOME_LIMITE / FOME_MULT_VELOCIDADE. */
     private static final float FOME_LIMITE = 10f, FOME_MULT_VELOCIDADE = 0.9f;
-    /** Igual servidor.py: DETECCAO_SQM (5) + PERSISTE_SQM (8) - o mob perde o player. */
+    /** Igual servidor.py: DETECCAO_SQM (4) + PERSISTE_SQM (9) - o mob perde o player. */
     private static final int DISTANCIA_PERDE_ALVO_SQM = 13;
     private float multFome = 1f;
     /** Velocidade de andar pelo level (servidor: sync_stats "move_speed", +1% por level). */
