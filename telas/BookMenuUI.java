@@ -514,6 +514,8 @@ public final class BookMenuUI {
         return Math.max(0f, Math.min(EXTRA_JANELA_MAX, cabe));
     }
 
+    private static final float FOLGA_GAVETA_MAGIA = 16f;
+
     private void ajustarLarguraDetalhes() {
         if (celulaJanela == null) return;
         float limite = limiteExtraTela();
@@ -579,7 +581,9 @@ public final class BookMenuUI {
         // Aba Spells (lista de magias): a janela alarga ate' a descricao caber numa linha.
         if (conteudoMagias != null && spellsPage.getParent() == mainWindow && conteudoMagias.getStage() != null) {
             float esquerda = TAM_SLOT_ATALHO * 3f + 6f * 3f + 22f + 6f;
-            float disponivel = JANELA_LARGURA - 16f - esquerda - 20f - 14f; // pads do painel + barra de rolagem
+            // pads do painel + barra de rolagem + folga (sem ela a borda da direita
+            // da gaveta ficava uns px pra fora da rolagem e era cortada).
+            float disponivel = JANELA_LARGURA - 16f - esquerda - 20f - 14f - FOLGA_GAVETA_MAGIA;
             extraVisivel = Math.max(extraVisivel,
                 Math.min(limite, Math.max(0f, conteudoMagias.getPrefWidth() - disponivel)));
         }
@@ -6174,11 +6178,11 @@ public final class BookMenuUI {
         if (dados != null) {
             texto.add(linhaComIcone("ui/MPIcon", dados.magiaMana + " Mana", COR_MANA)).left().row();
             if (dados.magiaDescricao != null && !dados.magiaDescricao.isEmpty()) {
-                // Quebra na largura da gaveta (loja e aba Spells): numa linha so' a
-                // gaveta ficava mais larga que a rolagem e cortava a borda da direita.
+                // Aba Spells: numa linha so' (a janela alarga, ajustarLarguraDetalhes).
+                // Loja: quebra na largura do painel.
                 Label desc = linhaStat(dados.magiaDescricao, Color.LIGHT_GRAY);
-                desc.setWrap(true);
-                texto.add(desc).growX().left().row();
+                if (preco > 0) { desc.setWrap(true); texto.add(desc).growX().left().row(); }
+                else texto.add(desc).left().row();
             }
             Table linhaDano = new Table();
             linhaDano.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET));
