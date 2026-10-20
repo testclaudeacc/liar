@@ -80,13 +80,13 @@ MOB_DB = {
     # speed_mult: mais rapida que o padrao do mapa (level maior). flap: a
     # sprite "andando" toca o tempo todo (asas batendo), parada tambem.
     # shadow: True = sombra no chao desenhada pelo jogo (parada enquanto o corpo sobe/desce).
-    "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "hp": 115, "xp": 15, "attack": 21.5, "attack_min": 20, "attack_max": 23,
+    "wasp": {"name": "Venom Wasp", "speed_mult": 1.15, "flap": True, "hp": 115, "xp": 15, "attack": 13.0, "attack_min": 12, "attack_max": 14,
              "range": 5, "proj": "res://ui/PoisonProjectile.png", "hit": "PoisonCloud",
              "drops": [{"item": "res://sprites/items/Mage/SecondHand/CrimsonTome.tres", "chance": 0.02}, {"item": "res://sprites/items/Bard/SecondHand/AzureScore.tres", "chance": 0.02}, {"item": "res://sprites/items/Knight/SecondHand/IronboundShield.tres", "chance": 0.02},
                        {"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
                        {"item": "res://sprites/items/Materials/WaspStinger.tres", "chance": 0.03}],
              "currency": {"min": 14, "max": 28}},
-    "wasp2": {"name": "Razor Hornet", "speed_mult": 1.15, "flap": True, "hp": 130, "xp": 17, "attack": 25.0, "attack_min": 23, "attack_max": 27,
+    "wasp2": {"name": "Razor Hornet", "speed_mult": 1.15, "flap": True, "hp": 130, "xp": 17, "attack": 14.0, "attack_min": 13, "attack_max": 15,
               "hit": "PoisonPhysATK",
               "drops": [{"item": "res://sprites/items/Mage/SecondHand/CrimsonTome.tres", "chance": 0.02}, {"item": "res://sprites/items/Bard/SecondHand/AzureScore.tres", "chance": 0.02}, {"item": "res://sprites/items/Knight/SecondHand/IronboundShield.tres", "chance": 0.02},
                        {"item": "res://sprites/items/Materials/WaspWing.tres", "chance": 0.03},
@@ -99,12 +99,12 @@ MOB_DB = {
     # Proximas hunts: ~40-50 min por level so' la' pelo lv 18-19.
     # "one_of": UMA rolagem com essa chance; se cair, sorteia um item da lista
     # (anel/colar de Ruby com ADC aleatorio).
-    "spidermushroom": {"name": "Mushroom Spider", "speed_mult": 2.0, "hp": 200, "xp": 54, "attack": 34.0, "attack_min": 32, "attack_max": 36,
+    "spidermushroom": {"name": "Mushroom Spider", "speed_mult": 2.0, "hp": 270, "xp": 54, "attack": 34.0, "attack_min": 32, "attack_max": 36,
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.05},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02}],
                        "currency": {"min": 20, "max": 35}},
-    "wolf": {"name": "Wolf", "speed_mult": 2.2, "hp": 260, "xp": 68, "attack": 39.0, "attack_min": 37, "attack_max": 41, "hit": "BiteAtk",
+    "wolf": {"name": "Wolf", "speed_mult": 2.2, "hp": 300, "xp": 68, "attack": 39.0, "attack_min": 37, "attack_max": 41, "hit": "BiteAtk",
              "drops": [{"item": "res://sprites/items/Materials/WolfFur.tres", "chance": 0.05},
                        {"item": "res://sprites/items/Knight/Weapons/BasicDagger.tres", "chance": 0.02},
                        {"item": "res://sprites/items/Mage/Weapons/RubyStaff.tres", "chance": 0.02},
