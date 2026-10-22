@@ -4860,10 +4860,11 @@ public class WorldScreen extends ScreenAdapter {
         if (perf != null) perf.marca("map");
 
         batch.setProjectionMatrix(camera.combined);
+        atualizarAreaVisivel();
         batch.begin();
         // Chao primeiro: sangue, cadaveres e bags ficam sempre por baixo de quem passa.
         desenharSangue(delta);
-        for (MobVisual mob : mobs.values()) if (mob.morto) desenharMob(mob);
+        for (MobVisual mob : mobs.values()) if (mob.morto && naTela(mob.x, mob.y)) desenharMob(mob);
         desenharBags();
         desenharCadaveres();
         desenharAvisosSpawn();
@@ -4906,9 +4907,9 @@ public class WorldScreen extends ScreenAdapter {
         // Nomes e baloes dos jogadores e NPCs recebem a mesma iluminacao.
         batch.begin();
         desenharNome(local);
-        for (Jogador j : remotos.values()) desenharNome(j);
-        for (NPCVisual npc : npcs.values()) desenharNomeNPC(npc);
-        for (MobVisual mob : mobs.values()) desenharNomeMob(mob);
+        for (Jogador j : remotos.values()) if (naTela(j.x, j.y)) desenharNome(j);
+        for (NPCVisual npc : npcs.values()) if (naTela(npc.movimento.x, npc.movimento.y)) desenharNomeNPC(npc);
+        for (MobVisual mob : mobs.values()) if (naTela(mob.x, mob.y)) desenharNomeMob(mob);
         desenharNumerosDano();
         desenharTextosFlutuantes();
         desenharLootsFlutuantes();
@@ -5641,12 +5642,32 @@ public class WorldScreen extends ScreenAdapter {
         return ((MobVisual) o).y;
     }
 
+    // Retangulo que a camera ve neste frame (+ folga pra sprite grande, nome,
+    // barra de vida e balao que passam do SQM).
+    private float visEsq, visDir, visBaixo, visCima;
+    private static final float FOLGA_TELA = 4f * Jogador.TILE;
+
+    private void atualizarAreaVisivel() {
+        float meiaL = camera.viewportWidth * camera.zoom / 2f, meiaA = camera.viewportHeight * camera.zoom / 2f;
+        visEsq = camera.position.x - meiaL - FOLGA_TELA;
+        visDir = camera.position.x + meiaL + FOLGA_TELA;
+        visBaixo = camera.position.y - meiaA - FOLGA_TELA;
+        visCima = camera.position.y + meiaA + FOLGA_TELA;
+    }
+
+    private boolean naTela(float x, float y) {
+        return x >= visEsq && x <= visDir && y >= visBaixo && y <= visCima;
+    }
+
     private void desenharEntidadesOrdenadas() {
         ordemDesenho.clear();
         ordemDesenho.add(local);
-        ordemDesenho.addAll(remotos.values());
-        ordemDesenho.addAll(npcs.values());
-        for (MobVisual mob : mobs.values()) if (!mob.morto) ordemDesenho.add(mob);
+        // So' quem esta' na tela: antes TODOS os mobs/NPCs do mapa eram
+        // ordenados e desenhados todo frame (centenas de draw calls fora da
+        // tela - era o "entities" pesado no celular).
+        for (Jogador j : remotos.values()) if (naTela(j.x, j.y)) ordemDesenho.add(j);
+        for (NPCVisual npc : npcs.values()) if (naTela(npc.movimento.x, npc.movimento.y)) ordemDesenho.add(npc);
+        for (MobVisual mob : mobs.values()) if (!mob.morto && naTela(mob.x, mob.y)) ordemDesenho.add(mob);
         ordemDesenho.sort((a, b) -> Float.compare(yDe(b), yDe(a)));
         for (Object o : ordemDesenho) {
             if (o instanceof Jogador) desenharJogador((Jogador) o);
