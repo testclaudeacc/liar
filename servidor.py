@@ -2144,6 +2144,7 @@ def _alcanca(m, sid, origem, destino, now):
 
 def _mob_voltar_pra_casa(mob_id, m):
     m['target_sid'] = None
+    m['prox_busca'] = 0.0  # ja' no proximo tick procura outro alvo perto (alvo entrou na PZ etc)
     m['sem_caminho'] = 0.0
     m['bloqueado_criatura'] = 0.0
     m['path'] = None
@@ -2532,6 +2533,20 @@ def _mob_tick(mob_id, m, now):
     if now < m.get('move_until', 0) - MOB_PASSO_ANTECIPA: return
 
     if m.get('returning'):
+        # Igual Tibia: voltando pra casa (flag) o mob continua de olho - quem
+        # entrar nos SQMs de deteccao vira o novo alvo (ex: knight lurando a
+        # hunt e entrando na PZ: os mobs viram em quem estiver perto). Sem
+        # ninguem, chega no spawn e volta a passear.
+        if now >= m.get('prox_busca', 0):
+            m['prox_busca'] = now + random.uniform(0.15, 0.25)
+            novo = _mob_procurar_alvo(m, origem, now)
+            if novo is not None:
+                _mob_definir_alvo(m, novo, now)
+                m['returning'] = False
+                m['sem_caminho'] = 0.0
+                m['path'] = None
+                _mob_emitir_estado(mob_id, m)
+                return
         spawn = m['spawn']
         perto_de_casa = abs(origem[0] - spawn[0]) + abs(origem[1] - spawn[1]) <= 2
         if origem == spawn or (perto_de_casa and m.get('sem_caminho', 0) >= SEM_CAMINHO_SEG):
@@ -2602,6 +2617,17 @@ def _mob_tick(mob_id, m, now):
     # trocar de andar, no bloco acima).
     # Area quadrada (DETECCAO_SQM pra cada lado, cantos inclusos); entre os
     # que estao dentro, o mais perto em linha reta.
+    melhor = _mob_procurar_alvo(m, origem, now)
+    if melhor is not None:
+        _mob_definir_alvo(m, melhor, now)
+        m['sem_caminho'] = 0.0
+        return
+
+    _mob_passear(mob_id, m, origem, now)
+
+def _mob_procurar_alvo(m, origem, now):
+    """Player mais perto dentro do quadrado de deteccao que de' pra alcancar
+    (None = ninguem). Usado parado/passeando e voltando pra casa."""
     melhor, melhor_dist = None, float('inf')
     # Filtro barato antes das checagens caras: player claramente fora do
     # quadrado de deteccao (em pixels, com 1 SQM de folga) nem e' avaliado.
@@ -2619,12 +2645,7 @@ def _mob_tick(mob_id, m, now):
         t_p = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
         if _adjacente(origem, t_p) or _alcanca(m, sid, origem, t_p, now):
             melhor, melhor_dist = sid, d
-    if melhor is not None:
-        _mob_definir_alvo(m, melhor, now)
-        m['sem_caminho'] = 0.0
-        return
-
-    _mob_passear(mob_id, m, origem, now)
+    return melhor
 
 def _mob_passear(mob_id, m, origem, now):
     """Sem alvo: igual o NPC (_npc_tick), da' 1 passo aleatorio de tempos em
