@@ -1288,7 +1288,22 @@ MOB_FLOOR = 1
 DETECCAO_SQM = 4
 # +4 SQMs de folga: dá tempo do mob perseguir até a escada/transição em vez de
 # desistir na hora só porque o alvo mudou de andar no meio da perseguição.
-PERSISTE_SQM = 9  # detecao + isso = 13 SQMs (o client usa 13 pra perder o alvo)
+PERSISTE_SQM = 9  # (antigo) detecao + isso = 13 SQMs - hoje vale PERDE_ALVO_SQM
+# Perseguicao (estilo Tibia, "mobs na maldade"):
+#  - alvo a mais de TROCA_ALVO_LONGE_SQM: se tiver outro player na deteccao do
+#    mob (e alcancavel), vira nele;
+#  - alvo a mais de PERDE_ALVO_SQM (ou entrou na PZ, morreu...): larga ele e
+#    fica ali mesmo - aquele SQM vira a "casa temporaria" (passeia em volta e
+#    vira em quem chegar perto). Sem flag, sem sumir;
+#  - casa temporaria sem nenhum player vendo por CASA_TEMP_VAZIA_SEG: o mob
+#    e' teleportado de volta pro spawn (ninguem ve, poupa o servidor).
+TROCA_ALVO_LONGE_SQM = 5
+PERDE_ALVO_SQM = 8
+CASA_TEMP_VAZIA_SEG = 10.0
+# Trancado por criaturas (trap): fica perambulando colado (1 SQM do lugar
+# onde travou) esperando abrir um spot, sem largar o alvo.
+MOB_ESPERA_RAIO_SQM = 1
+MOB_ESPERA_PASSO = (0.8, 1.6)
 SEM_CAMINHO_SEG = 1.5
 # Focando o mesmo alvo esse tempo sem conseguir bater: o próximo player que
 # bater no mob rouba o foco (anti-abuso).
@@ -2142,16 +2157,52 @@ def _alcanca(m, sid, origem, destino, now):
     m['alcance'][sid] = (now, origem, destino, ok)
     return ok
 
-def _mob_voltar_pra_casa(mob_id, m):
+def _mob_largar_alvo(mob_id, m):
+    """Larga o alvo e fica onde esta': longe do spawn, esse SQM vira a casa
+    temporaria (ver PERDE_ALVO_SQM). Ja' no proximo tick procura outro alvo."""
     m['target_sid'] = None
-    m['prox_busca'] = 0.0  # ja' no proximo tick procura outro alvo perto (alvo entrou na PZ etc)
+    m['prox_busca'] = 0.0
     m['sem_caminho'] = 0.0
     m['bloqueado_criatura'] = 0.0
     m['path'] = None
-    voltando = m.get('spawn') is not None and tile_do_mob(m) != m['spawn']
-    if voltando != m.get('returning'):
-        m['returning'] = voltando
+    t = tile_do_mob(m)
+    casa = m.get('spawn')
+    if casa is not None and max(abs(t[0] - casa[0]), abs(t[1] - casa[1])) > MOB_WANDER_RADIUS_SQM:
+        m['casa_temp'] = t
+    else:
+        m.pop('casa_temp', None)
+    m.pop('casa_temp_vazia', None)
+    m.pop('casa_espera', None)
+    if m.get('returning'):
+        m['returning'] = False
         _mob_emitir_estado(mob_id, m)
+
+def _mob_teleportar_pra_casa(mob_id, m):
+    """Casa temporaria sem ninguem por perto: volta pro spawn na hora."""
+    casa = m.get('spawn')
+    m.pop('casa_temp', None)
+    m.pop('casa_temp_vazia', None)
+    if casa is None: return
+    sala_antiga = m.get('room')
+    m['pos_x'], m['pos_y'] = centro_tile(casa)
+    m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
+    m['path'] = None
+    m['alcance'] = {}
+    m['move_until'] = 0.0
+    m['target_sid'] = None
+    m['returning'] = False
+    for sala in {sala_antiga, m['room']}:
+        if sala: emit_area('mob_pos', payload_mob_pos(mob_id, m), sala)
+    resetar_quem_ve_mob(mob_id)
+
+def _alguem_ve_mob(m):
+    mx, my = float(m.get('pos_x', 0)), float(m.get('pos_y', 0))
+    for sid in _sids_no_quadrado(mx, my, max(VISAO_X, VISAO_Y)):
+        p = online_players.get(sid)
+        if p is None: continue
+        if abs(float(p.get('pos_x', 0)) - mx) <= VISAO_X and abs(float(p.get('pos_y', 0)) - my) <= VISAO_Y:
+            return True
+    return False
 
 # Perseguiu longe demais (LEASH_SQM) do próprio spawn: em vez de voltar
 # andando (às vezes cruzando o mapa inteiro), some com o efeito SpawnEffect no
@@ -2567,14 +2618,22 @@ def _mob_tick(mob_id, m, now):
         # o mesmo andar (mais abaixo).
         alvo = _player_pursuit_valido(alvo_sid)
         if alvo is None or na_pz(alvo):  # morreu, saiu, desconectou, entrou na PZ
-            _mob_voltar_pra_casa(mob_id, m)
+            _mob_largar_alvo(mob_id, m)
             return
-        if _dist_sqm(m, alvo) > DETECCAO_SQM + PERSISTE_SQM:
-            _mob_voltar_pra_casa(mob_id, m)
+        dist_alvo = _dist_sqm(m, alvo)
+        if dist_alvo > PERDE_ALVO_SQM:
+            _mob_largar_alvo(mob_id, m)
             return
-        if _dist_spawn_sqm(m) > LEASH_SQM:
-            _mob_desaparece_por_perseguicao(mob_id, m, now)
-            return
+        # Alvo se afastando: tendo outro player perto, vira nele.
+        if dist_alvo > TROCA_ALVO_LONGE_SQM and now >= m.get('prox_busca', 0):
+            m['prox_busca'] = now + random.uniform(0.15, 0.25)
+            outro = _mob_procurar_alvo(m, origem, now)
+            if outro is not None and outro != alvo_sid:
+                _mob_definir_alvo(m, outro, now)
+                m['sem_caminho'] = 0.0
+                m['bloqueado_criatura'] = 0.0
+                m['path'] = None
+                return
         t_alvo = tile_de(alvo.get('pos_x', 0), alvo.get('pos_y', 0))
         # Ja' alcanca (do lado, ou a distancia pro mob ranged): para e encara.
         if _mob_no_alcance(m, origem, t_alvo, alvo):
@@ -2586,18 +2645,22 @@ def _mob_tick(mob_id, m, now):
             m['sem_caminho'] = 0.0
             if _mob_dar_passo(mob_id, m, t_alvo, now, ate_adjacente=True):
                 m['bloqueado_criatura'] = 0.0
+                m.pop('casa_espera', None)
             else:
-                # Bloqueado por criatura (outro mob/player no caminho): espera
-                # olhando pro alvo, mas se continuar trancado desiste com flag.
+                # Bloqueado por criatura (trap, corredor com outro mob): nao
+                # desiste - fica perambulando colado esperando abrir um spot.
                 m['bloqueado_criatura'] = m.get('bloqueado_criatura', 0) + dt
                 if m['bloqueado_criatura'] >= BLOQUEADO_CRIATURA_SEG:
-                    _mob_voltar_pra_casa(mob_id, m)
+                    if m.get('casa_espera') is None: m['casa_espera'] = origem
+                    if not _mob_passear(mob_id, m, origem, now, casa=m['casa_espera'],
+                                        raio=MOB_ESPERA_RAIO_SQM, espera=MOB_ESPERA_PASSO):
+                        _mob_encarar(mob_id, m, origem, t_alvo)
                 else:
                     _mob_encarar(mob_id, m, origem, t_alvo)
         else:
             m['sem_caminho'] = m.get('sem_caminho', 0) + dt
             if m['sem_caminho'] >= SEM_CAMINHO_SEG:
-                _mob_voltar_pra_casa(mob_id, m)
+                _mob_largar_alvo(mob_id, m)
             else:
                 _mob_encarar(mob_id, m, origem, t_alvo)
         return
@@ -2647,24 +2710,27 @@ def _mob_procurar_alvo(m, origem, now):
             melhor, melhor_dist = sid, d
     return melhor
 
-def _mob_passear(mob_id, m, origem, now):
+def _mob_passear(mob_id, m, origem, now, casa=None, raio=MOB_WANDER_RADIUS_SQM,
+                 espera=(MOB_WANDER_MIN_WAIT, MOB_WANDER_MAX_WAIT)):
     """Sem alvo: igual o NPC (_npc_tick), da' 1 passo aleatorio de tempos em
     tempos, sem sair de MOB_WANDER_RADIUS_SQM da casa dele (menor que a do
     NPC). Cada mob tem o proprio relogio aleatorio (5-10s), pra nao andarem
     todos juntos."""
+    # casa: em volta de onde passeia (padrao: a casa temporaria, senao o spawn).
+    # Devolve True se deu um passo.
     if 'next_wander_at' not in m:
-        m['next_wander_at'] = now + random.uniform(MOB_WANDER_MIN_WAIT, MOB_WANDER_MAX_WAIT)
-        return
-    if now < m['next_wander_at']: return
-    m['next_wander_at'] = now + random.uniform(MOB_WANDER_MIN_WAIT, MOB_WANDER_MAX_WAIT)
+        m['next_wander_at'] = now + random.uniform(*espera)
+        return False
+    if now < m['next_wander_at']: return False
+    m['next_wander_at'] = now + random.uniform(*espera)
     grade = mapas_colisao.get(m.get('mapa'))
-    casa = m.get('spawn')
-    if grade is None or casa is None: return
+    if casa is None: casa = m.get('casa_temp') or m.get('spawn')
+    if grade is None or casa is None: return False
     ocupados = _tiles_ocupados(excluir_mob=mob_id, sala=m.get('room'))
     destinos = [(origem[0] + dx, origem[1] + dy) for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0))]
     random.shuffle(destinos)
     for destino in destinos:
-        if max(abs(destino[0] - casa[0]), abs(destino[1] - casa[1])) > MOB_WANDER_RADIUS_SQM: continue
+        if max(abs(destino[0] - casa[0]), abs(destino[1] - casa[1])) > raio: continue
         if destino in ocupados or eh_parede(grade, destino) or borda_bloqueada(grade, origem, destino): continue
         if na_pz(m, destino): continue
         _virar_para(m, origem, destino)
@@ -2675,8 +2741,9 @@ def _mob_passear(mob_id, m, origem, now):
         m['path'] = None
         m['room'] = get_chunk(m['pos_x'], m['pos_y'], MOB_FLOOR)
         _mob_emitir_estado(mob_id, m, passo)
-        m['next_wander_at'] = m['move_until'] + random.uniform(MOB_WANDER_MIN_WAIT, MOB_WANDER_MAX_WAIT)
-        return
+        m['next_wander_at'] = m['move_until'] + random.uniform(*espera)
+        return True
+    return False
 
 def _mob_definir_alvo(m, sid, now=None):
     # Troca de alvo zera o relógio de "focando sem bater" (ver mob_focar_agressor).
@@ -2700,7 +2767,7 @@ def mob_focar_agressor(mob_id, m, sid):
     if atual == sid: return
     if atual is not None and not m.get('returning') and not _mob_preso_sem_bater(m, now): return
     p = _player_alvo_valido(sid, m)
-    if p is None or _dist_sqm(m, p) > DETECCAO_SQM + PERSISTE_SQM: return
+    if p is None or _dist_sqm(m, p) > PERDE_ALVO_SQM: return
     _mob_definir_alvo(m, sid, now)
     m['sem_caminho'] = 0.0
     if m.get('returning'):
@@ -8493,7 +8560,15 @@ def mob_cleanup_loop():
         socketio.sleep(1.0)
         now = time.time()
         for m_id, m_data in list(active_mobs.items()):
-            if m_data.get('hp', 1) > 0: continue
+            if m_data.get('hp', 1) > 0:
+                # Casa temporaria sem ninguem vendo: teleporta pro spawn.
+                if m_data.get('casa_temp') is not None and m_data.get('target_sid') is None:
+                    try:
+                        if _alguem_ve_mob(m_data): m_data.pop('casa_temp_vazia', None)
+                        elif now - m_data.setdefault('casa_temp_vazia', now) >= CASA_TEMP_VAZIA_SEG:
+                            _mob_teleportar_pra_casa(m_id, m_data)
+                    except Exception: traceback.print_exc()
+                continue
             if 'died_at' not in m_data:
                 m_data['died_at'] = now
             if m_data.get('summon'):
@@ -8518,6 +8593,7 @@ def mob_cleanup_loop():
             m_data.pop('died_at', None)
             m_data['returning'] = False
             m_data['target_sid'] = None
+            for k in ('casa_temp', 'casa_temp_vazia', 'casa_espera'): m_data.pop(k, None)
             m_data['path'] = None
             m_data['alcance'] = {}
             m_data['sem_caminho'] = 0.0
