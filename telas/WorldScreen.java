@@ -5935,18 +5935,7 @@ public class WorldScreen extends ScreenAdapter {
         if (!mob.morto && mob.tempoTargetHit > 0f && regiaoTargetHit != null) {
             batch.draw(regiaoTargetHit, ancoraX - regiaoTargetHit.getRegionWidth() / 2f, ancoraY);
         }
-        // Barra de vida (logo acima da cabeca; o nome vai por cima dela).
-        if (!mob.morto && mostrarBarraMob(mob)) {
-            float barraLargura = Math.round(LARGURA_BARRA_HP * multBarraHp);
-            float barraX = ancoraX - barraLargura / 2f;
-            float barraY = ancoraY + altura + 1f;
-            float pct = Math.max(0f, Math.min(1f, mob.hp / mob.maxHp));
-            batch.setColor(0f, 0f, 0f, 0.8f);
-            batch.draw(pixelBranco, barraX - 0.5f, barraY - 0.5f, barraLargura + 1f, 3f);
-            batch.setColor(corDaVida(pct));
-            batch.draw(pixelBranco, barraX, barraY, barraLargura * pct, 2f);
-            batch.setColor(Color.WHITE);
-        }
+        // Barra de vida: desenhada junto do nome (desenharNomeMob), por cima dos tiles.
     }
 
     // ===================== COMBATE =====================
@@ -6851,6 +6840,9 @@ public class WorldScreen extends ScreenAdapter {
         float altura = quadro.getRegionHeight() * ESCALA_SPRITE;
         float ancoraX = Math.round(mob.x / camera.zoom) * camera.zoom;
         float ancoraY = Math.round(mob.y / camera.zoom) * camera.zoom;
+        // Barra de vida logo acima da cabeca: aqui (passada dos nomes) e nao no
+        // sprite, pra ficar por cima de arvores/telhados igual o nome.
+        if (mostrarBarraMob(mob)) desenharBarraVida(ancoraX, ancoraY + altura + 1f, mob.hp / mob.maxHp);
         layout.setText(font, mob.nome);
         float nomeX = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
         float nomeY = Math.round((ancoraY + altura + 10f + extraAlturaNome()) / camera.zoom) * camera.zoom;
