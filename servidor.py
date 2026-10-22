@@ -1321,7 +1321,7 @@ PATH_RECALC_SEG = 0.3
 # alguém. Ultrapassou: em vez de voltar andando (às vezes por um mapa
 # inteiro), ele "some" (efeito SpawnEffect no client) e conta como morto pro
 # respawn normal (MOB_RESPAWN_SEG) — ver _mob_desaparece_por_perseguicao.
-LEASH_SQM = 40  # era 25; voltou junto com a casa temporaria (anti arrastar mob pra cidade)
+LEASH_SQM = 30  # era 25; voltou junto com a casa temporaria (anti arrastar mob pra cidade)
 ALCANCE_RECALC_SEG = 0.5
 MOB_TICK_SEG = 0.05
 # Quanto antes do fim do passo o proximo e' decidido (> 1 tick + folga de rede).
