@@ -1,0 +1,163 @@
+# Traducoes: ingles<TAB>portugues<TAB>espanhol. Depois de editar: python3 tools/gerar_idioma.py
+# Nomes de itens, mobs, magias, palavras das magias e comandos do chat ficam em ingles (universal).
+Settings	Configurações	Ajustes
+Screen	Tela	Pantalla
+Change your screen settings here	Altere as configurações de tela aqui	Cambia aquí los ajustes de pantalla
+Camera Zoom	Zoom da câmera	Zoom de cámara
+Full Screen	Tela cheia	Pantalla completa
+Style	Estilo	Estilo
+Controls	Controles	Controles
+Moving style	Movimento	Movimiento
+8 directions	8 direções	8 direcciones
+4 directions	4 direções	4 direcciones
+Reset to default	Restaurar padrão	Restablecer
+Controls reset to default.	Controles restaurados para o padrão.	Controles restablecidos.
+Edit controls	Editar controles	Editar controles
+Press...	Aperte...	Pulsa...
+Back	Voltar	Volver
+Exit	Sair	Salir
+Yes	Sim	Sí
+No	Não	No
+Language	Idioma	Idioma
+Language changed. Re-enter the world to update every screen.	Idioma alterado. Entre no mundo de novo para atualizar todas as telas.	Idioma cambiado. Vuelve a entrar al mundo para actualizar todas las pantallas.
+HP/MP bars	Barras de HP/MP	Barras de HP/MP
+Arc	Arco	Arco
+Square	Reta	Recta
+Portrait ring	Anel do retrato	Anillo del retrato
+Experience	Experiência	Experiencia
+Defense	Defesa	Defensa
+Show HP bar	Mostrar barra de HP	Mostrar barra de HP
+Always	Sempre	Siempre
+Only target	Só o alvo	Solo el objetivo
+Only enemies	Só inimigos	Solo enemigos
+Health bar size	Tamanho da barra de vida	Tamaño de la barra de vida
+UI font size	Tamanho do texto	Tamaño del texto
+Smaller	Menor	Más pequeño
+Small	Pequeno	Pequeño
+Default	Padrão	Normal
+Big	Grande	Grande
+Bigger	Maior	Más grande
+Lighting quality	Qualidade da luz	Calidad de luz
+High	Alta	Alta
+Medium	Média	Media
+Low	Baixa	Baja
+Off	Desligado	Apagado
+On	Ligado	Encendido
+Effects	Efeitos	Efectos
+Full	Completo	Completo
+Reduced	Reduzido	Reducido
+FPS limit	Limite de FPS	Límite de FPS
+Max	Máximo	Máximo
+Performance stats	Estatísticas de desempenho	Estadísticas de rendimiento
+Auto target	Alvo automático	Objetivo automático
+All	Todos	Todos
+Not others'	Menos os dos outros	Menos los de otros
+Only mine	Só os meus	Solo los míos
+Mine + party	Meus + party	Míos + grupo
+UI font size: the chat text and potion cooldown numbers update after re-entering the world.	Tamanho do texto: o chat e os números de cooldown das poções mudam ao entrar no mundo de novo.	Tamaño del texto: el chat y los números de enfriamiento de pociones cambian al volver a entrar al mundo.
+Language of menus, messages and descriptions. Item, creature and spell names stay in English for everyone.	Idioma dos menus, mensagens e descrições. Nomes de itens, criaturas e magias ficam em inglês para todos.	Idioma de menús, mensajes y descripciones. Los nombres de objetos, criaturas y hechizos quedan en inglés para todos.
+How close the camera is. A higher zoom shows less of the map around you.	Quão perto fica a câmera. Zoom maior mostra menos do mapa ao seu redor.	Qué tan cerca está la cámara. Más zoom muestra menos del mapa a tu alrededor.
+Switches between window and full screen (also F11 or Alt+Enter).	Alterna entre janela e tela cheia (também F11 ou Alt+Enter).	Cambia entre ventana y pantalla completa (también F11 o Alt+Enter).
+8 directions lets you walk diagonally. 4 directions walks only up, down, left and right.	8 direções deixa andar na diagonal. 4 direções anda só para cima, baixo, esquerda e direita.	8 direcciones permite caminar en diagonal. 4 direcciones camina solo arriba, abajo, izquierda y derecha.
+How your HP and MP are shown on the screen: arcs around the portrait or straight bars.	Como seu HP e MP aparecem na tela: arcos em volta do retrato ou barras retas.	Cómo se muestran tu HP y MP: arcos alrededor del retrato o barras rectas.
+What the ring around your portrait shows: experience, defense or your class skill progress.	O que o anel em volta do retrato mostra: experiência, defesa ou o progresso da skill da sua classe.	Lo que muestra el anillo del retrato: experiencia, defensa o el progreso de la habilidad de tu clase.
+Health bars over heads: on everyone, only on your target, or only on enemies.	Barras de vida em cima da cabeça: em todos, só no seu alvo ou só em inimigos.	Barras de vida sobre las cabezas: en todos, solo en tu objetivo o solo en enemigos.
+Width of the health bars over players and creatures.	Largura das barras de vida em cima de players e criaturas.	Ancho de las barras de vida sobre jugadores y criaturas.
+Size of names, damage numbers, item and coin numbers, descriptions and chat.	Tamanho dos nomes, números de dano, números de itens e moedas, descrições e chat.	Tamaño de nombres, números de daño, números de objetos y monedas, descripciones y chat.
+Detail of lights at dusk, at night and in caves. Lower gives more FPS. Off keeps only the day/night color.	Detalhe das luzes no entardecer, à noite e nas cavernas. Mais baixa dá mais FPS. Desligado deixa só a cor do dia/noite.	Detalle de las luces al atardecer, de noche y en cuevas. Más baja da más FPS. Apagado deja solo el color del día/noche.
+Reduced hides blood on the ground, night details (fireflies) and the shadow of flying creatures. Gives more FPS.	Reduzido esconde o sangue no chão, os detalhes noturnos (vagalumes) e a sombra das criaturas voadoras. Dá mais FPS.	Reducido oculta la sangre en el suelo, los detalles nocturnos (luciérnagas) y la sombra de las criaturas voladoras. Da más FPS.
+60 saves battery. Max runs as fast as your screen allows (90, 120 or 144 Hz).	60 economiza bateria. Máximo roda o quanto sua tela permitir (90, 120 ou 144 Hz).	60 ahorra batería. Máximo va tan rápido como tu pantalla permita (90, 120 o 144 Hz).
+Shows how long each part of the game takes per frame, to find what slows your device.	Mostra quanto tempo cada parte do jogo leva por quadro, para achar o que deixa seu aparelho lento.	Muestra cuánto tarda cada parte del juego por cuadro, para encontrar qué hace lento tu dispositivo.
+Which creatures the auto target key (middle mouse button) can pick.	Quais criaturas a tecla de alvo automático (botão do meio do mouse) pode escolher.	Qué criaturas puede elegir la tecla de objetivo automático (botón central del ratón).
+Map	Mapa	Mapa
+Center	Centralizar	Centrar
+Party	Party	Grupo
+Monsters	Monstros	Monstruos
+Your soul may rest, but your body will remain in battle. Continue?	Sua alma pode descansar, mas seu corpo continuará em batalha. Continuar?	Tu alma puede descansar, pero tu cuerpo seguirá en batalla. ¿Continuar?
+YOU DIED	VOCÊ MORREU	HAS MUERTO
+Respawn	Renascer	Reaparecer
+You have been slain.	Você foi derrotado.	Has sido derrotado.
+Slain by {0}	Derrotado por {0}	Derrotado por {0}
+{0} was killed by {1}.	{0} foi morto por {1}.	{0} fue asesinado por {1}.
+Miss	Errou	Fallo
+Welcome to Mitera Online! We hope you have fun, check out our Discord for updates, report bugs and events!	Bem-vindo ao Mitera Online! Esperamos que se divirta. Veja nosso Discord para novidades, reportar bugs e eventos!	¡Bienvenido a Mitera Online! Esperamos que te diviertas. ¡Mira nuestro Discord para novedades, reportar errores y eventos!
+That location is not in this area.	Esse local não fica nesta área.	Ese lugar no está en esta zona.
+Select a target first.	Selecione um alvo primeiro.	Selecciona un objetivo primero.
+You are now ignoring {0}.	Agora você está ignorando {0}.	Ahora estás ignorando a {0}.
+You stopped ignoring {0}.	Você parou de ignorar {0}.	Dejaste de ignorar a {0}.
+Party invite sent to {0}.	Convite de party enviado para {0}.	Invitación de grupo enviada a {0}.
+Your party is full.	Sua party está cheia.	Tu grupo está lleno.
+{0} is offline.	{0} está offline.	{0} está desconectado.
+{0} is already in your party.	{0} já está na sua party.	{0} ya está en tu grupo.
+{0} is already in a party.	{0} já está em uma party.	{0} ya está en un grupo.
+Only the party leader can invite.	Só o líder da party pode convidar.	Solo el líder del grupo puede invitar.
+Could not invite {0}.	Não foi possível convidar {0}.	No se pudo invitar a {0}.
+You joined {0}'s party.	Você entrou na party de {0}.	Te uniste al grupo de {0}.
+Party created.	Party criada.	Grupo creado.
+You are now the party leader.	Agora você é o líder da party.	Ahora eres el líder del grupo.
+{0} is now the party leader.	{0} agora é o líder da party.	{0} ahora es el líder del grupo.
+You were removed from the party.	Você foi removido da party.	Fuiste expulsado del grupo.
+You left the party.	Você saiu da party.	Saliste del grupo.
+Your party was disbanded.	Sua party foi desfeita.	Tu grupo se disolvió.
+Trade request sent to {0}.	Pedido de troca enviado para {0}.	Solicitud de intercambio enviada a {0}.
+{0} is too far away.	{0} está longe demais.	{0} está demasiado lejos.
+{0} is busy.	{0} está ocupado.	{0} está ocupado.
+You already sent a trade request to {0}.	Você já enviou um pedido de troca para {0}.	Ya enviaste una solicitud de intercambio a {0}.
+Trade request to {0} expired.	O pedido de troca para {0} expirou.	La solicitud de intercambio a {0} expiró.
+Could not trade with {0}.	Não foi possível trocar com {0}.	No se pudo intercambiar con {0}.
+Trade failed: the offer is no longer valid.	A troca falhou: a oferta não é mais válida.	El intercambio falló: la oferta ya no es válida.
+Trade cancelled: the player left.	Troca cancelada: o jogador saiu.	Intercambio cancelado: el jugador se fue.
+Trade cancelled.	Troca cancelada.	Intercambio cancelado.
+Trade successful!	Troca concluída!	¡Intercambio completado!
+Your arrows ran out!	Suas flechas acabaram!	¡Se acabaron tus flechas!
+You have no arrows equipped.	Você não tem flechas equipadas.	No tienes flechas equipadas.
+You don't have enough mana.	Você não tem mana suficiente.	No tienes suficiente maná.
+Your level is too low to use {0}.	Seu level é baixo demais para usar {0}.	Tu nivel es demasiado bajo para usar {0}.
+Your target is out of reach.	Seu alvo está fora de alcance.	Tu objetivo está fuera de alcance.
+You can't attack in a protection zone.	Você não pode atacar em uma zona de proteção.	No puedes atacar en una zona de protección.
+You don't know this spell.	Você não conhece essa magia.	No conoces este hechizo.
+Your class can't use {0}.	Sua classe não pode usar {0}.	Tu clase no puede usar {0}.
+You can't use spells with a training weapon.	Você não pode usar magias com uma arma de treino.	No puedes usar hechizos con un arma de entrenamiento.
+Your health is already full.	Sua vida já está cheia.	Tu vida ya está llena.
+Your mana is already full.	Sua mana já está cheia.	Tu maná ya está lleno.
+You are full.	Você está cheio.	Estás lleno.
+You don't have this item.	Você não tem esse item.	No tienes este objeto.
+New mob discovered!	Novo monstro descoberto!	¡Nuevo monstruo descubierto!
+The bank is full.	O banco está cheio.	El banco está lleno.
+Not enough capacity.	Capacidade insuficiente.	Capacidad insuficiente.
+You are dead.	Você está morto.	Estás muerto.
+You are not in a party.	Você não está em uma party.	No estás en un grupo.
+This player is offline.	Esse jogador está offline.	Ese jugador está desconectado.
+You have been muted for 1 hour for spam.	Você foi silenciado por 1 hora por spam.	Has sido silenciado por 1 hora por spam.
+You have been muted for 1 hour for toxic behavior.	Você foi silenciado por 1 hora por comportamento tóxico.	Has sido silenciado por 1 hora por comportamiento tóxico.
+You are muted. Wait {0} to talk again.	Você está silenciado. Espere {0} para falar de novo.	Estás silenciado. Espera {0} para volver a hablar.
+You are sending messages too fast. You are muted for {0}.	Você está mandando mensagens rápido demais. Silenciado por {0}.	Estás enviando mensajes demasiado rápido. Silenciado por {0}.
+You can't use this while in battle.	Você não pode usar isso em batalha.	No puedes usar esto en batalla.
+Wait {0}s to use another scroll.	Espere {0}s para usar outro pergaminho.	Espera {0}s para usar otro pergamino.
+XP can't be shared: party members need level {0}+ (2/3 of the highest level). Lower levels get XP by the damage they dealt.	O XP não pode ser dividido: os membros da party precisam de level {0}+ (2/3 do maior level). Levels menores ganham XP pelo dano que causaram.	La XP no se puede compartir: los miembros del grupo necesitan nivel {0}+ (2/3 del nivel más alto). Los niveles menores ganan XP por el daño que hicieron.
+Your possessed body died. You are a ghost again.	O corpo possuído morreu. Você é um fantasma de novo.	El cuerpo poseído murió. Eres un fantasma otra vez.
+Your possessed body was killed by {0}. You are a ghost again.	O corpo possuído foi morto por {0}. Você é um fantasma de novo.	El cuerpo poseído fue asesinado por {0}. Eres un fantasma otra vez.
+You left the creature. You are a ghost again.	Você saiu da criatura. Você é um fantasma de novo.	Saliste de la criatura. Eres un fantasma otra vez.
+You shall pass.	Você pode passar.	Puedes pasar.
+Do not try to deceive me, mortal.	Não tente me enganar, mortal.	No intentes engañarme, mortal.
+Welcome to the market! Trade your goods with other adventurers.	Bem-vindo ao mercado! Negocie seus itens com outros aventureiros.	¡Bienvenido al mercado! Comercia tus bienes con otros aventureros.
+Welcome to your private vault. Your belongings are safe with me.	Bem-vindo ao seu cofre particular. Seus pertences estão seguros comigo.	Bienvenido a tu bóveda privada. Tus pertenencias están seguras conmigo.
+Not enough money.	Dinheiro insuficiente.	Dinero insuficiente.
+Offer created.	Oferta criada.	Oferta creada.
+Offer cancelled.	Oferta cancelada.	Oferta cancelada.
+This offer is gone.	Essa oferta não existe mais.	Esta oferta ya no existe.
+You can't accept your own offer.	Você não pode aceitar sua própria oferta.	No puedes aceptar tu propia oferta.
+You don't have that many in your bag.	Você não tem tudo isso na bolsa.	No tienes tantos en tu bolsa.
+You can have at most {0} offers.	Você pode ter no máximo {0} ofertas.	Puedes tener como máximo {0} ofertas.
+You need {0} for the market fee.	Você precisa de {0} para a taxa do mercado.	Necesitas {0} para la tarifa del mercado.
+You bought {0}x {1} for {2}. It is in your bank.	Você comprou {0}x {1} por {2}. Está no seu banco.	Compraste {0}x {1} por {2}. Está en tu banco.
+You bought {0}x {1} for {2}.	Você comprou {0}x {1} por {2}.	Compraste {0}x {1} por {2}.
+You sold {0}x {1} for {2}.	Você vendeu {0}x {1} por {2}.	Vendiste {0}x {1} por {2}.
+Someone logged in your account.	Alguém entrou na sua conta.	Alguien entró en tu cuenta.
+Session expired. Please log in again.	Sessão expirada. Faça login de novo.	Sesión expirada. Inicia sesión de nuevo.
+Server busy. Try again in a few seconds.	Servidor ocupado. Tente de novo em alguns segundos.	Servidor ocupado. Inténtalo de nuevo en unos segundos.
+Server is full. Try again in a few minutes.	O servidor está cheio. Tente de novo em alguns minutos.	El servidor está lleno. Inténtalo de nuevo en unos minutos.
+Server temporarily closed. Try again later.	Servidor temporariamente fechado. Tente mais tarde.	Servidor cerrado temporalmente. Inténtalo más tarde.
+Server closed for maintenance. Try again later.	Servidor fechado para manutenção. Tente mais tarde.	Servidor cerrado por mantenimiento. Inténtalo más tarde.
+Server restarting. Your progress was saved.	O servidor está reiniciando. Seu progresso foi salvo.	El servidor se está reiniciando. Tu progreso fue guardado.
+Version outdated, please update your game	Versão desatualizada, atualize o jogo	Versión desactualizada, actualiza el juego

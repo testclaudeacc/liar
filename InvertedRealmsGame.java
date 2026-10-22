@@ -132,6 +132,7 @@ public class InvertedRealmsGame extends Game {
             socket.disconnect();
             String motivo = data != null ? data.getString("reason", "") : "";
             if (motivo.isEmpty()) motivo = "Someone logged in your account.";
+            motivo = com.teste.game.telas.Idioma.trServidor(motivo);
             setScreen(new AuthScreen(InvertedRealmsGame.this::entrarNoMundo, motivo));
         });
         // /class do admin: o servidor ja' trocou e salvou a classe - entra de

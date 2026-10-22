@@ -1,6 +1,7 @@
 package com.teste.game.telas;
 
 import com.badlogic.gdx.Gdx;
+import static com.teste.game.telas.Idioma.tr;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputMultiplexer;
@@ -1366,7 +1367,7 @@ public class WorldScreen extends ScreenAdapter {
 
         chat = new ChatUI(uiStage, skin, atlas, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), nomeVisivel(local.nome), local.classe);
         // Boas-vindas no Local ao entrar no jogo (so' pra ele).
-        chat.adicionarMensagemSistema("Welcome to Mitera Online! We hope you have fun, check out our Discord for updates, report bugs and events!",
+        chat.adicionarMensagemSistema(tr("Welcome to Mitera Online! We hope you have fun, check out our Discord for updates, report bugs and events!"),
             ChatUI.COR_BOAS_VINDAS);
         // Coordenada no chat ("x300, y400"): abre o mapa grande nela (so' se
         // for na mesma dimensao do player).
@@ -1383,7 +1384,7 @@ public class WorldScreen extends ScreenAdapter {
             float wx = mapaGrande.mundoXDe(cx), wy = mapaGrande.mundoYDe(cy);
             com.badlogic.gdx.math.Rectangle dim = mapa.dimensaoEm(local.x, local.y + 1f);
             if (wx < 0 || wy < 0 || wx > mapa.larguraPx() || wy > mapa.alturaPx() || !dim.contains(wx, wy)) {
-                hud.notificar("That location is not in this area.", COR_NOTIF_AVISO, null);
+                hud.notificar(tr("That location is not in this area."), COR_NOTIF_AVISO, null);
                 return;
             }
             abrirMapaGrande();
@@ -1452,7 +1453,7 @@ public class WorldScreen extends ScreenAdapter {
                 if (CooldownPocao.restanteMagia(caminho) > 0f) return;
                 MobVisual alvo = alvoMob == null ? null : mobs.get(alvoMob);
                 if (alvo == null || alvo.morto || !alvo.visivel) {
-                    hud.notificar("Select a target first.", COR_NOTIF_AVISO, null);
+                    hud.notificar(tr("Select a target first."), COR_NOTIF_AVISO, null);
                     return;
                 }
             }
@@ -1473,8 +1474,8 @@ public class WorldScreen extends ScreenAdapter {
                 boolean agora = !ignorados.contains(nome);
                 if (agora) ignorados.add(nome); else ignorados.remove(nome);
                 salvarIgnorados();
-                chat.adicionarMensagemSistema(agora ? "You are now ignoring " + nomeVisivel(nome) + "."
-                    : "You stopped ignoring " + nomeVisivel(nome) + ".");
+                chat.adicionarMensagemSistema(agora ? tr("You are now ignoring {0}.", nomeVisivel(nome))
+                    : tr("You stopped ignoring {0}.", nomeVisivel(nome)));
                 atualizarEstadoPainel();
             }
             @Override public void convidarParty(String nome) {
@@ -2151,11 +2152,11 @@ public class WorldScreen extends ScreenAdapter {
         painelMapaGrande.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
 
         Table topo = new Table();
-        Label titulo = new Label("Map", skin, "secao");
+        Label titulo = new Label(tr("Map"), skin, "secao");
         topo.add(titulo).left().expandX();
         float tb = mobile ? 52f : 40f;
         // Zoom: pinca (celular) ou rodinha do mouse (PC), no proprio mapa.
-        TextButton centro = new TextButton("Center", skin, "cinza-popup");
+        TextButton centro = new TextButton(tr("Center"), skin, "cinza-popup");
         centro.padLeft(16).padRight(16); // texto nao cola nas bordas
         TextButton fechar = new TextButton("X", skin, "vermelho-popup");
         centro.addListener(new ChangeListener() {
@@ -2174,7 +2175,7 @@ public class WorldScreen extends ScreenAdapter {
         adicionarLegenda(linhaPessoas, MiniMapa.COR_VOCE, "You");
         // Party: o icone vai trocando entre as 4 classes (devagar).
         adicionarLegendaParty(linhaPessoas);
-        adicionarLegenda(linhaPessoas, MiniMapa.COR_MOB, "Monsters");
+        adicionarLegenda(linhaPessoas, MiniMapa.COR_MOB, tr("Monsters"));
         for (String[] p : ICONES_PAPEL) adicionarLegendaIcone(linhaNpcs, regiaoCache(p[1]), p[2]);
         Table legenda = new Table();
         legenda.left();
@@ -2225,7 +2226,7 @@ public class WorldScreen extends ScreenAdapter {
         };
         icone.setScaling(com.badlogic.gdx.utils.Scaling.fit);
         legenda.add(icone).size(20).padRight(5);
-        legenda.add(new Label("Party", skin, "hud")).padRight(16);
+        legenda.add(new Label(tr("Party"), skin, "hud")).padRight(16);
     }
 
     private void adicionarLegendaIcone(Table legenda, TextureRegion regiao, String texto) {
@@ -2309,7 +2310,7 @@ public class WorldScreen extends ScreenAdapter {
         if (fonteDestaque != null) fonteDestaque.getData().setScale(NOME_ESCALA_BASE * 32f / 64f * ESCALA_DESTAQUE);
         if (bookMenu != null) bookMenu.aplicarTamanhoFonte();
         if (hotbar != null) hotbar.atualizar();
-        if (chat != null) chat.adicionarMensagemSistema("UI font size: the chat text and potion cooldown numbers update after re-entering the world.");
+        if (chat != null) chat.adicionarMensagemSistema(tr("UI font size: the chat text and potion cooldown numbers update after re-entering the world."));
     }
 
     private BitmapFont criarFonteDestaque() {
@@ -2836,18 +2837,18 @@ public class WorldScreen extends ScreenAdapter {
         Table conteudo = new Table();
         conteudo.setBackground(skin.getDrawable("popup-painel"));
         conteudo.pad(15, 14, 15, 14);
-        Label aviso = new Label("Your soul may rest, but your body will remain in battle. Continue?", skin, "default");
+        Label aviso = new Label(tr("Your soul may rest, but your body will remain in battle. Continue?"), skin, "default");
         aviso.setWrap(true);
         aviso.setAlignment(Align.center);
         conteudo.add(aviso).width(LARGURA_BOTAO_SETTINGS * 1.8f).colspan(2).padBottom(14).row();
-        TextButton sim = new TextButton("Yes", skin, "verde-popup");
+        TextButton sim = new TextButton(tr("Yes"), skin, "verde-popup");
         sim.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 sim.setDisabled(true);
                 salvarPosicaoESair();
             }
         });
-        TextButton nao = new TextButton("No", skin, "vermelho-popup");
+        TextButton nao = new TextButton(tr("No"), skin, "vermelho-popup");
         nao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 mostrarConteudoSettings(conteudoSettingsNormal);
@@ -2865,7 +2866,7 @@ public class WorldScreen extends ScreenAdapter {
         conteudo.pad(15, 10, 15, 10);
         conteudo.defaults().width(LARGURA_BOTAO_SETTINGS).height(ALTURA_BOTAO_SETTINGS).padBottom(10);
 
-        TextButton botaoSettings = new TextButton("Settings", skin, "cinza-popup");
+        TextButton botaoSettings = new TextButton(tr("Settings"), skin, "cinza-popup");
         botaoSettings.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 painelSettings.setVisible(false);
@@ -2879,13 +2880,13 @@ public class WorldScreen extends ScreenAdapter {
         // de fonte/escala dedicada menor (a versao anterior usava uma fonte
         // 20px + scale 0.7 so' nesse botao, deixando o texto visivelmente
         // menor que os outros 2, a pedido do usuario pra ficarem iguais).
-        TextButton botaoBack = new TextButton("Back", skin, "verde-popup");
+        TextButton botaoBack = new TextButton(tr("Back"), skin, "verde-popup");
         botaoBack.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { fecharSettings(); }
         });
         conteudo.add(botaoBack).row();
 
-        TextButton botaoExit = new TextButton("Exit", skin, "vermelho-popup");
+        TextButton botaoExit = new TextButton(tr("Exit"), skin, "vermelho-popup");
         botaoExit.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 // Em battle: avisa que o corpo fica no jogo ate' o battle acabar.
@@ -2938,7 +2939,7 @@ public class WorldScreen extends ScreenAdapter {
     private Table criarSecaoEstilo() {
         Table secao = new Table();
         secao.left().top();
-        secao.add(new Label("Style", skin, "secao")).left().row();
+        secao.add(new Label(tr("Style"), skin, "secao")).left().row();
 
         String[] nomesBarras = {"Arc", "Square"};
         secao.add(linhaDeEscolha("HP/MP bars", nomesBarras, Controles.barrasEmArco() ? 0 : 1, i -> {
@@ -2958,6 +2959,12 @@ public class WorldScreen extends ScreenAdapter {
         secao.add(linhaDeEscolha("Show HP bar", nomesBarra, modoBarraHp, i -> {
             modoBarraHp = i;
             Controles.definirModoBarraHp(i);
+        })).left().padTop(6).row();
+        // Idioma (interface, mensagens, descricoes); nomes de itens/mobs/magias ficam em ingles.
+        secao.add(linhaDeEscolha("Language", Idioma.NOMES, Idioma.atual(), i -> {
+            if (i == Idioma.atual()) return;
+            Idioma.definir(i);
+            if (chat != null) chat.adicionarMensagemSistema(tr("Language changed. Re-enter the world to update every screen."));
         })).left().padTop(6).row();
         // Tamanhos (5 niveis, 2 = padrao): barra de vida em cima da cabeca e textos dinamicos.
         secao.add(linhaDeEscolha("Health bar size", Controles.NOMES_TAMANHO, Controles.tamanhoBarraHp(), i -> {
@@ -3005,6 +3012,7 @@ public class WorldScreen extends ScreenAdapter {
     // ---- Dica (popup pequeno) de cada opcao do Options ----
     private static final java.util.Map<String, String> DICAS_OPCOES = new java.util.HashMap<>();
     static {
+        DICAS_OPCOES.put("Language", "Language of menus, messages and descriptions. Item, creature and spell names stay in English for everyone.");
         DICAS_OPCOES.put("Camera Zoom", "How close the camera is. A higher zoom shows less of the map around you.");
         DICAS_OPCOES.put("Full Screen", "Switches between window and full screen (also F11 or Alt+Enter).");
         DICAS_OPCOES.put("Moving style", "8 directions lets you walk diagonally. 4 directions walks only up, down, left and right.");
@@ -3026,8 +3034,9 @@ public class WorldScreen extends ScreenAdapter {
     /** PC: aparece com o mouse em cima da opcao e some ao sair. Celular:
      * aparece enquanto o dedo esta' em cima e some ~2s depois de soltar. */
     private void adicionarDica(com.badlogic.gdx.scenes.scene2d.Actor alvo, String titulo) {
-        String texto = DICAS_OPCOES.get(titulo);
-        if (texto == null) return;
+        String dicaEn = DICAS_OPCOES.get(titulo);
+        if (dicaEn == null) return;
+        String texto = tr(dicaEn);
         alvo.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         alvo.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
             @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, com.badlogic.gdx.scenes.scene2d.Actor de) {
@@ -3099,9 +3108,11 @@ public class WorldScreen extends ScreenAdapter {
         // Dropdown igual o do zoom (setinha abre a lista) - antes era uma
         // fileira de checkbox por opcao.
         Table linha = new Table();
-        linha.add(new Label(titulo, skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
+        linha.add(new Label(tr(titulo), skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
         SelectBox<String> caixa = new SelectSeta(skin, "zoom-select");
-        caixa.setItems(opcoes);
+        String[] opcoesTr = new String[opcoes.length];
+        for (int k = 0; k < opcoes.length; k++) opcoesTr[k] = tr(opcoes[k]);
+        caixa.setItems(opcoesTr);
         caixa.setSelectedIndex(Math.max(0, Math.min(opcoes.length - 1, marcada)));
         caixa.setAlignment(Align.center);
         caixa.getList().setAlignment(Align.center);
@@ -3112,7 +3123,7 @@ public class WorldScreen extends ScreenAdapter {
         });
         float largura = 90f;
         com.badlogic.gdx.graphics.g2d.GlyphLayout medida = new com.badlogic.gdx.graphics.g2d.GlyphLayout();
-        for (String o : opcoes) {
+        for (String o : opcoesTr) {
             medida.setText(caixa.getStyle().font, o);
             largura = Math.max(largura, medida.width + 56f); // + setinha e margens
         }
@@ -3124,12 +3135,12 @@ public class WorldScreen extends ScreenAdapter {
     private Table criarSecaoControles() {
         Table secao = new Table();
         secao.left().top();
-        secao.add(new Label("Controls", skin, "secao")).left().row();
+        secao.add(new Label(tr("Controls"), skin, "secao")).left().row();
         // Moving style: 8 direcoes (com diagonal) ou 4 (sem) - PC e celular.
         Table linhaMov = new Table();
-        linhaMov.add(new Label("Moving style", skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
+        linhaMov.add(new Label(tr("Moving style"), skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
         SelectBox<String> estiloMov = new SelectSeta(skin, "zoom-select");
-        estiloMov.setItems("8 directions", "4 directions");
+        estiloMov.setItems(tr("8 directions"), tr("4 directions"));
         estiloMov.setSelectedIndex(Controles.oitoDirecoes() ? 0 : 1);
         estiloMov.setAlignment(Align.center);
         estiloMov.getList().setAlignment(Align.center);
@@ -3162,11 +3173,11 @@ public class WorldScreen extends ScreenAdapter {
             avisoControles = new Label("", skin, "opcoes-label");
             avisoControles.setColor(1f, 0.85f, 0.3f, 1f);
             secao.add(avisoControles).left().padTop(6).row();
-            secao.add(botaoPequeno("Reset to default", () -> {
+            secao.add(botaoPequeno(tr("Reset to default"), () -> {
                 cancelarCaptura();
                 Controles.restaurarPadrao();
                 atualizarBotoesTecla();
-                avisoControles.setText("Controls reset to default.");
+                avisoControles.setText(tr("Controls reset to default."));
             })).left().width(200).height(38).padTop(8).padBottom(30).row();
             // Captura a proxima tecla (no uiStage: vem antes do jogo, entao a
             // tecla escolhida nao dispara a acao dela nesse mesmo aperto).
@@ -3199,7 +3210,7 @@ public class WorldScreen extends ScreenAdapter {
                 }
             });
         } else {
-            secao.add(botaoPequeno("Edit controls", () -> {
+            secao.add(botaoPequeno(tr("Edit controls"), () -> {
                 fecharSettings();
                 hotbar.entrarEdicao(null);
             })).left().width(210).height(48).padTop(10).padBottom(30).row();
@@ -3232,7 +3243,7 @@ public class WorldScreen extends ScreenAdapter {
         cancelarCaptura();
         acaoCapturando = acao;
         TextButton b = botoesTecla.get(acao);
-        if (b != null) { b.setStyle(estiloTecla(true)); b.setText("Press..."); }
+        if (b != null) { b.setStyle(estiloTecla(true)); b.setText(tr("Press...")); }
         if (avisoControles != null) avisoControles.setText("");
         uiStage.setKeyboardFocus(null); // a tecla chega na raiz do stage (listener acima)
     }
@@ -3261,16 +3272,16 @@ public class WorldScreen extends ScreenAdapter {
         // em cima) - por isso os dois usam aqui o mesmo drawable "barra-baixo".
         Table topBar = new Table();
         topBar.setBackground(skin.getDrawable("barra-baixo"));
-        topBar.add(new Label("Settings", skin, "opcoes-titulo"));
+        topBar.add(new Label(tr("Settings"), skin, "opcoes-titulo"));
         raiz.add(topBar).growX().height(80).row();
 
         Table corpo = new Table();
         corpo.top();
-        corpo.add(new Label("Screen", skin, "secao")).left().padTop(10).row();
-        corpo.add(new Label("Change your screen settings here", skin, "opcoes-label")).left().padTop(4).padBottom(20).row();
+        corpo.add(new Label(tr("Screen"), skin, "secao")).left().padTop(10).row();
+        corpo.add(new Label(tr("Change your screen settings here"), skin, "opcoes-label")).left().padTop(4).padBottom(20).row();
 
         Table grid = new Table();
-        Label rotuloZoom = new Label("Camera Zoom", skin, "opcoes-label");
+        Label rotuloZoom = new Label(tr("Camera Zoom"), skin, "opcoes-label");
         adicionarDica(rotuloZoom, "Camera Zoom");
         grid.add(rotuloZoom).align(Align.right).width(220).pad(6);
         // Dropdown de verdade (SelectBox), nao mais um botao quadrado que
@@ -3302,7 +3313,7 @@ public class WorldScreen extends ScreenAdapter {
         // Linha de Full Screen so' existe no PC - no celular nao ha janela
         // pra alternar, a opcao nao faz sentido (a pedido do usuario).
         if (!mobile) {
-            Label rotuloTela = new Label("Full Screen", skin, "opcoes-label");
+            Label rotuloTela = new Label(tr("Full Screen"), skin, "opcoes-label");
             adicionarDica(rotuloTela, "Full Screen");
             grid.add(rotuloTela).align(Align.right).width(220).pad(6);
             CheckBox.CheckBoxStyle estiloCheck = new CheckBox.CheckBoxStyle();
@@ -3331,7 +3342,7 @@ public class WorldScreen extends ScreenAdapter {
         Table bottomBar = new Table();
         bottomBar.left();
         bottomBar.setBackground(skin.getDrawable("barra-baixo"));
-        TextButton botaoVoltar = new TextButton("Back", skin, "verde-rodape");
+        TextButton botaoVoltar = new TextButton(tr("Back"), skin, "verde-rodape");
         botaoVoltar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 painelOptions.setVisible(false);
@@ -3558,16 +3569,16 @@ public class WorldScreen extends ScreenAdapter {
             String alvo = data.getString("target_name", "");
             if (data.getBoolean("success", false)) {
                 convitesPartyEnviados.add(alvo);
-                hud.notificarTipo(HudVitais.NOTIF_PARTY, "Party invite sent to " + alvo + ".");
+                hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("Party invite sent to {0}.", alvo));
                 return;
             }
             String motivo = data.getString("reason", "");
-            String texto = "party_full".equals(motivo) ? "Your party is full."
-                : "offline".equals(motivo) || "not_found".equals(motivo) ? alvo + " is offline."
-                : "already_in_your_party".equals(motivo) ? alvo + " is already in your party."
-                : "already_in_party".equals(motivo) ? alvo + " is already in a party."
-                : "not_leader".equals(motivo) ? "Only the party leader can invite."
-                : "Could not invite " + alvo + ".";
+            String texto = "party_full".equals(motivo) ? tr("Your party is full.")
+                : "offline".equals(motivo) || "not_found".equals(motivo) ? tr("{0} is offline.", alvo)
+                : "already_in_your_party".equals(motivo) ? tr("{0} is already in your party.", alvo)
+                : "already_in_party".equals(motivo) ? tr("{0} is already in a party.", alvo)
+                : "not_leader".equals(motivo) ? tr("Only the party leader can invite.")
+                : tr("Could not invite {0}.", alvo);
             hud.notificarTipo(HudVitais.NOTIF_PARTY, texto, COR_NOTIF_AVISO, null);
         });
         socket.on("party_invite_declined", (nomeEvt, data) -> {
@@ -3586,8 +3597,8 @@ public class WorldScreen extends ScreenAdapter {
             for (BookMenuUI.MembroParty m : bookMenu.membrosParty()) depois.add(m.nome);
             convitesPartyEnviados.removeAll(depois); // aceitou: vira escudo
             if (antigoLider == null) {
-                if (depois.size() > 1) hud.notificarTipo(HudVitais.NOTIF_PARTY, "You joined " + bookMenu.liderParty() + "'s party.", COR_NOTIF_PARTY, this::abrirAbaParty);
-                else hud.notificarTipo(HudVitais.NOTIF_PARTY, "Party created.", COR_NOTIF_PARTY, null);
+                if (depois.size() > 1) hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("You joined {0}'s party.", bookMenu.liderParty()), COR_NOTIF_PARTY, this::abrirAbaParty);
+                else hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("Party created."), COR_NOTIF_PARTY, null);
                 return;
             }
             for (String n : depois) {
@@ -3598,7 +3609,7 @@ public class WorldScreen extends ScreenAdapter {
             }
             String lider = bookMenu.liderParty();
             if (lider != null && !lider.equals(antigoLider)) {
-                hud.notificarTipo(HudVitais.NOTIF_PARTY, lider.equals(local.nome) ? "You are now the party leader." : lider + " is now the party leader.",
+                hud.notificarTipo(HudVitais.NOTIF_PARTY, lider.equals(local.nome) ? tr("You are now the party leader.") : tr("{0} is now the party leader.", lider),
                     COR_NOTIF_PARTY, null);
             }
         });
@@ -3608,9 +3619,9 @@ public class WorldScreen extends ScreenAdapter {
             convitesPartyEnviados.clear(); // convites da party antiga morrem junto
             if (!estava || data == null) return;
             String motivo = data.getString("reason", "");
-            if ("kicked".equals(motivo)) hud.notificarTipo(HudVitais.NOTIF_PARTY, "You were removed from the party.", COR_NOTIF_AVISO, null);
-            else if ("left".equals(motivo)) hud.notificarTipo(HudVitais.NOTIF_PARTY, "You left the party.");
-            else if ("auto_disband".equals(motivo)) hud.notificarTipo(HudVitais.NOTIF_PARTY, "Your party was disbanded.");
+            if ("kicked".equals(motivo)) hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("You were removed from the party."), COR_NOTIF_AVISO, null);
+            else if ("left".equals(motivo)) hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("You left the party."));
+            else if ("auto_disband".equals(motivo)) hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("Your party was disbanded."));
         });
         // ---- Trade (servidor.py, TRADE) ----
         socket.on("trade_invite_received", (nomeEvt, data) -> {
@@ -3632,16 +3643,16 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             String alvo = data.getString("target_name", "");
             if (data.getBoolean("success", false)) {
-                hud.notificarTipo(HudVitais.NOTIF_TRADE, "Trade request sent to " + alvo + ".");
+                hud.notificarTipo(HudVitais.NOTIF_TRADE, tr("Trade request sent to {0}.", alvo));
                 return;
             }
             String motivo = data.getString("reason", "");
-            String texto = "too_far".equals(motivo) ? alvo + " is too far away."
-                : "target_busy".equals(motivo) ? alvo + " is busy."
-                : "already_pending".equals(motivo) ? "You already sent a trade request to " + alvo + "."
-                : "timeout".equals(motivo) ? "Trade request to " + alvo + " expired."
-                : "offline".equals(motivo) ? alvo + " is offline."
-                : "Could not trade with " + alvo + ".";
+            String texto = "too_far".equals(motivo) ? tr("{0} is too far away.", alvo)
+                : "target_busy".equals(motivo) ? tr("{0} is busy.", alvo)
+                : "already_pending".equals(motivo) ? tr("You already sent a trade request to {0}.", alvo)
+                : "timeout".equals(motivo) ? tr("Trade request to {0} expired.", alvo)
+                : "offline".equals(motivo) ? tr("{0} is offline.", alvo)
+                : tr("Could not trade with {0}.", alvo);
             hud.notificarTipo(HudVitais.NOTIF_TRADE, texto, COR_NOTIF_AVISO, null);
         });
         socket.on("trade_started", (nomeEvt, data) -> {
@@ -3663,15 +3674,15 @@ public class WorldScreen extends ScreenAdapter {
             bookMenu.fecharTrade();
             atualizarVisibilidadeJoystick();
             String motivo = data != null ? data.getString("reason", "") : "";
-            hud.notificarTipo(HudVitais.NOTIF_TRADE, "invalid_offer".equals(motivo) ? "Trade failed: the offer is no longer valid."
-                : "disconnected".equals(motivo) ? "Trade cancelled: the player left."
-                : "Trade cancelled.", COR_NOTIF_AVISO, null);
+            hud.notificarTipo(HudVitais.NOTIF_TRADE, "invalid_offer".equals(motivo) ? tr("Trade failed: the offer is no longer valid.")
+                : "disconnected".equals(motivo) ? tr("Trade cancelled: the player left.")
+                : tr("Trade cancelled."), COR_NOTIF_AVISO, null);
         });
         socket.on("trade_executed", (nomeEvt, data) -> {
             bookMenu.fecharTrade();
             atualizarVisibilidadeJoystick();
             if (data != null && data.has("new_currency")) bookMenu.atualizarMoedas(data.getLong("new_currency", 0L));
-            hud.notificarTipo(HudVitais.NOTIF_TRADE, "Trade successful!");
+            hud.notificarTipo(HudVitais.NOTIF_TRADE, tr("Trade successful!"));
         });
 
         // Chat Local: [nome, mensagem (ja censurada), classe] de quem esta na
@@ -3717,11 +3728,11 @@ public class WorldScreen extends ScreenAdapter {
             String tipoMorto = data.getString("mob_type", "monster");
             String nomeMob = mob != null ? mob.nome
                 : tipoMorto.isEmpty() ? "monster" : nomeDoTipoMob(tipoMorto);
-            chat.adicionarMensagemSistema(nomeVisivel(data.getString("name", "")) + " was killed by " + nomeMob + ".",
+            chat.adicionarMensagemSistema(tr("{0} was killed by {1}.", nomeVisivel(data.getString("name", "")), nomeMob),
                 new Color(1f, 0.25f, 0.25f, 1f));
             // Eu morri: mostra quem matou na tela de morte.
             if (data.getString("name", "").equals(local.nome) && textoMortoPor != null) {
-                textoMortoPor.setText("Slain by " + nomeMob);
+                textoMortoPor.setText(tr("Slain by {0}", nomeMob));
             }
         });
 
@@ -3729,7 +3740,7 @@ public class WorldScreen extends ScreenAdapter {
         // mute de 1 hora (spam ou palavrao demais).
         socket.on("chat_system", (nomeEvt, data) -> {
             if (data == null || chat == null) return;
-            String texto = data.getString("text", "");
+            String texto = Idioma.trServidor(data.getString("text", ""));
             if ("red".equals(data.getString("color", ""))) chat.adicionarMensagemSistema(texto, ChatUI.COR_PUNICAO);
             else chat.adicionarMensagemSistema(texto);
         });
@@ -3902,7 +3913,7 @@ public class WorldScreen extends ScreenAdapter {
                 int antes = quantidadeMunicao;
                 quantidadeMunicao = data.getInt("ammo_qty", quantidadeMunicao);
                 if (antes > 0 && quantidadeMunicao <= 0) {
-                    hud.notificar("Your arrows ran out!", COR_NOTIF_AVISO, null);
+                    hud.notificar(tr("Your arrows ran out!"), COR_NOTIF_AVISO, null);
                     avisouSemMunicao = true; // ja' avisou agora
                 }
                 hud.definirMunicao(bookMenu.iconeDoItem(caminhoMunicao), quantidadeMunicao);
@@ -3987,7 +3998,7 @@ public class WorldScreen extends ScreenAdapter {
         // Alguem aceitou uma oferta minha (agora, ou enquanto eu estava offline).
         socket.on("market_notice", (nomeEvt, data) -> {
             if (data == null) return;
-            String msg = data.getString("msg", "");
+            String msg = Idioma.trServidor(data.getString("msg", ""));
             // "{c:750}" no texto = valor em moedas: icones na notificacao, "7s 50c" no chat.
             java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{c:(\\d+)\\}").matcher(msg);
             if (m.find()) {
@@ -4011,14 +4022,14 @@ public class WorldScreen extends ScreenAdapter {
             String nome = bookMenu.nomeExibicao(data.getString("item", ""));
             String msg;
             switch (motivo) {
-                case "level": msg = "Your level is too low to use " + nome + "."; break;
+                case "level": msg = tr("Your level is too low to use {0}.", nome); break;
                 case "cooldown": return; // o slot ja' mostra o cooldown
-                case "no_target": msg = "Select a target first."; break;
-                case "range": msg = "Your target is out of reach."; break;
-                case "pz": msg = "You can't attack in a protection zone."; break;
-                case "unknown": msg = "You don't know this spell."; break;
-                case "class": msg = "Your class can't use " + nome + "."; break;
-                case "training": msg = "You can't use spells with a training weapon."; break;
+                case "no_target": msg = tr("Select a target first."); break;
+                case "range": msg = tr("Your target is out of reach."); break;
+                case "pz": msg = tr("You can't attack in a protection zone."); break;
+                case "unknown": msg = tr("You don't know this spell."); break;
+                case "class": msg = tr("Your class can't use {0}.", nome); break;
+                case "training": msg = tr("You can't use spells with a training weapon."); break;
                 default: return;
             }
             hud.notificar(msg, COR_NOTIF_AVISO, null);
@@ -4262,10 +4273,10 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("food_result", (nomeEvt, data) -> {
             if (data == null || data.getBoolean("ok", false)) return;
             String motivo = data.getString("reason", "");
-            if ("full_hp".equals(motivo)) hud.notificar("Your health is already full.", COR_NOTIF_AVISO, null);
-            else if ("full_mp".equals(motivo)) hud.notificar("Your mana is already full.", COR_NOTIF_AVISO, null);
-            else if ("full".equals(motivo)) hud.notificar("You are full.", COR_NOTIF_AVISO, null);
-            else if ("none".equals(motivo)) hud.notificar("You don't have this item.", COR_NOTIF_AVISO, null);
+            if ("full_hp".equals(motivo)) hud.notificar(tr("Your health is already full."), COR_NOTIF_AVISO, null);
+            else if ("full_mp".equals(motivo)) hud.notificar(tr("Your mana is already full."), COR_NOTIF_AVISO, null);
+            else if ("full".equals(motivo)) hud.notificar(tr("You are full."), COR_NOTIF_AVISO, null);
+            else if ("none".equals(motivo)) hud.notificar(tr("You don't have this item."), COR_NOTIF_AVISO, null);
         });
         socket.on("hotbar_synced", (nomeEvt, data) -> {
             if (data != null) bookMenu.definirHotbar(data.get("hotbar"));
@@ -4350,7 +4361,7 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("npc_pay_result", (nomeEvt, data) -> {
             if (data == null) return;
             if (data.has("currency")) bookMenu.atualizarMoedas(data.getLong("currency", 0L));
-            dialogoNPC.mostrarResposta(data.getString("text", ""));
+            dialogoNPC.mostrarResposta(Idioma.trServidor(data.getString("text", "")));
         });
         socket.on("ranking", (nomeEvt, data) -> {
             if (data != null) bookMenu.atualizarRanking(data);
@@ -4364,7 +4375,7 @@ public class WorldScreen extends ScreenAdapter {
             String nome = data.getString("name", "Monster");
             Runnable abrir = () -> bookMenu.abrirSecao("Bestiary");
             if (nivel <= 1) {
-                hud.notificarIcone("New mob discovered!", atlas.findRegion("sheet/r15_c8"), COR_NOTIF_BESTIARIO, abrir);
+                hud.notificarIcone(tr("New mob discovered!"), atlas.findRegion("sheet/r15_c8"), COR_NOTIF_BESTIARIO, abrir);
             } else {
                 Color fundo = nivel == 2 ? COR_MEDALHA_COBRE : nivel == 3 ? COR_MEDALHA_PRATA : COR_NOTIF_BESTIARIO;
                 hud.notificarIcone(nome + " knowledge upgraded", bookMenu.medalhaDoNivel(nivel), fundo, abrir);
@@ -6097,7 +6108,7 @@ public class WorldScreen extends ScreenAdapter {
         int dano = data.getInt("damage", 0);
         boolean critico = data.getBoolean("is_crit", false);
         // Dano 0 = o player desviou (servidor.py: BLOCK_CHANCE, agora "Dodge"): "Miss" em amarelo.
-        NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? "Miss" : dano + (critico ? "!" : ""), critico);
+        NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? tr("Miss") : dano + (critico ? "!" : ""), critico);
         if (dano <= 0) nd.cor = new Color(1f, 0.9f, 0.1f, 1f);
         numerosDano.add(nd);
         if (dano > 0) sangrar(j.x, j.y);
@@ -6148,8 +6159,8 @@ public class WorldScreen extends ScreenAdapter {
     private void avisarSemMana() {
         if (avisouSemMana) return;
         avisouSemMana = true;
-        chat.adicionarMensagemSistema("You don't have enough mana.", new Color(1f, 0.25f, 0.25f, 1f));
-        hud.notificar("You don't have enough mana.", COR_NOTIF_AVISO, null);
+        chat.adicionarMensagemSistema(tr("You don't have enough mana."), new Color(1f, 0.25f, 0.25f, 1f));
+        hud.notificar(tr("You don't have enough mana."), COR_NOTIF_AVISO, null);
     }
 
     /** Le a flecha equipada (item + qty) e mostra/esconde a barrinha da HUD. */
@@ -6575,8 +6586,8 @@ public class WorldScreen extends ScreenAdapter {
         if ("Ranger".equals(local.classe) && (caminhoMunicao == null || quantidadeMunicao <= 0)) {
             if (!avisouSemMunicao) {
                 avisouSemMunicao = true;
-                chat.adicionarMensagemSistema("You have no arrows equipped.", new Color(1f, 0.25f, 0.25f, 1f));
-                hud.notificar("You have no arrows equipped.", COR_NOTIF_AVISO, null);
+                chat.adicionarMensagemSistema(tr("You have no arrows equipped."), new Color(1f, 0.25f, 0.25f, 1f));
+                hud.notificar(tr("You have no arrows equipped."), COR_NOTIF_AVISO, null);
             }
             return;
         }
@@ -6754,7 +6765,7 @@ public class WorldScreen extends ScreenAdapter {
             icone.setColor(new Color(0.85f, 0.15f, 0.15f, 1f));
             conteudoMorte.add(icone).size(mobile ? 48 : 56).padBottom(6).row();
         }
-        Label titulo = new Label("YOU DIED", skin, "titulo");
+        Label titulo = new Label(tr("YOU DIED"), skin, "titulo");
         titulo.setFontScale(mobile ? 0.5f : 0.6f);
         titulo.setColor(new Color(0.82f, 0.08f, 0.08f, 1f));
         conteudoMorte.add(titulo).row();
@@ -6768,7 +6779,7 @@ public class WorldScreen extends ScreenAdapter {
         textoMortoPor.setFontScale(mobile ? 0.55f : 0.65f);
         conteudoMorte.add(textoMortoPor).padBottom(22).row();
 
-        TextButton renascer = new TextButton("Respawn", skin, "vermelho-popup");
+        TextButton renascer = new TextButton(tr("Respawn"), skin, "vermelho-popup");
         renascer.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 renascerLocal();
@@ -6789,7 +6800,7 @@ public class WorldScreen extends ScreenAdapter {
         if (localMorto) return;
         localMorto = true;
         alvoMob = null;
-        if (textoMortoPor.getText().length() == 0) textoMortoPor.setText("You have been slain.");
+        if (textoMortoPor.getText().length() == 0) textoMortoPor.setText(tr("You have been slain."));
         // Fundo escurece em ~1s; o texto/botao aparecem logo depois (fade).
         fundoMorte.clearActions();
         fundoMorte.getColor().a = 0f;

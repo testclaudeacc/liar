@@ -1,6 +1,7 @@
 package com.teste.game.telas;
 
 import com.badlogic.gdx.Gdx;
+import static com.teste.game.telas.Idioma.tr;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
@@ -3312,7 +3313,7 @@ public final class BookMenuUI {
         moedasBanco = Math.max(0L, dados.getLong("currency", 0L));
         slotsBanco = Math.max(1, dados.getInt("slots_max", 100));
         String msg = dados.getString("msg", "");
-        bancoAviso.setText("full".equals(msg) ? "The bank is full." : "no_cap".equals(msg) ? "Not enough capacity." : "");
+        bancoAviso.setText("full".equals(msg) ? tr("The bank is full.") : "no_cap".equals(msg) ? tr("Not enough capacity.") : "");
         atualizarTelaBanco(); atualizarTelaLoja();
     }
 
@@ -4916,7 +4917,7 @@ public final class BookMenuUI {
     public void mercadoResultado(JsonValue d) {
         if (d == null) return;
         atualizarMoedas(d.getLong("currency", currencyTotal));
-        mercadoAviso = d.getString("msg", "");
+        mercadoAviso = Idioma.trServidor(d.getString("msg", ""));
         if (modoMercado) atualizarDetalheMercado();
     }
 
