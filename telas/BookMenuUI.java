@@ -75,6 +75,8 @@ public final class BookMenuUI {
     // Confirm manda todos de uma vez pro servidor (delete_items).
     private boolean modoExclusao = false;
     private final java.util.Set<String> idsParaExcluir = new java.util.LinkedHashSet<>();
+    // Empilhavel: quantos daquela pilha apagar (sem entrada = a pilha toda).
+    private final Map<String, Integer> qtdParaExcluir = new java.util.HashMap<>();
     private com.badlogic.gdx.scenes.scene2d.ui.Cell<Label> celulaStatus;
     private int selectedItem = -1;
     private String selectedInstanceId = "";
@@ -2574,8 +2576,10 @@ public final class BookMenuUI {
         // Pedidos do proximo popup (loja): confirmar 2x e mostrar as moedas embaixo.
         final boolean pedeCerteza = proximoPopupPedeCerteza;
         final Table rodapeExtra = proximoPopupRodape;
+        final java.util.function.IntConsumer aoMudarQtd = proximoPopupAoMudar;
         proximoPopupPedeCerteza = false;
         proximoPopupRodape = null;
+        proximoPopupAoMudar = null;
         final boolean[] perguntou = {false};
         Label limite = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
         escalarFonte(limite, 0.6f * FONTE_STATS);
@@ -2623,6 +2627,7 @@ public final class BookMenuUI {
         TextButton.TextButtonStyle estiloOk = estiloBotaoTrade("verde"), estiloSemCap = estiloBotaoTrade("vermelho");
         TextButton confirmar = new TextButton("Confirm", estiloOk);
         revalidar[0] = () -> {
+            if (aoMudarQtd != null) aoMudarQtd.accept(valorDoCampo(campo, max));
             boolean ok = cabe == null || cabe.test(valorDoCampo(campo, max));
             perguntou[0] = false; // mudou a quantia: pergunta de novo
             confirmar.setStyle(ok ? estiloOk : estiloSemCap);
@@ -2687,6 +2692,33 @@ public final class BookMenuUI {
 
     private boolean proximoPopupPedeCerteza = false;
     private Table proximoPopupRodape = null;
+    // Chamado a cada mudanca da quantidade no proximo popup (ex: total da compra).
+    private java.util.function.IntConsumer proximoPopupAoMudar = null;
+
+    /** "Total:" + o valor quebrado nas moedas (maior primeiro), cada uma na cor dela. */
+    private void preencherLinhaValor(Table t, String rotulo, long total) {
+        t.clearChildren();
+        Label rot = new LabelPixel(rotulo, estiloNitido(TAM_TEXTO_RODAPE));
+        rot.setColor(Color.WHITE);
+        t.add(rot).padRight(8);
+        boolean algum = false;
+        for (int i = MOEDAS_TRADE.length - 1; i >= 0; i--) {
+            long resto = i + 1 < VALOR_MOEDA.length ? total % VALOR_MOEDA[i + 1] : total;
+            long q = resto / VALOR_MOEDA[i];
+            if (q <= 0) continue;
+            algum = true;
+            TextureAtlas.AtlasRegion r = atlas.findRegion("ui/currency/" + MOEDAS_TRADE[i]);
+            if (r != null) {
+                Image img = new Image(new TextureRegionDrawable(r));
+                img.setScaling(Scaling.fit);
+                t.add(img).size(20).padRight(3);
+            }
+            Label n = new LabelPixel(String.valueOf(q), estiloNitido(TAM_TEXTO_RODAPE));
+            n.setColor(corMoeda(MOEDAS_TRADE[i]));
+            t.add(n).padRight(10);
+        }
+        if (!algum) t.add(new LabelPixel("0", estiloNitido(TAM_TEXTO_RODAPE)));
+    }
 
     /** "Your coins:" com as moedas que o player tem (maior primeiro). */
     private Table linhaMinhasMoedas() {
@@ -3967,7 +3999,13 @@ public final class BookMenuUI {
             return;
         }
         proximoPopupPedeCerteza = true;
-        proximoPopupRodape = linhaMinhasMoedas();
+        // Total da compra (preco x quantidade), atualiza junto com a barra.
+        Table linhaTotal = new Table();
+        Table rodape = new Table();
+        rodape.add(linhaTotal).padBottom(6).row();
+        rodape.add(linhaMinhasMoedas());
+        proximoPopupRodape = rodape;
+        proximoPopupAoMudar = v -> preencherLinhaValor(linhaTotal, "Total:", it.preco * (long) v);
         abrirPopupQuantidade(nomeExibicao(it.item), iconeDoItem(it.item), max, null, comprar);
     }
 
@@ -4488,6 +4526,7 @@ public final class BookMenuUI {
         }
         modoExclusao = true;
         idsParaExcluir.clear();
+        qtdParaExcluir.clear();
         selectedItem = -1;
         selectedInstanceId = "";
         bagDetalhes.clearChildren();
@@ -4502,7 +4541,23 @@ public final class BookMenuUI {
         InventoryItem item = inventoryItems.get(indice);
         // Favoritos nao podem ser apagados (o servidor tambem recusa).
         if (item.favorite || item.instanceId.isEmpty()) return;
-        if (!idsParaExcluir.remove(item.instanceId)) idsParaExcluir.add(item.instanceId);
+        if (idsParaExcluir.remove(item.instanceId)) {
+            qtdParaExcluir.remove(item.instanceId);
+        } else if (item.quantity > 1) {
+            // Pilha: pergunta quantos apagar (a janelinha da loja/bank).
+            final String id = item.instanceId;
+            final int total = item.quantity;
+            abrirPopupQuantidade(nomeExibicao(item.itemPath), iconeDoItem(item.itemPath), total, null, v -> {
+                if (!modoExclusao) return;
+                idsParaExcluir.add(id);
+                if (v < total) qtdParaExcluir.put(id, v); else qtdParaExcluir.remove(id);
+                atualizarStatusExclusao();
+                atualizarGrade();
+            });
+            return;
+        } else {
+            idsParaExcluir.add(item.instanceId);
+        }
         atualizarStatusExclusao();
         atualizarGrade();
     }
@@ -4524,9 +4579,14 @@ public final class BookMenuUI {
         if (!modoExclusao) return;
         if (!idsParaExcluir.isEmpty() && socket.isConnected()) {
             List<String> ids = new ArrayList<>(idsParaExcluir);
+            Map<String, Integer> qtds = new java.util.HashMap<>(qtdParaExcluir);
             String payload = GameSocket.obj(w -> {
                 w.array("instance_ids");
                 for (String id : ids) w.value(id);
+                w.pop();
+                // Pilhas apagadas em parte: id -> quantos (servidor.py::handle_delete_items).
+                w.object("qty");
+                for (Map.Entry<String, Integer> e : qtds.entrySet()) w.set(e.getKey(), e.getValue());
                 w.pop();
             });
             socket.emitRaw("delete_items", payload);
@@ -4538,6 +4598,7 @@ public final class BookMenuUI {
         boolean estava = modoExclusao;
         modoExclusao = false;
         idsParaExcluir.clear();
+        qtdParaExcluir.clear();
         if (actionButtons != null) actionButtons.setVisible(true);
         if (deleteConfirmation != null) deleteConfirmation.setVisible(false);
         atualizarStatusExclusao();
@@ -4576,6 +4637,7 @@ public final class BookMenuUI {
             }
         }
         idsParaExcluir.retainAll(idsAtuais);
+        qtdParaExcluir.keySet().retainAll(idsAtuais);
         atualizarStatusExclusao();
         selectedItem = -1;
         if (!selectedInstanceId.isEmpty()) {
@@ -4662,6 +4724,20 @@ public final class BookMenuUI {
     }
 
     public boolean conheceMagia(String caminho) { return magiasConhecidas.contains(caminho); }
+
+    /** Magias da classe (ou "All") que passam a poder ser aprendidas ao ir de
+     * levelAntes pra levelAgora (e que o player ainda nao sabe). */
+    public List<String> magiasLiberadas(int levelAntes, int levelAgora) {
+        List<String> lista = new ArrayList<>();
+        for (Map.Entry<String, EquipStats> e : ITEM_STATS.entrySet()) {
+            EquipStats d = e.getValue();
+            if (d.magia == null || d.magia.isEmpty() || conheceMagia(e.getKey())) continue;
+            if (d.reqLevel <= levelAntes || d.reqLevel > levelAgora) continue;
+            if (!"All".equalsIgnoreCase(d.reqClass) && !d.reqClass.equalsIgnoreCase(classeJogador)) continue;
+            lista.add(e.getKey());
+        }
+        return lista;
+    }
 
     /** Mana gasta pela magia (0 = nao e' magia). */
     public int manaDaMagia(String caminho) {

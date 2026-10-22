@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.43"
+SERVER_VERSION = "v0.44"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -4992,6 +4992,18 @@ def handle_swap_req(data):
         marcar_movimento(target_sid, (px, py, t_dint))
     except Exception: traceback.print_exc()
 
+PARTY_AVISO_XP_SEG = 60.0  # o aviso de XP nao compartilhado repete no maximo 1x por minuto
+
+def _avisar_xp_nao_compartilhado(hitters, maior):
+    agora = time.time()
+    minimo = int(math.ceil(maior * 2 / 3.0))
+    for h in hitters:
+        p = online_players.get(h)
+        if p is None or agora - p.get('_aviso_xp_party', 0) < PARTY_AVISO_XP_SEG: continue
+        p['_aviso_xp_party'] = agora
+        chat_sistema(h, f"XP can't be shared: party members need level {minimo}+ (2/3 of the highest level). "
+                        "Lower levels get XP by the damage they dealt.", 'red')
+
 def _calcular_xp_por_participante(mob_data, xp_total):
     # Substitui o cálculo antigo (proporcional ao dano de cada um, sem noção de
     # party) por um que agrupa os sids do dmg_tracker por party_id. Atacantes
@@ -5027,9 +5039,26 @@ def _calcular_xp_por_participante(mob_data, xp_total):
                 resultado[s_sid] = max(1, int(xp_total * pct_dano))
             continue
 
+        # XP so' e' compartilhado entre quem tem pelo menos 2/3 do level do
+        # maior que bateu (lv 100 -> precisa 75... 67). Quem esta' abaixo
+        # ganha pelo dano que deu, igual solo, e recebe o aviso.
+        maior = max(int(online_players[h].get('level', 1) or 1) for h in hitters)
+        fora = [h for h in hitters if int(online_players[h].get('level', 1) or 1) * 3 < maior * 2]
+        if fora:
+            for s_sid in fora:
+                resultado[s_sid] = max(1, int(xp_total * tracker[s_sid] / max_hp))
+            _avisar_xp_nao_compartilhado(hitters, maior)
+            hitters = [h for h in hitters if h not in fora]
+            if len(hitters) < 2:
+                for s_sid in hitters:
+                    resultado[s_sid] = max(1, int(xp_total * tracker[s_sid] / max_hp))
+                continue
+
         party = parties[chave]
         pct_combinado = sum(tracker[h] / max_hp for h in hitters)
-        bonus_percent = _calcular_bonus_percentual(party)
+        # Bonus de classe so' conta quem esta' na faixa de level (um alt lv 1
+        # de outra classe na party nao aumenta o XP de ninguem).
+        bonus_percent = _calcular_bonus_percentual(party, maior)
         pool = xp_total * pct_combinado * (1.0 + bonus_percent / 100.0)
         share = max(1, int(pool / len(hitters)))
         for h in hitters:
@@ -6452,13 +6481,25 @@ def handle_delete_items(data):
         if not isinstance(instance_ids, list): return
         instance_ids = instance_ids[:500]
         inventario = p.get('inventory', [])
+        # Pilha apagada em parte: {"qty": {id: quantos}} (client novo). Sem
+        # entrada (ou >= a pilha) apaga a pilha toda.
+        qtds = data.get('qty') if isinstance(data.get('qty'), dict) else {}
         ids_validos = set()
+        mudou = False
         for raw_id in instance_ids:
             instance_id = str(raw_id)
             alvo = encontrar_instancia(inventario, instance_id)
-            if alvo is not None and not alvo.get('favorite', False): ids_validos.add(instance_id)
+            if alvo is None or alvo.get('favorite', False): continue
+            try: tirar = int(qtds.get(instance_id, 0))
+            except (TypeError, ValueError): tirar = 0
+            tem = int(alvo.get('qty', 1) or 1)
+            if 0 < tirar < tem:
+                alvo['qty'] = tem - tirar
+                mudou = True
+            else:
+                ids_validos.add(instance_id)
 
-        if not ids_validos: return
+        if not ids_validos and not mudou: return
         p['inventory'] = [inst for inst in inventario if inst.get('id') not in ids_validos]
         _queue_save(p)
         emit('inventory_synced', {'inventory': ordenar_favoritos_primeiro(p['inventory']), 'equipped_items': p.get('equipped_items', {})}, room=sid)
@@ -6582,8 +6623,10 @@ def _party_public_member_dict(sid):
         'level': p.get('level', 1),
     }
 
-def _calcular_bonus_percentual(party):
+def _calcular_bonus_percentual(party, level_maior=None):
     membros = [s for s in party['members'] if s in online_players]
+    if level_maior is not None:
+        membros = [s for s in membros if int(online_players[s].get('level', 1) or 1) * 3 >= level_maior * 2]
     if len(membros) <= 1:
         return 0
     classes_distintas = len({online_players[s].get('class_name', 'Knight') for s in membros})
@@ -7885,7 +7928,11 @@ RANKING_CLASSE = {"magic": "Mage", "focus": "Ranger", "musicality": "Bard", "mel
 # Sem diferenciar maiuscula/minuscula.
 RE_RANKING_IGNORAR = re.compile(r"^(ptmember|ptleader|ptsolo|sw[ab]\s*\d)", re.IGNORECASE)
 
-def _fora_do_ranking(nome):
+def _fora_do_ranking(nome, user_id=None):
+    # Devs (nome de admin ou qualquer personagem da conta em ADMIN_USER_IDS)
+    # nao aparecem em nenhuma categoria: desmotivava quem quer o top 1.
+    if str(nome).lower() in ADMIN_NOMES: return True
+    if user_id is not None and str(user_id) in ADMIN_USER_IDS: return True
     return bool(RE_RANKING_IGNORAR.match(str(nome)))
 
 def _skill_nivel(skills, chave):
@@ -7899,13 +7946,13 @@ def _montar_ranking(categoria):
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
-        c.execute("SELECT name, class_name, level, exp, skills, skins FROM characters WHERE deleted_at IS NULL")
-        for nome, classe, level, exp, skills_txt, skins_txt in c.fetchall():
+        c.execute("SELECT name, class_name, level, exp, skills, skins, user_id FROM characters WHERE deleted_at IS NULL")
+        for nome, classe, level, exp, skills_txt, skins_txt, uid in c.fetchall():
             try: skills = json.loads(skills_txt) if skills_txt else {}
             except (TypeError, ValueError): skills = {}
             try: skins = json.loads(skins_txt) if skins_txt else {}
             except (TypeError, ValueError): skins = {}
-            por_nome[nome] = {"name": nome, "class": classe or "Knight", "level": level or 1,
+            por_nome[nome] = {"name": nome, "class": classe or "Knight", "level": level or 1, "user_id": uid,
                               "exp": exp or 0, "skills": skills if isinstance(skills, dict) else {},
                               "skins": skins if isinstance(skins, dict) else {}}
         c.close()
@@ -7915,12 +7962,12 @@ def _montar_ranking(categoria):
     for p in list(online_players.values()):
         nome = p.get('name')
         if not nome: continue
-        por_nome[nome] = {"name": nome, "class": p.get('class_name', 'Knight'), "level": p.get('level', 1),
+        por_nome[nome] = {"name": nome, "class": p.get('class_name', 'Knight'), "level": p.get('level', 1), "user_id": p.get('user_id'),
                           "exp": p.get('exp', 0), "skills": p.get('skills') or {}, "skins": p.get('skins') or {}}
     lista = []
     so_classe = RANKING_CLASSE.get(categoria)
     for d in por_nome.values():
-        if _fora_do_ranking(d["name"]): continue
+        if _fora_do_ranking(d["name"], d.get("user_id")): continue
         if so_classe and str(d["class"] or "Knight").strip().lower() != so_classe.lower(): continue
         e = {"name": d["name"], "class": d["class"], "level": int(d["level"] or 1), "exp": int(d["exp"] or 0)}
         # Skin pra foto da janela do player (clicar no nome no Rank).

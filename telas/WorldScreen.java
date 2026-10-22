@@ -1623,6 +1623,7 @@ public class WorldScreen extends ScreenAdapter {
     // Notificacoes do bestiary: amarelo dourado escuro (descoberta/ouro),
     // cobre e prata escuros pras medalhas.
     private static final Color COR_NOTIF_BESTIARIO = new Color(0.5f, 0.38f, 0.04f, 1f);
+    private int levelProprio = -1; // ultimo level visto no sync_stats (aviso de magia liberada)
     private static final Color COR_MEDALHA_COBRE = new Color(0.42f, 0.22f, 0.1f, 1f);
     private static final Color COR_MEDALHA_PRATA = new Color(0.3f, 0.32f, 0.36f, 1f);
     private com.badlogic.gdx.scenes.scene2d.ui.Container<Table> gavetaDebuffs;
@@ -4230,6 +4231,18 @@ public class WorldScreen extends ScreenAdapter {
             hud.definir(data.getFloat("current_hp", -1f), data.getFloat("max_hp", -1f),
                 data.getFloat("current_mp", -1f), data.getFloat("max_mp", -1f));
             if (data.has("level")) hud.definirXp(data.getInt("level", 1), data.getLong("exp", 0L));
+            // Subiu de level: avisa as magias novas que ja' da' pra aprender
+            // (icone e cor da gaveta da magia), pra ir na cidade aprender.
+            if (data.has("level")) {
+                int lv = data.getInt("level", 1);
+                if (levelProprio > 0 && lv > levelProprio && data.getBoolean("char_leveled_up", false)) {
+                    for (String magia : bookMenu.magiasLiberadas(levelProprio, lv)) {
+                        hud.notificarIcone(bookMenu.nomeExibicao(magia) + " can be learned!",
+                            bookMenu.iconeDoItem(magia), bookMenu.coresSlotMagia(magia)[1], null);
+                    }
+                }
+                levelProprio = lv;
+            }
         });
 
         // Troca de lugar aceita pelo servidor: [nomeA, xA, yA, dirA, nomeB, xB, yB, dirB].
