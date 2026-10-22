@@ -28,6 +28,10 @@ public final class PerfAdmin {
     private final GLProfiler gl;
     private final Map<String, Float> secoes = new LinkedHashMap<>();
     private final Map<String, Float> eventos = new LinkedHashMap<>();
+    // Media (suavizada) de cada parte do frame - mostra o que pesa SEMPRE
+    // (fps baixo constante), nao so' nos picos.
+    private final Map<String, Float> mediaSecoes = new LinkedHashMap<>();
+    private float mediaEventos = 0f;
     private long inicioFrame, ultimaMarca, inicioAnterior = 0L;
     private long heapAnterior = 0L;
     private boolean gcNesteFrame = false;
@@ -76,6 +80,10 @@ public final class PerfAdmin {
         sb.append(String.format(java.util.Locale.US, "cpu %.1f  wait %.1f  dc %d  tex %d  heap %dMB",
             suavizadoRender, suavizadoEspera, gl.getDrawCalls(), gl.getTextureBindings(),
             Gdx.app.getJavaHeap() / 1_000_000L));
+        for (Map.Entry<String, Float> e : secoes.entrySet())
+            mediaSecoes.merge(e.getKey(), e.getValue(), (velho, novo) -> velho + (novo - velho) * 0.1f);
+        mediaEventos += (totalEventos - mediaEventos) * 0.1f;
+        sb.append(String.format(java.util.Locale.US, "\n%s  net %.1f", maiores(mediaSecoes, 5), mediaEventos));
         linhaAtual = sb.toString();
 
         if (intervalo >= PICO_MS) {

@@ -2931,6 +2931,14 @@ public class WorldScreen extends ScreenAdapter {
             modoBarraHp = i;
             Controles.definirModoBarraHp(i);
         })).left().padTop(6).row();
+        // Medidor de desempenho (o que pesa no frame) - pra achar travada no celular.
+        boolean perfLigado = Gdx.app.getPreferences("inverted_realms_opcoes").getBoolean(PREF_PERF, false);
+        secao.add(linhaDeEscolha("Performance stats", new String[]{"Off", "On"}, perfLigado ? 1 : 0, i -> {
+            com.badlogic.gdx.Preferences prefs = Gdx.app.getPreferences("inverted_realms_opcoes");
+            prefs.putBoolean(PREF_PERF, i == 1);
+            prefs.flush();
+            if (i == 1) ligarPerf(true); else desligarPerf();
+        })).left().padTop(6).row();
         // Auto target (botao do meio do mouse) - so' no PC.
         if (!mobile) {
             String[] nomesAuto = {"All", "Not others'", "Only mine", "Mine + party"};
@@ -3256,7 +3264,8 @@ public class WorldScreen extends ScreenAdapter {
             // eram zerados no client.
             if (data.has("inventory")) {
                 adminLocal = data.getBoolean("admin", false);
-                if (adminLocal) ligarPerfAdmin(); // medidor de desempenho embaixo do fps
+                // Medidor de desempenho embaixo do fps: admin sempre (F8), os outros se ligaram no Options.
+                if (adminLocal || Gdx.app.getPreferences("inverted_realms_opcoes").getBoolean(PREF_PERF, false)) ligarPerfAdmin();
                 // Sugestoes de comando no chat (so' admin recebe a lista).
                 if (chat != null) chat.definirComandosAdmin(adminLocal ? data.get("admin_commands") : null);
                 if (chat != null) chat.definirArgumentosAdmin(adminLocal ? data.get("admin_args") : null);
@@ -4716,7 +4725,7 @@ public class WorldScreen extends ScreenAdapter {
         // reportado pelo usuario).
         // Write (padrao Enter): comeca a digitar no chat (abre ele se estiver fechado).
         // F8 (admin): mostra/esconde o medidor de desempenho.
-        if (labelPerf != null && Gdx.input.isKeyJustPressed(Input.Keys.F8) && acaoCapturando == null) {
+        if (adminLocal && labelPerf != null && Gdx.input.isKeyJustPressed(Input.Keys.F8) && acaoCapturando == null) {
             labelPerf.setVisible(!labelPerf.isVisible());
         }
         // Hotkey secreta do admin: F9 abre o chat ja' focado, mesmo sendo alma.
@@ -4995,16 +5004,38 @@ public class WorldScreen extends ScreenAdapter {
     private PerfAdmin perf;
     private Label labelPerf;
 
+    private static final String PREF_PERF = "perf_stats";
+
     private void ligarPerfAdmin() {
-        if (perf != null || cantoFpsTabela == null) return;
-        perf = new PerfAdmin();
-        GameSocket.medidorEventos = (nome, ns) -> { if (perf != null) perf.eventoMedido(nome, ns); };
-        labelPerf = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.7f), Color.WHITE));
-        labelPerf.setColor(new Color(1f, 1f, 0.6f, 1f));
-        labelPerf.setVisible(false); // comeca escondido - F8 mostra/esconde
-        cantoFpsTabela.clearChildren();
-        cantoFpsTabela.add(labelPerf).left().row();
-        cantoFpsTabela.add(infoDesempenho).left();
+        ligarPerf(Gdx.app.getPreferences("inverted_realms_opcoes").getBoolean(PREF_PERF, false));
+    }
+
+    /** Medidor de desempenho (cpu/espera/draw calls/picos) embaixo do fps.
+     * Admin: F8. Qualquer um: Options > Performance stats (no celular tambem). */
+    private void ligarPerf(boolean mostrar) {
+        if (cantoFpsTabela == null) return;
+        if (perf == null) {
+            perf = new PerfAdmin();
+            GameSocket.medidorEventos = (nome, ns) -> { if (perf != null) perf.eventoMedido(nome, ns); };
+        }
+        if (labelPerf == null) {
+            labelPerf = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, mobile ? 0.9f : 0.7f), Color.WHITE));
+            labelPerf.setColor(new Color(1f, 1f, 0.6f, 1f));
+            cantoFpsTabela.clearChildren();
+            cantoFpsTabela.add(labelPerf).left().row();
+            cantoFpsTabela.add(infoDesempenho).left();
+        }
+        labelPerf.setVisible(mostrar);
+    }
+
+    /** Opcao desligada: esconde e para de medir (o GLProfiler custa um pouco). */
+    private void desligarPerf() {
+        if (labelPerf != null) labelPerf.setVisible(false);
+        if (perf != null && !adminLocal) {
+            GameSocket.medidorEventos = null;
+            perf.dispose();
+            perf = null;
+        }
     }
 
     /** Debug (tecla C): pinta de vermelho translucido cada SQM que ColisaoGrid
