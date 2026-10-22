@@ -1298,12 +1298,14 @@ PERSISTE_SQM = 9  # (antigo) detecao + isso = 13 SQMs - hoje vale PERDE_ALVO_SQM
 #  - casa temporaria sem nenhum player vendo por CASA_TEMP_VAZIA_SEG: o mob
 #    e' teleportado de volta pro spawn (ninguem ve, poupa o servidor).
 TROCA_ALVO_LONGE_SQM = 5
-PERDE_ALVO_SQM = 8
+PERDE_ALVO_SQM = 9
 CASA_TEMP_VAZIA_SEG = 10.0
 # Trancado por criaturas (trap): fica perambulando colado (1 SQM do lugar
 # onde travou) esperando abrir um spot, sem largar o alvo.
 MOB_ESPERA_RAIO_SQM = 1
 MOB_ESPERA_PASSO = (0.8, 1.6)
+# Largou o alvo: o 1o passo do passeio sai nesse intervalo (s); os outros, o normal.
+MOB_PRIMEIRO_PASSEIO = (0.4, 0.9)
 SEM_CAMINHO_SEG = 1.5
 # Focando o mesmo alvo esse tempo sem conseguir bater: o próximo player que
 # bater no mob rouba o foco (anti-abuso).
@@ -2173,6 +2175,8 @@ def _mob_largar_alvo(mob_id, m):
         m.pop('casa_temp', None)
     m.pop('casa_temp_vazia', None)
     m.pop('casa_espera', None)
+    # 1o passeio logo em seguida (parado 5-10s parecia que o mob congelou).
+    m['next_wander_at'] = time.time() + random.uniform(MOB_PRIMEIRO_PASSEIO[0], MOB_PRIMEIRO_PASSEIO[1])
     if m.get('returning'):
         m['returning'] = False
         _mob_emitir_estado(mob_id, m)
