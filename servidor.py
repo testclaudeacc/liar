@@ -1033,10 +1033,25 @@ def _limite_excedido(chave, maximo, janela_seg):
     _tentativas[chave] = lista
     return False
 
+# Proxies em que confiamos pra dizer o IP real do jogador (cloudflared/nginx
+# rodando na MESMA maquina conectam de loopback). Mais IPs: TRUSTED_PROXIES
+# no .env, separados por virgula. Vindo de qualquer outro lugar o cabecalho
+# e' ignorado (senao qualquer um forja o IP e fura o limite por IP).
+_PROXIES_CONFIAVEIS = {'127.0.0.1', '::1'} | {x.strip() for x in os.getenv('TRUSTED_PROXIES', '').split(',') if x.strip()}
+
+def ip_real():
+    remoto = request.remote_addr or '?'
+    if remoto in _PROXIES_CONFIAVEIS:
+        ip = request.headers.get('CF-Connecting-IP') or ''
+        if not ip:
+            # nginx: X-Forwarded-For "cliente, proxy1, ..." -> o primeiro
+            ip = (request.headers.get('X-Forwarded-For') or '').split(',')[0]
+        ip = ip.strip()[:64]
+        if ip: return ip
+    return remoto
+
 def _ip():
-    # Atras de proxy (nginx/cloudflare), configure o proxy pra mandar o IP
-    # real e troque isto por request.headers['X-Forwarded-For'].
-    return request.remote_addr or '?'
+    return ip_real()
 
 def _resposta_limite():
     return jsonify({"erro": "Too many attempts. Wait a few minutes and try again."}), 429
@@ -2642,10 +2657,20 @@ def _queue_save(p, position_ack_sid=None):
     }
     save_queue.put(save_data)
 
+_gravando = [False]  # o writer esta' no meio de uma gravacao (desligamento espera)
+
 def db_writer_worker():
     while True:
         player_data = save_queue.get()
         if player_data is None: continue
+        _gravando[0] = True
+        try:
+            _gravar_um(player_data)
+        finally:
+            _gravando[0] = False
+
+def _gravar_um(player_data):
+    if True:
         conn = None
         try:
             conn = db_pool.getconn()
@@ -2655,7 +2680,7 @@ def db_writer_worker():
                 # saves, entao nao e' sobrescrito por um save antigo da conta.
                 c.execute("UPDATE users SET bank = %s WHERE id = %s", (json.dumps(player_data['bank']), player_data['user_id']))
                 conn.commit(); c.close()
-                continue
+                return
             
             valid_inventory = normalizar_inventario(player_data.get('inventory', []))
             valid_equipped = normalizar_equipados(player_data.get('equipped_items', {}))
@@ -3160,7 +3185,7 @@ _ip_da_conexao = {}
 
 @socketio.on('connect')
 def handle_connect():
-    ip = request.remote_addr or '?'
+    ip = ip_real()
     if _conexoes_por_ip.get(ip, 0) >= CONEXOES_POR_IP_MAX:
         return False  # recusa a conexao
     _conexoes_por_ip[ip] = _conexoes_por_ip.get(ip, 0) + 1
@@ -8196,8 +8221,46 @@ socketio.start_background_task(npc_ai_loop)
 socketio.start_background_task(loop_visao_movimento)
 eventlet.spawn(db_writer_worker)
 
+# ---- Desligamento seguro (systemctl stop/restart, Ctrl+C) ----
+# Salva todo mundo que esta' online e espera a fila de gravacao esvaziar antes
+# de sair - sem isso um restart perdia o que estava na fila e o progresso
+# desde o ultimo save. Timeout pra nunca travar o desligamento.
+DESLIGAR_TIMEOUT_SEG = 20.0
+_desligando = [False]
+
+def _desligar_seguro():
+    try:
+        print(f"[SERVIDOR] Desligando: salvando {len(online_players)} player(s)...")
+        try:
+            socketio.emit('server_message', {'text': 'Server restarting. Your progress was saved.'})
+        except Exception: pass
+        for p in list(online_players.values()):
+            try: _queue_save(p)
+            except Exception: traceback.print_exc()
+        limite = time.time() + DESLIGAR_TIMEOUT_SEG
+        while (not save_queue.empty() or _gravando[0]) and time.time() < limite:
+            eventlet.sleep(0.1)
+        if not save_queue.empty() or _gravando[0]:
+            print("[SERVIDOR] AVISO: tempo esgotado com saves pendentes na fila")
+        else:
+            print("[SERVIDOR] Tudo salvo.")
+    finally:
+        os._exit(0)
+
+def _ao_sinal(signum, frame):
+    if _desligando[0]: return
+    _desligando[0] = True
+    eventlet.spawn(_desligar_seguro)
+
+import signal
+signal.signal(signal.SIGTERM, _ao_sinal)
+signal.signal(signal.SIGINT, _ao_sinal)
+
 if __name__ == '__main__':
     init_db()
     # debug=False em producao (o debug deixa tudo mais lento e expoe detalhes
     # de erro). Pra desenvolver: DEBUG_SERVIDOR=1 python3 servidor.py
-    socketio.run(app, host='0.0.0.0', port=3000, debug=os.getenv('DEBUG_SERVIDOR') == '1')
+    # Producao atras do Cloudflare Tunnel/nginx: SERVER_HOST=127.0.0.1 (so' o
+    # proxy da propria maquina alcanca o jogo). Sem isso: 0.0.0.0 (rede local).
+    socketio.run(app, host=os.getenv('SERVER_HOST', '0.0.0.0'), port=int(os.getenv('SERVER_PORT', '3000')),
+                 debug=os.getenv('DEBUG_SERVIDOR') == '1')
