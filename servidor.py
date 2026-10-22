@@ -2281,6 +2281,7 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
     target_player['current_hp'] = hp_atual
     target_player['_ultimo_hp_broadcast'] = [hp_atual, max_hp_alvo]
     target_player['last_hit_by_mob'] = now  # libera o treino de defense (register_skill_hit)
+    target_player['credito_skill_def'] = 1  # 1 treino por golpe recebido (sem acumular)
 
     emit_area('player_damaged', {'target_player': target_name, 'damage': dano_final, 'new_hp': hp_atual,
                                  'max_hp': max_hp_alvo, 'hit_type': efeito_hit,
@@ -2466,6 +2467,7 @@ def handle_hit_morph(data):
         marcar_batalha(sid, p, now)
         marcar_batalha(alvo_sid, alvo, now)
         p['last_successful_hit'] = now
+        p['credito_skill_classe'] = 1
         max_hp = float(m.get('max_hp', 40))
         try: hp = float(alvo.get('current_hp', -1))
         except (TypeError, ValueError): hp = -1.0
@@ -2825,7 +2827,21 @@ def _queue_save(p, position_ack_sid=None):
         'bank': _copia_banco(p.get('user_id')),
         'position_ack_sid': position_ack_sid
     }
+    chave = (str(p['user_id']), p['name'])
+    _saves_pendentes[chave] = _saves_pendentes.get(chave, 0) + 1
     save_queue.put(save_data)
+
+# (user_id, nome) -> saves desse personagem ainda na fila. O join_game espera
+# zerar antes de ler o banco: relogar rapido nao carrega um estado velho
+# (ex: item ja' passado no trade voltava pro inventario = clone).
+_saves_pendentes = {}
+
+def _save_saiu_da_fila(player_data):
+    if player_data.get('_so_banco'): return
+    chave = (str(player_data.get('user_id')), player_data.get('name'))
+    n = _saves_pendentes.get(chave, 0) - 1
+    if n > 0: _saves_pendentes[chave] = n
+    else: _saves_pendentes.pop(chave, None)
 
 _gravando = [False]  # o writer esta' no meio de uma gravacao (desligamento espera)
 
@@ -2837,6 +2853,7 @@ def db_writer_worker():
         try:
             _gravar_um(player_data)
         finally:
+            _save_saiu_da_fila(player_data)
             _gravando[0] = False
 
 def _gravar_um(player_data):
@@ -3262,6 +3279,12 @@ def create_character():
         if not token_valido(c, user_id, dados.get('token')): return jsonify({"erro": "Session expired."}), 401
         c.execute("SELECT COUNT(*) FROM characters WHERE user_id = %s AND deleted_at IS NULL", (user_id,))
         if c.fetchone()[0] >= 4: return jsonify({"erro": "No character slots."}), 403
+        # Nome unico sem diferenciar maiuscula ("Labubus" x "labubus"): o
+        # UNIQUE do banco diferencia, e o nome do admin e' conferido assim.
+        if name.lower() in ADMIN_NOMES and str(user_id) not in ADMIN_USER_IDS:
+            return jsonify({"erro": "Name taken."}), 409
+        c.execute("SELECT 1 FROM characters WHERE LOWER(name) = LOWER(%s) LIMIT 1", (name,))
+        if c.fetchone(): return jsonify({"erro": "Name taken."}), 409
         inventory_inicial, equipped_inicial = montar_kit_inicial(class_name)
 
         # Personagem novo nasce como alma (ver eh_alma / despertar_alma).
@@ -3353,11 +3376,79 @@ CONEXOES_POR_IP_MAX = 8
 _conexoes_por_ip = {}
 _ip_da_conexao = {}
 
+# ---- Modo emergencia (ultimo recurso se um ataque passar do provedor) ----
+# Liga sem reiniciar: arquivo emergencia.txt do lado do servidor (ou
+# EMERGENCIA no .env, ou /emergency no chat do admin) com:
+#   login -> ninguem novo entra (cadastro, criar personagem, entrar no jogo);
+#            quem ja' esta' jogando continua. Admin entra.
+#   total -> igual login + salva e tira do jogo todo mundo que nao e' admin;
+#            com ADMIN_IPS no .env, so' esses IPs conseguem nem abrir conexao.
+# Apagar o arquivo (ou /emergency off) volta ao normal em ate' 2s.
+ARQUIVO_EMERGENCIA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'emergencia.txt')
+MAX_PLAYERS = int(os.getenv('MAX_PLAYERS', '600'))            # online ao mesmo tempo (admin passa)
+CONEXOES_MAX_TOTAL = int(os.getenv('CONEXOES_MAX_TOTAL', '2000'))  # sockets abertos no total
+ADMIN_IPS = {x.strip() for x in os.getenv('ADMIN_IPS', '').split(',') if x.strip()}
+_emergencia_cache = [0.0, '']
+
+def modo_emergencia():
+    agora = time.time()
+    if agora - _emergencia_cache[0] >= 2.0:
+        _emergencia_cache[0] = agora
+        modo = os.getenv('EMERGENCIA', '')
+        try:
+            with open(ARQUIVO_EMERGENCIA, 'r') as f: modo = f.read(32) or modo
+        except FileNotFoundError: pass
+        except Exception: traceback.print_exc()
+        modo = modo.strip().lower()
+        if modo != _emergencia_cache[1]:
+            print(f"[EMERGENCIA] modo: {modo or 'off'}")
+        _emergencia_cache[1] = modo if modo in ('login', 'total') else ''
+    return _emergencia_cache[1]
+
+def definir_emergencia(modo):
+    if modo in ('login', 'total'):
+        with open(ARQUIVO_EMERGENCIA, 'w') as f: f.write(modo)
+    else:
+        try: os.remove(ARQUIVO_EMERGENCIA)
+        except FileNotFoundError: pass
+    _emergencia_cache[0] = 0.0
+    return modo_emergencia()
+
+def _tirar_nao_admins():
+    for s, p in list(online_players.items()):
+        if eh_admin(p) or p.get('_expulso_emergencia'): continue
+        p['_expulso_emergencia'] = True
+        _queue_save(p)
+        try: socketio.emit('force_disconnect', {"reason": "Server closed for maintenance. Try again later."}, room=s)
+        except Exception: pass
+        def _derrubar(s=s):
+            socketio.sleep(1.0)
+            try: socketio.server.disconnect(s, namespace='/')
+            except Exception: pass
+        socketio.start_background_task(_derrubar)
+
+def emergencia_loop():
+    while True:
+        socketio.sleep(2.0)
+        try:
+            if modo_emergencia() == 'total' and any(not eh_admin(p) for p in online_players.values()):
+                _tirar_nao_admins()
+        except Exception: traceback.print_exc()
+
+_ROTAS_FECHADAS_EMERGENCIA = {'/register', '/resend-verification', '/forgot-password', '/create_character'}
+
+@app.before_request
+def _bloqueio_emergencia():
+    if request.path in _ROTAS_FECHADAS_EMERGENCIA and modo_emergencia():
+        return jsonify({"erro": "Server temporarily closed. Try again later."}), 503
+
 @socketio.on('connect')
 def handle_connect():
     ip = ip_real()
     if _conexoes_por_ip.get(ip, 0) >= CONEXOES_POR_IP_MAX:
         return False  # recusa a conexao
+    if len(_ip_da_conexao) >= CONEXOES_MAX_TOTAL: return False
+    if ADMIN_IPS and ip not in ADMIN_IPS and modo_emergencia() == 'total': return False
     _conexoes_por_ip[ip] = _conexoes_por_ip.get(ip, 0) + 1
     _ip_da_conexao[request.sid] = ip
 
@@ -3660,6 +3751,17 @@ def handle_join_game(data):
         user_id = data.get('user_id')
         p_name = str(data.get('name', '')).strip()
         if not p_name or not user_id or user_id == -1: return
+        # Save desse personagem ainda na fila (acabou de sair): espera gravar.
+        # (Ainda online em outra sessao: o estado vem da memoria, sem esperar.)
+        def _pendente():
+            return _saves_pendentes.get((str(user_id), p_name)) and not any(
+                str(o.get('user_id')) == str(user_id) and o.get('name') == p_name for o in online_players.values())
+        limite_espera = time.time() + 8.0
+        while _pendente() and time.time() < limite_espera:
+            socketio.sleep(0.05)
+        if _pendente():
+            emit('force_disconnect', {"reason": "Server busy. Try again in a few seconds."}, room=sid)
+            return
         conn = db_pool.getconn()
         c = conn.cursor()
         # Prova de login: sem isso, mandar o user_id + nome de outra pessoa
@@ -3667,6 +3769,14 @@ def handle_join_game(data):
         if not token_valido(c, user_id, data.get('token')):
             emit('force_disconnect', {"reason": "Session expired. Please log in again."}, room=sid)
             return
+        if not eh_admin({'name': p_name, 'user_id': user_id}):
+            ja_dentro = any(str(o.get('user_id')) == str(user_id) for o in online_players.values())
+            if modo_emergencia() and not ja_dentro:
+                emit('force_disconnect', {"reason": "Server temporarily closed. Try again later."}, room=sid)
+                return
+            if len(online_players) >= MAX_PLAYERS and not ja_dentro:
+                emit('force_disconnect', {"reason": "Server is full. Try again in a few minutes."}, room=sid)
+                return
         # So' guarda o que o servidor mesmo vai usar (o resto do payload do
         # client nao entra no estado do player).
         data = {'user_id': user_id, 'name': p_name, 'skins': data.get('skins')}
@@ -4017,7 +4127,10 @@ def chat_sistema(sid, texto, cor='yellow'):
 ADMIN_NOMES = {"labubus"}
 
 def eh_admin(p):
-    return str(p.get('name', '')).lower() in ADMIN_NOMES
+    # Com ADMIN_USER_IDS no .env, tambem precisa ser a conta certa (outra
+    # conta com o mesmo nome em outra caixa, ex "Labubus", nao vira admin).
+    if str(p.get('name', '')).lower() not in ADMIN_NOMES: return False
+    return not ADMIN_USER_IDS or str(p.get('user_id')) in ADMIN_USER_IDS
 
 def _avisar_admin_bloqueio(sid, p, motivo, tile):
     # So' pro admin: por que o SERVIDOR recusou o passo (o SQM no formato do
@@ -4070,6 +4183,7 @@ ADMIN_COMANDOS = [
     ("quests", "/quests", "quests e se voce ja fez"),
     ("quest", "/quest <nome> complete|reset", "completa ou reseta uma quest"),
     ("bestiary", "/bestiary <mob> <0-3|clear>", "bestiario: 0 descoberto, 1 cobre, 2 prata, 3 ouro"),
+    ("emergency", "/emergency off|login|total", "login: ninguem novo entra; total: tambem tira todo mundo (menos admin)"),
 ]
 
 def argumentos_admin():
@@ -4077,7 +4191,7 @@ def argumentos_admin():
     mobs = [str(i.get('name', t.capitalize())) for t, i in MOB_DB.items()]
     return {
         'summons': mobs, 'bestiary': mobs + ['clear'],
-        'soul': ['on', 'off'], 'ghost': ['on', 'off'], 'morph': ['cancel'], 'tp': ['@players'], 'faketalk': ['@player1'],
+        'soul': ['on', 'off'], 'emergency': ['off', 'login', 'total'], 'ghost': ['on', 'off'], 'morph': ['cancel'], 'tp': ['@players'], 'faketalk': ['@player1'],
         'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'], 'spells': ['reset'],
         'class': list(CLASSES_VALIDAS),
         'fixclass': list(CLASSES_VALIDAS),
@@ -4163,6 +4277,15 @@ def comando_admin(sid, p, texto, canal='local'):
     if cmd in ('help', 'admin'):
         for _, uso, desc in ADMIN_COMANDOS:
             chat_sistema(sid, f"Admin: {uso}  - {desc}")
+        return
+    if cmd == 'emergency':
+        if len(partes) < 2 or partes[1].lower() not in ('off', 'login', 'total'):
+            chat_sistema(sid, f"Emergency: {modo_emergencia() or 'off'}. Usage: /emergency off|login|total")
+            return
+        modo = definir_emergencia(partes[1].lower())
+        if modo == 'total': _tirar_nao_admins()
+        print(f"[EMERGENCIA] {p.get('name')} mudou pra {modo or 'off'}")
+        chat_sistema(sid, f"Emergency mode: {modo or 'off'}.")
         return
     if cmd == 'soul':
         if len(partes) < 2 or partes[1].lower() not in ('on', 'off'):
@@ -5251,6 +5374,7 @@ def handle_hit_mob(data):
             mob_data['treino_trava'] = {'sid': sid, 'nome': p.get('name', ''), 'ate': now + TREINO_TRAVA_SEG}
             trava_nova = mob_data['treino_trava']
         p['last_successful_hit'] = now  # libera o treino da skill da classe
+        p['credito_skill_classe'] = 1  # 1 treino por golpe (sem acumular)
         marcar_batalha(sid, p, now)
         mob_focar_agressor(mob_id, mob_data, sid)
         # Ranged colado (SQM do lado) num mob que continua focando OUTRO
@@ -5395,6 +5519,11 @@ def handle_register_map(data):
         map_id = str(data.get('map', ''))[:200]
         fp = str(data.get('fp', ''))[:64]
         if not map_id: return
+        # Servidor com o .tmx: so' existe o mapa dele. Um id inventado criava
+        # um "mapa novo" com mobs/grade vindos do client (mobs de farm do lado
+        # do player, mapa sem paredes pra validar movimento).
+        if MAPAS_DO_SERVIDOR and map_id not in MAPAS_DO_SERVIDOR:
+            map_id = MAPA_ID_SERVIDOR
         p_reg = online_players[sid]
         p_reg['mapa'] = map_id
         admin = _eh_admin(p_reg)
@@ -5485,7 +5614,7 @@ def handle_map_grid(data):
         w, h = int(data.get('w', 0)), int(data.get('h', 0))
         if not map_id or w <= 0 or h <= 0 or w * h > 4_000_000: return
         fp = str(data.get('fp', ''))[:64]
-        if map_id in MAPAS_DO_SERVIDOR: return  # grade vem do .tmx do servidor
+        if map_id in MAPAS_DO_SERVIDOR or MAPAS_DO_SERVIDOR: return  # grade vem do .tmx do servidor
         atual = mapas_colisao.get(map_id)
         if atual is not None and atual.get('fp') == fp: return  # já tenho essa versão
         # Grade ja' existe: so' admin troca (senao um client modificado
@@ -5674,17 +5803,24 @@ def handle_skill_hit(data):
         # golpe valido num mob, ou defense logo depois de apanhar de um mob.
         # Antes qualquer nome de skill era aceito a cada 1.8s sem fazer nada
         # (subia Magic de Knight parado, e enchia o banco de skills falsas).
+        # Cada treino gasta 1 credito ganho num golpe de verdade (dado ou
+        # recebido): client modificado mandando register_skill_hit a cada
+        # 1.8s nao treina mais rapido que o ritmo real de golpes.
         if skill_name == 'defense':
             if now - p.get('last_hit_by_mob', 0) > SKILL_JANELA_ACAO_SEG: return
+            chave_credito = 'credito_skill_def'
         elif skill_name == SKILL_DA_CLASSE.get(p.get('class_name', 'Knight')):
             if now - p.get('last_successful_hit', 0) > SKILL_JANELA_ACAO_SEG: return
+            chave_credito = 'credito_skill_classe'
         else:
             return
+        if not p.get(chave_credito): return
         cooldown_time = 1.8
         last_hit = p['last_skill_hit'].get(skill_name, 0)
         
         if now - last_hit < cooldown_time: return
         p['last_skill_hit'][skill_name] = now
+        p[chave_credito] = 0
 
         if skill_name == 'defense' and now - p.get('last_attack_time', 0) > DEFENSE_AFK_WINDOW: return
 
@@ -8405,6 +8541,7 @@ socketio.start_background_task(mob_ai_loop)
 socketio.start_background_task(npc_ai_loop)
 socketio.start_background_task(loop_visao_movimento)
 eventlet.spawn(db_writer_worker)
+eventlet.spawn(emergencia_loop)
 
 # ---- Desligamento seguro (systemctl stop/restart, Ctrl+C) ----
 # Salva todo mundo que esta' online e espera a fila de gravacao esvaziar antes

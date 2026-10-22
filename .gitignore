@@ -5,3 +5,5 @@ conteudo_mapas.json
 mapas_colisao.json
 .env
 __pycache__/
+emergencia.txt
+backups/
