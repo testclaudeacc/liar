@@ -1321,7 +1321,7 @@ PATH_RECALC_SEG = 0.3
 # alguém. Ultrapassou: em vez de voltar andando (às vezes por um mapa
 # inteiro), ele "some" (efeito SpawnEffect no client) e conta como morto pro
 # respawn normal (MOB_RESPAWN_SEG) — ver _mob_desaparece_por_perseguicao.
-LEASH_SQM = 25
+LEASH_SQM = 40  # era 25; voltou junto com a casa temporaria (anti arrastar mob pra cidade)
 ALCANCE_RECALC_SEG = 0.5
 MOB_TICK_SEG = 0.05
 # Quanto antes do fim do passo o proximo e' decidido (> 1 tick + folga de rede).
@@ -2619,6 +2619,9 @@ def _mob_tick(mob_id, m, now):
         alvo = _player_pursuit_valido(alvo_sid)
         if alvo is None or na_pz(alvo):  # morreu, saiu, desconectou, entrou na PZ
             _mob_largar_alvo(mob_id, m)
+            return
+        if _dist_spawn_sqm(m) > LEASH_SQM:
+            _mob_desaparece_por_perseguicao(mob_id, m, now)
             return
         dist_alvo = _dist_sqm(m, alvo)
         if dist_alvo > PERDE_ALVO_SQM:
