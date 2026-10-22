@@ -35,8 +35,12 @@ public final class BookMenuUI {
     private static final float BOTAO_SIZE = 74f;
     private static final float BOTAO_ABA = 8f;
     private static final float COLUNA_LARGURA = BOTAO_SIZE + BOTAO_ABA;
-    private static final float JANELA_LARGURA = 520f;
-    private static final float JANELA_ALTURA = 410f;
+    // Celular: slots (e icones) maiores na bag/equip/trade/banco/loja; a janela
+    // cresce pra caber (a tela inteira do livro ainda e' ampliada 1.2x la' embaixo).
+    private static final boolean CELULAR = Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
+        || Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
+    private static final float JANELA_LARGURA = CELULAR ? 575f : 520f;
+    private static final float JANELA_ALTURA = CELULAR ? 436f : 410f;
     private static final int COLUNAS_INVENTARIO = 6;
     private static final float COLUNA_BAG = 133f;
     private static final float TAM_BOTAO_ACAO = 52f;
@@ -90,9 +94,9 @@ public final class BookMenuUI {
     private static final String[][] SLOTS_EQUIP = {
         {null, "Helm", "Necklace"}, {"MainHand", "Chest", "Hand"}, {"Gloves", "Boots", "Ring"}
     };
-    private static final float SLOT_EQUIP = 54f;
-    private static final float COLUNA_EQUIP = 180f;
-    private static final float ALTURA_GRADE_EQUIP = 216f;
+    private static final float SLOT_EQUIP = CELULAR ? 62f : 54f;
+    private static final float COLUNA_EQUIP = CELULAR ? 205f : 180f;
+    private static final float ALTURA_GRADE_EQUIP = CELULAR ? 240f : 216f;
     private static final int COLUNAS_EQUIP = 5;
     private final Map<String, Button> equipSlotButtons = new LinkedHashMap<>();
     private final Map<String, String> equippedItemPaths = new LinkedHashMap<>();
@@ -1223,7 +1227,8 @@ public final class BookMenuUI {
      * isso e o numero encosta na borda sem sair do slot. */
     /** Numero de quantidade padrao (fonte com contorno, sem escala, nitido). */
     public Label rotuloQuantidade(int quantidade) {
-        Label rotulo = new LabelPixel(String.valueOf(quantidade), skin.get("quantidade", Label.LabelStyle.class));
+        // Celular: slots maiores, numero um pouco maior; os dois seguem o UI font size.
+        Label rotulo = new LabelPixel(String.valueOf(quantidade), estiloQuantidade(false));
         rotulo.setAlignment(Align.bottomRight);
         return rotulo;
     }
@@ -1233,6 +1238,19 @@ public final class BookMenuUI {
         Label rotulo = rotuloQuantidade(quantidade);
         marcadores.add().expandX();
         marcadores.add(rotulo).right().bottom().padBottom(rotulo.getStyle().font.getDescent());
+    }
+
+    /** grande: slots redondos da hotbar no celular. */
+    public Label.LabelStyle estiloQuantidade(boolean grande) {
+        return new Label.LabelStyle(UiSkin.fonteQuantidade(skin, grande ? 21 : CELULAR ? 18 : 16), Color.WHITE);
+    }
+
+    /** Options > UI font size mudou: moedas e numeros dos slots na hora. */
+    public void aplicarTamanhoFonte() {
+        for (Label l : currencyLabels.values()) l.setStyle(estiloNitido(TAM_TEXTO_RODAPE));
+        atualizarGrade();
+        atualizarGradeEquip();
+        root.invalidateHierarchy();
     }
 
     /** Mana gasta por ataque basico pela arma da mao principal (0 = nao gasta). */

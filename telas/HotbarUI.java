@@ -390,7 +390,7 @@ public final class HotbarUI {
                 pilha.add(centro);
                 if (qtd > 0) {
                     Label numero = livro.rotuloQuantidade(qtd);
-                    if (MOBILE) numero.setStyle(skin.get("quantidade-grande", Label.LabelStyle.class));
+                    if (MOBILE) numero.setStyle(livro.estiloQuantidade(true));
                     Table canto = new Table();
                     // Quantidade no canto de baixo a direita (no redondo, um pouco
                     // pra dentro pra nao sair do circulo).
@@ -415,7 +415,8 @@ public final class HotbarUI {
             if (!MOBILE || editando) {
                 String texto = MOBILE ? String.valueOf(i + 1) : Controles.nomeTecla(Controles.tecla("hotbar" + (i + 1)));
                 Label tecla = new Label(texto, skin, "hud");
-                tecla.setFontScale(0.55f);
+                // Segue o UI font size, so' que mais de leve (metade do aumento).
+                tecla.setFontScale(0.55f * (1f + (Controles.multFonte() - 1f) * 0.5f));
                 tecla.setColor(1f, 1f, 1f, 0.5f);
                 Table cantoTecla = new Table();
                 if (MOBILE) { cantoTecla.top(); cantoTecla.add(tecla).padTop(4); }

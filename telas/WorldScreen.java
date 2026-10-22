@@ -2307,7 +2307,9 @@ public class WorldScreen extends ScreenAdapter {
         NOME_ESCALA_BASE = NOME_ESCALA_PADRAO * Controles.multFonte();
         font.getData().setScale(NOME_ESCALA_BASE);
         if (fonteDestaque != null) fonteDestaque.getData().setScale(NOME_ESCALA_BASE * 32f / 64f * ESCALA_DESTAQUE);
-        if (chat != null) chat.adicionarMensagemSistema("UI font size: names/numbers updated; bag numbers and chat text update after re-entering the world.");
+        if (bookMenu != null) bookMenu.aplicarTamanhoFonte();
+        if (hotbar != null) hotbar.atualizar();
+        if (chat != null) chat.adicionarMensagemSistema("UI font size: the chat text and potion cooldown numbers update after re-entering the world.");
     }
 
     private BitmapFont criarFonteDestaque() {
