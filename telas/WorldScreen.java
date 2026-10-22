@@ -3002,6 +3002,99 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     /** "Nome   [x] Opcao1   [ ] Opcao2 ..." - uma marcada por vez. */
+    // ---- Dica (popup pequeno) de cada opcao do Options ----
+    private static final java.util.Map<String, String> DICAS_OPCOES = new java.util.HashMap<>();
+    static {
+        DICAS_OPCOES.put("Camera Zoom", "How close the camera is. A higher zoom shows less of the map around you.");
+        DICAS_OPCOES.put("Full Screen", "Switches between window and full screen (also F11 or Alt+Enter).");
+        DICAS_OPCOES.put("Moving style", "8 directions lets you walk diagonally. 4 directions walks only up, down, left and right.");
+        DICAS_OPCOES.put("HP/MP bars", "How your HP and MP are shown on the screen: arcs around the portrait or straight bars.");
+        DICAS_OPCOES.put("Portrait ring", "What the ring around your portrait shows: experience, defense or your class skill progress.");
+        DICAS_OPCOES.put("Show HP bar", "Health bars over heads: on everyone, only on your target, or only on enemies.");
+        DICAS_OPCOES.put("Health bar size", "Width of the health bars over players and creatures.");
+        DICAS_OPCOES.put("UI font size", "Size of names, damage numbers, item and coin numbers, descriptions and chat.");
+        DICAS_OPCOES.put("Lighting quality", "Detail of lights at dusk, at night and in caves. Lower gives more FPS. Off keeps only the day/night color.");
+        DICAS_OPCOES.put("Effects", "Reduced hides blood on the ground, night details (fireflies) and the shadow of flying creatures. Gives more FPS.");
+        DICAS_OPCOES.put("FPS limit", "60 saves battery. Max runs as fast as your screen allows (90, 120 or 144 Hz).");
+        DICAS_OPCOES.put("Performance stats", "Shows how long each part of the game takes per frame, to find what slows your device.");
+        DICAS_OPCOES.put("Auto target", "Which creatures the auto target key (middle mouse button) can pick.");
+    }
+    private Table popupDica;
+    private Label textoDica;
+    private com.badlogic.gdx.scenes.scene2d.Actor alvoDica;
+
+    /** PC: aparece com o mouse em cima da opcao e some ao sair. Celular:
+     * aparece enquanto o dedo esta' em cima e some ~2s depois de soltar. */
+    private void adicionarDica(com.badlogic.gdx.scenes.scene2d.Actor alvo, String titulo) {
+        String texto = DICAS_OPCOES.get(titulo);
+        if (texto == null) return;
+        alvo.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
+        alvo.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, com.badlogic.gdx.scenes.scene2d.Actor de) {
+                if (pointer == -1) mostrarDica(alvo, texto); // mouse
+            }
+            @Override public void exit(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, com.badlogic.gdx.scenes.scene2d.Actor para) {
+                if (pointer == -1 && (para == null || !para.isDescendantOf(alvo))) esconderDica(alvo, 0f);
+            }
+            @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, int botao) {
+                if (mobile) mostrarDica(alvo, texto);
+                return false; // nao rouba o toque do dropdown
+            }
+        });
+        // Soltou o dedo (o touchUp vai pro dropdown, entao escuta no stage): some depois de um tempinho.
+        if (mobile && !dicaEscutandoStage) {
+            dicaEscutandoStage = true;
+            uiStage.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+                @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p, int b) {
+                    if (alvoDica != null && (e.getTarget() == null || !e.getTarget().isDescendantOf(alvoDica))) esconderDica(alvoDica, 0f);
+                    return true;
+                }
+                @Override public void touchUp(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p, int b) {
+                    if (alvoDica != null) esconderDica(alvoDica, 2f);
+                }
+            });
+        }
+    }
+    private boolean dicaEscutandoStage = false;
+
+    private void mostrarDica(com.badlogic.gdx.scenes.scene2d.Actor alvo, String texto) {
+        if (popupDica == null) {
+            popupDica = new Table();
+            popupDica.setBackground(UiSkin.retangulo(new Color(0.07f, 0.07f, 0.07f, 0.95f), new Color(0.55f, 0.55f, 0.55f, 1f), 1));
+            popupDica.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+            textoDica = new Label("", new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE));
+            textoDica.setWrap(true);
+            popupDica.add(textoDica).width(300f).pad(8, 10, 8, 10);
+        }
+        alvoDica = alvo;
+        textoDica.setText(texto);
+        popupDica.clearActions();
+        popupDica.getColor().a = 1f;
+        popupDica.pack();
+        uiStage.addActor(popupDica);
+        popupDica.toFront();
+        // Em cima da opcao (alinhado a' esquerda dela); sem espaco, embaixo. Sempre dentro da tela.
+        com.badlogic.gdx.math.Vector2 p = alvo.localToStageCoordinates(new com.badlogic.gdx.math.Vector2(0f, 0f));
+        float x = p.x + 40f, y = p.y + alvo.getHeight() + 4f;
+        if (y + popupDica.getHeight() > uiStage.getHeight()) y = p.y - popupDica.getHeight() - 4f;
+        x = Math.max(4f, Math.min(x, uiStage.getWidth() - popupDica.getWidth() - 4f));
+        y = Math.max(4f, Math.min(y, uiStage.getHeight() - popupDica.getHeight() - 4f));
+        popupDica.setPosition(x, y);
+        // Fechou o Options com a dica aberta: some junto.
+        popupDica.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.forever(com.badlogic.gdx.scenes.scene2d.actions.Actions.run(() -> {
+            if (painelOptions == null || !painelOptions.isVisible()) { popupDica.clearActions(); popupDica.remove(); alvoDica = null; }
+        })));
+    }
+
+    private void esconderDica(com.badlogic.gdx.scenes.scene2d.Actor alvo, float depois) {
+        if (popupDica == null || alvoDica != alvo) return;
+        popupDica.clearActions();
+        popupDica.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.sequence(
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.delay(depois),
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.fadeOut(0.15f),
+            com.badlogic.gdx.scenes.scene2d.actions.Actions.run(() -> { popupDica.remove(); alvoDica = null; })));
+    }
+
     private Table linhaDeEscolha(String titulo, String[] opcoes, int marcada, java.util.function.IntConsumer aoMudar) {
         // Dropdown igual o do zoom (setinha abre a lista) - antes era uma
         // fileira de checkbox por opcao.
@@ -3024,6 +3117,7 @@ public class WorldScreen extends ScreenAdapter {
             largura = Math.max(largura, medida.width + 56f); // + setinha e margens
         }
         linha.add(caixa).width(largura).height(36).left();
+        adicionarDica(linha, titulo);
         return linha;
     }
 
@@ -3045,6 +3139,7 @@ public class WorldScreen extends ScreenAdapter {
             }
         });
         linhaMov.add(estiloMov).width(180).height(36);
+        adicionarDica(linhaMov, "Moving style");
         secao.add(linhaMov).left().padTop(10).row();
         if (!mobile) {
             Table grade = new Table();
@@ -3175,7 +3270,9 @@ public class WorldScreen extends ScreenAdapter {
         corpo.add(new Label("Change your screen settings here", skin, "opcoes-label")).left().padTop(4).padBottom(20).row();
 
         Table grid = new Table();
-        grid.add(new Label("Camera Zoom", skin, "opcoes-label")).align(Align.right).width(220).pad(6);
+        Label rotuloZoom = new Label("Camera Zoom", skin, "opcoes-label");
+        adicionarDica(rotuloZoom, "Camera Zoom");
+        grid.add(rotuloZoom).align(Align.right).width(220).pad(6);
         // Dropdown de verdade (SelectBox), nao mais um botao quadrado que
         // ciclava no clique - a pedido do usuario, pra ficar igual ao
         // SelectBox real do Mirage Realms (print de referencia "Selecao de
@@ -3199,12 +3296,15 @@ public class WorldScreen extends ScreenAdapter {
                 zoom = NIVEIS_ZOOM[indiceZoom];
             }
         });
+        adicionarDica(botaoZoom, "Camera Zoom");
         grid.add(botaoZoom).width(90).height(36).pad(6).row();
 
         // Linha de Full Screen so' existe no PC - no celular nao ha janela
         // pra alternar, a opcao nao faz sentido (a pedido do usuario).
         if (!mobile) {
-            grid.add(new Label("Full Screen", skin, "opcoes-label")).align(Align.right).width(220).pad(6);
+            Label rotuloTela = new Label("Full Screen", skin, "opcoes-label");
+            adicionarDica(rotuloTela, "Full Screen");
+            grid.add(rotuloTela).align(Align.right).width(220).pad(6);
             CheckBox.CheckBoxStyle estiloCheck = new CheckBox.CheckBoxStyle();
             estiloCheck.checkboxOn = new TextureRegionDrawable(iconeCheckOn);
             estiloCheck.checkboxOff = new TextureRegionDrawable(iconeCheckOff);
