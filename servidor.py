@@ -1696,6 +1696,7 @@ def _flush_mobs():
     vxm, vym = vx + VISAO_MARGEM_SAIR, vy + VISAO_MARGEM_SAIR
     pacotes = {}
     # 1) Mobs que andaram/viraram: pra quem ja' via (passo) ou acabou de ver (absoluta).
+    cand_por_celula = {}  # mobs na mesma celula da grade: mesmos candidatos (calcula 1x)
     for mob_id, estados in fila.items():
         m = active_mobs.get(mob_id)
         if m is None:
@@ -1707,7 +1708,11 @@ def _flush_mobs():
         quem = _mob_quem_ve.setdefault(mob_id, set())
         nid = nid_do_mob(mob_id)
         entradas = None
-        for sid in set(_candidatos_visao(mx, my)) | quem:
+        cel = _celula(mx, my)
+        cand = cand_por_celula.get(cel)
+        if cand is None:
+            cand = cand_por_celula[cel] = set(_candidatos_visao(mx, my))
+        for sid in (cand | quem) if quem else cand:
             p = op.get(sid)
             if p is None:
                 quem.discard(sid)
@@ -1724,18 +1729,24 @@ def _flush_mobs():
                 _mob_ver(sid, mob_id)
                 pacotes.setdefault(sid, []).append(_entrada_mob_absoluta(mob_id, m, estados[-1][4]))
     # 2) Players que andaram: mob parado que entrou na tela deles (ou saiu).
+    # No maximo a cada 0.2s por player (o raio de visao tem folga de muitos
+    # SQMs alem da tela, entao ninguem ve o mob "aparecer"); quem ficou pra
+    # depois continua na lista do proximo pacote.
+    agora = time.time()
     for sid in checar:
         p = op.get(sid)
         if p is None: continue
+        if agora - _ultimo_checar_mobs.get(sid, 0.0) < CHECAR_MOBS_SEG:
+            _players_checar_mobs.add(sid)
+            continue
+        _ultimo_checar_mobs[sid] = agora
         px, py = float(p.get('pos_x', 0)), float(p.get('pos_y', 0))
         vistos = _mob_vistos.setdefault(sid, set())
         for mob_id in list(vistos):
             m = active_mobs.get(mob_id)
             if m is None or abs(float(m.get('pos_x', 0)) - px) > vxm or abs(float(m.get('pos_y', 0)) - py) > vym:
                 _mob_desver(sid, mob_id)
-        sala = p.get('room')
-        if not sala: continue
-        for mob_id, m in _mobs_perto(sala):
+        for mob_id, m in _mobs_na_regiao(px - vx, py - vy, px + vx, py + vy):
             if mob_id in vistos or m.get('hp', 1) <= 0: continue
             if abs(float(m.get('pos_x', 0)) - px) <= vx and abs(float(m.get('pos_y', 0)) - py) <= vy:
                 _mob_ver(sid, mob_id)
@@ -1743,7 +1754,19 @@ def _flush_mobs():
     for sid, entradas in pacotes.items():
         socketio.emit('mm', entradas, room=sid)
 
+CHECAR_MOBS_SEG = 0.2
+_ultimo_checar_mobs = {}
+
+def _mobs_na_regiao(x0, y0, x1, y1):
+    """Mobs dos chunks que encostam no retangulo (so' a tela, nao o 3x3)."""
+    for cx in range(int(x0 // CHUNK_SIZE), int(x1 // CHUNK_SIZE) + 1):
+        for cy in range(int(y0 // CHUNK_SIZE), int(y1 // CHUNK_SIZE) + 1):
+            for m_id in _mobs_por_sala.get(f"c_0_{cx}_{cy}", ()):
+                m = active_mobs.get(m_id)
+                if m is not None: yield m_id, m
+
 def _mob_esquecer_player(sid):
+    _ultimo_checar_mobs.pop(sid, None)
     for mob_id in _mob_vistos.pop(sid, set()):
         q = _mob_quem_ve.get(mob_id)
         if q: q.discard(sid)
@@ -2000,14 +2023,100 @@ def _sids_perto(sala):
         for sid in _players_por_sala.get(r, ()):
             if sid in online_players: yield sid
 
+# SQM de cada mob durante UM tick da IA (cada passo chamava _tiles_ocupados,
+# que recalculava o SQM de centenas de mobs em volta - era o maior custo com
+# muita gente). Liga so' dentro do laco da IA; quem anda no tick atualiza o
+# seu (_mob_moveu_no_tick). Fora do laco, sempre calculado na hora.
+_tile_mob_tick = {}
+_cache_tiles_ligado = [False]
+
+def _tile_mob_cache(o_id, o):
+    if not _cache_tiles_ligado[0]: return tile_do_mob(o)
+    t = _tile_mob_tick.get(o_id)
+    if t is None:
+        t = tile_do_mob(o)
+        _tile_mob_tick[o_id] = t
+    return t
+
+# Durante o tick: contagem de mobs vivos por SQM, montada 1x no tick e
+# atualizada a cada passo. _tiles_ocupados devolve uma "visao" dela em vez de
+# montar um set novo varrendo centenas de mobs a cada passo.
+_ocup_mobs_tick = {}
+_ocup_montada = [False]      # o tick ja' comecou a montar (players + salas sob demanda)
+_ocup_salas_feitas = set()   # salas cujos mobs ja' entraram na contagem
+_ocup_contados = set()       # mobs que estao na contagem
+_ocup_players_tick = set()   # SQMs com player (montado 1x no tick)
+
+def _montar_ocupacao_tick():
+    _ocup_mobs_tick.clear(); _ocup_salas_feitas.clear(); _ocup_contados.clear(); _ocup_players_tick.clear()
+    for p in online_players.values():
+        if p.get('is_dead') or invisivel(p): continue
+        if int(p.get('floor', 1) or 1) != MOB_FLOOR: continue
+        _ocup_players_tick.add(tile_de(p.get('pos_x', 0), p.get('pos_y', 0)))
+    _ocup_montada[0] = True
+
+def _ocupacao_salas(sala):
+    """Conta os mobs das salas em volta de 'sala' (so' na 1a vez no tick)."""
+    for r in salas_vizinhas(sala):
+        if r in _ocup_salas_feitas: continue
+        _ocup_salas_feitas.add(r)
+        for o_id in _mobs_por_sala.get(r, ()):
+            o = active_mobs.get(o_id)
+            if o is None or o_id in _ocup_contados or o.get('hp', 1) <= 0 or 'pos_x' not in o: continue
+            t = _tile_mob_cache(o_id, o)
+            _ocup_mobs_tick[t] = _ocup_mobs_tick.get(t, 0) + 1
+            _ocup_contados.add(o_id)
+
+def _mob_moveu_no_tick(mob_id, tile):
+    if not _cache_tiles_ligado[0]: return
+    antigo = _tile_mob_tick.get(mob_id)
+    _tile_mob_tick[mob_id] = tile
+    if mob_id in _ocup_contados:
+        if antigo is not None:
+            c = _ocup_mobs_tick.get(antigo, 0) - 1
+            if c > 0: _ocup_mobs_tick[antigo] = c
+            else: _ocup_mobs_tick.pop(antigo, None)
+        _ocup_mobs_tick[tile] = _ocup_mobs_tick.get(tile, 0) + 1
+
+class _OcupacaoTick:
+    """SQMs ocupados (mobs vivos + players perto) sem copiar nada: o SQM do
+    proprio mob (excluido) nao conta; 'livres' (sem) sao ignorados."""
+    __slots__ = ('meu', 'players', 'sem')
+    def __init__(self, meu, players, sem=frozenset()):
+        self.meu, self.players, self.sem = meu, players, sem
+    def __contains__(self, t):
+        if t in self.sem: return False
+        c = _ocup_mobs_tick.get(t, 0)
+        if c and not (t == self.meu and c == 1): return True
+        return t in self.players
+    def __sub__(self, outros):
+        return _OcupacaoTick(self.meu, self.players, self.sem | frozenset(outros))
+
+def _players_ocupando(excluir_sid, sala):
+    ocupados = set()
+    sids = _sids_perto(sala) if sala else online_players.keys()
+    for o_sid in sids:
+        p = online_players.get(o_sid)
+        if p is None or o_sid == excluir_sid or p.get('is_dead') or invisivel(p): continue
+        if int(p.get('floor', 1) or 1) != MOB_FLOOR: continue
+        ocupados.add(tile_de(p.get('pos_x', 0), p.get('pos_y', 0)))
+    return ocupados
+
 def _tiles_ocupados(excluir_mob=None, excluir_sid=None, sala=None):
+    if _cache_tiles_ligado[0] and sala and excluir_sid is None:
+        if not _ocup_montada[0]: _montar_ocupacao_tick()
+        _ocupacao_salas(sala)
+        meu = _tile_mob_tick.get(excluir_mob) if excluir_mob else None
+        if excluir_mob and meu is None and excluir_mob in active_mobs:
+            meu = _tile_mob_cache(excluir_mob, active_mobs[excluir_mob])
+        return _OcupacaoTick(meu, _ocup_players_tick)
     # sala: so' olha a area 3x3 em volta (bem mais barato). Sem sala, o
     # servidor inteiro (so' em lugar raro, fora dos loops).
     ocupados = set()
     mobs = _mobs_perto(sala) if sala else active_mobs.items()
     for o_id, o in mobs:
         if o_id == excluir_mob or o.get('hp', 1) <= 0 or 'pos_x' not in o: continue
-        ocupados.add(tile_do_mob(o))
+        ocupados.add(_tile_mob_cache(o_id, o))
     sids = _sids_perto(sala) if sala else online_players.keys()
     for o_sid in sids:
         p = online_players.get(o_sid)
@@ -2114,6 +2223,7 @@ def _mob_dar_passo(mob_id, m, destino, now, ate_adjacente=False):
         return False
     _virar_para(m, origem, proximo)
     m['pos_x'], m['pos_y'] = centro_tile(proximo)
+    _mob_moveu_no_tick(mob_id, proximo)
     passo = _duracao_passo_mob(m, origem, proximo)
     # Encadeado: comeca quando o passo anterior termina (sem buraco entre eles).
     m['move_until'] = max(now, m.get('move_until', 0)) + passo
@@ -2495,7 +2605,7 @@ def _mob_tick(mob_id, m, now):
     # quadrado de deteccao (em pixels, com 1 SQM de folga) nem e' avaliado.
     mx, my = float(m.get('pos_x', 0)), float(m.get('pos_y', 0))
     lim = (DETECCAO_SQM + 1) * TILE
-    for sid in list(_sids_perto(m['room'])) if m.get('room') else list(online_players.keys()):
+    for sid in _sids_no_quadrado(mx, my, lim):
         pp = online_players.get(sid)
         if pp is None: continue
         if abs(float(pp.get('pos_x', 0)) - mx) > lim or abs(float(pp.get('pos_y', 0)) - my) > lim: continue
@@ -2536,6 +2646,7 @@ def _mob_passear(mob_id, m, origem, now):
         if na_pz(m, destino): continue
         _virar_para(m, origem, destino)
         m['pos_x'], m['pos_y'] = centro_tile(destino)
+        _mob_moveu_no_tick(mob_id, destino)
         passo = _duracao_passo_mob(m, origem, destino)
         m['move_until'] = max(now, m.get('move_until', 0)) + passo
         m['path'] = None
@@ -2576,9 +2687,15 @@ def mob_focar_agressor(mob_id, m, sid):
 def mob_ai_loop():
     while True:
         socketio.sleep(MOB_TICK_SEG)
-        now = time.time()
+        _rodar_tick_mobs(time.time())
+
+def _rodar_tick_mobs(now):
+    if True:
         _reindexar_areas()
         ativas = _salas_ativas()
+        _tile_mob_tick.clear()
+        _ocup_montada[0] = False
+        _cache_tiles_ligado[0] = True
         # So' os mobs das salas ativas (o indice _mobs_por_sala acabou de ser
         # refeito): os longe de todo mundo sao estatuas e nem entram no laco
         # (antes o laco passava por TODOS os mobs do mapa 20x/s so' pra pula-los).
@@ -2588,11 +2705,19 @@ def mob_ai_loop():
                 if m is None: continue
                 # Acordando de estatua: sem "dt" gigante no primeiro tick.
                 if now - m.get('last_tick', now) > 1.0: m['last_tick'] = now
+                # Mob ocioso (sem alvo, parado, nao voltando pra casa) so' precisa
+                # pensar ~5x/s: a busca de alvo ja' e' a cada ~0.2s e o passeio a
+                # cada 5-10s. Levar golpe da' alvo na hora e ele volta pros 20 Hz.
+                ocioso = (m.get('target_sid') is None and not m.get('returning')
+                          and now >= m.get('move_until', 0))
+                if ocioso and now < m.get('prox_pensar', 0): continue
                 try:
                     _mob_tick(mob_id, m, now)
                     _avisar_alvo_do_mob(mob_id, m)
                 except Exception:
                     traceback.print_exc()
+                if ocioso: m['prox_pensar'] = now + random.uniform(0.15, 0.25)
+        _cache_tiles_ligado[0] = False
         try:
             _flush_mobs()
         except Exception:
@@ -5641,6 +5766,18 @@ def _atualizar_celula(sid, p):
             if not conj: _grade_visao.pop(antiga, None)
     _grade_visao.setdefault(nova, set()).add(sid)
     _celula_de[sid] = nova
+
+def _sids_no_quadrado(x, y, lim):
+    """Players nas celulas da grade de visao (16 SQMs) que encostam no quadrado
+    x+-lim, y+-lim - bem menos gente que a area 3x3 de chunks (150 SQMs)."""
+    c0x, c0y = _celula(x - lim, y - lim)
+    c1x, c1y = _celula(x + lim, y + lim)
+    out = []
+    for cx in range(c0x, c1x + 1):
+        for cy in range(c0y, c1y + 1):
+            conj = _grade_visao.get((cx, cy))
+            if conj: out.extend(conj)
+    return out
 
 def _candidatos_visao(x, y):
     alcance_x = int((VISAO_X + VISAO_MARGEM_SAIR) // _CELULA_VISAO) + 1
