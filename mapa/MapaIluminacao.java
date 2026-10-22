@@ -72,6 +72,18 @@ public class MapaIluminacao implements Disposable {
 
     public Color corAmbiente = new Color(AMBIENTE_PADRAO);
 
+    /** Options > Lighting quality: 0 High (resolucao cheia), 1 Medium (1/2),
+     * 2 Low (1/4), 3 Off (sem luzes: so' a cor do dia/noite por cima). */
+    public int qualidade = 0;
+    private Texture texturaBranca;
+    private boolean passouLuzNesteFrame = false;
+
+    /** Dia claro fora da caverna: a cor ambiente e' branca e luz nenhuma muda
+     * nada (multiplicar por branco) - pula o FrameBuffer e o composite inteiros. */
+    private boolean semEfeito() {
+        return corAmbiente.r >= 0.995f && corAmbiente.g >= 0.995f && corAmbiente.b >= 0.995f;
+    }
+
     /** Hora do ciclo vinda do servidor (world_time). */
     public void definirTempoCiclo(float segundos) {
         tempoCiclo = ((segundos % CICLO_SEG) + CICLO_SEG) % CICLO_SEG;
@@ -144,7 +156,11 @@ public class MapaIluminacao implements Disposable {
         // Resolucao cheia (a pedido do usuario: em meia resolucao a borda da
         // luz perdia os pixels). O que pesava era o mapa trocando de textura
         // (ver UnificadorTilesets) e as luzes fora da tela, ja' resolvidos.
-        garantirFbo(Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
+        passouLuzNesteFrame = false;
+        if (semEfeito() || qualidade >= 3) return;
+        int div = qualidade == 1 ? 2 : qualidade == 2 ? 4 : 1;
+        garantirFbo(Math.max(1, Gdx.graphics.getBackBufferWidth() / div), Math.max(1, Gdx.graphics.getBackBufferHeight() / div));
+        passouLuzNesteFrame = true;
 
         fbo.begin();
         Gdx.gl.glClearColor(corAmbiente.r, corAmbiente.g, corAmbiente.b, 1f);
@@ -177,13 +193,29 @@ public class MapaIluminacao implements Disposable {
      * tela nesse frame - chamar por ULTIMO, depois de tudo (mapa, player,
      * nome) e antes da UI (HUD/chat nao devem escurecer). */
     public void compositar(Batch batch, OrthographicCamera camera) {
+        if (semEfeito()) return;
         batch.setProjectionMatrix(camera.combined);
         batch.setBlendFunction(GL20.GL_DST_COLOR, GL20.GL_ZERO);
         batch.begin();
         float meiaLargura = camera.viewportWidth * camera.zoom / 2f;
         float meiaAltura = camera.viewportHeight * camera.zoom / 2f;
-        batch.draw(fboRegiao, camera.position.x - meiaLargura, camera.position.y - meiaAltura,
-                meiaLargura * 2f, meiaAltura * 2f);
+        if (passouLuzNesteFrame && fboRegiao != null) {
+            batch.draw(fboRegiao, camera.position.x - meiaLargura, camera.position.y - meiaAltura,
+                    meiaLargura * 2f, meiaAltura * 2f);
+        } else {
+            // Off: so' escurece com a cor do momento (noite/caverna), sem as luzes.
+            if (texturaBranca == null) {
+                Pixmap px = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+                px.setColor(Color.WHITE);
+                px.fill();
+                texturaBranca = new Texture(px);
+                px.dispose();
+            }
+            batch.setColor(corAmbiente);
+            batch.draw(texturaBranca, camera.position.x - meiaLargura, camera.position.y - meiaAltura,
+                    meiaLargura * 2f, meiaAltura * 2f);
+            batch.setColor(Color.WHITE);
+        }
         batch.end();
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
     }
@@ -192,5 +224,6 @@ public class MapaIluminacao implements Disposable {
     public void dispose() {
         texturaLuz.dispose();
         if (fbo != null) fbo.dispose();
+        if (texturaBranca != null) texturaBranca.dispose();
     }
 }

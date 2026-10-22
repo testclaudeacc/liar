@@ -383,6 +383,7 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Sombra oval (4/6/4 px) no chao, centrada no SQM - igual a que vinha desenhada na sheet. */
     private void desenharSombraVoo(float ancoraX, float ancoraY) {
+        if (efeitosReduzidos) return;
         batch.setColor(COR_SOMBRA_VOO);
         float e = ESCALA_SPRITE;
         batch.draw(pixelBranco, ancoraX - 2f * e, ancoraY + 2f * e, 4f * e, e);
@@ -457,7 +458,7 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Barrinha de vida (14px) com fundo preto, igual a dos mobs. */
     private void desenharBarraVida(float ancoraX, float barraY, float pct) {
-        float barraLargura = 14f;
+        float barraLargura = Math.round(LARGURA_BARRA_HP * multBarraHp);
         float barraX = ancoraX - barraLargura / 2f;
         pct = Math.max(0f, Math.min(1f, pct));
         batch.setColor(0f, 0f, 0f, 0.8f);
@@ -593,6 +594,7 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void desenharSangue(float delta) {
+        if (efeitosReduzidos) { sangues.clear(); return; } // Options > Effects: Reduced
         for (int i = sangues.size() - 1; i >= 0; i--) {
             Sangue sg = sangues.get(i);
             sg.restante -= delta;
@@ -1029,6 +1031,7 @@ public class WorldScreen extends ScreenAdapter {
         conversor = mapa.conversor;
         colisao = new ColisaoGrid(mapa.propriedades.hitboxesMundo, mapa.propriedades.bordasFinas, conversor);
         iluminacao = new MapaIluminacao();
+        iluminacao.qualidade = Controles.qualidadeLuz();
 
         // SpawnPoints do World.tmx (spec secao 5) - usa "initial" se existir;
         // senao NAO adivinha nome nenhum (o spawn_id cadastrado no mapa ja
@@ -2269,7 +2272,14 @@ public class WorldScreen extends ScreenAdapter {
     // via camera.combined, igual o NameLabel do Godot (filho do mesmo
     // Node2D afetado pela Camera2D) - nao precisa mais recalcular nada por
     // frame.
-    private static final float NOME_ESCALA_BASE = 0.2f;
+    private static final float NOME_ESCALA_PADRAO = 0.2f;
+    // Escala dos textos do mundo (nomes, numeros de dano, falas, texto de acao):
+    // NOME_ESCALA_PADRAO x Options > UI font size.
+    private float NOME_ESCALA_BASE = NOME_ESCALA_PADRAO * Controles.multFonte();
+    // Options > Health bar size (largura das barrinhas de vida em cima da cabeca).
+    private float multBarraHp = Controles.multBarraHp();
+    private boolean efeitosReduzidos = Controles.efeitosReduzidos();
+    private static final float LARGURA_BARRA_HP = 14f;
 
     /** Nametag acima da cabeca - mesma fonte/cor/contorno do NameLabel real
      * (player.tscn::CanvasLayer/OverHeadUI/NameLabel): Tahoma Bold
@@ -2284,6 +2294,15 @@ public class WorldScreen extends ScreenAdapter {
      * resto quando o zoom muda. */
     /** Mesma Tahoma Bold dos nomes, gerada a 64px (2x) e reduzida pra 1.5x o
      * tamanho do nome - reduzir textura fica nitido, ampliar borrava. */
+    /** UI font size mudou: textos do mundo na hora; os numeros/cooldown das
+     * GUIs e o chat (fontes geradas no UiSkin) na proxima entrada no mundo. */
+    private void aplicarTamanhoFonte() {
+        NOME_ESCALA_BASE = NOME_ESCALA_PADRAO * Controles.multFonte();
+        font.getData().setScale(NOME_ESCALA_BASE);
+        if (fonteDestaque != null) fonteDestaque.getData().setScale(NOME_ESCALA_BASE * 32f / 64f * ESCALA_DESTAQUE);
+        if (chat != null) chat.adicionarMensagemSistema("UI font size: names/numbers updated; bag numbers and chat text update after re-entering the world.");
+    }
+
     private BitmapFont criarFonteDestaque() {
         FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal("fonts/TAHOMAB0.TTF"));
         FreeTypeFontGenerator.FreeTypeFontParameter parametros = new FreeTypeFontGenerator.FreeTypeFontParameter();
@@ -2930,6 +2949,24 @@ public class WorldScreen extends ScreenAdapter {
         secao.add(linhaDeEscolha("Show HP bar", nomesBarra, modoBarraHp, i -> {
             modoBarraHp = i;
             Controles.definirModoBarraHp(i);
+        })).left().padTop(6).row();
+        // Tamanhos (5 niveis, 2 = padrao): barra de vida em cima da cabeca e textos dinamicos.
+        secao.add(linhaDeEscolha("Health bar size", Controles.NOMES_TAMANHO, Controles.tamanhoBarraHp(), i -> {
+            Controles.definirTamanhoBarraHp(i);
+            multBarraHp = Controles.multBarraHp();
+        })).left().padTop(6).row();
+        secao.add(linhaDeEscolha("UI font size", Controles.NOMES_TAMANHO, Controles.tamanhoFonte(), i -> {
+            Controles.definirTamanhoFonte(i);
+            aplicarTamanhoFonte();
+        })).left().padTop(6).row();
+        // Desempenho: menos visual = mais FPS (celular fraco).
+        secao.add(linhaDeEscolha("Lighting quality", new String[]{"High", "Medium", "Low", "Off"}, Controles.qualidadeLuz(), i -> {
+            Controles.definirQualidadeLuz(i);
+            iluminacao.qualidade = i;
+        })).left().padTop(6).row();
+        secao.add(linhaDeEscolha("Effects", new String[]{"Full", "Reduced"}, efeitosReduzidos ? 1 : 0, i -> {
+            Controles.definirEfeitosReduzidos(i == 1);
+            efeitosReduzidos = i == 1;
         })).left().padTop(6).row();
         // Limite de FPS: 60 (bateria) ou o maximo da tela (90/120/144 Hz).
         secao.add(linhaDeEscolha("FPS limit", new String[]{"60", "Max"}, com.teste.game.InvertedRealmsGame.fpsSemLimite() ? 1 : 0, i -> {
@@ -4863,7 +4900,7 @@ public class WorldScreen extends ScreenAdapter {
         mapa.atualizarTrocasDia(iluminacao.fatorNoite() <= 0.02f);
         mapa.desenharMapa(camera);
         // Vagalumes etc (appear_at_night): aparecem conforme escurece.
-        mapa.desenharNoturnos(camera, iluminacao.fatorNoite());
+        if (!efeitosReduzidos) mapa.desenharNoturnos(camera, iluminacao.fatorNoite());
         if (perf != null) perf.marca("map");
 
         batch.setProjectionMatrix(camera.combined);
@@ -5780,7 +5817,7 @@ public class WorldScreen extends ScreenAdapter {
         }
         // Barra de vida (logo acima da cabeca; o nome vai por cima dela).
         if (!mob.morto && mostrarBarraMob(mob)) {
-            float barraLargura = 14f;
+            float barraLargura = Math.round(LARGURA_BARRA_HP * multBarraHp);
             float barraX = ancoraX - barraLargura / 2f;
             float barraY = ancoraY + altura + 1f;
             float pct = Math.max(0f, Math.min(1f, mob.hp / mob.maxHp));
@@ -6608,20 +6645,20 @@ public class WorldScreen extends ScreenAdapter {
             Image icone = new Image(caveira);
             icone.setScaling(com.badlogic.gdx.utils.Scaling.fit);
             icone.setColor(new Color(0.85f, 0.15f, 0.15f, 1f));
-            conteudoMorte.add(icone).size(mobile ? 72 : 56).padBottom(6).row();
+            conteudoMorte.add(icone).size(mobile ? 48 : 56).padBottom(6).row();
         }
         Label titulo = new Label("YOU DIED", skin, "titulo");
-        titulo.setFontScale(mobile ? 0.75f : 0.6f);
+        titulo.setFontScale(mobile ? 0.5f : 0.6f);
         titulo.setColor(new Color(0.82f, 0.08f, 0.08f, 1f));
         conteudoMorte.add(titulo).row();
 
         // Linha fina vermelha separando o titulo do resto.
         Image linha = new Image(UiSkin.retangulo(new Color(0.55f, 0.06f, 0.06f, 1f), new Color(0.55f, 0.06f, 0.06f, 1f), 0));
-        conteudoMorte.add(linha).width(mobile ? 340 : 280).height(2).padTop(4).padBottom(10).row();
+        conteudoMorte.add(linha).width(mobile ? 230 : 280).height(2).padTop(4).padBottom(8).row();
 
         textoMortoPor = new Label("", skin, "subtitulo");
         textoMortoPor.setColor(new Color(0.78f, 0.72f, 0.72f, 1f));
-        textoMortoPor.setFontScale(mobile ? 0.8f : 0.65f);
+        textoMortoPor.setFontScale(mobile ? 0.55f : 0.65f);
         conteudoMorte.add(textoMortoPor).padBottom(22).row();
 
         TextButton renascer = new TextButton("Respawn", skin, "vermelho-popup");

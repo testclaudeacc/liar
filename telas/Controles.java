@@ -207,6 +207,28 @@ public final class Controles {
         p.flush();
     }
 
+    // ---- Opcoes graficas (Options) ----
+    /** Nomes dos 5 tamanhos (Health Bar Size / UI Font Size); 2 = padrao. */
+    public static final String[] NOMES_TAMANHO = {"Smaller", "Small", "Default", "Big", "Bigger"};
+    private static final float[] MULT_BARRA = {0.6f, 0.8f, 1f, 1.3f, 1.6f};
+    private static final float[] MULT_FONTE = {0.8f, 0.9f, 1f, 1.15f, 1.3f};
+
+    public static int tamanhoBarraHp() { return Math.max(0, Math.min(4, prefs().getInteger("hp_bar_size", 2))); }
+    public static float multBarraHp() { return MULT_BARRA[tamanhoBarraHp()]; }
+    public static void definirTamanhoBarraHp(int i) { Preferences p = prefs(); p.putInteger("hp_bar_size", i); p.flush(); }
+
+    public static int tamanhoFonte() { return Math.max(0, Math.min(4, prefs().getInteger("ui_font_size", 2))); }
+    public static float multFonte() { return MULT_FONTE[tamanhoFonte()]; }
+    public static void definirTamanhoFonte(int i) { Preferences p = prefs(); p.putInteger("ui_font_size", i); p.flush(); }
+
+    /** 0 High, 1 Medium, 2 Low, 3 Off (so' a cor do dia/noite, sem as luzes). */
+    public static int qualidadeLuz() { return Math.max(0, Math.min(3, prefs().getInteger("light_quality", 0))); }
+    public static void definirQualidadeLuz(int i) { Preferences p = prefs(); p.putInteger("light_quality", i); p.flush(); }
+
+    /** Effects Reduced: sem sangue no chao, sem tiles noturnos (vagalumes) e sem sombra de mob voando. */
+    public static boolean efeitosReduzidos() { return prefs().getBoolean("effects_reduced", false); }
+    public static void definirEfeitosReduzidos(boolean v) { Preferences p = prefs(); p.putBoolean("effects_reduced", v); p.flush(); }
+
     public static int modoAutoTarget() { return prefs().getInteger("auto_target", 1); }
 
     public static void definirModoAutoTarget(int modo) {

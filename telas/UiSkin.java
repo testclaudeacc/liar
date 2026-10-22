@@ -198,15 +198,17 @@ public class UiSkin {
         // Quantidade nos slots (bag, hotbar, botoes) e cooldown das pocoes:
         // mesma fonte com contorno preto, pra ler em cima de qualquer icone.
         // Contorno de 1px (era 2: grosso demais nos numeros pequenos).
-        BitmapFont fonteQuantidade = gerarFonte("fonts/dejavu-sans.condensed.ttf", 16, 1, escala);
+        // Options > UI font size: numeros dos slots, cooldown e chat (gerados no tamanho certo, sem borrar).
+        float multFonte = Controles.multFonte();
+        BitmapFont fonteQuantidade = gerarFonte("fonts/dejavu-sans.condensed.ttf", Math.round(16 * multFonte), 1, escala);
         fonteQuantidade.setUseIntegerPositions(false);
         skin.add("quantidade-font", fonteQuantidade);
         skin.add("quantidade", new Label.LabelStyle(fonteQuantidade, Color.WHITE));
         // Slots redondos da hotbar no celular: numeros (quantidade/mana) maiores.
-        BitmapFont fonteQuantidadeGrande = gerarFonte("fonts/dejavu-sans.condensed.ttf", 21, 1, escala);
+        BitmapFont fonteQuantidadeGrande = gerarFonte("fonts/dejavu-sans.condensed.ttf", Math.round(21 * multFonte), 1, escala);
         fonteQuantidadeGrande.setUseIntegerPositions(false);
         skin.add("quantidade-grande", new Label.LabelStyle(fonteQuantidadeGrande, Color.WHITE));
-        BitmapFont fonteCooldown = gerarFonte("fonts/dejavu-sans.condensed.ttf", 17, 2, escala);
+        BitmapFont fonteCooldown = gerarFonte("fonts/dejavu-sans.condensed.ttf", Math.round(17 * multFonte), 2, escala);
         fonteCooldown.setUseIntegerPositions(false);
         skin.add("cooldown-font", fonteCooldown);
         // Log do chat - sem contorno (fundo escuro + texto branco ja tem
@@ -215,7 +217,7 @@ public class UiSkin {
         // pelo usuario nao virar tag de cor por engano) pra colorir
         // timestamp/nome por dentro da MESMA linha (ver ChatUI).
         // Com cirilico (chat Russian) - DejaVu tem os glifos.
-        BitmapFont fonteChatLog = gerarFonte("fonts/dejavu-sans.condensed.ttf", 20, 0, escala, CIRILICO);
+        BitmapFont fonteChatLog = gerarFonte("fonts/dejavu-sans.condensed.ttf", Math.round(20 * multFonte), 0, escala, CIRILICO);
         fonteChatLog.getData().markupEnabled = true;
         skin.add("chat-log", new Label.LabelStyle(fonteChatLog, Color.WHITE));
         // "+"/"-" do ChatUI - gerada JA no tamanho final (34px), em vez de
