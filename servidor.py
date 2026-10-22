@@ -960,9 +960,27 @@ def calcular_max_vitais(p):
 
 app = Flask(__name__)
 CORS(app)
+# JSON mais rapido (orjson, ~3-5x) pra todo emit, se estiver instalado
+# (pip install orjson). Mesmo formato na rede: o client nao percebe nada.
+try:
+    import orjson as _orjson
+
+    class _JsonRapido:
+        @staticmethod
+        def dumps(obj, *args, **kwargs):
+            return _orjson.dumps(obj, option=_orjson.OPT_NON_STR_KEYS).decode()
+
+        @staticmethod
+        def loads(s, *args, **kwargs):
+            return _orjson.loads(s)
+    _json_socket = _JsonRapido
+    print("[SERVIDOR] orjson ativo (JSON rapido nos emits)")
+except ImportError:
+    _json_socket = json
+
 socketio = SocketIO(
     app, cors_allowed_origins="*", ping_interval=10, 
-    ping_timeout=15, async_mode='eventlet'
+    ping_timeout=15, async_mode='eventlet', json=_json_socket
 )
 
 # =========================================================================
@@ -2473,7 +2491,14 @@ def _mob_tick(mob_id, m, now):
     # Area quadrada (DETECCAO_SQM pra cada lado, cantos inclusos); entre os
     # que estao dentro, o mais perto em linha reta.
     melhor, melhor_dist = None, float('inf')
+    # Filtro barato antes das checagens caras: player claramente fora do
+    # quadrado de deteccao (em pixels, com 1 SQM de folga) nem e' avaliado.
+    mx, my = float(m.get('pos_x', 0)), float(m.get('pos_y', 0))
+    lim = (DETECCAO_SQM + 1) * TILE
     for sid in list(_sids_perto(m['room'])) if m.get('room') else list(online_players.keys()):
+        pp = online_players.get(sid)
+        if pp is None: continue
+        if abs(float(pp.get('pos_x', 0)) - mx) > lim or abs(float(pp.get('pos_y', 0)) - my) > lim: continue
         p = _player_alvo_valido(sid, m)
         if p is None: continue
         if _dist_sqm(m, p) > DETECCAO_SQM: continue
@@ -5658,6 +5683,9 @@ def _flush_visao():
     movidos, passos = _movidos, _passos_pendentes
     _movidos, _passos_pendentes = set(), {}
     op = online_players
+    # /ghost e' raro: calcula uma vez por pacote quem esta' invisivel (antes era
+    # 1 checagem por par de players - centenas de milhares com muita gente junta).
+    invisiveis = {sid for sid, pp in op.items() if invisivel(pp)}
     for m in movidos:
         if m in op: _atualizar_celula(m, op[m])
 
@@ -5679,7 +5707,7 @@ def _flush_visao():
         mx, my = float(pm.get('pos_x', 0)), float(pm.get('pos_y', 0))
         vendo_m = _vendo.setdefault(m, set())
         visto_m = _visto_por.setdefault(m, set())
-        m_invisivel = invisivel(pm)  # /ghost: ninguem ve m (m continua vendo todo mundo)
+        m_invisivel = m in invisiveis  # /ghost: ninguem ve m (m continua vendo todo mundo)
         # Passos de m montados UMA vez e reaproveitados pra todo mundo que ja' via.
         lista_passos = passos.get(m)
         entradas_m = [[nome_m, x, y, d, 0] for (x, y, d) in lista_passos] if lista_passos else None
@@ -5712,7 +5740,7 @@ def _flush_visao():
                 visto_m.add(v); _vendo.setdefault(v, set()).add(m)
                 mandar_foto(v, m, pm)
             # -- o que m ve (m andou: quem esta parado pode entrar/sair) --
-            v_invisivel = invisivel(pv)
+            v_invisivel = v in invisiveis
             dentro, dentro_margem = dentro_real and not v_invisivel, margem_real and not v_invisivel
             if v in vendo_m:
                 if not dentro_margem:
