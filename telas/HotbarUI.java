@@ -1,5 +1,7 @@
 package com.teste.game.telas;
 
+import static com.teste.game.telas.Idioma.tr;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -277,7 +279,7 @@ public final class HotbarUI {
 
         Table linha1 = new Table();
         linha1.defaults().height(44).pad(3);
-        linha1.add(new Label("Buttons " + layout.size() + "/" + Controles.MAX_BOTOES_MOBILE, skin, "opcoes-label")).padRight(10);
+        linha1.add(new Label(tr("Buttons {0}/{1}", layout.size(), Controles.MAX_BOTOES_MOBILE), skin, "opcoes-label")).padRight(10);
         if (layout.size() < Controles.MAX_BOTOES_MOBILE) { // 9/9: some o Add
             linha1.add(botaoPainel("+ Add", "verde-popup", () -> {
                 if (layout.size() >= Controles.MAX_BOTOES_MOBILE) return;
@@ -285,32 +287,32 @@ public final class HotbarUI {
                 layoutMudou(layout.size() - 1);
             })).width(110);
         }
-        linha1.add(botaoPainel("Reset", "cinza-popup", () -> {
+        linha1.add(botaoPainel(tr("Reset"), "cinza-popup", () -> {
             layout = Controles.layoutPadrao();
             Controles.restaurarJoystick();
             if (joystick != null) joystick.aplicarConfig();
             layoutMudou(-1);
         })).width(100).padLeft(16);
-        linha1.add(botaoPainel("Done", "verde-popup", this::sairEdicao)).width(100);
+        linha1.add(botaoPainel(tr("Done"), "verde-popup", this::sairEdicao)).width(100);
         caixa.add(linha1).row();
 
         if (joystick != null) joystick.setSelecionado(selecionado == SEL_JOYSTICK);
         if (selecionado == SEL_JOYSTICK) {
             Table linha2 = new Table();
             linha2.defaults().height(44).pad(3);
-            linha2.add(new Label("Joystick size", skin, "opcoes-label")).padRight(8);
+            linha2.add(new Label(tr("Joystick size"), skin, "opcoes-label")).padRight(8);
             linha2.add(botaoPainel("-", "vermelho-popup", () -> mudarTamanhoJoystick(-0.1f))).width(48);
             linha2.add(new Label(Math.round(Controles.joystickEscala() * 100f) + "%", skin, "opcoes-label")).width(64);
             linha2.add(botaoPainel("+", "verde-popup", () -> mudarTamanhoJoystick(0.1f))).width(48);
             caixa.add(linha2).row();
         } else if (selecionado < 0) {
-            caixa.add(new Label("Tap a button or the joystick to edit it, drag to move it", skin, "opcoes-label")).padTop(4).row();
+            caixa.add(new Label(tr("Tap a button or the joystick to edit it, drag to move it"), skin, "opcoes-label")).padTop(4).row();
         } else {
             final int i = selecionado;
             final Controles.BotaoMobile c = layout.get(i);
             Table linha2 = new Table();
             linha2.defaults().height(44).pad(3);
-            linha2.add(new Label("Size", skin, "opcoes-label")).padRight(8);
+            linha2.add(new Label(tr("Size"), skin, "opcoes-label")).padRight(8);
             // Em % do tamanho padrao, de 10 em 10 (igual o joystick).
             float passo = Controles.TAM_BOTAO_PADRAO * 0.1f;
             linha2.add(botaoPainel("-", "vermelho-popup", () -> {
@@ -322,7 +324,7 @@ public final class HotbarUI {
                 c.tamanho = Math.min(Controles.TAM_BOTAO_MAX, c.tamanho + passo);
                 layoutMudou(i);
             })).width(48);
-            linha2.add(botaoPainel("Delete", "vermelho-popup", () -> {
+            linha2.add(botaoPainel(tr("Delete"), "vermelho-popup", () -> {
                 if (layout.size() <= 1) return; // pelo menos 1 botao
                 layout.remove(i);
                 layoutMudou(-1);

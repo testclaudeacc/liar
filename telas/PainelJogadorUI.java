@@ -1,5 +1,7 @@
 package com.teste.game.telas;
 
+import static com.teste.game.telas.Idioma.tr;
+
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -287,25 +289,25 @@ public class PainelJogadorUI {
         if (nome == null || !nome.equals(nomeAtual)) return;
         TextureRegion r = atlas.findRegion(online ? "ui/OnlineIcon" : "ui/OfflineIcon");
         iconeStatus.setDrawable(r != null ? new TextureRegionDrawable(r) : null);
-        textoStatus.setText(online ? "Online" : "Offline");
+        textoStatus.setText(online ? tr("Online") : tr("Offline"));
         textoStatus.setColor(online ? Color.valueOf("5ee36a") : new Color(0.75f, 0.75f, 0.75f, 1f));
-        textoVisto.setText(online || vistoHaSeg < 0 ? "" : "Last seen " + tempoAtras(vistoHaSeg));
+        textoVisto.setText(online || vistoHaSeg < 0 ? "" : tr("Last seen {0}", tempoAtras(vistoHaSeg)));
         statusFoto.setVisible(true);
     }
 
     private static String tempoAtras(long seg) {
-        if (seg < 60) return "just now";
-        if (seg < 3600) return (seg / 60) + "m ago";
-        if (seg < 86400) return (seg / 3600) + "h ago";
-        return (seg / 86400) + "d ago";
+        if (seg < 60) return tr("just now");
+        if (seg < 3600) return tr("{0}m ago", seg / 60);
+        if (seg < 86400) return tr("{0}h ago", seg / 3600);
+        return tr("{0}d ago", seg / 86400);
     }
 
     /** Estado dos botoes (amigo/ignorado ficam verdes; IconBtn so' pra amigo). */
     public void definirEstado(boolean amigo, boolean ignorado, boolean pk, boolean guild, boolean seller) {
         botaoAmigo.setStyle(amigo ? estiloAdded : estiloAddFriend);
-        botaoAmigo.setText(amigo ? "Added" : "Add Friend");
+        botaoAmigo.setText(amigo ? tr("Added") : tr("Add Friend"));
         botaoIgnorar.setStyle(ignorado ? estiloBlocked : estiloBlock);
-        botaoIgnorar.setText(ignorado ? "Blocked" : "Block");
+        botaoIgnorar.setText(ignorado ? tr("Blocked") : tr("Block"));
         botaoIconBtn.setVisible(amigo);
         if (!amigo) barraIcones.setVisible(false);
         miniPk.setStyle(pk ? estiloSlotAtivo : estiloSlot);

@@ -1,5 +1,7 @@
 package com.teste.game.telas;
 
+import static com.teste.game.telas.Idioma.tr;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.ScreenAdapter;
@@ -430,7 +432,7 @@ public class AuthScreen extends ScreenAdapter {
                         });
                     }
                     @Override public void canceled() { }
-                }, titulo, campo.getText(), "", tipo);
+                }, tr(titulo), campo.getText(), "", tipo);
             }
         });
     }
@@ -454,9 +456,9 @@ public class AuthScreen extends ScreenAdapter {
         definirRodape();
 
         Table painel = criarPainel();
-        TextButton playBtn = new TextButton("PLAY", skin, "verde");
-        TextButton registerBtn = new TextButton("Register", skin, "laranja");
-        TextButton exitBtn = new TextButton("Exit", skin, "vermelho");
+        TextButton playBtn = new TextButton(tr("PLAY"), skin, "verde");
+        TextButton registerBtn = new TextButton(tr("Register"), skin, "laranja");
+        TextButton exitBtn = new TextButton(tr("Exit"), skin, "vermelho");
 
         playBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { iniciarFluxo(); }
@@ -475,7 +477,21 @@ public class AuthScreen extends ScreenAdapter {
         painel.pad(10);
         painel.add(playBtn).width(largura).height(altura).padBottom(5).row();
         painel.add(registerBtn).width(largura).height(altura).padBottom(5).row();
-        painel.add(exitBtn).width(largura).height(altura);
+        painel.add(exitBtn).width(largura).height(altura).row();
+        // Idioma (antes mesmo do login): troca e redesenha o menu na hora.
+        com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> idioma = new SelectSeta(skin, "zoom-select");
+        idioma.setItems(Idioma.NOMES);
+        idioma.setSelectedIndex(Idioma.atual());
+        idioma.setAlignment(Align.center);
+        idioma.getList().setAlignment(Align.center);
+        idioma.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                if (idioma.getSelectedIndex() == Idioma.atual()) return;
+                Idioma.definir(idioma.getSelectedIndex());
+                Gdx.app.postRunnable(AuthScreen.this::telaMenuPrincipal);
+            }
+        });
+        painel.add(idioma).width(largura).height(mobile ? 44f : 36f).padTop(10);
         content.add(painel);
     }
 
@@ -483,13 +499,13 @@ public class AuthScreen extends ScreenAdapter {
     // Fluxo de conexao: ping -> check_version -> sessao salva? char select : login
     // ---------------------------------------------------------------------
     private void iniciarFluxo() {
-        telaCarregando("Connecting...");
+        telaCarregando(tr("Connecting..."));
         ServerApi.ping(new ServerApi.ApiCallback() {
             @Override public void onResponse(int statusCode, JsonValue body) {
                 if (statusCode == 200) {
                     verificarVersao();
                 } else {
-                    telaErro("Failed to connect to the server.", AuthScreen.this::telaMenuPrincipal);
+                    telaErro(tr("Failed to connect to the server."), AuthScreen.this::telaMenuPrincipal);
                 }
             }
             @Override public void onFailure(String motivo) {
@@ -499,7 +515,7 @@ public class AuthScreen extends ScreenAdapter {
     }
 
     private void verificarVersao() {
-        telaCarregando("Checking Version...");
+        telaCarregando(tr("Checking Version..."));
         ServerApi.checkVersion(new ServerApi.ApiCallback() {
             @Override public void onResponse(int statusCode, JsonValue body) {
                 if (statusCode == 200) {
@@ -536,7 +552,7 @@ public class AuthScreen extends ScreenAdapter {
 
     private void telaErro(String texto, Runnable aoOk) {
         limparConteudo();
-        Label label = new Label(texto, skin);
+        Label label = new Label(Idioma.trServidor(texto), skin); // mensagem do servidor (ingles) tambem traduz
         label.setWrap(true);
         label.setAlignment(Align.center);
         TextButton ok = new TextButton("OK", skin);
@@ -566,15 +582,15 @@ public class AuthScreen extends ScreenAdapter {
         campoNativo(senha, "Password");
         marcarValidacao(email, () -> EMAIL_REGEX.matcher(email.getText().trim()).matches());
         marcarValidacao(senha, () -> senha.getText().length() >= 5);
-        TextButton esqueciBtn = new TextButton("Forgot Password?", skin, "link");
+        TextButton esqueciBtn = new TextButton(tr("Forgot Password?"), skin, "link");
         esqueciBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { forgotStep = 0; telaEsqueciSenha(); }
         });
 
         Table grid = new Table();
-        grid.add(new Label("Email", skin)).left().pad(3);
+        grid.add(new Label(tr("Email"), skin)).left().pad(3);
         grid.add(email).width(300).pad(3).row();
-        grid.add(new Label("Password", skin)).left().pad(3);
+        grid.add(new Label(tr("Password"), skin)).left().pad(3);
         grid.add(senha).width(300).pad(3).row();
         grid.add(esqueciBtn).colspan(2).center().padTop(6);
 
@@ -582,17 +598,17 @@ public class AuthScreen extends ScreenAdapter {
         painel.add(grid).pad(14);
         content.add(painel);
 
-        TextButton voltarBtn = new TextButton("Back", skin);
+        TextButton voltarBtn = new TextButton(tr("Back"), skin);
         voltarBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaMenuPrincipal(); }
         });
-        TextButton loginBtn = new TextButton("Login", skin, "verde");
+        TextButton loginBtn = new TextButton(tr("Login"), skin, "verde");
         loginBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 String em = email.getText().trim();
                 String pw = senha.getText();
                 if (em.isEmpty() || pw.isEmpty() || !EMAIL_REGEX.matcher(em).matches()) {
-                    telaErro("Fill all fields with a valid email.", AuthScreen.this::telaLogin);
+                    telaErro(tr("Fill all fields with a valid email."), AuthScreen.this::telaLogin);
                     return;
                 }
                 loginBtn.setDisabled(true);
@@ -605,9 +621,9 @@ public class AuthScreen extends ScreenAdapter {
                             Sessao.salvar(currentUserId, body.getString("email", em), body.getString("token", ""));
                             fetchCharacters();
                         } else if (statusCode == 403 && body != null && body.getBoolean("unverified", false)) {
-                            telaVerificarEmail(em, "Your email is not verified yet.");
+                            telaVerificarEmail(em, tr("Your email is not verified yet."));
                         } else {
-                            telaErro("Invalid email or password.", AuthScreen.this::telaLogin);
+                            telaErro(tr("Invalid email or password."), AuthScreen.this::telaLogin);
                         }
                     }
                     @Override public void onFailure(String motivo) { loginBtn.setDisabled(false); telaErro(motivo, AuthScreen.this::telaLogin); }
@@ -645,24 +661,24 @@ public class AuthScreen extends ScreenAdapter {
         tambemAtualizarQuandoMudar(senha, atualizarConfirmSenha);
 
         Table grid = new Table();
-        grid.add(new Label("Email", skin)).left().pad(3);
+        grid.add(new Label(tr("Email"), skin)).left().pad(3);
         grid.add(email).width(300).pad(3).row();
-        grid.add(new Label("Confirm Email", skin)).left().pad(3);
+        grid.add(new Label(tr("Confirm Email"), skin)).left().pad(3);
         grid.add(confirmEmail).width(300).pad(3).row();
-        grid.add(new Label("Password", skin)).left().pad(3);
+        grid.add(new Label(tr("Password"), skin)).left().pad(3);
         grid.add(senha).width(300).pad(3).row();
-        grid.add(new Label("Confirm Password", skin)).left().pad(3);
+        grid.add(new Label(tr("Confirm Password"), skin)).left().pad(3);
         grid.add(confirmSenha).width(300).pad(3);
 
         Table painel = criarPainel();
         painel.add(grid).pad(14);
         content.add(painel);
 
-        TextButton voltarBtn = new TextButton("Back", skin);
+        TextButton voltarBtn = new TextButton(tr("Back"), skin);
         voltarBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaMenuPrincipal(); }
         });
-        TextButton criarBtn = new TextButton("Create", skin, "verde");
+        TextButton criarBtn = new TextButton(tr("Create"), skin, "verde");
         criarBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 String em = email.getText().trim();
@@ -670,11 +686,11 @@ public class AuthScreen extends ScreenAdapter {
                 String pw = senha.getText();
                 String cpw = confirmSenha.getText();
                 if (em.isEmpty() || cem.isEmpty() || pw.isEmpty() || cpw.isEmpty()) {
-                    telaErro("You must fill in all fields.", AuthScreen.this::telaRegistro); return;
+                    telaErro(tr("You must fill in all fields."), AuthScreen.this::telaRegistro); return;
                 }
-                if (!EMAIL_REGEX.matcher(em).matches()) { telaErro("Invalid email address.", AuthScreen.this::telaRegistro); return; }
-                if (!em.equals(cem)) { telaErro("Emails do not match.", AuthScreen.this::telaRegistro); return; }
-                if (pw.length() < 5 || !pw.equals(cpw)) { telaErro("Password must match and have at least 5 chars.", AuthScreen.this::telaRegistro); return; }
+                if (!EMAIL_REGEX.matcher(em).matches()) { telaErro(tr("Invalid email address."), AuthScreen.this::telaRegistro); return; }
+                if (!em.equals(cem)) { telaErro(tr("Emails do not match."), AuthScreen.this::telaRegistro); return; }
+                if (pw.length() < 5 || !pw.equals(cpw)) { telaErro(tr("Password must match and have at least 5 chars."), AuthScreen.this::telaRegistro); return; }
 
                 criarBtn.setDisabled(true);
                 ServerApi.register(em, pw, new ServerApi.ApiCallback() {
@@ -689,13 +705,13 @@ public class AuthScreen extends ScreenAdapter {
                                 atualizarLogout();
                                 Sessao.salvar(currentUserId, body.getString("email", em), body.getString("token", ""));
                             }
-                            telaErro("Account created successfully!", AuthScreen.this::fetchCharacters);
+                            telaErro(tr("Account created successfully!"), AuthScreen.this::fetchCharacters);
                         } else if (statusCode == 409) {
-                            telaErro("Email already in use.", AuthScreen.this::telaRegistro);
+                            telaErro(tr("Email already in use."), AuthScreen.this::telaRegistro);
                         } else if (statusCode == 429) {
-                            telaErro("Too many attempts. Try again later.", AuthScreen.this::telaRegistro);
+                            telaErro(tr("Too many attempts. Try again later."), AuthScreen.this::telaRegistro);
                         } else {
-                            telaErro("Server error. Try again later.", AuthScreen.this::telaRegistro);
+                            telaErro(tr("Server error. Try again later."), AuthScreen.this::telaRegistro);
                         }
                     }
                     @Override public void onFailure(String motivo) { criarBtn.setDisabled(false); telaErro(motivo, AuthScreen.this::telaRegistro); }
@@ -710,8 +726,7 @@ public class AuthScreen extends ScreenAdapter {
     private void telaVerificarEmail(String em, String aviso) {
         limparConteudo();
         String texto = (aviso != null ? aviso + "\n\n" : "")
-            + "We sent a verification link to\n" + em
-            + "\n\nOpen the email and tap Verify Email, then log in.\nThe link expires in 1 hour.";
+            + tr("We sent a verification link to\n{0}\n\nOpen the email and tap Verify Email, then log in.\nThe link expires in 1 hour.", em);
         Label label = new Label(texto, skin);
         label.setWrap(true);
         label.setAlignment(Align.center);
@@ -719,21 +734,21 @@ public class AuthScreen extends ScreenAdapter {
         painel.add(label).width(mobile ? 420 : 340).pad(mobile ? 18 : 14);
         content.add(painel);
 
-        TextButton loginBtn = new TextButton("Login", skin);
+        TextButton loginBtn = new TextButton(tr("Login"), skin);
         loginBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaLogin(); }
         });
-        TextButton reenviarBtn = new TextButton("Resend Email", skin, "verde");
+        TextButton reenviarBtn = new TextButton(tr("Resend Email"), skin, "verde");
         reenviarBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 reenviarBtn.setDisabled(true);
                 ServerApi.resendVerification(em, new ServerApi.ApiCallback() {
                     @Override public void onResponse(int statusCode, JsonValue body) {
                         Runnable voltar = () -> telaVerificarEmail(em, null);
-                        if (statusCode == 200) telaErro("A new link was sent. The old one no longer works.", voltar);
-                        else if (statusCode == 429) telaErro("Too many emails. Wait a few minutes.", voltar);
-                        else if (statusCode == 404) telaErro("This registration was not found. Register again.", AuthScreen.this::telaRegistro);
-                        else telaErro("Server error. Try again later.", voltar);
+                        if (statusCode == 200) telaErro(tr("A new link was sent. The old one no longer works."), voltar);
+                        else if (statusCode == 429) telaErro(tr("Too many emails. Wait a few minutes."), voltar);
+                        else if (statusCode == 404) telaErro(tr("This registration was not found. Register again."), AuthScreen.this::telaRegistro);
+                        else telaErro(tr("Server error. Try again later."), voltar);
                     }
                     @Override public void onFailure(String motivo) { telaErro(motivo, () -> telaVerificarEmail(em, null)); }
                 });
@@ -757,15 +772,15 @@ public class AuthScreen extends ScreenAdapter {
         marcarValidacao(novaSenha, () -> novaSenha.getText().length() >= 5);
 
         Table grid = new Table();
-        grid.add(new Label("Email", skin)).left().pad(3);
+        grid.add(new Label(tr("Email"), skin)).left().pad(3);
         grid.add(email).width(300).pad(3).row();
         if (forgotStep >= 1) {
             email.setDisabled(true);
-            grid.add(new Label("Code", skin)).left().pad(3);
+            grid.add(new Label(tr("Code"), skin)).left().pad(3);
             grid.add(codigo).width(300).pad(3).row();
         }
         if (forgotStep >= 2) {
-            grid.add(new Label("New Password", skin)).left().pad(3);
+            grid.add(new Label(tr("New Password"), skin)).left().pad(3);
             grid.add(novaSenha).width(300).pad(3);
         }
 
@@ -773,51 +788,51 @@ public class AuthScreen extends ScreenAdapter {
         painel.add(grid).pad(14);
         content.add(painel);
 
-        TextButton voltarBtn = new TextButton("Back", skin);
+        TextButton voltarBtn = new TextButton(tr("Back"), skin);
         voltarBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaLogin(); }
         });
 
         TextButton acaoBtn;
         if (forgotStep == 0) {
-            acaoBtn = new TextButton("Send Code", skin, "verde");
+            acaoBtn = new TextButton(tr("Send Code"), skin, "verde");
             acaoBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     String em = email.getText().trim();
-                    if (!EMAIL_REGEX.matcher(em).matches()) { telaErro("Invalid email address.", AuthScreen.this::telaEsqueciSenha); return; }
+                    if (!EMAIL_REGEX.matcher(em).matches()) { telaErro(tr("Invalid email address."), AuthScreen.this::telaEsqueciSenha); return; }
                     acaoBtn.setDisabled(true);
                     ServerApi.forgotPassword(em, new ServerApi.ApiCallback() {
                         @Override public void onResponse(int statusCode, JsonValue body) {
                             acaoBtn.setDisabled(false);
                             if (statusCode == 200) { forgotStep = 1; telaEsqueciSenha(); }
-                            else if (statusCode == 404) { telaErro("Email not found.", AuthScreen.this::telaEsqueciSenha); }
-                            else { telaErro("Error sending reset code.", AuthScreen.this::telaEsqueciSenha); }
+                            else if (statusCode == 404) { telaErro(tr("Email not found."), AuthScreen.this::telaEsqueciSenha); }
+                            else { telaErro(tr("Error sending reset code."), AuthScreen.this::telaEsqueciSenha); }
                         }
                         @Override public void onFailure(String motivo) { acaoBtn.setDisabled(false); telaErro(motivo, AuthScreen.this::telaEsqueciSenha); }
                     });
                 }
             });
         } else if (forgotStep == 1) {
-            acaoBtn = new TextButton("Verify Code", skin, "verde");
+            acaoBtn = new TextButton(tr("Verify Code"), skin, "verde");
             acaoBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                    if (codigo.getText().trim().isEmpty()) { telaErro("Enter the code sent to your email.", AuthScreen.this::telaEsqueciSenha); return; }
+                    if (codigo.getText().trim().isEmpty()) { telaErro(tr("Enter the code sent to your email."), AuthScreen.this::telaEsqueciSenha); return; }
                     forgotStep = 2;
                     telaEsqueciSenha();
                 }
             });
         } else {
-            acaoBtn = new TextButton("Reset Password", skin, "verde");
+            acaoBtn = new TextButton(tr("Reset Password"), skin, "verde");
             acaoBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     String np = novaSenha.getText();
-                    if (np.length() < 5) { telaErro("Password must have at least 5 chars.", AuthScreen.this::telaEsqueciSenha); return; }
+                    if (np.length() < 5) { telaErro(tr("Password must have at least 5 chars."), AuthScreen.this::telaEsqueciSenha); return; }
                     acaoBtn.setDisabled(true);
                     ServerApi.resetPassword(email.getText().trim(), codigo.getText().trim(), np, new ServerApi.ApiCallback() {
                         @Override public void onResponse(int statusCode, JsonValue body) {
                             acaoBtn.setDisabled(false);
                             if (statusCode == 200) {
-                                telaErro("Password updated successfully! You can now login.", AuthScreen.this::telaLogin);
+                                telaErro(tr("Password updated successfully! You can now login."), AuthScreen.this::telaLogin);
                             } else {
                                 String erro = body != null && body.has("erro") ? body.getString("erro") : "Wrong code! Try again.";
                                 telaErro(erro, AuthScreen.this::telaEsqueciSenha);
@@ -835,7 +850,7 @@ public class AuthScreen extends ScreenAdapter {
     // Selecao de personagem (carrossel de MAX_SLOTS, 2 paineis lado a lado)
     // ---------------------------------------------------------------------
     private void fetchCharacters() {
-        telaCarregando("Loading characters...");
+        telaCarregando(tr("Loading characters..."));
         ServerApi.getCharacters(currentUserId, new ServerApi.ApiCallback() {
             @Override public void onResponse(int statusCode, JsonValue body) {
                 if (statusCode == 200) {
@@ -872,12 +887,12 @@ public class AuthScreen extends ScreenAdapter {
                     Sessao.limpar();
                     currentUserId = -1;
                     atualizarLogout();
-                    telaErro("Session expired. Please log in again.", AuthScreen.this::telaLogin);
+                    telaErro(tr("Session expired. Please log in again."), AuthScreen.this::telaLogin);
                 } else {
                     // Codigo + mensagem do servidor ajudam a saber o que houve
                     // (ex: 500 = erro no servidor, ver o console dele).
                     String detalhe = body != null && body.has("erro") ? " " + body.getString("erro") : "";
-                    telaErro("Failed to load characters (" + statusCode + ")." + detalhe, AuthScreen.this::telaMenuPrincipal);
+                    telaErro(tr("Failed to load characters ({0}).", statusCode) + detalhe, AuthScreen.this::telaMenuPrincipal);
                 }
             }
             @Override public void onFailure(String motivo) {
@@ -970,7 +985,7 @@ public class AuthScreen extends ScreenAdapter {
         // com o indicador "x/4" sobreposto via Stack, pra poder ficar quase
         // colado no canto sem herdar o pad(16) uniforme do painel.
         com.badlogic.gdx.scenes.scene2d.Actor painelDireitoFinal = painelDireito;
-        TextButton voltarBtn = new TextButton("Back", skin);
+        TextButton voltarBtn = new TextButton(tr("Back"), skin);
         voltarBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaMenuPrincipal(); }
         });
@@ -983,10 +998,10 @@ public class AuthScreen extends ScreenAdapter {
             // tela (nome/nivel usam escalaNomeNivel=0.55). Reaproveitando
             // encaixarTexto() com a mesma largura usada pelo nome/nivel pra
             // ficar consistente e nunca vazar do painel.
-            Label vazioLabel = new Label("Empty Slot", skin);
+            Label vazioLabel = new Label(tr("Empty Slot"), skin);
             encaixarTexto(vazioLabel, 194 * escalaSlots - 28, escalaNomeNivel);
             painelEsquerdo.add(vazioLabel).pad(30 * escalaSlots);
-            TextButton criarBtn = new TextButton("Create", skin, "verde");
+            TextButton criarBtn = new TextButton(tr("Create"), skin, "verde");
             criarBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     selectedClassKey = "";
@@ -1040,7 +1055,7 @@ public class AuthScreen extends ScreenAdapter {
             encaixarTexto(nome, larguraEsquerda, escalaNomeNivel);
             painelEsquerdo.add(nome).growX().center().row();
             painelEsquerdo.add(previewPersonagem).grow().pad(6).row();
-            Label nivel = new Label("Lv. " + atual.level, skin, "nivel");
+            Label nivel = new Label(tr("Lv. {0}", atual.level), skin, "nivel");
             nivel.setColor(new Color(1f, 0.85f, 0.2f, 1f));
             nivel.setAlignment(Align.center);
             encaixarTexto(nivel, larguraEsquerda, escalaNomeNivel);
@@ -1080,13 +1095,13 @@ public class AuthScreen extends ScreenAdapter {
             xpLabel.setColor(new Color(1f, 0.7f, 0.15f, 1f));
             adicionarLinhaStat(painelDireito, texturas.get("xp"), xpLabel, escalaTextoDireita, larguraDireitaComIcone, tamanhoIconeDireita);
 
-            TextButton playBtn = new TextButton("Play", skin, "verde");
+            TextButton playBtn = new TextButton(tr("Play"), skin, "verde");
             playBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     playListener.onPlay(currentUserId, atual);
                 }
             });
-            TextButton deleteBtn = new TextButton("Delete", skin, "vermelho");
+            TextButton deleteBtn = new TextButton(tr("Delete"), skin, "vermelho");
             deleteBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                     if (deleteConfirmStage == 0) {
@@ -1107,8 +1122,8 @@ public class AuthScreen extends ScreenAdapter {
                         Label.LabelStyle estiloLabel = deleteBtn.getLabel().getStyle();
                         estiloLabel.font = skin.getFont("versao-font");
                         deleteBtn.getLabel().setStyle(estiloLabel);
-                        deleteBtn.setText("Are you sure?");
-                    } else if (deleteConfirmStage == 1) { deleteConfirmStage = 2; deleteBtn.setText("100% sure?"); }
+                        deleteBtn.setText(tr("Are you sure?"));
+                    } else if (deleteConfirmStage == 1) { deleteConfirmStage = 2; deleteBtn.setText(tr("100% sure?")); }
                     else { telaConfirmarDeleteComSenha(atual); }
                 }
             });
@@ -1206,22 +1221,22 @@ public class AuthScreen extends ScreenAdapter {
         senha.setPasswordCharacter('*');
 
         Table grid = new Table();
-        grid.add(new Label("Password", skin)).left().pad(3);
+        grid.add(new Label(tr("Password"), skin)).left().pad(3);
         grid.add(senha).width(300).pad(3);
 
         Table painel = criarPainel();
         painel.add(grid).pad(14);
         content.add(painel);
 
-        TextButton cancelar = new TextButton("Cancel", skin);
+        TextButton cancelar = new TextButton(tr("Cancel"), skin);
         cancelar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaSelecaoPersonagem(); }
         });
-        TextButton confirmar = new TextButton("Delete", skin, "vermelho");
+        TextButton confirmar = new TextButton(tr("Delete"), skin, "vermelho");
         confirmar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 String pw = senha.getText();
-                if (pw.isEmpty()) { telaErro("Please enter your password.", () -> telaConfirmarDeleteComSenha(personagem)); return; }
+                if (pw.isEmpty()) { telaErro(tr("Please enter your password."), () -> telaConfirmarDeleteComSenha(personagem)); return; }
                 confirmar.setDisabled(true);
                 ServerApi.deleteCharacter(currentUserId, personagem.name, pw, new ServerApi.ApiCallback() {
                     @Override public void onResponse(int statusCode, JsonValue body) {
@@ -1300,11 +1315,11 @@ public class AuthScreen extends ScreenAdapter {
         linha.add(direita).height(esquerda.getPrefHeight());
         content.add(linha);
 
-        TextButton voltar = new TextButton("Back", skin);
+        TextButton voltar = new TextButton(tr("Back"), skin);
         voltar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaSelecaoPersonagem(); }
         });
-        TextButton proximo = new TextButton("Create", skin, "verde");
+        TextButton proximo = new TextButton(tr("Create"), skin, "verde");
         proximo.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 if (selectedClassKey.isEmpty()) return;
@@ -1326,7 +1341,7 @@ public class AuthScreen extends ScreenAdapter {
         Label erro = new Label("", skin);
 
         Table grid = new Table();
-        grid.add(new Label("Character Name", skin)).pad(6).row();
+        grid.add(new Label(tr("Character Name"), skin)).pad(6).row();
         grid.add(nome).width(300).pad(6).row();
         grid.add(erro).padTop(6);
 
@@ -1334,11 +1349,11 @@ public class AuthScreen extends ScreenAdapter {
         painel.add(grid).pad(20);
         content.add(painel);
 
-        TextButton voltar = new TextButton("Back", skin);
+        TextButton voltar = new TextButton(tr("Back"), skin);
         voltar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaSelecaoClasse(); }
         });
-        TextButton criar = new TextButton("Create", skin, "verde");
+        TextButton criar = new TextButton(tr("Create"), skin, "verde");
         criar.setDisabled(true);
         nome.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
@@ -1371,15 +1386,15 @@ public class AuthScreen extends ScreenAdapter {
 
     private String validarNome(String texto) {
         if (texto.length() < 3 || texto.length() > 12) {
-            return "Name must be between 3 and 12 characters.";
+            return tr("Name must be between 3 and 12 characters.");
         }
         // Mesma regra do servidor (servidor.py::RE_NOME_PERSONAGEM).
         if (!NOME_PERSONAGEM_REGEX.matcher(texto).matches() || texto.contains("  ")) {
-            return "Use only letters, numbers and spaces.";
+            return tr("Use only letters, numbers and spaces.");
         }
         String lower = texto.toLowerCase();
         for (String banido : BANNED_NAMES) {
-            if (lower.contains(banido)) return "Name contains inappropriate words.";
+            if (lower.contains(banido)) return tr("Name contains inappropriate words.");
         }
         return null;
     }

@@ -161,3 +161,265 @@ Server temporarily closed. Try again later.	Servidor temporariamente fechado. Te
 Server closed for maintenance. Try again later.	Servidor fechado para manutenção. Tente mais tarde.	Servidor cerrado por mantenimiento. Inténtalo más tarde.
 Server restarting. Your progress was saved.	O servidor está reiniciando. Seu progresso foi salvo.	El servidor se está reiniciando. Tu progreso fue guardado.
 Version outdated, please update your game	Versão desatualizada, atualize o jogo	Versión desactualizada, actualiza el juego
+Equip	Equipar	Equipar
+Bag	Bolsa	Bolsa
+Skills	Habilidades	Habilidades
+Vanity	Visual	Apariencia
+Spells	Magias	Hechizos
+Friends	Amigos	Amigos
+Rank	Ranking	Clasificación
+Bestiary	Bestiário	Bestiario
+Class	Classe	Clase
+Next Level	Próximo level	Siguiente nivel
+Crit Chance	Chance de crítico	Prob. de crítico
+Dodge Chance	Chance de esquiva	Prob. de esquiva
+Capacity	Capacidade	Capacidad
+HP Regen	Regen de HP	Regen. de HP
+Mana Regen	Regen de mana	Regen. de maná
+Total EXP	EXP total	EXP total
+Total Kills	Abates totais	Muertes totales
+Attack	Ataque	Ataque
+Armour	Armadura	Armadura
+Stamina	Stamina	Aguante
+Mana	Mana	Maná
+{0} Mana per hit	{0} de mana por golpe	{0} de maná por golpe
+Req. Lv {0}	Req. Lv {0}	Req. Nv {0}
+Fullness {0}	Saciedade {0}	Saciedad {0}
+Material	Material	Material
+Spell	Magia	Hechizo
+Potion	Poção	Poción
+Scroll	Pergaminho	Pergamino
+Slows for {0}s	Deixa lento por {0}s	Ralentiza por {0}s
+Area Damage	Dano em área	Daño en área
+Single Target	Alvo único	Objetivo único
+Teleports you to the city. Can't be used in battle.	Teleporta você para a cidade. Não pode ser usado em batalha.	Te teletransporta a la ciudad. No se puede usar en batalla.
+Universal	Universal	Universal
+Training Weapon	Arma de treino	Arma de entrenamiento
+Hits 1% of target HP (max 100)	Tira 1% do HP do alvo (máx. 100)	Quita 1% del HP del objetivo (máx. 100)
++5% skill gain	+5% de ganho de skill	+5% de ganancia de habilidad
+No HP/MP regen	Sem regen de HP/MP	Sin regen. de HP/MP
+No spells	Sem magias	Sin hechizos
+Locks the creature for 5s	Prende a criatura por 5s	Bloquea a la criatura por 5s
+{0}% chance to save arrows	{0}% de chance de economizar flechas	{0}% de probabilidad de ahorrar flechas
+Bonus: {0}%	Bônus: {0}%	Bono: {0}%
+Extra XP	XP extra	XP extra
+5% Extra DMG/DEF	5% de DANO/DEF extra	5% de DAÑO/DEF extra
+Quantity {0}	Quantidade {0}	Cantidad {0}
+Quantity	Quantidade	Cantidad
+Favorite	Favorito	Favorito
+Use	Usar	Usar
+Eat	Comer	Comer
+Unequip	Desequipar	Desequipar
+Apply	Aplicar	Aplicar
+Reset	Restaurar	Restablecer
+Skin	Pele	Piel
+Clothe	Roupa	Ropa
+Hair/Hat	Cabelo/Chapéu	Pelo/Sombrero
+Capacity 0/0	Capacidade 0/0	Capacidad 0/0
+Trade with {0}	Troca com {0}	Intercambio con {0}
+Step 1 of 2  -  Tap what you want to give	Passo 1 de 2  -  Toque no que quer dar	Paso 1 de 2  -  Toca lo que quieres dar
+Send Offer	Enviar oferta	Enviar oferta
+Selected {0}	Selecionado {0}	Seleccionado {0}
+Max {0} items	Máx. {0} itens	Máx. {0} objetos
+Waiting...	Aguardando...	Esperando...
+Waiting for {0}...	Aguardando {0}...	Esperando a {0}...
+Accept	Aceitar	Aceptar
+Accepted	Aceito	Aceptado
+You give	Você dá	Tú das
+You receive	Você recebe	Tú recibes
+Nothing offered.	Nada oferecido.	Nada ofrecido.
+Your offer:	Sua oferta:	Tu oferta:
+Your offer: nothing yet	Sua oferta: nada ainda	Tu oferta: nada aún
+Nothing	Nada	Nada
+Confirm	Confirmar	Confirmar
+No Cap	Sem cap	Sin cap.
+Are you sure?	Tem certeza?	¿Seguro?
+Cancel	Cancelar	Cancelar
+Your coins:	Suas moedas:	Tus monedas:
+Total:	Total:	Total:
+Bank	Banco	Banco
+Withdraw	Sacar	Retirar
+Deposit	Depositar	Depositar
+Bank Full	Banco cheio	Banco lleno
+Buy	Comprar	Comprar
+Sell	Vender	Vender
+Learn	Aprender	Aprender
+Selling	À venda	En venta
+Your items	Seus itens	Tus objetos
+No Money	Sem dinheiro	Sin dinero
+No money	Sem dinheiro	Sin dinero
+Loot	Loot	Botín
+Create	Criar	Crear
+Leave	Sair	Salir
+Class EXP Bonus: {0}%	Bônus de EXP por classe: {0}%	Bono de EXP por clase: {0}%
+Remove	Remover	Quitar
+Add Friend	Adicionar amigo	Añadir amigo
+Add	Adicionar	Añadir
+Friend name	Nome do amigo	Nombre del amigo
+Click a friend to remove.	Clique em um amigo para remover.	Haz clic en un amigo para quitarlo.
+You can't add yourself.	Você não pode adicionar a si mesmo.	No puedes añadirte a ti mismo.
+Player not found.	Jogador não encontrado.	Jugador no encontrado.
+No friends yet.	Nenhum amigo ainda.	Aún no tienes amigos.
+Online	Online	En línea
+Offline	Offline	Desconectado
+Last seen {0}	Visto {0}	Visto {0}
+just now	agora mesmo	justo ahora
+{0}m ago	há {0} min	hace {0} min
+{0}h ago	há {0}h	hace {0} h
+{0}d ago	há {0} dias	hace {0} días
+Added	Adicionado	Añadido
+Block	Bloquear	Bloquear
+Blocked	Bloqueado	Bloqueado
+Search item...	Buscar item...	Buscar objeto...
+My offers	Minhas ofertas	Mis ofertas
+No items found.	Nenhum item encontrado.	No se encontraron objetos.
+Lv {0}	Lv {0}	Nv {0}
+Select an item on the left.	Selecione um item à esquerda.	Selecciona un objeto a la izquierda.
+In your bag: {0}	Na sua bolsa: {0}	En tu bolsa: {0}
+Loading...	Carregando...	Cargando...
+Nobody is selling this.	Ninguém está vendendo isso.	Nadie está vendiendo esto.
+Nobody is buying this.	Ninguém está comprando isso.	Nadie está comprando esto.
+Create sell offer	Criar oferta de venda	Crear oferta de venta
+Create buy offer	Criar oferta de compra	Crear oferta de compra
+None	Nenhum	Ninguno
+Sell {0}	Vender {0}	Vender {0}
+Buy {0}	Comprar {0}	Comprar {0}
+Price each	Preço cada	Precio c/u
+Type the quantity and the price.	Digite a quantidade e o preço.	Escribe la cantidad y el precio.
+Fee paid now:	Taxa paga agora:	Tarifa pagada ahora:
+You pay now:	Você paga agora:	Pagas ahora:
+You have no offers.	Você não tem ofertas.	No tienes ofertas.
+Selling {0}x {1}	Vendendo {0}x {1}	Vendiendo {0}x {1}
+Buying {0}x {1}	Comprando {0}x {1}	Comprando {0}x {1}
+each	cada	c/u
+All classes	Todas as classes	Todas las clases
+All levels	Todos os levels	Todos los niveles
+All types	Todos os tipos	Todos los tipos
+Lv 0-9	Lv 0-9	Nv 0-9
+Lv 10-19	Lv 10-19	Nv 10-19
+Lv 20-29	Lv 20-29	Nv 20-29
+Lv 30+	Lv 30+	Nv 30+
+Weapons	Armas	Armas
+Off-hand	Mão secundária	Mano secundaria
+Armor	Armadura (peças)	Armadura (piezas)
+Ammo	Munição	Munición
+Potions	Poções	Pociones
+Food	Comida	Comida
+Scrolls	Pergaminhos	Pergaminos
+Other	Outros	Otros
+Rankings update every hour.	O ranking atualiza a cada hora.	La clasificación se actualiza cada hora.
+No players yet.	Nenhum jogador ainda.	Aún no hay jugadores.
+Defeat monsters to\nfill your bestiary.	Derrote monstros para\npreencher seu bestiário.	Derrota monstruos para\nllenar tu bestiario.
+Hotbar	Atalhos	Atajos
+Select a slot on the left	Selecione um slot à esquerda	Selecciona una casilla a la izquierda
+Slot {0}	Slot {0}	Casilla {0}
+Inventory	Inventário	Inventario
+You don't know any spells yet.	Você ainda não conhece nenhuma magia.	Aún no conoces ningún hechizo.
+No food or potions in your bag.	Nenhuma comida ou poção na bolsa.	No hay comida ni pociones en tu bolsa.
+Clear slot	Limpar slot	Vaciar casilla
+You	Você	Tú
+You are hungry!\n10% less Dmg and Speed. Regen disabled.	Você está com fome!\n10% menos dano e velocidade. Regen desativado.	¡Tienes hambre!\n10% menos daño y velocidad. Regen. desactivada.
+Safe Zone\nMobs can't target you, neither the players. Collision disabled.	Zona segura\nMonstros e jogadores não podem te atacar. Colisão desativada.	Zona segura\nNi monstruos ni jugadores pueden atacarte. Colisión desactivada.
+In Battle\nIf you log out now, your body stays in the game until the battle ends.	Em batalha\nSe sair agora, seu corpo fica no jogo até a batalha acabar.	En batalla\nSi sales ahora, tu cuerpo queda en el juego hasta que termine la batalla.
+Health Regen\nExtra Health Regen for {0} Seconds	Regen de vida\nRegen de vida extra por {0} segundos	Regen. de vida\nRegen. de vida extra por {0} segundos
+Mana Regen\nExtra Mana Regen for {0} Seconds	Regen de mana\nRegen de mana extra por {0} segundos	Regen. de maná\nRegen. de maná extra por {0} segundos
+Close	Fechar	Cerrar
+Next	Próximo	Siguiente
+Buttons {0}/{1}	Botões {0}/{1}	Botones {0}/{1}
+Done	Pronto	Listo
+Joystick size	Tamanho do joystick	Tamaño del joystick
+Tap a button or the joystick to edit it, drag to move it	Toque em um botão ou no joystick para editar, arraste para mover	Toca un botón o el joystick para editarlo, arrastra para moverlo
+Size	Tamanho	Tamaño
+Delete	Apagar	Borrar
+Hotbar slot {0}	Atalho {0}	Atajo {0}
+Open Menu	Abrir menu	Abrir menú
+Open Bag	Abrir bolsa	Abrir bolsa
+Open Chat	Abrir chat	Abrir chat
+Open Map	Abrir mapa	Abrir mapa
+Write	Escrever	Escribir
+Auto Target	Alvo automático	Objetivo automático
+Collect Bags	Pegar bolsas	Recoger bolsas
+PLAY	JOGAR	JUGAR
+Play	Jogar	Jugar
+Register	Registrar	Registrarse
+Connecting...	Conectando...	Conectando...
+Failed to connect to the server.	Não foi possível conectar ao servidor.	No se pudo conectar al servidor.
+Checking Version...	Verificando versão...	Verificando versión...
+Email	Email	Correo
+Password	Senha	Contraseña
+Forgot Password?	Esqueceu a senha?	¿Olvidaste la contraseña?
+Login	Entrar	Entrar
+Fill all fields with a valid email.	Preencha todos os campos com um email válido.	Rellena todos los campos con un correo válido.
+Your email is not verified yet.	Seu email ainda não foi verificado.	Tu correo aún no está verificado.
+Invalid email or password.	Email ou senha inválidos.	Correo o contraseña inválidos.
+Confirm Email	Confirmar email	Confirmar correo
+Confirm Password	Confirmar senha	Confirmar contraseña
+You must fill in all fields.	Preencha todos os campos.	Debes rellenar todos los campos.
+Invalid email address.	Endereço de email inválido.	Dirección de correo inválida.
+Emails do not match.	Os emails não são iguais.	Los correos no coinciden.
+Password must match and have at least 5 chars.	A senha deve ser igual nos dois campos e ter pelo menos 5 caracteres.	La contraseña debe coincidir y tener al menos 5 caracteres.
+Account created successfully!	Conta criada com sucesso!	¡Cuenta creada con éxito!
+Email already in use.	Email já está em uso.	El correo ya está en uso.
+Too many attempts. Try again later.	Muitas tentativas. Tente mais tarde.	Demasiados intentos. Inténtalo más tarde.
+Server error. Try again later.	Erro no servidor. Tente mais tarde.	Error del servidor. Inténtalo más tarde.
+We sent a verification link to\n{0}\n\nOpen the email and tap Verify Email, then log in.\nThe link expires in 1 hour.	Enviamos um link de verificação para\n{0}\n\nAbra o email e toque em Verify Email, depois faça login.\nO link expira em 1 hora.	Enviamos un enlace de verificación a\n{0}\n\nAbre el correo y toca Verify Email, luego inicia sesión.\nEl enlace expira en 1 hora.
+Resend Email	Reenviar email	Reenviar correo
+A new link was sent. The old one no longer works.	Um novo link foi enviado. O antigo não funciona mais.	Se envió un nuevo enlace. El anterior ya no funciona.
+Too many emails. Wait a few minutes.	Muitos emails. Espere alguns minutos.	Demasiados correos. Espera unos minutos.
+This registration was not found. Register again.	Cadastro não encontrado. Registre-se de novo.	No se encontró el registro. Regístrate de nuevo.
+Code	Código	Código
+New Password	Nova senha	Nueva contraseña
+Send Code	Enviar código	Enviar código
+Email not found.	Email não encontrado.	Correo no encontrado.
+Error sending reset code.	Erro ao enviar o código.	Error al enviar el código.
+Verify Code	Verificar código	Verificar código
+Enter the code sent to your email.	Digite o código enviado para o seu email.	Escribe el código enviado a tu correo.
+Reset Password	Redefinir senha	Restablecer contraseña
+Password must have at least 5 chars.	A senha deve ter pelo menos 5 caracteres.	La contraseña debe tener al menos 5 caracteres.
+Password updated successfully! You can now login.	Senha atualizada! Agora você pode entrar.	¡Contraseña actualizada! Ya puedes iniciar sesión.
+Loading characters...	Carregando personagens...	Cargando personajes...
+Failed to load characters ({0}).	Falha ao carregar personagens ({0}).	No se pudieron cargar los personajes ({0}).
+Empty Slot	Slot vazio	Casilla vacía
+Lv. {0}	Lv. {0}	Nv. {0}
+100% sure?	100% de certeza?	¿100% seguro?
+Please enter your password.	Digite sua senha.	Escribe tu contraseña.
+Character Name	Nome do personagem	Nombre del personaje
+Name must be between 3 and 12 characters.	O nome deve ter entre 3 e 12 caracteres.	El nombre debe tener entre 3 y 12 caracteres.
+Use only letters, numbers and spaces.	Use só letras, números e espaços.	Usa solo letras, números y espacios.
+Name contains inappropriate words.	O nome contém palavras impróprias.	El nombre contiene palabras inapropiadas.
+Invalid credentials.	Credenciais inválidas.	Credenciales inválidas.
+Email not verified.	Email não verificado.	Correo no verificado.
+Name taken.	Nome já em uso.	Nombre en uso.
+Invalid name.	Nome inválido.	Nombre inválido.
+Inappropriate name.	Nome impróprio.	Nombre inapropiado.
+No character slots.	Sem espaço para personagens.	Sin espacio para personajes.
+Character is online.	O personagem está online.	El personaje está en línea.
+Too many attempts. Wait a few minutes and try again.	Muitas tentativas. Espere alguns minutos e tente de novo.	Demasiados intentos. Espera unos minutos e inténtalo de nuevo.
+Server error.	Erro no servidor.	Error del servidor.
+Session expired.	Sessão expirada.	Sesión expirada.
+Invalid or expired code.	Código inválido ou expirado.	Código inválido o expirado.
+Password updated.	Senha atualizada.	Contraseña actualizada.
+Character created!	Personagem criado!	¡Personaje creado!
+Missing fields.	Campos faltando.	Faltan campos.
+Missing fields	Campos faltando	Faltan campos
+{0} is online.	{0} está online.	{0} está en línea.
+{0} was added to your friends.	{0} foi adicionado aos seus amigos.	{0} fue añadido a tus amigos.
+{0} was removed from your friends.	{0} foi removido dos seus amigos.	{0} fue quitado de tus amigos.
+{0} invited you to a party.	{0} te convidou para uma party.	{0} te invitó a un grupo.
+{0} declined the party invite.	{0} recusou o convite da party.	{0} rechazó la invitación al grupo.
+{0} joined the party.	{0} entrou na party.	{0} se unió al grupo.
+{0} left the party.	{0} saiu da party.	{0} salió del grupo.
+{0} wants to trade.	{0} quer trocar.	{0} quiere intercambiar.
+Level {0}!	Level {0}!	¡Nivel {0}!
+{0} has reached Level {1}!	{0} chegou ao level {1}!	¡{0} alcanzó el nivel {1}!
+{0} has reached {1} level {2}!	{0} chegou ao level {2} de {1}!	¡{0} alcanzó el nivel {2} de {1}!
+{0} knowledge upgraded	Conhecimento de {0} melhorado	Conocimiento de {0} mejorado
+{0} can be learned!	{0} pode ser aprendida!	¡{0} se puede aprender!
+{0} is training on this creature.	{0} está treinando nesta criatura.	{0} está entrenando con esta criatura.
+for {0} seconds	por {0} segundos	por {0} segundos
+{0} Mana	{0} de mana	{0} de maná
+{0}s Cooldown	{0}s de recarga	{0}s de enfriamiento
+{0} added.	{0} adicionado.	{0} añadido.
+{0} hits of {1}%	{0} golpes de {1}%	{0} golpes de {1}%
+{0} Player	{0} jogador	{0} jugador
+{0} Players	{0} jogadores	{0} jugadores

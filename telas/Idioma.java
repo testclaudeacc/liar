@@ -71,7 +71,9 @@ public final class Idioma {
                 if (linha.isEmpty() || linha.startsWith("#")) continue;
                 String[] c = linha.split("\t", -1);
                 if (c.length < 3 || c[0].isEmpty()) continue;
+                c[0] = c[0].replace("\\n", "\n"); // "\n" no TSV = quebra de linha
                 for (int i = 1; i <= 2; i++) {
+                    c[i] = c[i].replace("\\n", "\n");
                     if (c[i].isEmpty()) continue;
                     mapas[i].put(c[0], c[i]);
                     if (c[0].contains("{0}")) modelos[i].add(new Object[]{modeloRegex(c[0]), c[i], indicesModelo(c[0])});

@@ -1,5 +1,7 @@
 package com.teste.game;
 
+import static com.teste.game.telas.Idioma.tr;
+
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
@@ -263,7 +265,7 @@ public class ChatUI {
         linhaAbas.left();
         reconstruirAbas();
 
-        TextButton botaoFechar = new TextButton("Close", skin, "vermelho-popup");
+        TextButton botaoFechar = new TextButton(tr("Close"), skin, "vermelho-popup");
         botaoFechar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { setVisivel(false); }
         });
@@ -919,7 +921,7 @@ public class ChatUI {
     private void reconstruirPainelJogadores() {
         List<String> nomes = membrosPorAba.getOrDefault(abaAtual, java.util.Collections.emptyList());
         cabecalhoJogadores.setText(ehPrivada(abaAtual) ? nomeExibidoPrivada.getOrDefault(abaAtual, "Private") : abaAtual);
-        contadorJogadores.setText(nomes.size() + " Player" + (nomes.size() == 1 ? "" : "s"));
+        contadorJogadores.setText(nomes.size() == 1 ? tr("{0} Player", 1) : tr("{0} Players", nomes.size()));
         listaJogadoresBox.clearChildren();
         for (String nome : nomes) {
             listaJogadoresBox.add(new Label(nome, skin)).center().expandX().padBottom(4).row();

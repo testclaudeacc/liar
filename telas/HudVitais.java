@@ -1,5 +1,7 @@
 package com.teste.game.telas;
 
+import static com.teste.game.telas.Idioma.tr;
+
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
@@ -324,11 +326,11 @@ public final class HudVitais {
         painelXp.add(pilhaXp).size(px(260), px(32));
 
         quadradoFome = quadradoStatus(atlas, "sheet/r18_c10", COR_FOME,
-            "You are hungry!\n10% less Dmg and Speed. Regen disabled.");
+            tr("You are hungry!\n10% less Dmg and Speed. Regen disabled."));
         quadradoFome.setUserObject(TITULO_FOME);
         // Protection Zone (efeito neutro): sprite no 320,720 do atlas.
         quadradoZonaSegura = quadradoStatus(atlas, nomeRegiao(atlas, "sheet/r78_c4", 320, 720), COR_ZONA_SEGURA,
-            "Safe Zone\nMobs can't target you, neither the players. Collision disabled.");
+            tr("Safe Zone\nMobs can't target you, neither the players. Collision disabled."));
         quadradoZonaSegura.setUserObject(TITULO_ZONA_SEGURA);
         contadorBatalha = new Label("", estilo);
         contadorBatalha.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
@@ -644,8 +646,7 @@ public final class HudVitais {
     }
 
     private String textoBatalha() {
-        return "In Battle\n"
-            + "If you log out now, your body stays in the game until the battle ends.";
+        return tr("In Battle\nIf you log out now, your body stays in the game until the battle ends.");
     }
 
     /** Arredonda (unidades do stage) pro pixel de tela mais proximo. */
@@ -722,9 +723,9 @@ public final class HudVitais {
         int seg = Math.round(segundos);
         Label.LabelStyle estilo = contadorBatalha != null ? contadorBatalha.getStyle() : null;
         quadradoRegenHp = hp > 0 && estilo != null ? quadradoStatus(atlasHud, "ui/HPIcon", COR_REGEN_HP,
-            "Health Regen\nExtra Health Regen for " + seg + " Seconds", new Label(String.valueOf(hp), estilo)) : null;
+            tr("Health Regen\nExtra Health Regen for {0} Seconds", seg), new Label(String.valueOf(hp), estilo)) : null;
         quadradoRegenMp = mp > 0 && estilo != null ? quadradoStatus(atlasHud, "ui/MPIcon", COR_REGEN_MP,
-            "Mana Regen\nExtra Mana Regen for " + seg + " Seconds", new Label(String.valueOf(mp), estilo)) : null;
+            tr("Mana Regen\nExtra Mana Regen for {0} Seconds", seg), new Label(String.valueOf(mp), estilo)) : null;
         if (quadradoRegenHp != null) quadradoRegenHp.setUserObject(TITULO_REGEN_HP);
         if (quadradoRegenMp != null) quadradoRegenMp.setUserObject(TITULO_REGEN_MP);
         buffRestante = segundos;

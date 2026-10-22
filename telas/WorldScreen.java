@@ -3157,7 +3157,7 @@ public class WorldScreen extends ScreenAdapter {
             int coluna = 0;
             for (java.util.Map.Entry<String, String> e : Controles.NOMES.entrySet()) {
                 final String acao = e.getKey();
-                Label nome = new Label(e.getValue(), skin, "opcoes-label");
+                Label nome = new Label(Idioma.trServidor(e.getValue()), skin, "opcoes-label"); // "Hotbar slot {0}" por modelo
                 TextButton tecla = new TextButton(Controles.nomeTecla(Controles.tecla(acao)), estiloTecla(false));
                 tecla.addListener(new ChangeListener() {
                     @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
@@ -3515,7 +3515,7 @@ public class WorldScreen extends ScreenAdapter {
             // silent: so' o boneco apareceu (admin possuindo um mob) - nao "ficou online".
             if (data != null && !data.getBoolean("silent", false)) {
                 String nome = data.getString("name", "");
-                if (bookMenu.amigo(nome) != null) hud.notificarTipo(HudVitais.NOTIF_AMIGO, nome + " is online.", COR_NOTIF_ON, null);
+                if (bookMenu.amigo(nome) != null) hud.notificarTipo(HudVitais.NOTIF_AMIGO, tr("{0} is online.", nome), COR_NOTIF_ON, null);
                 bookMenu.definirOnline(nome, true);
             }
         });
@@ -3527,7 +3527,7 @@ public class WorldScreen extends ScreenAdapter {
             String nome = data.getString("friend_name", "");
             boolean amigo = data.getBoolean("is_friend", false);
             bookMenu.definirAmigo(nome, amigo);
-            chat.adicionarMensagemSistema(amigo ? nome + " was added to your friends." : nome + " was removed from your friends.");
+            chat.adicionarMensagemSistema(amigo ? tr("{0} was added to your friends.", nome) : tr("{0} was removed from your friends.", nome));
         });
         socket.on("friend_icon_updated", (nomeEvt, data) -> {
             if (data == null) return;
@@ -3562,7 +3562,7 @@ public class WorldScreen extends ScreenAdapter {
             }
             // Vira uma linha (Confirm/Negate) na aba Party; a notificacao leva pra la'.
             bookMenu.adicionarConviteParty(quem, data.getInt("inviter_level", 1));
-            hud.notificarTipo(HudVitais.NOTIF_PARTY, quem + " invited you to a party.", COR_NOTIF_PARTY, this::abrirAbaParty);
+            hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("{0} invited you to a party.", quem), COR_NOTIF_PARTY, this::abrirAbaParty);
         });
         socket.on("party_invite_result", (nomeEvt, data) -> {
             if (data == null) return;
@@ -3584,7 +3584,7 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("party_invite_declined", (nomeEvt, data) -> {
             if (data == null) return;
             convitesPartyEnviados.remove(data.getString("target_name", ""));
-            hud.notificarTipo(HudVitais.NOTIF_PARTY, data.getString("target_name", "") + " declined the party invite.");
+            hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("{0} declined the party invite.", data.getString("target_name", "")));
         });
         socket.on("party_update", (nomeEvt, data) -> {
             if (data == null) return;
@@ -3602,10 +3602,10 @@ public class WorldScreen extends ScreenAdapter {
                 return;
             }
             for (String n : depois) {
-                if (!antes.contains(n) && !n.equals(local.nome)) hud.notificarTipo(HudVitais.NOTIF_PARTY, n + " joined the party.", COR_NOTIF_PARTY, null);
+                if (!antes.contains(n) && !n.equals(local.nome)) hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("{0} joined the party.", n), COR_NOTIF_PARTY, null);
             }
             for (String n : antes) {
-                if (!depois.contains(n)) hud.notificarTipo(HudVitais.NOTIF_PARTY, n + " left the party.");
+                if (!depois.contains(n)) hud.notificarTipo(HudVitais.NOTIF_PARTY, tr("{0} left the party.", n));
             }
             String lider = bookMenu.liderParty();
             if (lider != null && !lider.equals(antigoLider)) {
@@ -3629,7 +3629,7 @@ public class WorldScreen extends ScreenAdapter {
             String quem = data.getString("inviter_name", "");
             if (ignorados.contains(quem)) return;
             convitesTrade.add(quem); // balaozinho "Trade" em cima dele (so' pra mim)
-            hud.notificarTipo(HudVitais.NOTIF_TRADE, quem + " wants to trade.", COR_NOTIF_PARTY, () -> {
+            hud.notificarTipo(HudVitais.NOTIF_TRADE, tr("{0} wants to trade.", quem), COR_NOTIF_PARTY, () -> {
                 if (socket.isConnected() && convitesTrade.contains(quem)) {
                     socket.emitRaw("accept_trade_invite", GameSocket.obj(w -> w.set("inviter_name", quem)));
                 }
@@ -4149,7 +4149,7 @@ public class WorldScreen extends ScreenAdapter {
             bookMenu.removerConviteParty(data.getString("name", ""));
             boolean silencioso = data.getBoolean("silent", false); // so' o boneco sumiu (morph acabou)
             if (!silencioso && bookMenu.amigo(data.getString("name", "")) != null && !data.getString("name", "").equals(local.nome)) {
-                hud.notificarTipo(HudVitais.NOTIF_AMIGO, data.getString("name", "") + " is offline.", COR_NOTIF_OFF, null);
+                hud.notificarTipo(HudVitais.NOTIF_AMIGO, tr("{0} is offline.", data.getString("name", "")), COR_NOTIF_OFF, null);
             }
             if (!silencioso) bookMenu.definirOnline(data.getString("name", ""), false);
             if (data.getString("name", "").equals(painelJogador.nomeAberto())) painelJogador.fechar();
@@ -4210,10 +4210,10 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             String nome = data.getString("name", "");
             Jogador j = jogadorPorNome(nome);
-            if (j != null) textosFlutuantes.add(new TextoFlutuante(j, "Level " + data.getInt("level", 0) + "!",
+            if (j != null) textosFlutuantes.add(new TextoFlutuante(j, tr("Level {0}!", data.getInt("level", 0)),
                 new Color(1f, 0.84f, 0.2f, 1f)));
             // Aviso no chat Local de todo mundo da area (o servidor ja manda pra area toda).
-            if (chat != null) chat.adicionarMensagemSistema(nomeVisivel(nome) + " has reached Level " + data.getInt("level", 0) + "!");
+            if (chat != null) chat.adicionarMensagemSistema(tr("{0} has reached Level {1}!", nomeVisivel(nome), data.getInt("level", 0)));
         });
         // Textinho de acao em cima da cabeca (servidor.py::texto_de_acao): comer
         // ("Om Noom"), e depois magias/pocoes/quests. Vem pra area toda.
@@ -4233,8 +4233,7 @@ public class WorldScreen extends ScreenAdapter {
             String skill = data.getString("skill_name", "");
             if (j != null) textosFlutuantes.add(new TextoFlutuante(j,
                 nomeSkill(skill) + " " + data.getInt("new_level", 0) + "!", corSkill(skill)));
-            if (chat != null) chat.adicionarMensagemSistema(nomeVisivel(nome) + " has reached " + nomeSkill(skill)
-                + " level " + data.getInt("new_level", 0) + "!");
+            if (chat != null) chat.adicionarMensagemSistema(tr("{0} has reached {1} level {2}!", nomeVisivel(nome), nomeSkill(skill), data.getInt("new_level", 0)));
         });
         socket.on("player_skins_updated", (nomeEvt, data) -> {
             if (data == null) return;
@@ -4378,7 +4377,7 @@ public class WorldScreen extends ScreenAdapter {
                 hud.notificarIcone(tr("New mob discovered!"), atlas.findRegion("sheet/r15_c8"), COR_NOTIF_BESTIARIO, abrir);
             } else {
                 Color fundo = nivel == 2 ? COR_MEDALHA_COBRE : nivel == 3 ? COR_MEDALHA_PRATA : COR_NOTIF_BESTIARIO;
-                hud.notificarIcone(nome + " knowledge upgraded", bookMenu.medalhaDoNivel(nivel), fundo, abrir);
+                hud.notificarIcone(tr("{0} knowledge upgraded", nome), bookMenu.medalhaDoNivel(nivel), fundo, abrir);
             }
         });
 
@@ -4408,7 +4407,7 @@ public class WorldScreen extends ScreenAdapter {
                 int lv = data.getInt("level", 1);
                 if (levelProprio > 0 && lv > levelProprio && data.getBoolean("char_leveled_up", false)) {
                     for (String magia : bookMenu.magiasLiberadas(levelProprio, lv)) {
-                        hud.notificarIcone(bookMenu.nomeExibicao(magia) + " can be learned!",
+                        hud.notificarIcone(tr("{0} can be learned!", bookMenu.nomeExibicao(magia)),
                             bookMenu.iconeDoItem(magia), bookMenu.coresSlotMagia(magia)[1], null);
                     }
                 }
@@ -6298,7 +6297,7 @@ public class WorldScreen extends ScreenAdapter {
         long agora = System.currentTimeMillis();
         if (agora - ultimoAvisoTravado < 1500L) return;
         ultimoAvisoTravado = agora;
-        hud.notificar(mob.treinoDono + " is training on this creature.", COR_NOTIF_AVISO, null);
+        hud.notificar(tr("{0} is training on this creature.", mob.treinoDono), COR_NOTIF_AVISO, null);
     }
 
     private void mirarMob(MobVisual mob) {

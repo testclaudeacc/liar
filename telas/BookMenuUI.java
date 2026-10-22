@@ -208,8 +208,8 @@ public final class BookMenuUI {
             new Color(0.125f, 0.125f, 0.125f, 0.98f), UiSkin.COR_BORDA_PAINEL, 1));
         mainWindow.pad(14);
         mainWindow.top().left();
-        tituloSecao = new LabelPixel("Bag", skin.get("subtitulo", Label.LabelStyle.class));
-        capacityLabel = new LabelPixel("Capacity 0/0", skin.get("hud", Label.LabelStyle.class));
+        tituloSecao = new LabelPixel(tr("Bag"), skin.get("subtitulo", Label.LabelStyle.class));
+        capacityLabel = new LabelPixel(tr("Capacity 0/0"), skin.get("hud", Label.LabelStyle.class));
         actionStatus = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
         construirPaginaBag(skin);
         construirPaginaEquip(skin);
@@ -700,13 +700,13 @@ public final class BookMenuUI {
         estiloEquiparBloqueado.font = skin.getFont("botao-texto-font");
         estiloEquiparBloqueado.fontColor = new Color(0.55f, 0.55f, 0.55f, 1f);
         estiloEquiparBloqueado.disabledFontColor = estiloEquiparBloqueado.fontColor;
-        equipButton = new TextButton("Equip", estiloEquipar);
+        equipButton = new TextButton(tr("Equip"), estiloEquipar);
         equipButton.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 equiparSelecionado();
             }
         });
-        unequipButton = new TextButton("Unequip", estiloDesequipar);
+        unequipButton = new TextButton(tr("Unequip"), estiloDesequipar);
         unequipButton.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 desequiparSlotSelecionado();
@@ -968,56 +968,56 @@ public final class BookMenuUI {
         boolean comparar = compararCom != null;
         // Material (drop de mob): so' o nome, "Material" e o cap.
         if ("Material".equals(dados.tipo)) {
-            bloco.add(linhaStat("Material", new Color(0.6f, 0.6f, 0.6f, 1f))).left().row();
+            bloco.add(linhaStat(tr("Material"), new Color(0.6f, 0.6f, 0.6f, 1f))).left().row();
             adicionarLinhaCap(bloco, dados);
             return;
         }
         if (dados.fullness > 0) {
             // Comida: coxinha + Fullness; HP/MP com o regen extra (buff).
-            bloco.add(linhaComIcone(ICONE_FULLNESS, "Fullness " + dados.fullness, COR_FOME)).left().row();
+            bloco.add(linhaComIcone(ICONE_FULLNESS, tr("Fullness {0}", dados.fullness), COR_FOME)).left().row();
             // Regen extra: soma no regen natural enquanto o buff durar.
             if (dados.regenHp > 0) bloco.add(linhaComIcone("ui/HPIcon", "+" + dados.regenHp + " Regen", COR_POCAO_HP)).left().row();
             if (dados.regenMp > 0) bloco.add(linhaComIcone("ui/MPIcon", "+" + dados.regenMp + " Regen", COR_POCAO_MP)).left().row();
             if (dados.regenHp > 0 || dados.regenMp > 0)
-                bloco.add(linhaStat("for " + dados.regenSeg + " seconds", new Color(0.6f, 0.6f, 0.6f, 1f))).left().row();
+                bloco.add(linhaStat(tr("for {0} seconds", dados.regenSeg), new Color(0.6f, 0.6f, 0.6f, 1f))).left().row();
             adicionarLinhaCap(bloco, dados);
             return;
         }
         if (dados.magia != null && !dados.magia.isEmpty()) {
             // Magia: requisito, custo, cooldown e o dano.
-            bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
-            bloco.add(linhaStat("Spell", Color.LIGHT_GRAY)).left().row();
-            bloco.add(linhaStat(dados.magiaMana + " Mana", COR_MANA)).left().row();
-            bloco.add(linhaStat(dados.magiaCd + "s Cooldown", Color.LIGHT_GRAY)).left().row();
+            bloco.add(linhaStat(tr("Req. Lv {0}", dados.reqLevel), COR_REQUISITO)).left().row();
+            bloco.add(linhaStat(tr("Spell"), Color.LIGHT_GRAY)).left().row();
+            bloco.add(linhaStat(tr("{0} Mana", dados.magiaMana), COR_MANA)).left().row();
+            bloco.add(linhaStat(tr("{0}s Cooldown", dados.magiaCd), Color.LIGHT_GRAY)).left().row();
             bloco.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET)).left().padTop(6).row();
             if (dados.sangraTicks > 0) bloco.add(linhaStat(textoSangramento(dados), corDoDot(dados))).left().row();
-            if (dados.magiaLento > 0) bloco.add(linhaStat("Slows for " + porcento(dados.magiaLento) + "s", Color.LIGHT_GRAY)).left().row();
+            if (dados.magiaLento > 0) bloco.add(linhaStat(tr("Slows for {0}s", porcento(dados.magiaLento)), Color.LIGHT_GRAY)).left().row();
             if (dados.magiaGolpes > 1) bloco.add(linhaStat(textoGolpes(dados), Color.LIGHT_GRAY)).left().row();
-            bloco.add(linhaStat(dados.magiaArea ? "Area Damage" : "Single Target", COR_ALVO_MAGIA)).left().row();
+            bloco.add(linhaStat(dados.magiaArea ? tr("Area Damage") : tr("Single Target"), COR_ALVO_MAGIA)).left().row();
             return;
         }
         if (dados.usavel) {
             // Scroll: o tipo e o que faz.
-            bloco.add(linhaStat(dados.tipo.isEmpty() ? "Scroll" : dados.tipo, Color.LIGHT_GRAY)).left().row();
+            bloco.add(linhaStat(dados.tipo.isEmpty() ? tr("Scroll") : dados.tipo, Color.LIGHT_GRAY)).left().row();
             adicionarLinhaCap(bloco, dados);
-            Label efeito = linhaStat("Teleports you to the city. Can't be used in battle.", new Color(0.7f, 0.85f, 1f, 1f));
+            Label efeito = linhaStat(tr("Teleports you to the city. Can't be used in battle."), new Color(0.7f, 0.85f, 1f, 1f));
             efeito.setWrap(true);
             bloco.add(efeito).growX().left().row();
             return;
         }
         if (dados.ehPocao()) {
             // Pocao: "Potion" e quanto cura (valor maximo; o servidor varia um pouco).
-            bloco.add(linhaStat("Potion", Color.LIGHT_GRAY)).left().row();
+            bloco.add(linhaStat(tr("Potion"), Color.LIGHT_GRAY)).left().row();
             // "+(icone de HP/MP da HUD) 50".
             if (dados.healHp > 0) bloco.add(linhaCura("ui/HPIcon", dados.healHp, COR_POCAO_HP)).left().row();
             if (dados.healMp > 0) bloco.add(linhaCura("ui/MPIcon", dados.healMp, COR_POCAO_MP)).left().row();
             adicionarLinhaCap(bloco, dados);
             return;
         }
-        bloco.add(linhaStat("Req. Lv " + dados.reqLevel, COR_REQUISITO)).left().row();
+        bloco.add(linhaStat(tr("Req. Lv {0}", dados.reqLevel), COR_REQUISITO)).left().row();
         // Vermelho = classe errada (o servidor pune quem equipa item de outra classe).
         boolean classeCerta = "All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass);
-        bloco.add(linhaStat(("All".equals(dados.reqClass) ? "Universal" : dados.reqClass) + " " + dados.tipo,
+        bloco.add(linhaStat(("All".equals(dados.reqClass) ? tr("Universal") : dados.reqClass) + " " + dados.tipo,
             classeCerta ? corClasse(dados.reqClass) : Color.valueOf("ff4a4a"))).left().row();
         adicionarLinhaStat(bloco, "Attack", dados.bonusDamage, base == null ? 0 : base.bonusDamage, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Defense", dados.defense, base == null ? 0 : base.defense, comparar, Color.WHITE);
@@ -1037,22 +1037,22 @@ public final class BookMenuUI {
             bloco.add(linhaComIcone("ui/items/StarterSword", mult + "x Atk Speed", Color.WHITE)).left().row();
         }
         // Mana gasta por ataque (varinha). Sem "(+n)": nao e' bonus, e' custo.
-        if (dados.manaCost > 0) bloco.add(linhaStat(dados.manaCost + " Mana per hit", COR_MANA)).left().row();
+        if (dados.manaCost > 0) bloco.add(linhaStat(tr("{0} Mana per hit", dados.manaCost), COR_MANA)).left().row();
         // Cap: sempre o ultimo stat (antes das descricoes em azul).
         adicionarLinhaCap(bloco, dados);
         if (dados.treino) {
             // Arma de treino: o que ela faz, em topicos (azul, igual o scroll).
             List<String> topicos = new ArrayList<>(java.util.Arrays.asList(
-                "Hits 1% of target HP (max 100)",
-                "+5% skill gain",
-                "No HP/MP regen",
-                "No spells",
-                "Locks the creature for 5s"));
-            if (dados.economiaFlecha > 0) topicos.add(dados.economiaFlecha + "% chance to save arrows");
-            bloco.add(linhaStat("Training Weapon", COR_SET)).left().padTop(6).row();
+                tr("Hits 1% of target HP (max 100)"),
+                tr("+5% skill gain"),
+                tr("No HP/MP regen"),
+                tr("No spells"),
+                tr("Locks the creature for 5s")));
+            if (dados.economiaFlecha > 0) topicos.add(tr("{0}% chance to save arrows", dados.economiaFlecha));
+            bloco.add(linhaStat(tr("Training Weapon"), COR_SET)).left().padTop(6).row();
             for (String t : topicos) bloco.add(linhaStat(t, COR_SET)).left().padLeft(10).row();
         } else if (dados.economiaFlecha > 0) {
-            bloco.add(linhaStat(dados.economiaFlecha + "% chance to save arrows", COR_SET)).left().padTop(6).row();
+            bloco.add(linhaStat(tr("{0}% chance to save arrows", dados.economiaFlecha), COR_SET)).left().padTop(6).row();
         }
         if (dados.conjunto != null && !dados.conjunto.isEmpty()) adicionarBlocoSet(bloco, dados);
     }
@@ -1108,21 +1108,21 @@ public final class BookMenuUI {
         if (dados.conjuntoXp > 0) {
             Color cor = completo ? COR_SET : COR_SET_OFF;
             Table linha = new Table();
-            linha.add(linhaStat("Bonus: " + dados.conjuntoXp + "%", cor)).padRight(4);
+            linha.add(linhaStat(tr("Bonus: {0}%", dados.conjuntoXp), cor)).padRight(4);
             TextureAtlas.AtlasRegion regiao = atlas.findRegion("ui/XPIcon");
             if (regiao != null) {
                 Image img = new Image(new TextureRegionDrawable(regiao));
                 img.setScaling(Scaling.fit);
                 linha.add(img).size(18f).padRight(4);
             }
-            linha.add(linhaStat("Extra XP", cor));
+            linha.add(linhaStat(tr("Extra XP"), cor));
             bloco.add(linha).left().padTop(4).row();
         }
     }
 
     private void adicionarLinhaStat(Table bloco, String nome, int valor, int anterior, boolean comparar, Color cor) {
         if (valor == 0 && (!comparar || anterior == 0)) return;
-        String texto = valor + " " + nome;
+        String texto = valor + " " + tr(nome);
         if (comparar) {
             int diferenca = valor - anterior;
             texto += " (" + (diferenca >= 0 ? "+" : "") + diferenca + ")";
@@ -1643,7 +1643,7 @@ public final class BookMenuUI {
         } else {
             linha.add().size(TAMANHO_ICONE_STATUS).padRight(8);
         }
-        Label r = new LabelPixel(rotulo, skin.get("hud", Label.LabelStyle.class));
+        Label r = new LabelPixel(tr(rotulo), skin.get("hud", Label.LabelStyle.class));
         Label v = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
         linha.add(r).left().width(LARGURA_ROTULO_STATUS);
         linha.add(v).left();
@@ -1718,14 +1718,14 @@ public final class BookMenuUI {
         estiloAplicarNormal = estiloBotao;
         estiloAplicarAlterado = new TextButton.TextButtonStyle(skin.get("verde", TextButton.TextButtonStyle.class));
         estiloAplicarAlterado.font = skin.getFont("botao-texto-font");
-        TextButton equipar = new TextButton("Apply", estiloBotao);
+        TextButton equipar = new TextButton(tr("Apply"), estiloBotao);
         botaoAplicarSkins = equipar;
         equipar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 equiparSkins();
             }
         });
-        TextButton resetar = new TextButton("Reset", estiloBotao);
+        TextButton resetar = new TextButton(tr("Reset"), estiloBotao);
         resetar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 copiarSkins(skinsEquipadas, skinsRascunho);
@@ -1873,10 +1873,10 @@ public final class BookMenuUI {
 
     private static String nomeCategoriaVanity(String cat) {
         switch (cat) {
-            case "base": return "Skin";
-            case "body": return "Clothe";
-            case "helm": return "Hair/Hat";
-            case "acc": return "Back";
+            case "base": return tr("Skin");
+            case "body": return tr("Clothe");
+            case "helm": return tr("Hair/Hat");
+            case "acc": return tr("Back");
             default: return cat;
         }
     }
@@ -2182,14 +2182,14 @@ public final class BookMenuUI {
         // Comida/pocao nao mostram "Quantity" (a quantidade ja' aparece no icone).
         boolean ehPocao = comida != null && comida.ehPocao();
         boolean ehComida = comida != null && (comida.fullness > 0 || ehPocao || comida.usavel);
-        if (item.quantity > 1 && !ehComida) bagDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
-        if (item.favorite) bagDetalhes.add(linhaStat("Favorite", new Color(1f, 0.82f, 0.24f, 1f))).left().row();
+        if (item.quantity > 1 && !ehComida) bagDetalhes.add(linhaStat(tr("Quantity {0}", item.quantity), Color.LIGHT_GRAY)).left().row();
+        if (item.favorite) bagDetalhes.add(linhaStat(tr("Favorite"), new Color(1f, 0.82f, 0.24f, 1f))).left().row();
         if (ehComida && !item.instanceId.isEmpty()) {
             TextButton.TextButtonStyle estiloComer = new TextButton.TextButtonStyle(
                 skin.get("verde", TextButton.TextButtonStyle.class));
             estiloComer.font = skin.getFont("botao-texto-font");
             // Pocao: "Use" (o servidor decide: eat_food usa comida ou pocao).
-            TextButton comer = new TextButton(ehPocao || comida.usavel ? "Use" : "Eat", estiloComer);
+            TextButton comer = new TextButton(ehPocao || comida.usavel ? tr("Use") : tr("Eat"), estiloComer);
             String id = item.instanceId;
             comer.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
                 @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
@@ -2315,7 +2315,7 @@ public final class BookMenuUI {
         // ---- Tela 1: escolher itens ----
         tradeGrid.top().left();
         tradeDetalhes.top().left();
-        botaoEnviarTrade = botaoComIcone("Send Offer", "ui/currency/Gold", estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
+        botaoEnviarTrade = botaoComIcone(tr("Send Offer"), "ui/currency/Gold", estiloPlano(COR_BOTAO_TRADE, Color.WHITE));
         // Celular: o livro ja' e' ampliado 1.2x - a fonte do botao ficava enorme.
         if (MOBILE_LIVRO) botaoEnviarTrade.getLabel().setFontScale(0.7f);
         botaoEnviarTrade.addListener(new ChangeListener() {
@@ -2349,7 +2349,7 @@ public final class BookMenuUI {
 
         // ---- Tela 2: confirmar ----
         confirmDetalhes.top().left();
-        botaoAceitarTrade = botaoComIcone("Accept", "ui/Confirm", estiloPlano(COR_BOTAO_ACEITAR, Color.WHITE));
+        botaoAceitarTrade = botaoComIcone(tr("Accept"), "ui/Confirm", estiloPlano(COR_BOTAO_ACEITAR, Color.WHITE));
         botaoAceitarTrade.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aceitarTrade(); }
         });
@@ -2446,9 +2446,9 @@ public final class BookMenuUI {
         cancelarExclusao();
         if (colunaEsquerdaAbas != null) colunaEsquerdaAbas.setVisible(false);
         if (colunaDireitaAbas != null) colunaDireitaAbas.setVisible(false);
-        tituloTrade.setText("Trade with " + outro);
-        passoTrade.setText("Step 1 of 2  -  Tap what you want to give");
-        botaoEnviarTrade.setText("Send Offer");
+        tituloTrade.setText(tr("Trade with {0}", outro));
+        passoTrade.setText(tr("Step 1 of 2  -  Tap what you want to give"));
+        botaoEnviarTrade.setText(tr("Send Offer"));
         botaoEnviarTrade.setDisabled(false);
         mostrarPaginaTrade(tradePage);
         atualizarGradeTrade();
@@ -2562,7 +2562,7 @@ public final class BookMenuUI {
         nome.setColor(corMoeda(tipo));
         tradeDetalhes.add(nome).left().padBottom(1).row();
         if (tradeSelecao.containsKey(chave)) {
-            tradeDetalhes.add(linhaStat("Selected " + tradeSelecao.get(chave), COR_TRADE_SELECIONADO)).left().row();
+            tradeDetalhes.add(linhaStat(tr("Selected {0}", tradeSelecao.get(chave)), COR_TRADE_SELECIONADO)).left().row();
         }
     }
 
@@ -2634,7 +2634,7 @@ public final class BookMenuUI {
         barra.definir(max, false);
         TextButton menos = botaoRepetir("-", () -> barra.definir(barra.valor - 1, true));
         TextButton mais = botaoRepetir("+", () -> barra.definir(barra.valor + 1, true));
-        TextButton botaoMax = new TextButton("Max", estiloBotaoTrade("default"));
+        TextButton botaoMax = new TextButton(tr("Max"), estiloBotaoTrade("default"));
         botaoMax.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 campo.setText(String.valueOf(max));
@@ -2642,15 +2642,15 @@ public final class BookMenuUI {
                 revalidar[0].run();
             }
         });
-        TextButton cancelar = new TextButton("Cancel", estiloBotaoTrade("vermelho"));
+        TextButton cancelar = new TextButton(tr("Cancel"), estiloBotaoTrade("vermelho"));
         TextButton.TextButtonStyle estiloOk = estiloBotaoTrade("verde"), estiloSemCap = estiloBotaoTrade("vermelho");
-        TextButton confirmar = new TextButton("Confirm", estiloOk);
+        TextButton confirmar = new TextButton(tr("Confirm"), estiloOk);
         revalidar[0] = () -> {
             if (aoMudarQtd != null) aoMudarQtd.accept(valorDoCampo(campo, max));
             boolean ok = cabe == null || cabe.test(valorDoCampo(campo, max));
             perguntou[0] = false; // mudou a quantia: pergunta de novo
             confirmar.setStyle(ok ? estiloOk : estiloSemCap);
-            confirmar.setText(ok ? "Confirm" : "No Cap");
+            confirmar.setText(ok ? tr("Confirm") : tr("No Cap"));
         };
         cancelar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { fecharPopupQuantidade(); }
@@ -2660,7 +2660,7 @@ public final class BookMenuUI {
                 if (pedeCerteza && !perguntou[0]) {
                     if (cabe != null && !cabe.test(valorDoCampo(campo, max))) return;
                     perguntou[0] = true;
-                    confirmar.setText("Are you sure?");
+                    confirmar.setText(tr("Are you sure?"));
                     return;
                 }
                 confirmarPopup(campo, max, cabe, aoConfirmar);
@@ -2742,7 +2742,7 @@ public final class BookMenuUI {
     /** "Your coins:" com as moedas que o player tem (maior primeiro). */
     private Table linhaMinhasMoedas() {
         Table t = new Table();
-        Label rot = new LabelPixel("Your coins:", estiloNitido(TAM_TEXTO_RODAPE));
+        Label rot = new LabelPixel(tr("Your coins:"), estiloNitido(TAM_TEXTO_RODAPE));
         rot.setColor(Color.LIGHT_GRAY);
         t.add(rot).padRight(8);
         boolean algum = false;
@@ -2928,11 +2928,11 @@ public final class BookMenuUI {
         for (String k : tradeSelecao.keySet()) if (indiceMoeda(k) < 0) itens++;
         long moedas = valorMoedasSelecionadas(null);
         if (itens == 0 && moedas == 0) {
-            resumoTrade.setText("Your offer: nothing yet");
+            resumoTrade.setText(tr("Your offer: nothing yet"));
             resumoTrade.setColor(COR_PASSO);
             return;
         }
-        StringBuilder sb = new StringBuilder("Your offer: ");
+        StringBuilder sb = new StringBuilder(tr("Your offer:") + " ");
         if (itens > 0) sb.append(itens).append(itens == 1 ? " item" : " items");
         if (moedas > 0) sb.append(itens > 0 ? " + " : "").append(textoMoedas(moedas));
         resumoTrade.setText(sb.toString());
@@ -2964,10 +2964,10 @@ public final class BookMenuUI {
             return;
         }
         preencherBlocoStats(tradeDetalhes, item.itemPath, null, item.quantity);
-        if (tradeLimiteAviso) tradeDetalhes.add(linhaStat("Max " + TRADE_MAX_ITENS + " items", Color.valueOf("ff6a6a"))).left().row();
-        if (item.quantity > 1) tradeDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
+        if (tradeLimiteAviso) tradeDetalhes.add(linhaStat(tr("Max {0} items", TRADE_MAX_ITENS), Color.valueOf("ff6a6a"))).left().row();
+        if (item.quantity > 1) tradeDetalhes.add(linhaStat(tr("Quantity {0}", item.quantity), Color.LIGHT_GRAY)).left().row();
         if (tradeSelecao.containsKey(item.instanceId) && item.quantity > 1) {
-            tradeDetalhes.add(linhaStat("Selected " + tradeSelecao.get(item.instanceId), COR_TRADE_SELECIONADO)).left().row();
+            tradeDetalhes.add(linhaStat(tr("Selected {0}", tradeSelecao.get(item.instanceId)), COR_TRADE_SELECIONADO)).left().row();
         }
     }
 
@@ -2992,8 +2992,8 @@ public final class BookMenuUI {
         socket.emitRaw("trade_offer_update", payload);
         socket.emitRaw("trade_ready", "{}");
         tradeEnviado = true;
-        botaoEnviarTrade.setText("Waiting...");
-        passoTrade.setText("Waiting for " + tradeOutro + "...");
+        botaoEnviarTrade.setText(tr("Waiting..."));
+        passoTrade.setText(tr("Waiting for {0}...", tradeOutro));
         botaoEnviarTrade.setDisabled(true);
         if (root.getStage() != null && campoQtdTrade != null && root.getStage().getKeyboardFocus() == campoQtdTrade) {
             root.getStage().setKeyboardFocus(null);
@@ -3013,13 +3013,13 @@ public final class BookMenuUI {
     public void mostrarConfirmacaoTrade(String meuNome) {
         if (!modoTrade) return;
         tradeAceito = false;
-        botaoAceitarTrade.setText("Accept");
+        botaoAceitarTrade.setText(tr("Accept"));
         botaoAceitarTrade.setDisabled(false);
         statusTradeConfirm.setText("");
         statusMeuAceite.setText("");
-        tituloMinhaOferta.setText("You give");
+        tituloMinhaOferta.setText(tr("You give"));
         tituloMinhaOferta.setColor(Color.valueOf("ff9a6a"));
-        tituloOfertaOutro.setText("You receive");
+        tituloOfertaOutro.setText(tr("You receive"));
         tituloOfertaOutro.setColor(COR_TRADE_SELECIONADO);
         tradeFoco = null;
         mostrarPaginaTrade(tradeConfirmPage);
@@ -3027,8 +3027,8 @@ public final class BookMenuUI {
     }
 
     private void montarConfirmacaoTrade() {
-        montarGradeOferta(gradeMinhaOferta, minhaOferta, "Nothing offered.");
-        montarGradeOferta(gradeOfertaOutro, ofertaOutro, "Nothing offered.");
+        montarGradeOferta(gradeMinhaOferta, minhaOferta, tr("Nothing offered."));
+        montarGradeOferta(gradeOfertaOutro, ofertaOutro, tr("Nothing offered."));
         if (tradeFoco == null) {
             confirmDetalhes.clearChildren();
         }
@@ -3067,7 +3067,7 @@ public final class BookMenuUI {
                 Button slot = slotBanco(iconeDoItem(caminho), qtd, false, Color.WHITE, chave.equals(tradeFoco), () -> {
                     tradeFoco = chave;
                     preencherBlocoStats(confirmDetalhes, caminho, null, qtd);
-                    if (qtd > 1) confirmDetalhes.add(linhaStat("Quantity " + qtd, Color.LIGHT_GRAY)).left().row();
+                    if (qtd > 1) confirmDetalhes.add(linhaStat(tr("Quantity {0}", qtd), Color.LIGHT_GRAY)).left().row();
                     montarGradeOferta(gradeMinhaOferta, minhaOferta, vazioTexto);
                     montarGradeOferta(gradeOfertaOutro, ofertaOutro, vazioTexto);
                 });
@@ -3082,16 +3082,16 @@ public final class BookMenuUI {
         if (tradeAceito || !socket.isConnected()) return;
         tradeAceito = true;
         socket.emitRaw("trade_lock_in", "{}");
-        botaoAceitarTrade.setText("Waiting...");
+        botaoAceitarTrade.setText(tr("Waiting..."));
         botaoAceitarTrade.setDisabled(true);
     }
 
     /** trade_lock_state_updated. */
     public void estadoAceiteTrade(boolean euAceitei, boolean eleAceitou) {
         if (!modoTrade) return;
-        statusTradeConfirm.setText(eleAceitou ? "Accepted" : "");
+        statusTradeConfirm.setText(eleAceitou ? tr("Accepted") : "");
         statusTradeConfirm.setColor(COR_TRADE_SELECIONADO);
-        statusMeuAceite.setText(euAceitei ? "Accepted" : "");
+        statusMeuAceite.setText(euAceitei ? tr("Accepted") : "");
     }
 
     // ===================== BANK (NPC Jack) =====================
@@ -3199,7 +3199,7 @@ public final class BookMenuUI {
 
         estiloBancoOk = estiloPlano(COR_BOTAO_BANCO, Color.WHITE);
         estiloBancoBloqueado = estiloPlano(COR_BLOQUEADO, Color.WHITE);
-        bancoAcao = botaoComIcone("Withdraw", ICONE_DEPOSITO, estiloBancoOk);
+        bancoAcao = botaoComIcone(tr("Withdraw"), ICONE_DEPOSITO, estiloBancoOk);
         iconeAcaoBanco = (Image) bancoAcao.getChildren().first();
         bancoAcao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { acaoBanco(); }
@@ -3215,8 +3215,8 @@ public final class BookMenuUI {
         esquerda.add(bancoDetalhes).grow().top().left().pad(8).row();
         esquerda.add(bancoRodapeAcao).growX().pad(6);
 
-        abaBag = botaoComIcone("Bag", ICONE_ABA_BAG, estiloAba(false, true));
-        abaBank = botaoComIcone("Bank", ICONE_ABA_BANK, estiloAba(true, false));
+        abaBag = botaoComIcone(tr("Bag"), ICONE_ABA_BAG, estiloAba(false, true));
+        abaBank = botaoComIcone(tr("Bank"), ICONE_ABA_BANK, estiloAba(true, false));
         abaBag.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaBanco(false); }
         });
@@ -3461,17 +3461,17 @@ public final class BookMenuUI {
             bancoDetalhes.add(nome).left().padBottom(1).row();
         } else {
             preencherBlocoStats(bancoDetalhes, item.itemPath, null, item.quantity);
-            if (item.quantity > 1) bancoDetalhes.add(linhaStat("Quantity " + item.quantity, Color.LIGHT_GRAY)).left().row();
+            if (item.quantity > 1) bancoDetalhes.add(linhaStat(tr("Quantity {0}", item.quantity), Color.LIGHT_GRAY)).left().row();
             if (abaBancoBank) {
                 bloqueado = !cabeNaMochila(item.itemPath, 1);
-                textoBloqueado = "No Cap";
+                textoBloqueado = tr("No Cap");
             } else {
                 bloqueado = bancoCheioPara(item.itemPath);
-                textoBloqueado = "Bank Full";
+                textoBloqueado = tr("Bank Full");
             }
         }
         bancoAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloBancoOk);
-        bancoAcao.setText(bloqueado ? textoBloqueado : abaBancoBank ? "Withdraw" : "Deposit");
+        bancoAcao.setText(bloqueado ? textoBloqueado : abaBancoBank ? tr("Withdraw") : tr("Deposit"));
         TextureAtlas.AtlasRegion r = atlas.findRegion(abaBancoBank ? ICONE_SAQUE : ICONE_DEPOSITO);
         if (iconeAcaoBanco != null && r != null) iconeAcaoBanco.setDrawable(new TextureRegionDrawable(r));
     }
@@ -3561,7 +3561,7 @@ public final class BookMenuUI {
 
     private boolean lojaDeMagia() { return "spell".equals(lojaPapel); }
 
-    private String textoComprar() { return lojaDeMagia() ? "Learn" : "Buy"; }
+    private String textoComprar() { return lojaDeMagia() ? tr("Learn") : tr("Buy"); }
 
     private String iconeAbaBuy() {
         if ("pot".equals(lojaPapel)) return "sheet/r44_c2";
@@ -3585,7 +3585,7 @@ public final class BookMenuUI {
         lojaGridVendendo.top().left();
         lojaGridMeus.top().left();
 
-        lojaAcao = botaoComIcone("Buy", ICONE_COMPRAR, estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
+        lojaAcao = botaoComIcone(tr("Buy"), ICONE_COMPRAR, estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
         lojaAcao.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { comprarFoco(); }
         });
@@ -3599,8 +3599,8 @@ public final class BookMenuUI {
         esquerda.add(lojaDetalhes).width(COLUNA_BAG - 16f).growY().top().left().pad(8).row();
         esquerda.add(lojaRodapeAcao).width(COLUNA_BAG - 14f).pad(6, 7, 7, 7);
 
-        abaBuy = botaoComIcone("Buy", ICONE_FULLNESS, estiloAbaLoja(false, true));
-        abaSell = botaoComIcone("Sell", "ui/currency/Gold", estiloAbaLoja(true, false));
+        abaBuy = botaoComIcone(tr("Buy"), ICONE_FULLNESS, estiloAbaLoja(false, true));
+        abaSell = botaoComIcone(tr("Sell"), "ui/currency/Gold", estiloAbaLoja(true, false));
         abaBuy.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { trocarAbaLoja(false); }
         });
@@ -3633,7 +3633,7 @@ public final class BookMenuUI {
         moedasLoja = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
         moedasLoja.left();
         // Linha das moedas: na loja de magia o botao Learn fica aqui, na direita.
-        botaoAprenderRodape = botaoComIcone("Learn", ICONE_APRENDER, estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
+        botaoAprenderRodape = botaoComIcone(tr("Learn"), ICONE_APRENDER, estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
         botaoAprenderRodape.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aprenderMagiaFoco(); }
         });
@@ -3644,14 +3644,14 @@ public final class BookMenuUI {
         conteudoCompra.add(new Stack(barraCapLoja, textoBarra)).growX().height(24).padTop(4);
 
         // ---- Sell: em cima o que vai vender, embaixo os meus itens ----
-        Label tituloVendendo = new LabelPixel("Selling", estiloTexto);
-        Label tituloMeus = new LabelPixel("Your items", estiloTexto);
+        Label tituloVendendo = new LabelPixel(tr("Selling"), estiloTexto);
+        Label tituloMeus = new LabelPixel(tr("Your items"), estiloTexto);
         tituloVendendo.setColor(Color.LIGHT_GRAY);
         tituloMeus.setColor(Color.LIGHT_GRAY);
         lojaTotal = new LabelPixel("0", new Label.LabelStyle(fonteBanco(), Color.WHITE));
         iconeTotalLoja = new Image();
         iconeTotalLoja.setScaling(Scaling.fit);
-        botaoVender = botaoComIcone("Sell", "ui/currency/Gold", estiloPlano(COR_ABA_SELL, Color.WHITE));
+        botaoVender = botaoComIcone(tr("Sell"), "ui/currency/Gold", estiloPlano(COR_ABA_SELL, Color.WHITE));
         botaoVender.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { venderSelecao(); }
         });
@@ -3752,7 +3752,7 @@ public final class BookMenuUI {
         String r = dados.getString("result", "");
         if (!modoLoja) return;
         if ("sold".equals(r)) vendaSelecao.clear();
-        lojaAviso.setText("no_money".equals(r) ? "Not enough money." : "no_cap".equals(r) ? "Not enough capacity."
+        lojaAviso.setText("no_money".equals(r) ? tr("Not enough money.") : "no_cap".equals(r) ? tr("Not enough capacity.")
             : "");
         atualizarTelaLoja();
     }
@@ -3946,7 +3946,7 @@ public final class BookMenuUI {
         if (vendaArmada) {
             vendaArmada = false;
             iconeDoBotao(botaoVender, true);
-            botaoVender.setText("Sell");
+            botaoVender.setText(tr("Sell"));
         }
         botaoVender.setColor(total > 0 ? Color.WHITE : new Color(1f, 1f, 1f, 0.45f));
     }
@@ -3978,7 +3978,7 @@ public final class BookMenuUI {
             compraArmada = false;
             iconeDoBotao(lojaAcao, true);
             lojaAcao.setStyle(bloqueado ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
-            lojaAcao.setText(!bloqueado ? textoComprar() : semDinheiro ? "No Money" : "No Cap");
+            lojaAcao.setText(!bloqueado ? textoComprar() : semDinheiro ? tr("No Money") : tr("No Cap"));
         } else {
             InventoryItem item = itemPorId(lojaFoco);
             if (item == null || precoVenda(item.itemPath) <= 0) return;
@@ -4008,7 +4008,7 @@ public final class BookMenuUI {
             if (!compraArmada) {
                 compraArmada = true;
                 iconeDoBotao(lojaAcao, false); // "Are you sure?" nao cabe com o icone
-                lojaAcao.setText("Are you sure?");
+                lojaAcao.setText(tr("Are you sure?"));
                 return;
             }
             compraArmada = false;
@@ -4024,7 +4024,7 @@ public final class BookMenuUI {
         rodape.add(linhaTotal).padBottom(6).row();
         rodape.add(linhaMinhasMoedas());
         proximoPopupRodape = rodape;
-        proximoPopupAoMudar = v -> preencherLinhaValor(linhaTotal, "Total:", it.preco * (long) v);
+        proximoPopupAoMudar = v -> preencherLinhaValor(linhaTotal, tr("Total:"), it.preco * (long) v);
         abrirPopupQuantidade(nomeExibicao(it.item), iconeDoItem(it.item), max, null, comprar);
     }
 
@@ -4035,12 +4035,12 @@ public final class BookMenuUI {
         if (!vendaArmada) {
             vendaArmada = true;
             iconeDoBotao(botaoVender, false);
-            botaoVender.setText("Are you sure?");
+            botaoVender.setText(tr("Are you sure?"));
             return;
         }
         vendaArmada = false;
         iconeDoBotao(botaoVender, true);
-        botaoVender.setText("Sell");
+        botaoVender.setText(tr("Sell"));
         String npc = lojaNpc;
         String payload = GameSocket.obj(w -> {
             w.set("npc_id", npc);
@@ -4108,7 +4108,7 @@ public final class BookMenuUI {
         estiloCriar.up = UiSkin.retangulo(rosa, rosaBorda, 2);
         estiloCriar.over = UiSkin.retangulo(rosa.cpy().lerp(Color.WHITE, 0.15f), rosaBorda, 2);
         estiloCriar.down = UiSkin.retangulo(rosa.cpy().mul(0.75f, 0.75f, 0.75f, 1f), rosaBorda, 2);
-        botaoCriarParty = new TextButton("Create", estiloCriar);
+        botaoCriarParty = new TextButton(tr("Create"), estiloCriar);
         botaoCriarParty.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 if (!socket.isConnected()) return;
@@ -4157,12 +4157,12 @@ public final class BookMenuUI {
                 () -> responderConviteParty(quem, true))).growX().height(40).padBottom(3).row();
         }
         if (ordenados.isEmpty() && convitesParty.isEmpty()) {
-            Label vazio = new LabelPixel("You are not in a party.", skin.get("hud", Label.LabelStyle.class));
+            Label vazio = new LabelPixel(tr("You are not in a party."), skin.get("hud", Label.LabelStyle.class));
             escalarFonte(vazio, 0.6f);
             listaParty.add(vazio).pad(10);
         }
-        bonusParty.setText("Class EXP Bonus: " + bonusPartyPct + "%");
-        botaoCriarParty.setText(liderParty == null ? "Create" : "Leave");
+        bonusParty.setText(tr("Class EXP Bonus: {0}%", bonusPartyPct));
+        botaoCriarParty.setText(liderParty == null ? tr("Create") : tr("Leave"));
     }
 
     /** classe null = linha de convite (sem bolinha/icone de classe, com Confirm). */
@@ -4175,7 +4175,7 @@ public final class BookMenuUI {
         Label rotulo = new LabelPixel(nome, skin.get("hud", Label.LabelStyle.class));
         escalarFonte(rotulo, 0.75f);
         linha.add(rotulo).left().padLeft(classe != null ? 0 : 8);
-        Label lv = new LabelPixel("Lv " + level, skin.get("hud", Label.LabelStyle.class));
+        Label lv = new LabelPixel(tr("Lv {0}", level), skin.get("hud", Label.LabelStyle.class));
         escalarFonte(lv, 0.6f);
         lv.setColor(COR_LV);
         linha.add(lv).left().padLeft(16).expandX();
@@ -4326,14 +4326,14 @@ public final class BookMenuUI {
         estiloRemover.font = skin.getFont("botao-texto-font");
         TextButton.TextButtonStyle estiloAdicionar = new TextButton.TextButtonStyle(skin.get("verde", TextButton.TextButtonStyle.class));
         estiloAdicionar.font = skin.getFont("botao-texto-font");
-        TextButton remover = new TextButton("Remove", estiloRemover);
-        TextButton adicionar = new TextButton("Add Friend", estiloAdicionar);
+        TextButton remover = new TextButton(tr("Remove"), estiloRemover);
+        TextButton adicionar = new TextButton(tr("Add Friend"), estiloAdicionar);
         remover.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 // Clicar na linha agora abre a janela do player; pra remover,
                 // aperta Remove e depois clica no amigo.
                 modoRemover = !modoRemover;
-                statusAmigos.setText(modoRemover ? "Click a friend to remove." : "");
+                statusAmigos.setText(modoRemover ? tr("Click a friend to remove.") : "");
             }
         });
         adicionar.addListener(new ChangeListener() {
@@ -4349,10 +4349,10 @@ public final class BookMenuUI {
 
         // "Add Friend": campo com o nome + Add/Cancel no lugar do rodape.
         campoNovoAmigo = new com.badlogic.gdx.scenes.scene2d.ui.TextField("", skin);
-        campoNovoAmigo.setMessageText("Friend name");
+        campoNovoAmigo.setMessageText(tr("Friend name"));
         campoNovoAmigo.setMaxLength(12);
-        TextButton confirmar = new TextButton("Add", estiloAdicionar);
-        TextButton cancelar = new TextButton("Cancel", estiloRemover);
+        TextButton confirmar = new TextButton(tr("Add"), estiloAdicionar);
+        TextButton cancelar = new TextButton(tr("Cancel"), estiloRemover);
         confirmar.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
                 String nome = campoNovoAmigo.getText().trim();
@@ -4392,7 +4392,7 @@ public final class BookMenuUI {
         ordenados.sort((a, b) -> a.online != b.online ? (a.online ? -1 : 1) : a.nome.compareToIgnoreCase(b.nome));
         for (AmigoInfo a : ordenados) listaAmigos.add(linhaAmigo(a)).growX().height(40).padBottom(3).row();
         if (ordenados.isEmpty()) {
-            Label vazio = new LabelPixel("No friends yet.", skin.get("hud", Label.LabelStyle.class));
+            Label vazio = new LabelPixel(tr("No friends yet."), skin.get("hud", Label.LabelStyle.class));
             escalarFonte(vazio, 0.6f);
             listaAmigos.add(vazio).pad(10);
         }
@@ -4498,9 +4498,9 @@ public final class BookMenuUI {
 
     /** friend_add_result: mensagem curta no rodape. */
     public void resultadoAdicionarAmigo(boolean sucesso, String nome, String motivo) {
-        if (sucesso) statusAmigos.setText(nome + " added.");
-        else if ("self".equals(motivo)) statusAmigos.setText("You can't add yourself.");
-        else statusAmigos.setText("Player not found.");
+        if (sucesso) statusAmigos.setText(tr("{0} added.", nome));
+        else if ("self".equals(motivo)) statusAmigos.setText(tr("You can't add yourself."));
+        else statusAmigos.setText(tr("Player not found."));
     }
 
     public AmigoInfo amigo(String nome) { return amigos.get(nome); }
@@ -4933,7 +4933,10 @@ public final class BookMenuUI {
 
     private com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> seletorMercado(String[] opcoes) {
         com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> sb = new SelectSeta(skin, "zoom-select");
-        sb.setItems(opcoes);
+        // Mostra traduzido; os filtros comparam pelo INDICE (FILTRO_* em ingles).
+        String[] mostrar = new String[opcoes.length];
+        for (int i = 0; i < opcoes.length; i++) mostrar[i] = tr(opcoes[i]);
+        sb.setItems(mostrar);
         sb.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { atualizarListaMercado(); }
         });
@@ -4943,9 +4946,9 @@ public final class BookMenuUI {
     private void construirPaginaMercado() {
         mercadoPage.top().left();
         mercadoBusca = new com.badlogic.gdx.scenes.scene2d.ui.TextField("", skin);
-        mercadoBusca.setMessageText("Search item...");
+        mercadoBusca.setMessageText(tr("Search item..."));
         mercadoBusca.setTextFieldListener((campo, c) -> atualizarListaMercado());
-        TextButton minhas = botaoSpells("My offers", "default", () -> {
+        TextButton minhas = botaoSpells(tr("My offers"), "default", () -> {
             mercadoVendoMinhas = !mercadoVendoMinhas;
             mercadoAviso = "";
             atualizarDetalheMercado();
@@ -5023,7 +5026,7 @@ public final class BookMenuUI {
         }
         itens.sort((a, b) -> nomeExibicao(a).compareToIgnoreCase(nomeExibicao(b)));
         for (String caminho : itens) mercadoLista.add(gavetaItemMercado(caminho)).growX().padBottom(3).row();
-        if (itens.isEmpty()) mercadoLista.add(linhaStat("No items found.", Color.GRAY)).left().pad(4);
+        if (itens.isEmpty()) mercadoLista.add(linhaStat(tr("No items found."), Color.GRAY)).left().pad(4);
     }
 
     /** Gaveta da lista: icone + nome (+ level); clicar abre as ofertas dele. */
@@ -5044,7 +5047,7 @@ public final class BookMenuUI {
         txt.left();
         txt.add(linhaStat(nomeExibicao(caminho), Color.WHITE)).left().row();
         EquipStats d = ITEM_STATS.get(caminho);
-        if (d != null && d.reqLevel > 0) txt.add(linhaStat("Lv " + d.reqLevel, COR_REQUISITO)).left().row();
+        if (d != null && d.reqLevel > 0) txt.add(linhaStat(tr("Lv {0}", d.reqLevel), COR_REQUISITO)).left().row();
         g.add(txt).growX().left();
         g.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
@@ -5156,7 +5159,7 @@ public final class BookMenuUI {
         mercadoDetalhe.top().left();
         if (mercadoVendoMinhas) { detalheMinhasOfertas(); return; }
         if (mercadoItem == null) {
-            mercadoDetalhe.add(linhaStat("Select an item on the left.", Color.GRAY)).expand().center();
+            mercadoDetalhe.add(linhaStat(tr("Select an item on the left."), Color.GRAY)).expand().center();
             return;
         }
         String caminho = mercadoItem;
@@ -5172,7 +5175,7 @@ public final class BookMenuUI {
         Table nomes = new Table();
         nomes.left();
         nomes.add(new LabelPixel(nomeExibicao(caminho), new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE))).left().row();
-        nomes.add(linhaStat("In your bag: " + mercadoTenho, Color.LIGHT_GRAY)).left().row();
+        nomes.add(linhaStat(tr("In your bag: {0}", mercadoTenho), Color.LIGHT_GRAY)).left().row();
         cab.add(nomes).left();
         mercadoDetalhe.add(cab).left().padBottom(6).row();
         // Item universal com ADC de cada classe (Ruby Ring...): escolhe qual.
@@ -5198,10 +5201,10 @@ public final class BookMenuUI {
         // Abas: Sell offers (outros vendendo) / Buy offers (outros comprando).
         Table abas = new Table();
         abas.left();
-        abas.add(botaoSpells("Sell", mercadoAbaVenda ? "verde" : "default", () -> {
+        abas.add(botaoSpells(tr("Sell"), mercadoAbaVenda ? "verde" : "default", () -> {
             mercadoAbaVenda = true; mercadoAviso = ""; atualizarDetalheMercado();
         })).width(140).height(34).padRight(6);
-        abas.add(botaoSpells("Buy", mercadoAbaVenda ? "default" : "verde", () -> {
+        abas.add(botaoSpells(tr("Buy"), mercadoAbaVenda ? "default" : "verde", () -> {
             mercadoAbaVenda = false; mercadoAviso = ""; atualizarDetalheMercado();
         })).width(140).height(34);
         mercadoDetalhe.add(abas).left().padBottom(6).row();
@@ -5209,14 +5212,14 @@ public final class BookMenuUI {
         Table lista = new Table();
         lista.top().left();
         JsonValue ofertas = mercadoOfertas == null ? null : mercadoOfertas.get(mercadoAbaVenda ? "sell" : "buy");
-        if (mercadoOfertas == null) lista.add(linhaStat("Loading...", Color.GRAY)).left();
-        else if (ofertas == null || ofertas.size == 0) lista.add(linhaStat(mercadoAbaVenda ? "Nobody is selling this." : "Nobody is buying this.", Color.GRAY)).left();
+        if (mercadoOfertas == null) lista.add(linhaStat(tr("Loading..."), Color.GRAY)).left();
+        else if (ofertas == null || ofertas.size == 0) lista.add(linhaStat(mercadoAbaVenda ? tr("Nobody is selling this.") : tr("Nobody is buying this."), Color.GRAY)).left();
         else for (JsonValue o = ofertas.child; o != null; o = o.next) lista.add(linhaOferta(caminho, o)).growX().padBottom(3).row();
         ScrollPane rolagemOfertas = rolagem(lista);
         rolagemComRodinha(rolagemOfertas);
         mercadoDetalhe.add(rolagemOfertas).grow().row();
         // Criar a minha oferta (do tipo da aba): abre uma janelinha por cima.
-        mercadoDetalhe.add(botaoSpells(mercadoAbaVenda ? "Create sell offer" : "Create buy offer", "verde",
+        mercadoDetalhe.add(botaoSpells(mercadoAbaVenda ? tr("Create sell offer") : tr("Create buy offer"), "verde",
             () -> abrirPopupOferta(caminho))).width(220).height(36).left().padTop(6).row();
         if (!mercadoAviso.isEmpty()) mercadoDetalhe.add(linhaStat(mercadoAviso, Color.valueOf("ffd56b"))).left().padTop(4).row();
     }
@@ -5234,20 +5237,20 @@ public final class BookMenuUI {
         Table cima = new Table();
         cima.add(linhaStat(qtd + "x", Color.WHITE)).padRight(8);
         cima.add(valorComMoedas(preco)).padRight(4);
-        cima.add(linhaStat("each", Color.GRAY));
+        cima.add(linhaStat(tr("each"), Color.GRAY));
         info.add(cima).left().row();
         Table baixo = new Table();
-        baixo.add(linhaStat((minha ? "You" : o.getString("owner", "")) + "  -  total", Color.GRAY)).padRight(6);
+        baixo.add(linhaStat((minha ? tr("You") : o.getString("owner", "")) + "  -  total", Color.GRAY)).padRight(6);
         baixo.add(valorComMoedas(preco * qtd));
         info.add(baixo).left().row();
         linha.add(info).growX().left();
         TextButton acao;
         if (minha) {
-            acao = botaoSpells("Cancel", "vermelho", () -> emitirMercado("market_cancel", w -> w.set("id", id)));
+            acao = botaoSpells(tr("Cancel"), "vermelho", () -> emitirMercado("market_cancel", w -> w.set("id", id)));
         } else if (mercadoAbaVenda) {
             // Alguem vende: eu compro (ate' o que o dinheiro paga).
             int max = (int) Math.min(qtd, preco > 0 ? currencyTotal / preco : 0);
-            acao = botaoSpells(max > 0 ? "Buy" : "No money", max > 0 ? "verde" : "default", () -> {
+            acao = botaoSpells(max > 0 ? tr("Buy") : tr("No money"), max > 0 ? "verde" : "default", () -> {
                 if (max <= 0) return;
                 if (max == 1) { emitirMercado("market_accept", w -> { w.set("id", id); w.set("qty", 1); }); return; }
                 abrirPopupQuantidade(nomeExibicao(caminho), iconeDoItem(caminho), max, null,
@@ -5256,7 +5259,7 @@ public final class BookMenuUI {
         } else {
             // Alguem compra: eu vendo (ate' o que tenho na bag).
             int max = Math.min(qtd, mercadoTenho);
-            acao = botaoSpells(max > 0 ? "Sell" : "None", max > 0 ? "verde" : "default", () -> {
+            acao = botaoSpells(max > 0 ? tr("Sell") : tr("None"), max > 0 ? "verde" : "default", () -> {
                 if (max <= 0) return;
                 if (max == 1) { emitirMercado("market_accept", w -> { w.set("id", id); w.set("qty", 1); }); return; }
                 abrirPopupQuantidade(nomeExibicao(caminho), iconeDoItem(caminho), max, null,
@@ -5316,7 +5319,7 @@ public final class BookMenuUI {
             img.setScaling(Scaling.fit);
             titulo.add(img).size(30).padRight(6);
         }
-        titulo.add(new LabelPixel((mercadoAbaVenda ? "Sell " : "Buy ") + nomeExibicao(caminho),
+        titulo.add(new LabelPixel(mercadoAbaVenda ? tr("Sell {0}", nomeExibicao(caminho)) : tr("Buy {0}", nomeExibicao(caminho)),
             new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE)));
         f.add(titulo).left().padBottom(8).row();
         // Quantidade
@@ -5324,12 +5327,12 @@ public final class BookMenuUI {
         mercadoQtd = new com.badlogic.gdx.scenes.scene2d.ui.TextField(qtdAntes, skin);
         mercadoQtd.setTextFieldFilter(new com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldFilter.DigitsOnlyFilter());
         Table linhaQtd = new Table();
-        linhaQtd.add(linhaStat("Quantity", Color.LIGHT_GRAY)).padRight(8);
+        linhaQtd.add(linhaStat(tr("Quantity"), Color.LIGHT_GRAY)).padRight(8);
         linhaQtd.add(mercadoQtd).width(80).height(32);
         f.add(linhaQtd).left().padBottom(4).row();
         // Preco por unidade: platina, ouro, prata, cobre
         Table linhaPreco = new Table();
-        linhaPreco.add(linhaStat("Price each", Color.LIGHT_GRAY)).padRight(8);
+        linhaPreco.add(linhaStat(tr("Price each"), Color.LIGHT_GRAY)).padRight(8);
         for (int i = MOEDAS_TRADE.length - 1; i >= 0; i--) {
             String antes = mercadoMoedas[i] != null ? mercadoMoedas[i].getText() : "";
             mercadoMoedas[i] = new com.badlogic.gdx.scenes.scene2d.ui.TextField(antes, skin);
@@ -5350,21 +5353,21 @@ public final class BookMenuUI {
         Runnable atualizarResumo = () -> {
             resumo.clearChildren();
             long q = lerInteiro(mercadoQtd.getText()), pr = precoDosCampos();
-            if (q <= 0 || pr <= 0) { resumo.add(linhaStat("Type the quantity and the price.", Color.GRAY)); return; }
+            if (q <= 0 || pr <= 0) { resumo.add(linhaStat(tr("Type the quantity and the price."), Color.GRAY)); return; }
             long total = q * pr;
             if (mercadoAbaVenda) {
                 long taxa = Math.max(1, (long) Math.ceil(total * mercadoTaxa / 100.0));
                 // "Total: 100 + 10% Fee = 110" e embaixo o que sai agora (so' a taxa).
-                resumo.add(linhaStat("Total:", Color.LIGHT_GRAY)).padRight(4);
+                resumo.add(linhaStat(tr("Total:"), Color.LIGHT_GRAY)).padRight(4);
                 resumo.add(valorComMoedas(total));
                 resumo.add(linhaStat("+ " + mercadoTaxa + "% Fee =", Color.LIGHT_GRAY)).padRight(4);
                 resumo.add(valorComMoedas(total + taxa)).row();
                 Table agora = new Table();
-                agora.add(linhaStat("Fee paid now:", Color.GRAY)).padRight(4);
+                agora.add(linhaStat(tr("Fee paid now:"), Color.GRAY)).padRight(4);
                 agora.add(valorComMoedas(taxa));
                 resumo.add(agora).left().colspan(5).padTop(2);
             } else {
-                resumo.add(linhaStat("You pay now:", Color.LIGHT_GRAY)).padRight(4);
+                resumo.add(linhaStat(tr("You pay now:"), Color.LIGHT_GRAY)).padRight(4);
                 resumo.add(valorComMoedas(total));
             }
         };
@@ -5386,9 +5389,9 @@ public final class BookMenuUI {
         caixa.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
         caixa.pad(14, 16, 14, 16);
         Label aviso = linhaStat("", Color.valueOf("ff6a6a"));
-        TextButton confirmar = botaoSpells("Confirm", "verde", () -> {
+        TextButton confirmar = botaoSpells(tr("Confirm"), "verde", () -> {
             long q = lerInteiro(mercadoQtd.getText()), pr = precoDosCampos();
-            if (q <= 0 || pr <= 0) { aviso.setText("Type the quantity and the price."); return; }
+            if (q <= 0 || pr <= 0) { aviso.setText(tr("Type the quantity and the price.")); return; }
             String tipo = mercadoAbaVenda ? "sell" : "buy";
             emitirMercado("market_create", w -> {
                 w.set("kind", tipo);
@@ -5398,7 +5401,7 @@ public final class BookMenuUI {
             });
             fecharPopupQuantidade();
         });
-        TextButton cancelar = botaoSpells("Cancel", "vermelho", this::fecharPopupQuantidade);
+        TextButton cancelar = botaoSpells(tr("Cancel"), "vermelho", this::fecharPopupQuantidade);
         Table botoes = new Table();
         botoes.add(cancelar).width(130).height(38).padRight(10);
         botoes.add(confirmar).width(130).height(38);
@@ -5415,11 +5418,11 @@ public final class BookMenuUI {
     }
 
     private void detalheMinhasOfertas() {
-        mercadoDetalhe.add(linhaStat("My offers", Color.WHITE)).left().padBottom(6).row();
+        mercadoDetalhe.add(linhaStat(tr("My offers"), Color.WHITE)).left().padBottom(6).row();
         Table lista = new Table();
         lista.top().left();
         JsonValue ofertas = mercadoMinhas == null ? null : mercadoMinhas.get("offers");
-        if (ofertas == null || ofertas.size == 0) lista.add(linhaStat("You have no offers.", Color.GRAY)).left();
+        if (ofertas == null || ofertas.size == 0) lista.add(linhaStat(tr("You have no offers."), Color.GRAY)).left();
         else for (JsonValue o = ofertas.child; o != null; o = o.next) {
             String caminho = o.getString("item", "");
             long id = o.getLong("id", 0), preco = o.getLong("price", 0);
@@ -5436,14 +5439,14 @@ public final class BookMenuUI {
             }
             Table info = new Table();
             info.left();
-            info.add(linhaStat((venda ? "Selling " : "Buying ") + qtd + "x " + nomeExibicao(caminho),
+            info.add(linhaStat(venda ? tr("Selling {0}x {1}", qtd, nomeExibicao(caminho)) : tr("Buying {0}x {1}", qtd, nomeExibicao(caminho)),
                 venda ? Color.valueOf("7fd47f") : Color.valueOf("7fb4ff"))).left().row();
             Table precoLinha = new Table();
             precoLinha.add(valorComMoedas(preco)).padRight(4);
-            precoLinha.add(linhaStat("each", Color.GRAY));
+            precoLinha.add(linhaStat(tr("each"), Color.GRAY));
             info.add(precoLinha).left().row();
             linha.add(info).growX().left();
-            linha.add(botaoSpells("Cancel", "vermelho", () -> emitirMercado("market_cancel", w -> w.set("id", id))))
+            linha.add(botaoSpells(tr("Cancel"), "vermelho", () -> emitirMercado("market_cancel", w -> w.set("id", id))))
                 .width(110).height(34);
             lista.add(linha).growX().padBottom(3).row();
         }
@@ -5502,7 +5505,7 @@ public final class BookMenuUI {
         caixa.setBackground(UiSkin.retangulo(new Color(0.08f, 0.08f, 0.08f, 1f), new Color(0.3f, 0.3f, 0.3f, 1f), 1));
         caixa.top();
         caixa.add(scroll).grow().pad(4);
-        Label aviso = new LabelPixel("Rankings update every hour.", skin.get("hud", Label.LabelStyle.class));
+        Label aviso = new LabelPixel(tr("Rankings update every hour."), skin.get("hud", Label.LabelStyle.class));
         escalarFonte(aviso, 0.5f * FONTE_STATS);
         aviso.setColor(Color.GRAY);
         rankPage.add(abas).left().padBottom(6).row();
@@ -5602,7 +5605,7 @@ public final class BookMenuUI {
                     escalarFonte(xp, 0.55f * FONTE_STATS);
                     xp.setColor(Color.LIGHT_GRAY);
                     linha.add(xp).right().padRight(12);
-                    Label lv = new LabelPixel("Lv " + e.getInt("level", 1), skin.get("hud", Label.LabelStyle.class));
+                    Label lv = new LabelPixel(tr("Lv {0}", e.getInt("level", 1)), skin.get("hud", Label.LabelStyle.class));
                     escalarFonte(lv, 0.7f * FONTE_STATS);
                     linha.add(lv).right().width(70).padRight(6);
                 } else {
@@ -5627,7 +5630,7 @@ public final class BookMenuUI {
             }
         }
         if (pos == 0) {
-            Label vazio = new LabelPixel("No players yet.", skin.get("hud", Label.LabelStyle.class));
+            Label vazio = new LabelPixel(tr("No players yet."), skin.get("hud", Label.LabelStyle.class));
             escalarFonte(vazio, 0.6f * FONTE_STATS);
             vazio.setColor(Color.GRAY);
             listaRank.add(vazio).padTop(20);
@@ -5803,7 +5806,7 @@ public final class BookMenuUI {
         fichaBestiario.clearChildren();
         JsonValue e = entradaBestiario(bestiarioSelecionado);
         if (e == null || e.getInt("tier", 0) < 1) {
-            Label vazio = new LabelPixel("Defeat monsters to\nfill your bestiary.", skin.get("hud", Label.LabelStyle.class));
+            Label vazio = new LabelPixel(tr("Defeat monsters to\nfill your bestiary."), skin.get("hud", Label.LabelStyle.class));
             escalarFonte(vazio, 0.6f * FONTE_STATS);
             vazio.setAlignment(Align.center);
             vazio.setColor(Color.GRAY);
@@ -5882,7 +5885,7 @@ public final class BookMenuUI {
                 if (!comBonus) i.setColor(0.4f, 0.4f, 0.4f, 0.7f);
                 linhaBonus.add(i).size(ICONE_FICHA).padRight(6);
             }
-            Label bonus = new LabelPixel("5% Extra DMG/DEF", skin.get("hud", Label.LabelStyle.class));
+            Label bonus = new LabelPixel(tr("5% Extra DMG/DEF"), skin.get("hud", Label.LabelStyle.class));
             escalarFonte(bonus, 0.65f * FONTE_STATS);
             bonus.setColor(comBonus ? Color.valueOf("f5d328") : Color.GRAY);
             linhaBonus.add(bonus);
@@ -5899,7 +5902,7 @@ public final class BookMenuUI {
                 i.setScaling(Scaling.fit);
                 linhaTitulo.add(i).size(ICONE_FICHA).padRight(6);
             }
-            Label titulo = new LabelPixel("Loot", skin.get("hud", Label.LabelStyle.class));
+            Label titulo = new LabelPixel(tr("Loot"), skin.get("hud", Label.LabelStyle.class));
             escalarFonte(titulo, 0.75f * FONTE_STATS);
             titulo.setColor(Color.LIGHT_GRAY);
             linhaTitulo.add(titulo);
@@ -5953,7 +5956,7 @@ public final class BookMenuUI {
             }
             if (n > 0) info.add(itens).left().padLeft(8).padTop(4).row();
             else if (moeda == null) {
-                Label nada = new LabelPixel("Nothing", skin.get("hud", Label.LabelStyle.class));
+                Label nada = new LabelPixel(tr("Nothing"), skin.get("hud", Label.LabelStyle.class));
                 escalarFonte(nada, 0.7f * FONTE_STATS);
                 nada.setColor(Color.GRAY);
                 info.add(nada).left().padLeft(10).row();
@@ -6074,7 +6077,7 @@ public final class BookMenuUI {
 
         // ---- Esquerda: slots ----
         Table esquerda = painelSpells();
-        esquerda.add(linhaStat("Hotbar", Color.LIGHT_GRAY)).left().padBottom(6).row();
+        esquerda.add(linhaStat(tr("Hotbar"), Color.LIGHT_GRAY)).left().padBottom(6).row();
         Table grade = new Table();
         grade.top().left();
         for (int i = 0; i < visiveis; i++) {
@@ -6092,18 +6095,18 @@ public final class BookMenuUI {
         // ---- Direita: o que colocar no slot escolhido ----
         Table direita = painelSpells();
         if (slotAtalhoEscolhendo < 0) {
-            direita.add(linhaStat("Select a slot on the left", Color.GRAY)).expand().center();
+            direita.add(linhaStat(tr("Select a slot on the left"), Color.GRAY)).expand().center();
         } else {
             final int slot = slotAtalhoEscolhendo;
-            direita.add(linhaStat("Slot " + (ehMobile() ? String.valueOf(slot + 1)
+            direita.add(linhaStat(tr("Slot {0}", ehMobile() ? String.valueOf(slot + 1)
                 : Controles.nomeTecla(Controles.tecla("hotbar" + (slot + 1)))), Color.WHITE)).left().padBottom(8).row();
             Table abas = new Table();
             abas.left();
-            abas.add(botaoSpells("Inventory", escolhendoMagias ? "default" : "verde", () -> {
+            abas.add(botaoSpells(tr("Inventory"), escolhendoMagias ? "default" : "verde", () -> {
                 escolhendoMagias = false;
                 construirPaginaSpells();
             })).size(110, 34).padRight(6);
-            abas.add(botaoSpells("Spells", escolhendoMagias ? "verde" : "default", () -> {
+            abas.add(botaoSpells(tr("Spells"), escolhendoMagias ? "verde" : "default", () -> {
                 escolhendoMagias = true;
                 construirPaginaSpells();
             })).size(110, 34);
@@ -6119,7 +6122,7 @@ public final class BookMenuUI {
                     conteudo.add(gavetaMagia(magia, magia.equals(atalhos[slot]), () -> escolherAtalho(slot, magia)))
                         .growX().padBottom(6).padRight(3).row();
                 }
-                if (magiasConhecidas.isEmpty()) conteudo.add(linhaStat("You don't know any spells yet.", Color.GRAY)).left();
+                if (magiasConhecidas.isEmpty()) conteudo.add(linhaStat(tr("You don't know any spells yet."), Color.GRAY)).left();
             } else {
                 java.util.LinkedHashSet<String> caminhos = new java.util.LinkedHashSet<>();
                 for (InventoryItem it : inventoryItems) if (podeIrNoSlot(it.itemPath, slot)) caminhos.add(it.itemPath);
@@ -6129,7 +6132,7 @@ public final class BookMenuUI {
                         .size(TAM_SLOT_ATALHO).pad(3);
                     if (++n % 4 == 0) conteudo.row();
                 }
-                if (caminhos.isEmpty()) conteudo.add(linhaStat("No food or potions in your bag.", Color.GRAY)).left();
+                if (caminhos.isEmpty()) conteudo.add(linhaStat(tr("No food or potions in your bag."), Color.GRAY)).left();
             }
             ScrollPane rolagem = new ScrollPane(conteudo, skin);
             rolagem.setFadeScrollBars(false);
@@ -6137,7 +6140,7 @@ public final class BookMenuUI {
             rolagemComRodinha(rolagem);
             direita.add(rolagem).grow().left().top().row();
             if (atalhos[slot] != null && !atalhos[slot].isEmpty()) {
-                direita.add(botaoSpells("Clear slot", "vermelho", () -> escolherAtalho(slot, ""))).size(130, 34).left().padTop(8);
+                direita.add(botaoSpells(tr("Clear slot"), "vermelho", () -> escolherAtalho(slot, ""))).size(130, 34).left().padTop(8);
             }
         }
 
@@ -6200,7 +6203,7 @@ public final class BookMenuUI {
     }
 
     /** "3 hits of 21.5%" (so' magia com mais de um golpe). */
-    private static String textoGolpes(EquipStats d) { return d.magiaGolpes + " hits of " + porcento(d.magiaDano) + "%"; }
+    private static String textoGolpes(EquipStats d) { return tr("{0} hits of {1}%", d.magiaGolpes, porcento(d.magiaDano)); }
 
     private static String textoSangramento(EquipStats d) {
         String tipo = "poison".equals(d.magiaDot) ? "Poison" : "Bleed";
@@ -6227,7 +6230,7 @@ public final class BookMenuUI {
         boolean semDinheiro = ok && currencyTotal < it.preco;
         boolean armado = ok && it.item.equals(magiaArmada);
         botaoAprenderRodape.setStyle(!ok || semDinheiro ? estiloBancoBloqueado : estiloPlano(COR_BOTAO_COMPRAR, Color.WHITE));
-        botaoAprenderRodape.setText(semDinheiro ? "No Money" : armado ? "Are you sure?" : "Learn");
+        botaoAprenderRodape.setText(semDinheiro ? tr("No Money") : armado ? tr("Are you sure?") : tr("Learn"));
         iconeDoBotao(botaoAprenderRodape, !armado && !semDinheiro);
     }
 
@@ -6271,7 +6274,7 @@ public final class BookMenuUI {
         Label nome = new LabelPixel(nomeExibicao(caminho), new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE));
         texto.add(nome).left().row();
         if (dados != null) {
-            texto.add(linhaComIcone("ui/MPIcon", dados.magiaMana + " Mana", COR_MANA)).left().row();
+            texto.add(linhaComIcone("ui/MPIcon", tr("{0} Mana", dados.magiaMana), COR_MANA)).left().row();
             if (dados.magiaDescricao != null && !dados.magiaDescricao.isEmpty()) {
                 // Aba Spells: numa linha so' (a janela alarga, ajustarLarguraDetalhes).
                 // Loja: quebra na largura do painel.
@@ -6282,10 +6285,10 @@ public final class BookMenuUI {
             }
             Table linhaDano = new Table();
             linhaDano.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET));
-            linhaDano.add(linhaStat(dados.magiaArea ? "Area Damage" : "Single Target", COR_ALVO_MAGIA)).padLeft(10);
+            linhaDano.add(linhaStat(dados.magiaArea ? tr("Area Damage") : tr("Single Target"), COR_ALVO_MAGIA)).padLeft(10);
             texto.add(linhaDano).left().row();
             if (dados.sangraTicks > 0) texto.add(linhaStat(textoSangramento(dados), corDoDot(dados))).left().row();
-            if (dados.magiaLento > 0) texto.add(linhaStat("Slows for " + porcento(dados.magiaLento) + "s", Color.LIGHT_GRAY)).left().row();
+            if (dados.magiaLento > 0) texto.add(linhaStat(tr("Slows for {0}s", porcento(dados.magiaLento)), Color.LIGHT_GRAY)).left().row();
             if (dados.magiaGolpes > 1) texto.add(linhaStat(textoGolpes(dados), Color.LIGHT_GRAY)).left().row();
         }
         if (preco > 0) {
@@ -6480,7 +6483,7 @@ public final class BookMenuUI {
         atualizandoSecao = true;
         try {
             secaoAtual = secao;
-            tituloSecao.setText(secao);
+            tituloSecao.setText(tr(secao));
             boolean comTitulo = !"Bag".equals(secao) && !"Skills".equals(secao) && !"Equip".equals(secao)
                 && !"Vanity".equals(secao) && !"Spells".equals(secao);
             tituloSecao.setVisible(comTitulo);

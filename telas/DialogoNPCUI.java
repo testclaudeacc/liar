@@ -1,5 +1,7 @@
 package com.teste.game.telas;
 
+import static com.teste.game.telas.Idioma.tr;
+
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
@@ -228,7 +230,7 @@ public final class DialogoNPCUI {
         estiloFechar = estiloBotao(fonteBotao, Color.valueOf("a82828"));   // Close vermelho
         estiloProximo = estiloBotao(fonteBotao, Color.valueOf("4a4a4a"));
 
-        fecharButton = new TextButton("Close", estiloFechar);
+        fecharButton = new TextButton(tr("Close"), estiloFechar);
         fecharButton.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
@@ -381,7 +383,7 @@ public final class DialogoNPCUI {
      * (vermelho) so' na ultima - a pedido do usuario. */
     private void atualizarBotaoRodape() {
         boolean ultimaPagina = paginaAtual >= paginas.length - 1;
-        fecharButton.setText(ultimaPagina ? "Close" : "Next");
+        fecharButton.setText(ultimaPagina ? tr("Close") : tr("Next"));
         fecharButton.setStyle(ultimaPagina ? estiloFechar : estiloProximo);
         rodape.clearChildren();
         // Embaixo do retrato, com a mesma largura dele; acao (Pay...) em
