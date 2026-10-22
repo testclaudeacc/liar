@@ -4931,7 +4931,7 @@ public final class BookMenuUI {
     }
 
     private com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> seletorMercado(String[] opcoes) {
-        com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> sb = new com.badlogic.gdx.scenes.scene2d.ui.SelectBox<>(skin, "zoom-select");
+        com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> sb = new SelectSeta(skin, "zoom-select");
         sb.setItems(opcoes);
         sb.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { atualizarListaMercado(); }
@@ -5510,7 +5510,7 @@ public final class BookMenuUI {
     }
 
     /** SelectBox com um icone antes do texto (na caixa e na lista aberta). */
-    private static final class SelectComIcone extends com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> {
+    private static final class SelectComIcone extends SelectSeta {
         private final Map<String, TextureRegion> icones;
 
         SelectComIcone(Skin skin, String estilo, Map<String, TextureRegion> icones) {

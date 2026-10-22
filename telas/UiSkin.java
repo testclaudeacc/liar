@@ -310,7 +310,7 @@ public class UiSkin {
         SelectBox.SelectBoxStyle estiloSelect = new SelectBox.SelectBoxStyle();
         estiloSelect.font = fonteCampoTexto;
         estiloSelect.fontColor = Color.WHITE;
-        // Setinha pra baixo no canto direito (mostra que abre uma lista); aberta, pra cima.
+        // Espaco pra setinha no canto direito (desenhada e animada pelo SelectSeta).
         estiloSelect.background = comSeta(solido(corCaixaSelect), false);
         estiloSelect.backgroundOpen = comSeta(solido(corCaixaSelect), true);
         estiloSelect.scrollStyle = new ScrollPane.ScrollPaneStyle();
@@ -502,25 +502,11 @@ public class UiSkin {
      * de 1px de um pixel branco, cada uma 2px mais estreita. Reserva espaco a
      * direita pro texto centralizado nao passar por cima da seta. */
     private static Drawable comSeta(NinePatchDrawable fundo, boolean praCima) {
-        Pixmap pm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pm.setColor(Color.WHITE);
-        pm.fill();
-        Texture branco = new Texture(pm);
-        pm.dispose();
-        final Color corSeta = new Color(0.85f, 0.85f, 0.85f, 1f);
+        // So' o espaco a direita: a seta (que gira ao abrir) e' desenhada
+        // pelo proprio dropdown - SelectSeta.
         com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable d = new com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable() {
             @Override public void draw(com.badlogic.gdx.graphics.g2d.Batch batch, float x, float y, float w, float h) {
                 fundo.draw(batch, x, y, w, h);
-                Color antes = batch.getColor().cpy();
-                batch.setColor(corSeta.r, corSeta.g, corSeta.b, corSeta.a * antes.a);
-                int linhas = 5; // seta de 9x5
-                float cx = x + w - 14f, topo = y + h / 2f + linhas / 2f;
-                for (int i = 0; i < linhas; i++) {
-                    float meia = (linhas - 1 - i) + 0.5f; // de 4.5 (larga) ate 0.5 (ponta)
-                    int linha = praCima ? (linhas - 1 - i) : i;
-                    batch.draw(branco, Math.round(cx - meia), Math.round(topo - 1 - linha), Math.round(meia * 2f), 1f);
-                }
-                batch.setColor(antes);
             }
         };
         d.setLeftWidth(fundo.getLeftWidth() + 6f);

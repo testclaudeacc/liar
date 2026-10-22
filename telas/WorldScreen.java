@@ -3007,7 +3007,7 @@ public class WorldScreen extends ScreenAdapter {
         // fileira de checkbox por opcao.
         Table linha = new Table();
         linha.add(new Label(titulo, skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
-        SelectBox<String> caixa = new SelectBox<>(skin, "zoom-select");
+        SelectBox<String> caixa = new SelectSeta(skin, "zoom-select");
         caixa.setItems(opcoes);
         caixa.setSelectedIndex(Math.max(0, Math.min(opcoes.length - 1, marcada)));
         caixa.setAlignment(Align.center);
@@ -3034,7 +3034,7 @@ public class WorldScreen extends ScreenAdapter {
         // Moving style: 8 direcoes (com diagonal) ou 4 (sem) - PC e celular.
         Table linhaMov = new Table();
         linhaMov.add(new Label("Moving style", skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
-        SelectBox<String> estiloMov = new SelectBox<>(skin, "zoom-select");
+        SelectBox<String> estiloMov = new SelectSeta(skin, "zoom-select");
         estiloMov.setItems("8 directions", "4 directions");
         estiloMov.setSelectedIndex(Controles.oitoDirecoes() ? 0 : 1);
         estiloMov.setAlignment(Align.center);
@@ -3184,7 +3184,7 @@ public class WorldScreen extends ScreenAdapter {
         // botao antigo tinha (bug de duplo-evento especifico de ChangeListener
         // num Actor dentro de ScrollPane) - SelectBox so' dispara cada opcao
         // selecionada uma vez.
-        botaoZoom = new SelectBox<>(skin, "zoom-select");
+        botaoZoom = new SelectSeta(skin, "zoom-select");
         // NOMES_ZOOM/NIVEIS_ZOOM ja' sao os arrays certos pra essa
         // plataforma (ver declaracao dos campos - PC so' tem x3/x4, mobile
         // tem x1-x4), entao os indices aqui batem direto com indiceZoom,
