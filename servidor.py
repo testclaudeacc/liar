@@ -1155,12 +1155,20 @@ def get_chunk(x, y, floor=1):
     try: return f"c_0_{int(float(x) // CHUNK_SIZE)}_{int(float(y) // CHUNK_SIZE)}"
     except Exception: return "c_0_0_0"
 
+_cache_vizinhas = {}
+
 def salas_vizinhas(room):
+    # Chamada centenas de milhares de vezes por segundo (IA dos mobs): as salas
+    # sao poucas e fixas, entao guarda o resultado (tupla, ninguem altera).
+    v = _cache_vizinhas.get(room)
+    if v is not None: return v
     try:
         _, floor, cx, cy = room.split('_'); floor, cx, cy = int(floor), int(cx), int(cy)
+        v = tuple(f"c_{floor}_{cx+dx}_{cy+dy}" for dx in (-1, 0, 1) for dy in (-1, 0, 1))
     except Exception:
-        return [room] if room else []
-    return [f"c_{floor}_{cx+dx}_{cy+dy}" for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+        return (room,) if room else ()
+    if len(_cache_vizinhas) < 100000: _cache_vizinhas[room] = v
+    return v
 
 def emit_tela(event, payload, x, y, incluir=None, skip_sid=None):
     """Evento so' pra quem tem (x, y) no raio da tela (+ margem) - bem menos
@@ -2449,6 +2457,15 @@ def _mob_tick(mob_id, m, now):
                 _mob_encarar(mob_id, m, origem, t_alvo)
         return
 
+    # Sem alvo: so' procura player a cada ~0.2s (com jitter, pra nao fazerem
+    # todos no mesmo tick) - era o maior custo de mob parado: varrer os players
+    # perto 20x/s. Quem esta' perseguindo continua a 20 Hz; levar golpe puxa
+    # na hora (mob_focar_agressor).
+    if now < m.get('prox_busca', 0):
+        _mob_passear(mob_id, m, origem, now)
+        return
+    m['prox_busca'] = now + random.uniform(0.15, 0.25)
+
     # Sem alvo: procura o player mais perto (5 SQMs) que dê pra alcançar.
     # _player_alvo_valido já filtra andar: um mob parado ignora quem já está
     # num andar diferente (só continua perseguindo quem virou alvo ANTES de
@@ -2537,17 +2554,20 @@ def mob_ai_loop():
         now = time.time()
         _reindexar_areas()
         ativas = _salas_ativas()
-        for mob_id, m in list(active_mobs.items()):
-            # Longe de todo mundo: estatua (nao anda, nao procura alvo, nao
-            # passeia). Volta a agir quando alguem chega perto.
-            if m.get('room') not in ativas:
-                m['last_tick'] = now
-                continue
-            try:
-                _mob_tick(mob_id, m, now)
-                _avisar_alvo_do_mob(mob_id, m)
-            except Exception:
-                traceback.print_exc()
+        # So' os mobs das salas ativas (o indice _mobs_por_sala acabou de ser
+        # refeito): os longe de todo mundo sao estatuas e nem entram no laco
+        # (antes o laco passava por TODOS os mobs do mapa 20x/s so' pra pula-los).
+        for sala in ativas:
+            for mob_id in _mobs_por_sala.get(sala, ()):
+                m = active_mobs.get(mob_id)
+                if m is None: continue
+                # Acordando de estatua: sem "dt" gigante no primeiro tick.
+                if now - m.get('last_tick', now) > 1.0: m['last_tick'] = now
+                try:
+                    _mob_tick(mob_id, m, now)
+                    _avisar_alvo_do_mob(mob_id, m)
+                except Exception:
+                    traceback.print_exc()
         try:
             _flush_mobs()
         except Exception:
