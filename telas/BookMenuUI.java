@@ -444,7 +444,7 @@ public final class BookMenuUI {
             this.magiaCd = d.getInt("spell_cd", 0);
             this.magiaDano = d.getFloat("spell_dmg", 0f);
             this.magiaGolpes = Math.max(1, d.getInt("spell_hits", 1));
-            this.magiaDescricao = d.getString("spell_desc", "");
+            this.magiaDescricao = Idioma.trServidor(d.getString("spell_desc", "")); // descricao traduzida; o nome da magia fica em ingles
             this.magiaArea = d.getBoolean("spell_area", false);
             this.sangraTicks = d.getInt("spell_bleed_ticks", 0);
             this.sangraPct = d.getFloat("spell_bleed_pct", 0f);

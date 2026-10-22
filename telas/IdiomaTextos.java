@@ -431,6 +431,16 @@ final class IdiomaTextos {
             + "{0} hits of {1}%	{0} golpes de {1}%	{0} golpes de {1}%\n"
             + "{0} Player	{0} jogador	{0} jugador\n"
             + "{0} Players	{0} jogadores	{0} jugadores\n"
+            + "Hurls a small ball of fire at your target.	Lan\u00e7a uma pequena bola de fogo no seu alvo.	Lanza una peque\u00f1a bola de fuego a tu objetivo.\n"
+            + "A brutal cut that leaves the target bleeding.	Um corte brutal que deixa o alvo sangrando.	Un corte brutal que deja al objetivo sangrando.\n"
+            + "Fires three arrows in quick succession.	Dispara tr\u00eas flechas em sequ\u00eancia r\u00e1pida.	Dispara tres flechas en r\u00e1pida sucesi\u00f3n.\n"
+            + "Vines burst from the ground, slowing and poisoning the target.	Vinhas brotam do ch\u00e3o, deixando o alvo lento e envenenado.	Enredaderas brotan del suelo, ralentizando y envenenando al objetivo.\n"
+            + "Hungry, traveler? Fresh food, right here.	Com fome, viajante? Comida fresca, bem aqui.	\u00bfHambre, viajero? Comida fresca, aqu\u00ed mismo.\n"
+            + "Seeking arcane power? My spells are not for the faint of heart.	Procurando poder arcano? Minhas magias n\u00e3o s\u00e3o para os fracos de cora\u00e7\u00e3o.	\u00bfBuscas poder arcano? Mis hechizos no son para los d\u00e9biles de coraz\u00f3n.\n"
+            + "Looking for a blade? Finest steel in town.	Procurando uma l\u00e2mina? O melhor a\u00e7o da cidade.	\u00bfBuscas una espada? El mejor acero de la ciudad.\n"
+            + "Potions, fresh from the cauldron. Don't ask what's in them.	Po\u00e7\u00f5es, fresquinhas do caldeir\u00e3o. N\u00e3o pergunte o que tem nelas.	Pociones, reci\u00e9n salidas del caldero. No preguntes qu\u00e9 llevan.\n"
+            + "Give me {0} to sail by the worlds	Me d\u00ea {0} para navegar pelos mundos	Dame {0} para navegar por los mundos\n"
+            + "Hmm... by far an entity from the ancient realm that i was waiting for.	Hmm... finalmente uma entidade do reino antigo que eu esperava.	Hmm... por fin una entidad del reino antiguo que estaba esperando.\n"
         ,
     };
 }

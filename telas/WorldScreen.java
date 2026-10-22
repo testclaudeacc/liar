@@ -4556,7 +4556,10 @@ public class WorldScreen extends ScreenAdapter {
         String nome = data.getString("name", "");
         NPCVisual visual = new NPCVisual(id, tipo, nome.isEmpty() ? nomeSprite : nome, movimento, criarAnimacao(sprite));
         JsonValue falas = data.get("falas");
-        if (falas != null && falas.isArray()) visual.falas = falas.asStringArray();
+        if (falas != null && falas.isArray()) {
+            visual.falas = falas.asStringArray();
+            for (int k = 0; k < visual.falas.length; k++) visual.falas[k] = Idioma.trServidor(visual.falas[k]);
+        }
         visual.papel = data.getString("role", "");
         npcs.put(id, visual);
     }
@@ -4607,16 +4610,16 @@ public class WorldScreen extends ScreenAdapter {
     // "pedido" (icone Silver + "2 Silver Coins" em cinza, INLINE na mesma
     // linha do resto da fala - ver DialogoNPCUI.moeda()) reaproveitado nas
     // 2 situacoes abaixo.
-    private static final String DIALOGO_NPC_PEDIDO =
-        "Give me " + DialogoNPCUI.moeda("2 Silver Coins") + " to sail by the worlds";
+    private final String DIALOGO_NPC_PEDIDO = // por instancia: segue o idioma ao reentrar no mundo
+        tr("Give me {0} to sail by the worlds", DialogoNPCUI.moeda("2 Silver Coins"));
     // 1a vez: discurso completo (2 paginas - Next na 1a, Close na 2a).
     // Depois de visto (ver npcDialogoVisto): so' o "pedido"/ultima pagina,
     // direto - a pedido do usuario ("ele sempre fala o ultimo dialogo").
-    private static final String[] DIALOGO_NPC_INTRO = {
-        "Hmm... by far an entity from the ancient realm that i was waiting for.",
+    private final String[] DIALOGO_NPC_INTRO = {
+        tr("Hmm... by far an entity from the ancient realm that i was waiting for."),
         DIALOGO_NPC_PEDIDO
     };
-    private static final String[] DIALOGO_NPC_LEMBRETE = { DIALOGO_NPC_PEDIDO };
+    private final String[] DIALOGO_NPC_LEMBRETE = { DIALOGO_NPC_PEDIDO };
 
     /** NPC do bank aberto agora (pra fechar ao se afastar). */
     private NPCVisual npcBanco;
@@ -4661,7 +4664,7 @@ public class WorldScreen extends ScreenAdapter {
         // Quest dele ja feita (pagou): so' "You shall pass.", sem botao.
         boolean questFeita = questsFeitas.contains(npc.tipo.toLowerCase());
         String[] paginas = npc.falas.length > 0 ? npc.falas
-            : questFeita ? new String[]{"You shall pass."}
+            : questFeita ? new String[]{tr("You shall pass.")}
             : npcDialogoVisto.contains(npc.tipo)
             ? DIALOGO_NPC_LEMBRETE
             : DIALOGO_NPC_INTRO;
