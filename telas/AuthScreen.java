@@ -502,10 +502,7 @@ public class AuthScreen extends ScreenAdapter {
                 Gdx.app.postRunnable(AuthScreen.this::telaMenuPrincipal);
             }
         });
-        Table linhaIdioma = new Table();
-        linhaIdioma.add(new Label(tr("Language:"), skin, "opcoes-label")).padRight(8);
-        linhaIdioma.add(idioma).width(Math.max(largura * 0.8f, mobile ? 190f : 160f)).height(mobile ? 44f : 36f);
-        painel.add(linhaIdioma).padTop(10);
+        painel.add(idioma).width(largura).height(mobile ? 44f : 36f).padTop(10);
         content.add(painel);
     }
 
