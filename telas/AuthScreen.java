@@ -482,8 +482,15 @@ public class AuthScreen extends ScreenAdapter {
         painel.add(playBtn).width(largura).height(altura).padBottom(5).row();
         painel.add(registerBtn).width(largura).height(altura).padBottom(5).row();
         painel.add(exitBtn).width(largura).height(altura).row();
-        // Idioma (antes mesmo do login): troca e redesenha o menu na hora.
-        com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> idioma = new SelectSeta(skin, "zoom-select");
+        // Idioma (so' aqui, antes do login): "Idioma: (bandeira) Portugues",
+        // mesmas bandeiras das abas do chat. Troca e redesenha o menu na hora.
+        java.util.Map<String, com.badlogic.gdx.graphics.g2d.TextureRegion> bandeiras = new java.util.HashMap<>();
+        String[] regioesBandeira = {"ui/America", "ui/Brazil", "ui/Spain"}; // mesma ordem de Idioma.NOMES
+        for (int i = 0; i < Idioma.NOMES.length; i++) {
+            com.badlogic.gdx.graphics.g2d.TextureRegion r = atlas.findRegion(regioesBandeira[i]);
+            if (r != null) bandeiras.put(Idioma.NOMES[i], r);
+        }
+        com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> idioma = new SelectComIcone(skin, "zoom-select", bandeiras);
         idioma.setItems(Idioma.NOMES);
         idioma.setSelectedIndex(Idioma.atual());
         idioma.setAlignment(Align.center);
@@ -495,7 +502,10 @@ public class AuthScreen extends ScreenAdapter {
                 Gdx.app.postRunnable(AuthScreen.this::telaMenuPrincipal);
             }
         });
-        painel.add(idioma).width(largura).height(mobile ? 44f : 36f).padTop(10);
+        Table linhaIdioma = new Table();
+        linhaIdioma.add(new Label(tr("Language:"), skin, "opcoes-label")).padRight(8);
+        linhaIdioma.add(idioma).width(Math.max(largura * 0.8f, mobile ? 190f : 160f)).height(mobile ? 44f : 36f);
+        painel.add(linhaIdioma).padTop(10);
         content.add(painel);
     }
 

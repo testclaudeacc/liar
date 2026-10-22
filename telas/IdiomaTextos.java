@@ -440,6 +440,7 @@ final class IdiomaTextos {
             + "Potions, fresh from the cauldron. Don't ask what's in them.	Po\u00e7\u00f5es, fresquinhas do caldeir\u00e3o. N\u00e3o pergunte o que tem nelas.	Pociones, reci\u00e9n salidas del caldero. No preguntes qu\u00e9 llevan.\n"
             + "Give me {0} to sail by the worlds	Me d\u00ea {0} para navegar pelos mundos	Dame {0} para navegar por los mundos\n"
             + "Hmm... by far an entity from the ancient realm that i was waiting for.	Hmm... finalmente uma entidade do reino antigo que eu esperava.	Hmm... por fin una entidad del reino antiguo que estaba esperando.\n"
+            + "Language:	Idioma:	Idioma:\n"
         ,
     };
 }

@@ -2962,12 +2962,6 @@ public class WorldScreen extends ScreenAdapter {
             modoBarraHp = i;
             Controles.definirModoBarraHp(i);
         })).left().padTop(6).row();
-        // Idioma (interface, mensagens, descricoes); nomes de itens/mobs/magias ficam em ingles.
-        secao.add(linhaDeEscolha("Language", Idioma.NOMES, Idioma.atual(), i -> {
-            if (i == Idioma.atual()) return;
-            Idioma.definir(i);
-            if (chat != null) chat.adicionarMensagemSistema(tr("Language changed. Re-enter the world to update every screen."));
-        })).left().padTop(6).row();
         // Tamanhos (5 niveis, 2 = padrao): barra de vida em cima da cabeca e textos dinamicos.
         secao.add(linhaDeEscolha("Health bar size", Controles.NOMES_TAMANHO, Controles.tamanhoBarraHp(), i -> {
             Controles.definirTamanhoBarraHp(i);
@@ -3014,7 +3008,6 @@ public class WorldScreen extends ScreenAdapter {
     // ---- Dica (popup pequeno) de cada opcao do Options ----
     private static final java.util.Map<String, String> DICAS_OPCOES = new java.util.HashMap<>();
     static {
-        DICAS_OPCOES.put("Language", "Language of menus, messages and descriptions. Item, creature and spell names stay in English for everyone.");
         DICAS_OPCOES.put("Camera Zoom", "How close the camera is. A higher zoom shows less of the map around you.");
         DICAS_OPCOES.put("Full Screen", "Switches between window and full screen (also F11 or Alt+Enter).");
         DICAS_OPCOES.put("Moving style", "8 directions lets you walk diagonally. 4 directions walks only up, down, left and right.");
@@ -3106,11 +3099,21 @@ public class WorldScreen extends ScreenAdapter {
             com.badlogic.gdx.scenes.scene2d.actions.Actions.run(() -> { popupDica.remove(); alvoDica = null; })));
     }
 
+    /** Nome da opcao (a esquerda da caixa): alinhado a' direita e, se nao
+     * couber na coluna (traducao comprida), quebra em 2 linhas em vez de
+     * passar por baixo da caixa. */
+    private Label rotuloOpcao(String texto) {
+        Label l = new Label(texto, skin, "opcoes-label");
+        l.setWrap(true);
+        l.setAlignment(Align.right);
+        return l;
+    }
+
     private Table linhaDeEscolha(String titulo, String[] opcoes, int marcada, java.util.function.IntConsumer aoMudar) {
         // Dropdown igual o do zoom (setinha abre a lista) - antes era uma
         // fileira de checkbox por opcao.
         Table linha = new Table();
-        linha.add(new Label(tr(titulo), skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
+        linha.add(rotuloOpcao(tr(titulo))).width(200).padRight(10);
         SelectBox<String> caixa = new SelectSeta(skin, "zoom-select");
         String[] opcoesTr = new String[opcoes.length];
         for (int k = 0; k < opcoes.length; k++) opcoesTr[k] = tr(opcoes[k]);
@@ -3140,7 +3143,7 @@ public class WorldScreen extends ScreenAdapter {
         secao.add(new Label(tr("Controls"), skin, "secao")).left().row();
         // Moving style: 8 direcoes (com diagonal) ou 4 (sem) - PC e celular.
         Table linhaMov = new Table();
-        linhaMov.add(new Label(tr("Moving style"), skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
+        linhaMov.add(rotuloOpcao(tr("Moving style"))).width(200).padRight(10);
         SelectBox<String> estiloMov = new SelectSeta(skin, "zoom-select");
         estiloMov.setItems(tr("8 directions"), tr("4 directions"));
         estiloMov.setSelectedIndex(Controles.oitoDirecoes() ? 0 : 1);
@@ -3283,7 +3286,7 @@ public class WorldScreen extends ScreenAdapter {
         corpo.add(new Label(tr("Change your screen settings here"), skin, "opcoes-label")).left().padTop(4).padBottom(20).row();
 
         Table grid = new Table();
-        Label rotuloZoom = new Label(tr("Camera Zoom"), skin, "opcoes-label");
+        Label rotuloZoom = rotuloOpcao(tr("Camera Zoom"));
         adicionarDica(rotuloZoom, "Camera Zoom");
         grid.add(rotuloZoom).align(Align.right).width(220).pad(6);
         // Dropdown de verdade (SelectBox), nao mais um botao quadrado que
@@ -3315,7 +3318,7 @@ public class WorldScreen extends ScreenAdapter {
         // Linha de Full Screen so' existe no PC - no celular nao ha janela
         // pra alternar, a opcao nao faz sentido (a pedido do usuario).
         if (!mobile) {
-            Label rotuloTela = new Label(tr("Full Screen"), skin, "opcoes-label");
+            Label rotuloTela = rotuloOpcao(tr("Full Screen"));
             adicionarDica(rotuloTela, "Full Screen");
             grid.add(rotuloTela).align(Align.right).width(220).pad(6);
             CheckBox.CheckBoxStyle estiloCheck = new CheckBox.CheckBoxStyle();
