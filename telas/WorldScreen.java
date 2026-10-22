@@ -2854,7 +2854,7 @@ public class WorldScreen extends ScreenAdapter {
                 mostrarConteudoSettings(conteudoSettingsNormal);
             }
         });
-        float largura = LARGURA_BOTAO_SETTINGS * 0.8f;
+        float largura = UiSkin.larguraBotoes(LARGURA_BOTAO_SETTINGS * 0.8f, 28f, sim, nao);
         conteudo.add(nao).width(largura).height(ALTURA_BOTAO_SETTINGS).padRight(10);
         conteudo.add(sim).width(largura).height(ALTURA_BOTAO_SETTINGS);
         return conteudo;
@@ -2864,7 +2864,7 @@ public class WorldScreen extends ScreenAdapter {
         Table conteudo = new Table();
         conteudo.setBackground(skin.getDrawable("popup-painel"));
         conteudo.pad(15, 10, 15, 10);
-        conteudo.defaults().width(LARGURA_BOTAO_SETTINGS).height(ALTURA_BOTAO_SETTINGS).padBottom(10);
+        conteudo.defaults().height(ALTURA_BOTAO_SETTINGS).padBottom(10);
 
         TextButton botaoSettings = new TextButton(tr("Settings"), skin, "cinza-popup");
         botaoSettings.addListener(new ChangeListener() {
@@ -2873,7 +2873,6 @@ public class WorldScreen extends ScreenAdapter {
                 painelOptions.setVisible(true);
             }
         });
-        conteudo.add(botaoSettings).row();
 
         // Mesmo estilo/fonte padrao de Settings/Exit (fonteBotao, martel 32px)
         // - "Back" tem o mesmo tanto de letras que "Exit", cabe sem precisar
@@ -2884,7 +2883,6 @@ public class WorldScreen extends ScreenAdapter {
         botaoBack.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { fecharSettings(); }
         });
-        conteudo.add(botaoBack).row();
 
         TextButton botaoExit = new TextButton(tr("Exit"), skin, "vermelho-popup");
         botaoExit.addListener(new ChangeListener() {
@@ -2898,7 +2896,11 @@ public class WorldScreen extends ScreenAdapter {
                 salvarPosicaoESair();
             }
         });
-        conteudo.add(botaoExit).padBottom(0);
+        // Mesma largura nos 3; cresce se a traducao nao couber (o fundo acompanha).
+        float largura = UiSkin.larguraBotoes(LARGURA_BOTAO_SETTINGS, 28f, botaoSettings, botaoBack, botaoExit);
+        conteudo.add(botaoSettings).width(largura).row();
+        conteudo.add(botaoBack).width(largura).row();
+        conteudo.add(botaoExit).width(largura).padBottom(0);
         return conteudo;
     }
 
@@ -3349,7 +3351,7 @@ public class WorldScreen extends ScreenAdapter {
                 painelSettings.setVisible(true);
             }
         });
-        bottomBar.add(botaoVoltar).width(128).height(64).left().pad(18);
+        bottomBar.add(botaoVoltar).width(UiSkin.larguraBotoes(128f, 28f, botaoVoltar)).height(64).left().pad(18);
         raiz.add(bottomBar).growX().height(100);
         return raiz;
     }
@@ -6099,7 +6101,7 @@ public class WorldScreen extends ScreenAdapter {
         int dano = data.getInt("damage", 0);
         boolean critico = data.getBoolean("is_crit", false);
         // Dano 0 = o player desviou (servidor.py: BLOCK_CHANCE, agora "Dodge"): "Miss" em amarelo.
-        NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? tr("Miss") : dano + (critico ? "!" : ""), critico);
+        NumeroDano nd = new NumeroDano(j.x, j.y + 4f, dano <= 0 ? "Miss" : dano + (critico ? "!" : ""), critico);
         if (dano <= 0) nd.cor = new Color(1f, 0.9f, 0.1f, 1f);
         numerosDano.add(nd);
         if (dano > 0) sangrar(j.x, j.y);
@@ -6776,7 +6778,7 @@ public class WorldScreen extends ScreenAdapter {
                 renascerLocal();
             }
         });
-        conteudoMorte.add(renascer).width(LARGURA_BOTAO_SETTINGS).height(ALTURA_BOTAO_SETTINGS);
+        conteudoMorte.add(renascer).width(UiSkin.larguraBotoes(LARGURA_BOTAO_SETTINGS, 28f, renascer)).height(ALTURA_BOTAO_SETTINGS);
 
         Table centro = new Table();
         centro.setFillParent(true);

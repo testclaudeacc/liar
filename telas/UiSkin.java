@@ -521,6 +521,19 @@ public class UiSkin {
         return d;
     }
 
+    /** Largura de um grupo de botoes: o minimo, ou mais se o texto de algum
+     * nao couber (traducao mais comprida). Todos do grupo usam a mesma, entao
+     * crescem juntos e o fundo acompanha. folga = margem dos dois lados. */
+    public static float larguraBotoes(float minimo, float folga, TextButton... botoes) {
+        float l = minimo;
+        for (TextButton b : botoes) {
+            if (b == null) continue;
+            b.getLabel().invalidate();
+            l = Math.max(l, b.getLabel().getPrefWidth() + folga);
+        }
+        return (float) Math.ceil(l);
+    }
+
     /** Numeros de quantidade (slots da bag/equip/trade/hotbar), no tamanho do
      * Options > UI font size - gerados sob demanda e guardados no skin, entao
      * mudar a opcao vale na hora (a proxima vez que o slot e' redesenhado). */

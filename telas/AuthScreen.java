@@ -379,6 +379,10 @@ public class AuthScreen extends ScreenAdapter {
         bottomBar.clear();
         bottomBar.setVisible(botoes.length > 0);
         if (botoes.length == 0) return;
+        // Todos com a mesma largura; cresce se a traducao nao couber.
+        java.util.List<TextButton> comTexto = new java.util.ArrayList<>();
+        for (com.badlogic.gdx.scenes.scene2d.Actor a : botoes) if (a instanceof TextButton) comTexto.add((TextButton) a);
+        float LARGURA_BOTAO_RODAPE = UiSkin.larguraBotoes(this.LARGURA_BOTAO_RODAPE, 32f, comTexto.toArray(new TextButton[0]));
         bottomBar.add(botoes[0]).width(LARGURA_BOTAO_RODAPE).height(ALTURA_BOTAO_RODAPE).padLeft(MARGEM_BORDA_RODAPE);
         for (int i = 1; i < botoes.length - 1; i++) {
             bottomBar.add(botoes[i]).width(LARGURA_BOTAO_RODAPE).height(ALTURA_BOTAO_RODAPE).padLeft(GAP_BOTOES_RODAPE);
@@ -472,7 +476,7 @@ public class AuthScreen extends ScreenAdapter {
 
         // 240x72 no mobile (bom la, a pedido do usuario); reduzido no PC
         // (ficava grande demais).
-        float largura = mobile ? 240f : 190f;
+        float largura = UiSkin.larguraBotoes(mobile ? 240f : 190f, 32f, playBtn, registerBtn, exitBtn);
         float altura = mobile ? 72f : 56f;
         painel.pad(10);
         painel.add(playBtn).width(largura).height(altura).padBottom(5).row();

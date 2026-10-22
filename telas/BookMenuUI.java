@@ -838,7 +838,7 @@ public final class BookMenuUI {
             String slotAlvo = slotDoItem(candidatoPath);
             String atual = slotAlvo == null ? null : equippedItemPaths.get(slotAlvo);
             equipColunaDireita.add(equipPainelGrade).growX().height(ALTURA_GRADE_EQUIP - 54f).row();
-            equipColunaDireita.add(equipButton).width(120).height(42).right().padRight(14).padBottom(8).row();
+            equipColunaDireita.add(equipButton).width(UiSkin.larguraBotoes(120f, 24f, equipButton, unequipButton)).height(42).right().padRight(14).padBottom(8).row();
             equipColunaDireita.add(separadorEquip()).growX().height(1).row();
             preencherBlocoStats(equipDetalhesDireita, candidatoPath, atual == null ? "" : atual);
             equipColunaDireita.add(equipScrollDireita).grow().top().left().pad(10, 12, 10, 12);
@@ -848,7 +848,7 @@ public final class BookMenuUI {
         } else {
             equipColunaDireita.add(equipPainelGrade).grow().row();
             if (equipadoPath != null) {
-                equipColunaDireita.add(unequipButton).width(120).height(42).right().padRight(14).padBottom(10);
+                equipColunaDireita.add(unequipButton).width(UiSkin.larguraBotoes(120f, 24f, equipButton, unequipButton)).height(42).right().padRight(14).padBottom(10);
             }
         }
     }
@@ -1239,6 +1239,12 @@ public final class BookMenuUI {
         Label rotulo = rotuloQuantidade(quantidade);
         marcadores.add().expandX();
         marcadores.add(rotulo).right().bottom().padBottom(rotulo.getStyle().font.getDescent());
+    }
+
+    /** Largura que o botao precisa pra mostrar esse texto (ex: o texto que ele vira depois). */
+    private static float larguraTexto(TextButton b, String texto, float folga) {
+        com.badlogic.gdx.graphics.g2d.GlyphLayout g = new com.badlogic.gdx.graphics.g2d.GlyphLayout(b.getLabel().getStyle().font, texto);
+        return (float) Math.ceil(g.width * b.getLabel().getFontScaleX() + folga);
     }
 
     /** grande: slots redondos da hotbar no celular. */
@@ -2682,8 +2688,16 @@ public final class BookMenuUI {
         linhaCampo.add(campo).width(140).height(40).padRight(6);
         linhaCampo.add(botaoMax).width(64).height(40);
         Table linhaBotoes = new Table();
-        linhaBotoes.add(cancelar).width(110).height(44).padRight(10);
-        linhaBotoes.add(confirmar).width(pedeCerteza ? 150 : 110).height(44);
+        // Largura: o maior texto que esse botao pode mostrar (traducao mais comprida cresce).
+        float larguraConfirmar = pedeCerteza ? 150f : 110f;
+        String textoAntes = confirmar.getText().toString();
+        for (String v : new String[]{tr("Confirm"), tr("No Cap"), pedeCerteza ? tr("Are you sure?") : tr("Confirm")}) {
+            confirmar.setText(v);
+            larguraConfirmar = UiSkin.larguraBotoes(larguraConfirmar, 24f, confirmar);
+        }
+        confirmar.setText(textoAntes);
+        linhaBotoes.add(cancelar).width(UiSkin.larguraBotoes(110f, 24f, cancelar)).height(44).padRight(10);
+        linhaBotoes.add(confirmar).width(larguraConfirmar).height(44);
         caixa.add(cabecalho).left().padBottom(12).row();
         caixa.add(linhaCampo).padBottom(10).row();
         if (max > 1) {
@@ -4122,7 +4136,7 @@ public final class BookMenuUI {
 
         Table rodape = new Table();
         rodape.add(bonusParty).expandX().left().bottom();
-        rodape.add(botaoCriarParty).width(110).height(44);
+        rodape.add(botaoCriarParty).width(Math.max(UiSkin.larguraBotoes(110f, 24f, botaoCriarParty), larguraTexto(botaoCriarParty, tr("Leave"), 24f))).height(44);
         partyPage.add(caixa).grow().row();
         partyPage.add(rodape).growX().height(44).padTop(8);
         reconstruirListaParty();
@@ -4344,8 +4358,8 @@ public final class BookMenuUI {
         statusAmigos = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
         escalarFonte(statusAmigos, 0.6f);
         rodapeAmigos.add(statusAmigos).expandX().left();
-        rodapeAmigos.add(remover).width(110).height(44).padRight(6);
-        rodapeAmigos.add(adicionar).width(130).height(44);
+        rodapeAmigos.add(remover).width(UiSkin.larguraBotoes(110f, 24f, remover)).height(44).padRight(6);
+        rodapeAmigos.add(adicionar).width(UiSkin.larguraBotoes(130f, 24f, adicionar)).height(44);
 
         // "Add Friend": campo com o nome + Add/Cancel no lugar do rodape.
         campoNovoAmigo = new com.badlogic.gdx.scenes.scene2d.ui.TextField("", skin);
@@ -4367,8 +4381,8 @@ public final class BookMenuUI {
             }
         });
         rodapeAdicionar.add(campoNovoAmigo).growX().height(44).padRight(6);
-        rodapeAdicionar.add(cancelar).width(100).height(44).padRight(6);
-        rodapeAdicionar.add(confirmar).width(90).height(44);
+        rodapeAdicionar.add(cancelar).width(UiSkin.larguraBotoes(100f, 24f, cancelar)).height(44).padRight(6);
+        rodapeAdicionar.add(confirmar).width(UiSkin.larguraBotoes(90f, 24f, confirmar)).height(44);
 
         Stack rodape = new Stack(rodapeAmigos, rodapeAdicionar);
         rodapeAdicionar.setVisible(false);
@@ -5403,8 +5417,9 @@ public final class BookMenuUI {
         });
         TextButton cancelar = botaoSpells(tr("Cancel"), "vermelho", this::fecharPopupQuantidade);
         Table botoes = new Table();
-        botoes.add(cancelar).width(130).height(38).padRight(10);
-        botoes.add(confirmar).width(130).height(38);
+        float larguraPar = UiSkin.larguraBotoes(130f, 24f, cancelar, confirmar);
+        botoes.add(cancelar).width(larguraPar).height(38).padRight(10);
+        botoes.add(confirmar).width(larguraPar).height(38);
         caixa.add(aviso).left().row();
         caixa.add(botoes).right().padTop(6);
         popupQuantidade = new Table();

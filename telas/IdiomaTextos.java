@@ -85,7 +85,6 @@ final class IdiomaTextos {
             + "You have been slain.	Voc\u00ea foi derrotado.	Has sido derrotado.\n"
             + "Slain by {0}	Derrotado por {0}	Derrotado por {0}\n"
             + "{0} was killed by {1}.	{0} foi morto por {1}.	{0} fue asesinado por {1}.\n"
-            + "Miss	Errou	Fallo\n"
             + "Welcome to Mitera Online! We hope you have fun, check out our Discord for updates, report bugs and events!	Bem-vindo ao Mitera Online! Esperamos que se divirta. Veja nosso Discord para novidades, reportar bugs e eventos!	\u00a1Bienvenido a Mitera Online! Esperamos que te diviertas. \u00a1Mira nuestro Discord para novedades, reportar errores y eventos!\n"
             + "That location is not in this area.	Esse local n\u00e3o fica nesta \u00e1rea.	Ese lugar no est\u00e1 en esta zona.\n"
             + "Select a target first.	Selecione um alvo primeiro.	Selecciona un objetivo primero.\n"
@@ -289,9 +288,9 @@ final class IdiomaTextos {
             + "Create buy offer	Criar oferta de compra	Crear oferta de compra\n"
             + "None	Nenhum	Ninguno\n"
             + "Sell {0}	Vender {0}	Vender {0}\n"
+            + "Buy {0}	Comprar {0}	Comprar {0}\n"
         ,
         ""
-            + "Buy {0}	Comprar {0}	Comprar {0}\n"
             + "Price each	Pre\u00e7o cada	Precio c/u\n"
             + "Type the quantity and the price.	Digite a quantidade e o pre\u00e7o.	Escribe la cantidad y el precio.\n"
             + "Fee paid now:	Taxa paga agora:	Tarifa pagada ahora:\n"
