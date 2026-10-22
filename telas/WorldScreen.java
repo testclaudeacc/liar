@@ -2294,6 +2294,13 @@ public class WorldScreen extends ScreenAdapter {
      * resto quando o zoom muda. */
     /** Mesma Tahoma Bold dos nomes, gerada a 64px (2x) e reduzida pra 1.5x o
      * tamanho do nome - reduzir textura fica nitido, ampliar borrava. */
+    /** Fonte do nome maior que a padrao: o texto cresce pra baixo a partir do
+     * topo, entao sobe ele o tanto que cresceu (o pe' do nome fica no mesmo
+     * lugar e nao encosta na cabeca/barra de vida). Usa o layout ja' medido. */
+    private float extraAlturaNome() {
+        return layout.height * (1f - NOME_ESCALA_PADRAO / NOME_ESCALA_BASE);
+    }
+
     /** UI font size mudou: textos do mundo na hora; os numeros/cooldown das
      * GUIs e o chat (fontes geradas no UiSkin) na proxima entrada no mundo. */
     private void aplicarTamanhoFonte() {
@@ -2994,29 +3001,27 @@ public class WorldScreen extends ScreenAdapter {
 
     /** "Nome   [x] Opcao1   [ ] Opcao2 ..." - uma marcada por vez. */
     private Table linhaDeEscolha(String titulo, String[] opcoes, int marcada, java.util.function.IntConsumer aoMudar) {
+        // Dropdown igual o do zoom (setinha abre a lista) - antes era uma
+        // fileira de checkbox por opcao.
         Table linha = new Table();
         linha.add(new Label(titulo, skin, "opcoes-label")).align(Align.right).width(200).padRight(10);
-        CheckBox.CheckBoxStyle estilo = new CheckBox.CheckBoxStyle();
-        estilo.checkboxOn = new TextureRegionDrawable(iconeCheckOn);
-        estilo.checkboxOff = new TextureRegionDrawable(iconeCheckOff);
-        estilo.font = skin.getFont("default-font");
-        estilo.fontColor = Color.WHITE;
-        com.badlogic.gdx.scenes.scene2d.ui.ButtonGroup<CheckBox> grupo = new com.badlogic.gdx.scenes.scene2d.ui.ButtonGroup<>();
-        grupo.setMinCheckCount(1);
-        grupo.setMaxCheckCount(1);
-        for (int i = 0; i < opcoes.length; i++) {
-            final int indice = i;
-            CheckBox c = new CheckBox(" " + opcoes[i], estilo);
-            c.getImageCell().size(28);
-            grupo.add(c);
-            c.setChecked(i == marcada);
-            c.addListener(new ChangeListener() {
-                @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                    if (c.isChecked()) aoMudar.accept(indice);
-                }
-            });
-            linha.add(c).left().padRight(24).height(36);
+        SelectBox<String> caixa = new SelectBox<>(skin, "zoom-select");
+        caixa.setItems(opcoes);
+        caixa.setSelectedIndex(Math.max(0, Math.min(opcoes.length - 1, marcada)));
+        caixa.setAlignment(Align.center);
+        caixa.getList().setAlignment(Align.center);
+        caixa.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                aoMudar.accept(caixa.getSelectedIndex());
+            }
+        });
+        float largura = 90f;
+        com.badlogic.gdx.graphics.g2d.GlyphLayout medida = new com.badlogic.gdx.graphics.g2d.GlyphLayout();
+        for (String o : opcoes) {
+            medida.setText(caixa.getStyle().font, o);
+            largura = Math.max(largura, medida.width + 56f); // + setinha e margens
         }
+        linha.add(caixa).width(largura).height(36).left();
         return linha;
     }
 
@@ -6733,7 +6738,7 @@ public class WorldScreen extends ScreenAdapter {
         float ancoraY = Math.round(mob.y / camera.zoom) * camera.zoom;
         layout.setText(font, mob.nome);
         float nomeX = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
-        float nomeY = Math.round((ancoraY + altura + 10f) / camera.zoom) * camera.zoom;
+        float nomeY = Math.round((ancoraY + altura + 10f + extraAlturaNome()) / camera.zoom) * camera.zoom;
         Color anterior = new Color(font.getColor());
         font.setColor(corDaVida(mob.hp / mob.maxHp));
         font.draw(batch, mob.nome, nomeX, nomeY);
@@ -6889,7 +6894,7 @@ public class WorldScreen extends ScreenAdapter {
         float altura = quadro.getRegionHeight() * ESCALA_SPRITE;
         layout.setText(font, npc.nome);
         float x = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
-        float y = Math.round((ancoraY + altura + 7f) / camera.zoom) * camera.zoom;
+        float y = Math.round((ancoraY + altura + 7f + extraAlturaNome()) / camera.zoom) * camera.zoom;
         font.draw(batch, npc.nome, x, y);
     }
 
@@ -6940,7 +6945,7 @@ public class WorldScreen extends ScreenAdapter {
         // proporcional ao personagem de 32px/ESCALA_SPRITE=2x; com o
         // personagem agora em 16px (ESCALA_SPRITE=1x) o nome ficava flutuando
         // longe demais da cabeca (usuario reportou "muito em cima").
-        float nomeYBruto = ancoraY + altura + 7f;
+        float nomeYBruto = ancoraY + altura + 7f + extraAlturaNome();
         float nomeX = Math.round(nomeXBruto / camera.zoom) * camera.zoom;
         float nomeY = Math.round(nomeYBruto / camera.zoom) * camera.zoom;
         // Nome na cor da vida (igual os mobs).

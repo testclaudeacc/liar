@@ -210,7 +210,7 @@ public final class Controles {
     // ---- Opcoes graficas (Options) ----
     /** Nomes dos 5 tamanhos (Health Bar Size / UI Font Size); 2 = padrao. */
     public static final String[] NOMES_TAMANHO = {"Smaller", "Small", "Default", "Big", "Bigger"};
-    private static final float[] MULT_BARRA = {0.6f, 0.8f, 1f, 1.3f, 1.6f};
+    private static final float[] MULT_BARRA = {0.6f, 0.8f, 1f, 1.3f, 2.0f};
     private static final float[] MULT_FONTE = {0.8f, 0.9f, 1f, 1.15f, 1.3f};
 
     public static int tamanhoBarraHp() { return Math.max(0, Math.min(4, prefs().getInteger("hp_bar_size", 2))); }

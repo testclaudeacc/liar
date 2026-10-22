@@ -6257,7 +6257,8 @@ public final class BookMenuUI {
                 // Aba Spells: numa linha so' (a janela alarga, ajustarLarguraDetalhes).
                 // Loja: quebra na largura do painel.
                 Label desc = linhaStat(dados.magiaDescricao, Color.LIGHT_GRAY);
-                if (preco > 0) { desc.setWrap(true); texto.add(desc).growX().left().row(); }
+                // Fonte maior que a padrao: quebra por palavra em vez de alargar a janela sem fim.
+                if (preco > 0 || Controles.multFonte() > 1f) { desc.setWrap(true); texto.add(desc).growX().left().row(); }
                 else texto.add(desc).left().row();
             }
             Table linhaDano = new Table();

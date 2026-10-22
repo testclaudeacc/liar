@@ -96,7 +96,9 @@ public class UiSkin {
      * notificacoes da HUD - Tahoma Bold com contorno preto de 1px, gerada no
      * tamanho da tela. tamanho = px no PC (13 = notificacao). */
     public static BitmapFont fonteDescricao(Skin skin, int tamanho) {
-        int px = Math.max(6, Math.round(tamanho * escalaAtual));
+        // Options > UI font size vale nas descricoes tambem (cada tamanho
+        // gerado nitido e guardado no skin).
+        int px = Math.max(6, Math.round(tamanho * escalaAtual * Controles.multFonte()));
         String nome = "desc-px-" + px;
         if (skin.has(nome, BitmapFont.class)) return skin.getFont(nome);
         FreeTypeFontGenerator gerador = new FreeTypeFontGenerator(Gdx.files.internal("fonts/TAHOMAB0.TTF"));
