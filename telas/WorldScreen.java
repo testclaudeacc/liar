@@ -2931,6 +2931,13 @@ public class WorldScreen extends ScreenAdapter {
             modoBarraHp = i;
             Controles.definirModoBarraHp(i);
         })).left().padTop(6).row();
+        // Limite de FPS: 60 (bateria) ou o maximo da tela (90/120/144 Hz).
+        secao.add(linhaDeEscolha("FPS limit", new String[]{"60", "Max"}, com.teste.game.InvertedRealmsGame.fpsSemLimite() ? 1 : 0, i -> {
+            com.badlogic.gdx.Preferences prefs = Gdx.app.getPreferences("inverted_realms_opcoes");
+            prefs.putBoolean("fps_max", i == 1);
+            prefs.flush();
+            com.teste.game.InvertedRealmsGame.definirFpsSemLimite(i == 1);
+        })).left().padTop(6).row();
         // Medidor de desempenho (o que pesa no frame) - pra achar travada no celular.
         boolean perfLigado = Gdx.app.getPreferences("inverted_realms_opcoes").getBoolean(PREF_PERF, false);
         secao.add(linhaDeEscolha("Performance stats", new String[]{"Off", "On"}, perfLigado ? 1 : 0, i -> {

@@ -303,7 +303,10 @@ public class MapaMundo {
         b.setProjectionMatrix(camera.combined);
         b.begin();
         b.setColor(1f, 1f, 1f, alpha);
-        for (MapaPropriedades.CelulaAcima c : lista) {
+        idxNoturnas = indiceAcima(lista, idxNoturnas);
+        int[] ids = naTela(idxNoturnas, camera, meiaL, meiaA);
+        for (int k = 0, n = idxNoturnas.quantos(); k < n; k++) {
+            MapaPropriedades.CelulaAcima c = lista.get(ids[k]);
             if (Math.abs(c.worldX - camera.position.x) > meiaL || Math.abs(c.worldY - camera.position.y) > meiaA) continue;
             TextureRegion regiao = c.tile.getTextureRegion();
             b.draw(regiao, c.worldX, c.worldY, regiao.getRegionWidth(), regiao.getRegionHeight());
@@ -348,10 +351,33 @@ public class MapaMundo {
         if (fixas.isEmpty() && dinamicas.isEmpty()) return;
         float meiaL = camera.viewportWidth * camera.zoom / 2f + tileWidth * 4f;
         float meiaA = camera.viewportHeight * camera.zoom / 2f + tileHeight * 6f;
-        for (MapaPropriedades.CelulaAcima c : fixas) desenharCelulaAcima(batch, camera, c, meiaL, meiaA);
-        for (int i = 0; i < dinamicas.size(); i++) {
-            if (dinamicaAcima != null && dinamicaAcima[i]) desenharCelulaAcima(batch, camera, dinamicas.get(i), meiaL, meiaA);
+        idxAcima = indiceAcima(fixas, idxAcima);
+        int[] ids = naTela(idxAcima, camera, meiaL, meiaA);
+        for (int k = 0, n = idxAcima.quantos(); k < n; k++) desenharCelulaAcima(batch, camera, fixas.get(ids[k]), meiaL, meiaA);
+        if (dinamicaAcima != null && !dinamicas.isEmpty()) {
+            idxDinamicas = indiceAcima(dinamicas, idxDinamicas);
+            ids = naTela(idxDinamicas, camera, meiaL, meiaA);
+            for (int k = 0, n = idxDinamicas.quantos(); k < n; k++) {
+                int i = ids[k];
+                if (i < dinamicaAcima.length && dinamicaAcima[i]) desenharCelulaAcima(batch, camera, dinamicas.get(i), meiaL, meiaA);
+            }
         }
+    }
+
+    // Indices espaciais (so' as celulas perto da camera/do player por frame).
+    private IndiceCelulas idxAcima, idxDinamicas, idxOverlay, idxNoturnas;
+
+    private static IndiceCelulas indiceAcima(java.util.List<MapaPropriedades.CelulaAcima> l, IndiceCelulas atual) {
+        if (atual != null && atual.tamanho == l.size()) return atual;
+        return new IndiceCelulas(l.size(), new IndiceCelulas.Coord() {
+            public int cx(int i) { return l.get(i).cx; }
+            public int cy(int i) { return l.get(i).cy; }
+        });
+    }
+
+    private int[] naTela(IndiceCelulas idx, OrthographicCamera camera, float meiaL, float meiaA) {
+        return idx.naArea((int) Math.floor((camera.position.x - meiaL) / tileWidth), (int) Math.floor((camera.position.y - meiaA) / tileHeight),
+            (int) Math.floor((camera.position.x + meiaL) / tileWidth), (int) Math.floor((camera.position.y + meiaA) / tileHeight));
     }
 
     private void desenharCelulaAcima(Batch batch, OrthographicCamera camera, MapaPropriedades.CelulaAcima c, float meiaL, float meiaA) {
@@ -381,7 +407,12 @@ public class MapaMundo {
         java.util.List<MapaPropriedades.CelulaAcima> dinamicas = propriedades.celulasAcimaDinamicas;
         if (dinamicas.isEmpty()) return;
         if (dinamicaAcima == null || dinamicaAcima.length != dinamicas.size()) dinamicaAcima = new boolean[dinamicas.size()];
-        for (int i = 0; i < dinamicas.size(); i++) {
+        // So' as celulas no 3x3 em volta do passo podem mudar (aplicarFileira).
+        idxDinamicas = indiceAcima(dinamicas, idxDinamicas);
+        int[] ids = idxDinamicas.naArea(Math.min(origemCx, destinoCx) - 1, Math.min(origemCy, destinoCy) - 1,
+            Math.max(origemCx, destinoCx) + 1, Math.max(origemCy, destinoCy) + 1);
+        for (int k = 0, n = idxDinamicas.quantos(); k < n; k++) {
+            int i = ids[k];
             MapaPropriedades.CelulaAcima c = dinamicas.get(i);
             aplicarFileira(i, origemCx - c.cx, origemCy - c.cy);
             aplicarFileira(i, destinoCx - c.cx, destinoCy - c.cy);
@@ -422,7 +453,21 @@ public class MapaMundo {
         int jcy = (int) Math.floor(jogadorMundoY / tileHeight);
         float meiaL = camera != null ? camera.viewportWidth * camera.zoom / 2f + tileWidth * 4f : 0f;
         float meiaA = camera != null ? camera.viewportHeight * camera.zoom / 2f + tileHeight * 4f : 0f;
-        for (MapaPropriedades.CelulaOverlay c : propriedades.celulasOverlay) {
+        java.util.List<MapaPropriedades.CelulaOverlay> overlays = propriedades.celulasOverlay;
+        int[] ids = null;
+        int n = overlays.size();
+        if (camera != null) {
+            if (idxOverlay == null || idxOverlay.tamanho != overlays.size()) {
+                idxOverlay = new IndiceCelulas(overlays.size(), new IndiceCelulas.Coord() {
+                    public int cx(int i) { return overlays.get(i).cx; }
+                    public int cy(int i) { return overlays.get(i).cy; }
+                });
+            }
+            ids = naTela(idxOverlay, camera, meiaL, meiaA);
+            n = idxOverlay.quantos();
+        }
+        for (int k = 0; k < n; k++) {
+            MapaPropriedades.CelulaOverlay c = overlays.get(ids != null ? ids[k] : k);
             if (camera != null && (Math.abs(c.worldX - camera.position.x) > meiaL || Math.abs(c.worldY - camera.position.y) > meiaA)) continue;
             TextureRegion regiao = c.tile.getTextureRegion();
             boolean jogadorAqui = c.cx == jcx && c.cy == jcy;

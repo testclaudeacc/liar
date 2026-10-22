@@ -34,7 +34,7 @@ public class InvertedRealmsGame extends Game {
         // 60 fixo em qualquer plataforma - tudo acima disso e' desnecessario
         // (a pedido do usuario). Graphics.setForegroundFPS() e' cross-platform
         // (desktop LWJGL3 e Android), nao precisa configurar em cada launcher.
-        Gdx.graphics.setForegroundFPS(60);
+        definirFpsSemLimite(Gdx.app.getPreferences("inverted_realms_opcoes").getBoolean("fps_max", false));
         setScreen(new AuthScreen(this::entrarNoMundo));
     }
 
@@ -64,9 +64,21 @@ public class InvertedRealmsGame extends Game {
     // tela, sem dormir nada.
     private int hzTela = 60, framesAteLerHz = 0;
 
+    // Options > FPS limit: "60" (padrao, economiza bateria) ou "Max" (o que a
+    // tela der: 90/120/144 Hz).
+    private static volatile boolean fpsSemLimite = false;
+
+    public static boolean fpsSemLimite() { return fpsSemLimite; }
+
+    public static void definirFpsSemLimite(boolean livre) {
+        fpsSemLimite = livre;
+        Gdx.graphics.setForegroundFPS(livre ? 0 : 60);
+    }
+
     private void limitarFpsCelular(long inicioFrameNs) {
         Application.ApplicationType tipo = Gdx.app.getType();
         if (tipo != Application.ApplicationType.Android && tipo != Application.ApplicationType.iOS) return;
+        if (fpsSemLimite) return;
         // Hz da tela: le de tempos em tempos (getDisplayMode cria objeto - nao
         // a cada frame; muda quando o celular troca 60 <-> 120 sozinho).
         if (--framesAteLerHz <= 0) {
