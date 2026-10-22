@@ -40,6 +40,7 @@ public class InvertedRealmsGame extends Game {
 
     @Override
     public void render() {
+        long inicioFrameNs = System.nanoTime(); // logo depois do vsync anterior
         // F11 ou Alt+Enter alterna fullscreen exclusivo <-> janela, do jeito
         // que o usuario pediu - checado aqui (nao dentro de uma Screen
         // especifica) pra funcionar em qualquer tela do jogo. Gdx.input aqui
@@ -50,34 +51,44 @@ public class InvertedRealmsGame extends Game {
             alternarFullscreen();
         }
         super.render();
-        limitarFpsCelular();
+        limitarFpsCelular(inicioFrameNs);
     }
 
     // No Android o setForegroundFPS(60) nao faz nada (o jogo roda no ritmo
-    // da tela: 90/120 Hz nos celulares mais novos). Aqui o proprio jogo
-    // espera ate' completar ~16.7 ms por frame - 60 fixo, e um frame mais
-    // pesado de vez em quando nao aparece como queda.
-    private static final long FRAME_ALVO_NS = 1_000_000_000L / 60L;
-    private long proximoFrameNs = 0L;
+    // da tela: 60/90/120 Hz). O limite antigo dormia ate' completar 16.7 ms
+    // contado pelo relogio do jogo - so' que a troca de quadro espera o vsync
+    // da tela, e qualquer desencontro entre os dois relogios fazia o frame
+    // perder o vsync: 60 Hz virava ~50 fps (e com o frame um pouco mais pesado,
+    // 30). Agora o limite segue o vsync: pula vsyncs inteiros so' quando a tela
+    // e' de 120 Hz ou mais (120 -> 60, 144 -> 72); 60 e 90 Hz rodam no ritmo da
+    // tela, sem dormir nada.
+    private int hzTela = 60, framesAteLerHz = 0;
 
-    private void limitarFpsCelular() {
+    private void limitarFpsCelular(long inicioFrameNs) {
         Application.ApplicationType tipo = Gdx.app.getType();
         if (tipo != Application.ApplicationType.Android && tipo != Application.ApplicationType.iOS) return;
-        long agora = System.nanoTime();
-        if (proximoFrameNs == 0L || agora - proximoFrameNs > FRAME_ALVO_NS) {
-            // 1o frame ou atrasou mais de 1 frame: recomeca a contagem daqui.
-            proximoFrameNs = agora + FRAME_ALVO_NS;
-            return;
+        // Hz da tela: le de tempos em tempos (getDisplayMode cria objeto - nao
+        // a cada frame; muda quando o celular troca 60 <-> 120 sozinho).
+        if (--framesAteLerHz <= 0) {
+            framesAteLerHz = 120;
+            try { hzTela = Math.max(30, Gdx.graphics.getDisplayMode().refreshRate); } catch (RuntimeException ignorado) { }
         }
-        long falta = proximoFrameNs - agora;
-        if (falta > 0L) {
+        int hz = hzTela;
+        int pular = Math.max(1, hz / 60); // quantos vsyncs por frame
+        if (pular <= 1) return;
+        // O frame comecou logo depois de um vsync: dorme ate' passar do(s)
+        // vsync(s) que vamos pular (+ meio vsync de folga) e a troca de quadro
+        // encaixa sozinha no vsync certo. Frame pesado (ja' passou): nao dorme.
+        long vsyncNs = 1_000_000_000L / hz;
+        long acordar = inicioFrameNs + (pular - 1) * vsyncNs + vsyncNs / 2L;
+        long falta = acordar - System.nanoTime();
+        if (falta > 0L && falta < 50_000_000L) {
             try {
                 Thread.sleep(falta / 1_000_000L, (int) (falta % 1_000_000L));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }
-        proximoFrameNs += FRAME_ALVO_NS;
     }
 
     /** Mesmo toggle do F11/Alt+Enter, exposto pra tela poder chamar direto de

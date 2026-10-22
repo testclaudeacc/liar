@@ -52,6 +52,11 @@ public class Jogador {
     // dar "pulo".
     private float passoRemoto = TEMPO_PASSO;
     private long ultimoAlvoNs = 0L;
+    private boolean passoDoServidor = false; // passoRemoto veio do servidor (exato)
+
+    /** Duracao de um passo reto do remoto: a do servidor (exata, inclusive mais
+     * lento com fome/lama); sem ela, a estimada (nunca mais lenta que o normal). */
+    private float passoBase() { return passoDoServidor ? passoRemoto : Math.min(TEMPO_PASSO, passoRemoto); }
 
     public Jogador(String nome, String classe, float x, float y) {
         this.nome = nome;
@@ -94,9 +99,17 @@ public class Jogador {
 
     /** Player remoto: o servidor manda a posicao alvo pronta (evento "m") -
      * tween ate la na mesma duracao de um passo, em vez de ficar teleportando. */
-    public void definirAlvo(float alvoX, float alvoY, String direcao) {
+    public void definirAlvo(float alvoX, float alvoY, String direcao) { definirAlvo(alvoX, alvoY, direcao, 0f); }
+
+    /** passoServidor > 0: duracao do passo que o servidor mandou (velocidade
+     * real do player: level, /speed, fome, lama) - usa ela direto em vez de
+     * adivinhar pelo intervalo entre os pacotes. */
+    public void definirAlvo(float alvoX, float alvoY, String direcao, float passoServidor) {
         long agora = System.nanoTime();
-        if (ultimoAlvoNs != 0L) {
+        passoDoServidor = passoServidor > 0f;
+        if (passoDoServidor) {
+            passoRemoto = Math.max(0.02f, passoServidor);
+        } else if (ultimoAlvoNs != 0L) {
             float dt = (agora - ultimoAlvoNs) / 1e9f;
             // Andando direto (intervalo curto): media; parou e voltou: reseta.
             if (dt < TEMPO_PASSO * 1.5f) passoRemoto = 0.7f * passoRemoto + 0.3f * Math.max(0.05f, dt);
@@ -105,13 +118,18 @@ public class Jogador {
         ultimoAlvoNs = agora;
         if (movendo || !fila.isEmpty()) {
             fila.add(new Object[]{alvoX, alvoY, direcao});
-            if (fila.size() > FILA_MAX) {
+            // Fila guarda ~0.45s de passos (rapido = mais passos), nunca menos de FILA_MAX.
+            int filaMax = Math.max(FILA_MAX, (int) Math.ceil(0.45f / Math.max(0.02f, passoRemoto)));
+            if (fila.size() > filaMax) {
                 Object[] ultimo = fila.peekLast();
                 posicionar((Float) ultimo[0], (Float) ultimo[1], (String) ultimo[2]);
             }
             return;
         }
-        iniciarAlvo(alvoX, alvoY, direcao, Math.min(TEMPO_PASSO, passoRemoto) + BUFFER_REMOTO);
+        // Folga do 1o passo proporcional ao passo (GM rapido: folga pequena,
+        // senao o 1o passo ficava varias vezes mais lento que os outros).
+        float base = passoBase();
+        iniciarAlvo(alvoX, alvoY, direcao, base + Math.min(BUFFER_REMOTO, base * 0.5f));
     }
 
     /** Vai direto pra posicao (sem passo), descartando a fila. */
@@ -162,7 +180,7 @@ public class Jogador {
                 // Proximo passo da fila, colado no anterior. Com a fila
                 // acumulando (atraso), anda um pouco mais rapido pra alcancar.
                 Object[] prox = fila.poll();
-                float base = Math.min(TEMPO_PASSO, passoRemoto);
+                float base = passoBase();
                 float dur = fila.size() >= 1 ? base * 0.85f : base;
                 iniciarAlvo((Float) prox[0], (Float) prox[1], (String) prox[2], dur);
                 continue;

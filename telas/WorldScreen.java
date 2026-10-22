@@ -4259,8 +4259,9 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null || !data.isArray()) return;
             for (JsonValue e = data.child; e != null; e = e.next) {
                 if (!e.isArray() || e.size < 5) continue;
+                // 6o campo (servidor novo): duracao do passo em ms.
                 aplicarMovimentoRemoto(e.get(0).asString(), e.get(1).asFloat(), e.get(2).asFloat(),
-                    direcaoDoInt(e.get(3).asInt()), e.get(4).asInt());
+                    direcaoDoInt(e.get(3).asInt()), e.get(4).asInt(), e.size >= 6 ? e.get(5).asInt() / 1000f : 0f);
             }
         });
         // Sairam do raio da tela: somem (guardados ate' voltarem).
@@ -5209,7 +5210,7 @@ public class WorldScreen extends ScreenAdapter {
         return null;
     }
 
-    private void aplicarMovimentoRemoto(String nome, float rawX, float rawY, String direcao, int flags) {
+    private void aplicarMovimentoRemoto(String nome, float rawX, float rawY, String direcao, int flags, float passoSeg) {
         Jogador j = remotos.get(nome);
         if (j == null) {
             j = remotosForaDeVisao.remove(nome);
@@ -5229,7 +5230,7 @@ public class WorldScreen extends ScreenAdapter {
         float alvoAtualX = j.ultimoAlvoX(), alvoAtualY = j.ultimoAlvoY();
         // Mesma posicao: so' virou pro lado (vai na fila, vira na hora certa).
         if (mx == alvoAtualX && my == alvoAtualY) {
-            j.definirAlvo(mx, my, direcao);
+            j.definirAlvo(mx, my, direcao, passoSeg);
             return;
         }
         // Passo normal. Morto nao anda: se mexeu, renasceu (cadaver fica).
@@ -5237,7 +5238,7 @@ public class WorldScreen extends ScreenAdapter {
         if (Math.abs(mx - alvoAtualX) + Math.abs(my - alvoAtualY) > Jogador.TILE * 2.5f) {
             j.posicionar(mx, my, direcao); // pulou passos (pacote perdido): vai direto
         } else {
-            j.definirAlvo(mx, my, direcao);
+            j.definirAlvo(mx, my, direcao, passoSeg);
         }
     }
 

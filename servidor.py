@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.44"
+SERVER_VERSION = "v0.45"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -6107,7 +6107,8 @@ def _flush_visao():
         m_invisivel = m in invisiveis  # /ghost: ninguem ve m (m continua vendo todo mundo)
         # Passos de m montados UMA vez e reaproveitados pra todo mundo que ja' via.
         lista_passos = passos.get(m)
-        entradas_m = [[nome_m, x, y, d, 0] for (x, y, d) in lista_passos] if lista_passos else None
+        # [nome, x, y, dir, flags(, passo_ms)]
+        entradas_m = [[nome_m, ps[0], ps[1], ps[2], 0] + list(ps[3:4]) for ps in lista_passos] if lista_passos else None
         candidatos = set(_candidatos_visao(mx, my))
         candidatos |= vendo_m
         candidatos |= visto_m
@@ -6229,7 +6230,12 @@ def handle_m(data):
         # e' a duracao dele, que depende dos 2 SQMs - ver fator_tempo_passo).
         fator = p.get('_fator_passo') or (1.0 / max(0.05, mult_velocidade_player(p)))
         recarga = MOVE_SQM_POR_SEG * MOVE_FOLGA / fator
-        balde = min(MOVE_BALDE_MAX, p.get('_move_balde', MOVE_BALDE_MAX) + (now - p.get('last_move_time', now)) * recarga)
+        # Rajada em TEMPO (nao em passos): quem anda 5x mais rapido (GM, level
+        # alto) tem 5x mais passos de folga - a mesma ~1.8s de atraso de rede.
+        # Antes eram 4 passos pra todo mundo: o GM rapido perdia passos a cada
+        # soluco da rede e era puxado ~5 SQMs pra tras.
+        cap = MOVE_BALDE_MAX * max(1.0, 1.0 / max(0.05, fator))
+        balde = min(cap, p.get('_move_balde', cap) + (now - p.get('last_move_time', now)) * recarga)
         p['last_move_time'] = now
         if balde < custo:
             # Andando rapido demais (speed hack): o passo nao vale e o client
@@ -6314,8 +6320,12 @@ def handle_m(data):
             
         # Nao manda mais na hora pra area inteira: entra no pacote de
         # movimento (ver loop_visao_movimento), que so' vai pra quem tem esse
-        # player no raio da tela.
-        marcar_movimento(sid, (x, y, d_int))
+        # player no raio da tela. Vai junto a duracao do passo (ms, sem a
+        # diagonal): quem ve anima no ritmo certo desde o 1o passo (antes o
+        # client adivinhava pelo intervalo entre pacotes e o GM rapido comecava
+        # lento e depois pulava).
+        fator_m = p.get('_fator_passo') or (1.0 / max(0.05, mult_velocidade_player(p)))
+        marcar_movimento(sid, (x, y, d_int, int(round(1000.0 * fator_m / MOVE_SQM_POR_SEG))))
     except Exception: pass
 
 def _destino_livre(p, dest):
