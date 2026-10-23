@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.48"
+SERVER_VERSION = "v0.49"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -3173,6 +3173,11 @@ def init_db():
                         token_hash TEXT NOT NULL,
                         expires DOUBLE PRECISION NOT NULL)''')
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code_expires DOUBLE PRECISION")
+        # Aceite dos Termos de Uso (prova: versao, quando e de qual IP).
+        for tabela in ('users', 'pending_users'):
+            c.execute(f"ALTER TABLE {tabela} ADD COLUMN IF NOT EXISTS terms_version TEXT")
+            c.execute(f"ALTER TABLE {tabela} ADD COLUMN IF NOT EXISTS terms_accepted_at DOUBLE PRECISION")
+            c.execute(f"ALTER TABLE {tabela} ADD COLUMN IF NOT EXISTS terms_ip TEXT")
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bestiary TEXT DEFAULT '{}'")
         # Bank da conta (todos os personagens): {"items": [...], "currency": N}.
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bank TEXT DEFAULT '{}'")
@@ -3312,13 +3317,39 @@ def enviar_email_verificacao(email, link):
         server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD)
         server.sendmail(GMAIL_SENDER, email, msg.as_string())
 
-def _criar_pendente(c, email, hashed_password):
-    """Grava/troca o cadastro pendente com um token novo (o link anterior deixa de valer)."""
+# ---------------------------------------------------------------------------
+# TERMOS DE USO: textos em termos/termos_<idioma>.txt (pt, en, es). Mudou o
+# texto de verdade? Suba TERMOS_VERSAO (o cadastro grava qual versao foi aceita).
+# ---------------------------------------------------------------------------
+TERMOS_VERSAO = "2026-10-23"
+_PASTA_TERMOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'termos')
+
+def texto_termos(idioma):
+    idioma = idioma if idioma in ('pt', 'en', 'es') else 'en'
+    try:
+        with open(os.path.join(_PASTA_TERMOS, f'termos_{idioma}.txt'), encoding='utf-8') as f:
+            return f.read()
+    except OSError:
+        traceback.print_exc()
+        return ""
+
+@app.route('/terms', methods=['GET'])
+def terms():
+    return jsonify({"version": TERMOS_VERSAO, "text": texto_termos(str(request.args.get('lang') or 'en')[:5])}), 200
+
+def _criar_pendente(c, email, hashed_password, termos=None):
+    """Grava/troca o cadastro pendente com um token novo (o link anterior deixa de valer).
+    termos = (versao, quando, ip) do aceite dos Termos de Uso (vai pra conta no /verify-email)."""
     token = secrets.token_urlsafe(32)
-    c.execute("""INSERT INTO pending_users (email, password, token_hash, expires) VALUES (%s, %s, %s, %s)
+    versao, quando, ip = termos or (None, None, None)
+    c.execute("""INSERT INTO pending_users (email, password, token_hash, expires, terms_version, terms_accepted_at, terms_ip)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s)
                  ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password,
-                 token_hash = EXCLUDED.token_hash, expires = EXCLUDED.expires""",
-              (email, hashed_password, _hash_token(token), time.time() + VERIFY_TTL_SEG))
+                 token_hash = EXCLUDED.token_hash, expires = EXCLUDED.expires,
+                 terms_version = COALESCE(EXCLUDED.terms_version, pending_users.terms_version),
+                 terms_accepted_at = COALESCE(EXCLUDED.terms_accepted_at, pending_users.terms_accepted_at),
+                 terms_ip = COALESCE(EXCLUDED.terms_ip, pending_users.terms_ip)""",
+              (email, hashed_password, _hash_token(token), time.time() + VERIFY_TTL_SEG, versao, quando, ip))
     return f"{_url_base()}/verify-email?token={token}"
 
 @app.route('/register', methods=['POST'])
@@ -3329,6 +3360,9 @@ def register():
     if not email or not senha: return jsonify({"erro": "Missing fields"}), 400
     if len(email) > 254 or not RE_EMAIL.match(email): return jsonify({"erro": "Invalid email."}), 400
     if not (SENHA_MIN <= len(senha) <= SENHA_MAX): return jsonify({"erro": "Invalid password."}), 400
+    # Sem aceitar a versao atual dos Termos de Uso, nao cadastra.
+    if str(dados.get('terms_version') or '') != TERMOS_VERSAO:
+        return jsonify({"erro": "You must accept the Terms of Use.", "terms_version": TERMOS_VERSAO}), 400
     if _limite_excedido(('register', _ip()), 5, 3600): return _resposta_limite()
     conn = None
     try:
@@ -3337,7 +3371,7 @@ def register():
         c.execute("SELECT 1 FROM users WHERE email = %s", (email,))
         if c.fetchone(): return jsonify({"erro": "Email in use."}), 409
         # A conta so' e' criada quando clicar no link do email (/verify-email).
-        link = _criar_pendente(c, email, _hash_senha(senha))
+        link = _criar_pendente(c, email, _hash_senha(senha), (TERMOS_VERSAO, time.time(), _ip()))
         conn.commit()
         enviar_email_verificacao(email, link)
         return jsonify({"mensagem": "Check your email to verify your account.", "pending": True, "email": email}), 202
@@ -3392,18 +3426,20 @@ def verify_email():
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
-        c.execute("SELECT email, password, expires FROM pending_users WHERE token_hash = %s", (_hash_token(token),))
+        c.execute("SELECT email, password, expires, terms_version, terms_accepted_at, terms_ip FROM pending_users WHERE token_hash = %s", (_hash_token(token),))
         linha = c.fetchone()
         if not linha:
             return _pagina_verificacao("Invalid link",
                 "This link is invalid or was replaced by a newer one. Use the latest email we sent.", False)
-        email, senha_hash, expira = linha
+        email, senha_hash, expira, termos_versao, termos_quando, termos_ip = linha
         if time.time() > expira:
             return _pagina_verificacao("Link expired",
                 "This link expired. Open the game and tap Resend Email to get a new one.", False)
         c.execute("DELETE FROM pending_users WHERE email = %s", (email,))
         try:
-            c.execute("INSERT INTO users (email, password) VALUES (%s, %s)", (email, senha_hash))
+            # Prova do aceite dos Termos de Uso fica na conta (versao, quando, IP).
+            c.execute("INSERT INTO users (email, password, terms_version, terms_accepted_at, terms_ip) VALUES (%s, %s, %s, %s, %s)",
+                      (email, senha_hash, termos_versao, termos_quando, termos_ip))
         except psycopg2.IntegrityError:
             conn.rollback()
             c = conn.cursor()

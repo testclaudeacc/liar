@@ -671,15 +671,18 @@ public class AuthScreen extends ScreenAdapter {
         definirRodape(voltarBtn, loginBtn);
     }
 
+    /** O que foi digitado no cadastro (voltar da tela dos termos nao apaga). */
+    private String regEmail = "", regConfirmEmail = "", regSenha = "", regConfirmSenha = "";
+
     private void telaRegistro() {
         limparConteudo();
 
-        TextField email = new TextField("", skin);
-        TextField confirmEmail = new TextField("", skin);
-        TextField senha = new TextField("", skin);
+        TextField email = new TextField(regEmail, skin);
+        TextField confirmEmail = new TextField(regConfirmEmail, skin);
+        TextField senha = new TextField(regSenha, skin);
         senha.setPasswordMode(true);
         senha.setPasswordCharacter('*');
-        TextField confirmSenha = new TextField("", skin);
+        TextField confirmSenha = new TextField(regConfirmSenha, skin);
         confirmSenha.setPasswordMode(true);
         confirmSenha.setPasswordCharacter('*');
         campoNativo(email, "Email");
@@ -729,11 +732,78 @@ public class AuthScreen extends ScreenAdapter {
                 if (!EMAIL_REGEX.matcher(em).matches()) { telaErro(tr("Invalid email address."), AuthScreen.this::telaRegistro); return; }
                 if (!em.equals(cem)) { telaErro(tr("Emails do not match."), AuthScreen.this::telaRegistro); return; }
                 if (pw.length() < 5 || !pw.equals(cpw)) { telaErro(tr("Password must match and have at least 5 chars."), AuthScreen.this::telaRegistro); return; }
+                regEmail = em; regConfirmEmail = cem; regSenha = pw; regConfirmSenha = cpw;
+                // Antes de criar: Termos de Uso (precisa marcar "Li e aceito").
+                telaTermos(em, pw);
+            }
+        });
+        definirRodape(voltarBtn, criarBtn);
+    }
 
+    /** Termos de Uso (texto vem do servidor, no idioma atual): so' cadastra
+     * depois de marcar o aceite; a versao aceita vai junto pro /register. */
+    private void telaTermos(String em, String pw) {
+        limparConteudo();
+        Label texto = new Label(tr("Loading..."), skin);
+        texto.setWrap(true);
+        texto.setAlignment(Align.topLeft);
+        Table caixaTexto = new Table();
+        caixaTexto.top().left();
+        caixaTexto.add(texto).growX().top().left().pad(8);
+        ScrollPane rolagem = new ScrollPane(caixaTexto, skin);
+        rolagem.setFadeScrollBars(false);
+        rolagem.setScrollingDisabled(true, false);
+        String[] versao = {null};
+
+        CheckBox.CheckBoxStyle estiloCheck = new CheckBox.CheckBoxStyle();
+        TextureAtlas.AtlasRegion on = atlas.findRegion("ui/Gui_checkbox_mark"), off = atlas.findRegion("ui/Gui_button_Press");
+        if (on != null) estiloCheck.checkboxOn = new TextureRegionDrawable(on);
+        if (off != null) estiloCheck.checkboxOff = new TextureRegionDrawable(off);
+        estiloCheck.font = skin.getFont("default-font");
+        estiloCheck.fontColor = Color.WHITE;
+        CheckBox aceito = new CheckBox(" " + tr("I have read and agree to the Terms of Use"), estiloCheck);
+        aceito.getImageCell().size(mobile ? 36 : 28);
+        aceito.getLabel().setWrap(true);
+
+        Table painel = criarPainel();
+        Label titulo = new Label(tr("Terms of Use"), skin);
+        float largura = mobile ? 620 : 520;
+        painel.add(titulo).padTop(10).row();
+        painel.add(rolagem).width(largura).height(mobile ? 300 : 260).pad(8).row();
+        painel.add(aceito).width(largura).left().padLeft(10).padBottom(10).row();
+        content.add(painel);
+
+        TextButton voltarBtn = new TextButton(tr("Back"), skin);
+        voltarBtn.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaRegistro(); }
+        });
+        TextButton criarBtn = new TextButton(tr("Create"), skin, "verde");
+        criarBtn.setDisabled(true);
+        Runnable atualizar = () -> criarBtn.setDisabled(!aceito.isChecked() || versao[0] == null);
+        aceito.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { atualizar.run(); }
+        });
+        String idioma = Idioma.atual() == 1 ? "pt" : Idioma.atual() == 2 ? "es" : "en";
+        ServerApi.getTerms(idioma, new ServerApi.ApiCallback() {
+            @Override public void onResponse(int statusCode, JsonValue body) {
+                if (statusCode == 200 && body != null && !body.getString("text", "").isEmpty()) {
+                    texto.setText(body.getString("text", ""));
+                    versao[0] = body.getString("version", null);
+                } else {
+                    texto.setText(tr("Could not load the Terms of Use. Try again later."));
+                }
+                atualizar.run();
+            }
+            @Override public void onFailure(String motivo) { texto.setText(Idioma.trServidor(motivo)); }
+        });
+        criarBtn.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                if (criarBtn.isDisabled()) return;
                 criarBtn.setDisabled(true);
-                ServerApi.register(em, pw, new ServerApi.ApiCallback() {
+                ServerApi.register(em, pw, versao[0], new ServerApi.ApiCallback() {
                     @Override public void onResponse(int statusCode, JsonValue body) {
                         criarBtn.setDisabled(false);
+                        if (statusCode >= 200 && statusCode < 300) { regEmail = regConfirmEmail = regSenha = regConfirmSenha = ""; }
                         if (statusCode == 202) {
                             // Conta so' e' criada depois do clique no link do email.
                             telaVerificarEmail(em, null);

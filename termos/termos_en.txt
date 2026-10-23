@@ -1,0 +1,67 @@
+TERMS OF USE - MITERA ONLINE
+
+Welcome to Mitera Online! These terms explain the rules for using the game. Please read them carefully: by creating your account, you agree to them.
+
+1. ACCEPTANCE
+By checking "I have read and agree" and creating your account, you agree to these Terms of Use and to the Server Rules. If you do not agree, do not create an account.
+If you are under 18, you need permission from your parents or legal guardians to play.
+
+2. YOUR ACCOUNT
+- Your account is personal. You are responsible for keeping your password secret and for everything that happens on your account.
+- Sharing, lending or selling your account is forbidden.
+- You may have more than one account, but you may not play on more than one at the same time.
+- We will never ask for your password in chat or messages. If someone does, it is a scam.
+
+3. CODE OF CONDUCT
+To keep the game fun for everyone, the following is forbidden:
+- Hate speech, prejudice, harassment and severe toxicity;
+- Spam, flooding, and advertising other servers or malicious links;
+- Bots, macros, hacks, scripts, unauthorized modifications or bug abuse;
+- Pretending to be an Administrator, Moderator or staff member;
+- Blackmail, manipulation or false reports;
+- Planning, promoting or confessing crimes, and sharing other people's personal information (doxxing);
+- Buying or selling characters, items or coins outside the official game system.
+The full list is in the Server Rules.
+
+4. PUNISHMENTS
+Players who break the rules may receive, depending on severity:
+- A chat mute, temporary or permanent;
+- An account ban, temporary or permanent;
+- Removal of items, coins or progress obtained irregularly.
+With a permanent ban, the account's characters are kept for 30 days and then deleted.
+When logging in, a banned player sees the reason and the time left on the ban.
+
+5. CHARACTERS, ITEMS AND COINS
+Your account, characters and items are yours to use and enjoy within Mitera Online. Since they exist only on the game's servers, they have no real-money value and cannot be sold or traded outside the official system.
+In case of technical failures, we will do our best to recover your progress, but we cannot guarantee that lost items will be restored.
+
+6. DELETED CHARACTERS
+When you delete a character, it is kept for 30 days. During this time the staff can recover it at your request. After that, it is permanently deleted.
+
+7. HOW THE GAME WORKS
+Mitera Online is in development. The game may:
+- Go offline for maintenance or technical problems;
+- Receive changes to balance, items, maps and rules;
+- In rare cases, roll back progress to an earlier point (rollback);
+- Be shut down in the future.
+We will do our best to announce important changes in advance.
+
+8. YOUR DATA
+We follow the Brazilian General Data Protection Law (LGPD, Law No. 13,709/2018).
+- What we collect: your email, your password (stored encrypted, not even the staff can see it), the IP address you connect from and your game data (characters, items, progress).
+- What we use it for: creating and protecting your account, password recovery, enforcing the game rules and preventing fraud and attacks.
+- Chat messages may be reviewed by the staff to enforce the rules.
+- We do not sell your data and do not share it with third parties, except when required by law.
+- You can ask to see, correct or delete your data through the contact below. When your account is deleted, your data is removed, except what the law requires us to keep.
+
+9. LIMITATION OF LIABILITY
+The game is provided "as is". We are not responsible for losses caused by weak or shared passwords, scams between players, problems with your internet or device, or trades made outside the game.
+
+10. CHANGES TO THESE TERMS
+These terms may be updated. When that happens, you will be notified and will need to accept the new version to keep playing.
+
+11. CONTACT AND JURISDICTION
+Questions, data requests or punishment appeals: [CONTACT EMAIL].
+These terms are governed by the laws of Brazil. The courts of [CITY/STATE] are chosen to settle any dispute.
+
+Have a good game!

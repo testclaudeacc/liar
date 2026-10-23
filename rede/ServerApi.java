@@ -38,12 +38,19 @@ public class ServerApi {
         post("/login", body, callback);
     }
 
-    public static void register(String email, String password, ApiCallback callback) {
+    /** termsVersion: versao dos Termos de Uso que o jogador aceitou (sem ela o servidor recusa). */
+    public static void register(String email, String password, String termsVersion, ApiCallback callback) {
         String body = json(w -> {
             w.set("email", email);
             w.set("password", password);
+            w.set("terms_version", termsVersion);
         });
         post("/register", body, callback);
+    }
+
+    /** Termos de Uso no idioma ("pt", "en", "es"): {version, text}. */
+    public static void getTerms(String lang, ApiCallback callback) {
+        get("/terms?lang=" + lang, callback);
     }
 
     /** Manda outro link de verificacao (o anterior expira). */

@@ -476,6 +476,10 @@ final class IdiomaTextos {
             + "{0} months (duration)	{0} meses	{0} meses\n"
             + "{0} year (duration)	{0} ano	{0} a\u00f1o\n"
             + "{0} years (duration)	{0} anos	{0} a\u00f1os\n"
+            + "Terms of Use	Termos de Uso	T\u00e9rminos de Uso\n"
+            + "I have read and agree to the Terms of Use	Li e aceito os Termos de Uso	He le\u00eddo y acepto los T\u00e9rminos de Uso\n"
+            + "Could not load the Terms of Use. Try again later.	N\u00e3o foi poss\u00edvel carregar os Termos de Uso. Tente mais tarde.	No se pudieron cargar los T\u00e9rminos de Uso. Int\u00e9ntalo m\u00e1s tarde.\n"
+            + "You must accept the Terms of Use.	Voc\u00ea precisa aceitar os Termos de Uso.	Debes aceptar los T\u00e9rminos de Uso.\n"
         ,
     };
 }
