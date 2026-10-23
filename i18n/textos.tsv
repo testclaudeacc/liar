@@ -448,3 +448,24 @@ Two-Handed	Duas mãos	Dos manos
 10% chance to save ammo	10% de chance de economizar munição	10% de probabilidad de ahorrar munición
 Select All	Selecionar tudo	Seleccionar todo
 Materials	Materiais	Materiales
+Account banned	Conta banida	Cuenta baneada
+Permanent	Permanente	Permanente
+Time left: {0}	Tempo restante: {0}	Tiempo restante: {0}
+Reason: {0}	Motivo: {0}	Motivo: {0}
+You have been banned.	Você foi banido.	Has sido baneado.
+You are muted for {0}, motive: {1}	Você está silenciado por {0}, motivo: {1}	Estás silenciado por {0}, motivo: {1}
+You are no longer muted.	Você não está mais silenciado.	Ya no estás silenciado.
+{0} second (duration)	{0} segundo	{0} segundo
+{0} seconds (duration)	{0} segundos	{0} segundos
+{0} minute (duration)	{0} minuto	{0} minuto
+{0} minutes (duration)	{0} minutos	{0} minutos
+{0} hour (duration)	{0} hora	{0} hora
+{0} hours (duration)	{0} horas	{0} horas
+{0} day (duration)	{0} dia	{0} día
+{0} days (duration)	{0} dias	{0} días
+{0} week (duration)	{0} semana	{0} semana
+{0} weeks (duration)	{0} semanas	{0} semanas
+{0} month (duration)	{0} mês	{0} mes
+{0} months (duration)	{0} meses	{0} meses
+{0} year (duration)	{0} ano	{0} año
+{0} years (duration)	{0} anos	{0} años

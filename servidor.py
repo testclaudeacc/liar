@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.47"
+SERVER_VERSION = "v0.48"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -3176,6 +3176,11 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bestiary TEXT DEFAULT '{}'")
         # Bank da conta (todos os personagens): {"items": [...], "currency": N}.
         c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bank TEXT DEFAULT '{}'")
+        # Punicoes da conta (/ban e /mute do admin): fim (epoch, 0 = nenhuma) e motivo.
+        c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_until DOUBLE PRECISION DEFAULT 0")
+        c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT")
+        c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS mute_until DOUBLE PRECISION DEFAULT 0")
+        c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS mute_reason TEXT")
         c.execute('''CREATE TABLE IF NOT EXISTS characters (
                         id SERIAL PRIMARY KEY, 
                         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, 
@@ -3562,6 +3567,13 @@ def get_characters():
         c = conn.cursor()
         # Sem token valido, qualquer um via os personagens de qualquer conta.
         if not token_valido(c, user_id, dados.get('token')): return jsonify({"erro": "Session expired."}), 401
+        # Banido: em vez dos personagens, o client mostra a tela com o motivo e o tempo.
+        ban = punicao_da_conta(c, user_id, 'ban')
+        if ban:
+            restante = ban[0] - time.time()
+            return jsonify({"banned": {"reason": ban[1], "remaining": int(restante),
+                                       "permanent": ban[0] >= PUNICAO_PERMANENTE,
+                                       "duration": formatar_duracao(None if ban[0] >= PUNICAO_PERMANENTE else restante)}}), 403
         c.execute("SELECT name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, time_played, npc_dialogue_state FROM characters WHERE user_id = %s AND deleted_at IS NULL ORDER BY id ASC", (user_id,))
         char_list = []
         for row in c.fetchall():
@@ -4020,6 +4032,10 @@ def handle_join_game(data):
         if not token_valido(c, user_id, data.get('token')):
             emit('force_disconnect', {"reason": "Session expired. Please log in again."}, room=sid)
             return
+        if punicao_da_conta(c, user_id, 'ban'):
+            emit('force_disconnect', {"reason": "You have been banned."}, room=sid)
+            return
+        mute_conta = punicao_da_conta(c, user_id, 'mute')
         if not eh_admin({'name': p_name, 'user_id': user_id}):
             ja_dentro = any(str(o.get('user_id')) == str(user_id) for o in online_players.values())
             if modo_emergencia() and not ja_dentro:
@@ -4031,6 +4047,7 @@ def handle_join_game(data):
         # So' guarda o que o servidor mesmo vai usar (o resto do payload do
         # client nao entra no estado do player).
         data = {'user_id': user_id, 'name': p_name, 'skins': data.get('skins')}
+        data['_mute_admin'] = mute_conta  # /mute do admin (vale em todo chat)
         c.execute("SELECT class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, kills, current_hp, current_mp, currency, time_played, npc_dialogue_state, hotbar FROM characters WHERE user_id = %s AND name = %s AND deleted_at IS NULL", (user_id, p_name))
         row = c.fetchone()
 
@@ -4420,6 +4437,11 @@ ADMIN_COMANDOS = [
     ("npcs", "/npcs", "NPCs lidos do mapa e se estao ativos"),
     ("mobs", "/mobs", "lista os mobs (nomes pro /summons)"),
     ("summons", "/summons <mob> [quantidade]", "cria mobs nos SQMs livres em volta (nao renascem)"),
+    ("ban", "/ban <nome> <tempo> <regra|Other motivo>", "bane a conta (ex: /ban Lukan 30 days 1a; tempo: 1 week, 2 meses, 1 ano, perm)"),
+    ("unban", "/unban <nome>", "tira o ban da conta"),
+    ("mute", "/mute <nome> <tempo> <regra|Other motivo>", "muta a conta no chat (ex: /mute Lukan 1 week 2a)"),
+    ("unmute", "/unmute <nome>", "tira o mute da conta"),
+    ("rules", "/rules", "lista as regras (codigos pro /ban e /mute)"),
     ("level", "/level <1-1000>", "muda seu level (sobe ou desce; XP vai pro inicio do level)"),
     ("speed", "/speed <valor>|reset", "multiplica sua velocidade (fica salvo); reset volta ao normal"),
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
@@ -4445,6 +4467,7 @@ def argumentos_admin():
         'summons': mobs, 'bestiary': mobs + ['clear'],
         'soul': ['on', 'off'], 'emergency': ['off', 'login', 'total'], 'ghost': ['on', 'off'], 'morph': ['cancel'], 'tp': ['@players'], 'faketalk': ['@player1'],
         'speed': ['reset'], 'dmg': ['reset'], 'atkspd': ['reset'], 'spells': ['reset'],
+        'ban': ['@players'], 'mute': ['@players'], 'unban': ['@players'], 'unmute': ['@players'],
         'class': list(CLASSES_VALIDAS),
         'fixclass': list(CLASSES_VALIDAS),
         'time': list(FASES_DO_DIA.keys()), 'money': ['add'],
@@ -4522,6 +4545,139 @@ def _achar_online(nome):
     p_n = online_players.get(sid_n) if sid_n else None
     return (sid_n, p_n) if p_n is not None else (None, None)
 
+# ---------------------------------------------------------------------------
+# PUNICOES (/ban, /mute). Regras fixas: o codigo (ex: "1a") vira o texto que o
+# jogador ve na tela de ban / no aviso de mute. "Other <texto>" = motivo livre.
+# ---------------------------------------------------------------------------
+REGRAS = {
+    "1a": "1a. Hate Speech and Prejudice: Any kind of racism, homophobia, xenophobia, sexism, or any other form of discrimination is strictly prohibited.",
+    "1b": "1b. Harassment and Toxicity: Severe insults, stalking other players, or bullying.",
+    "2a": "2a. Spam and Flood: Sending the same message repeatedly, intentionally polluting the chat, or abusing characters and capital letters.",
+    "2b": "2b. Unauthorized Advertising: Promoting other servers or malicious links.",
+    "3a": "3a. Bots and Automation: The use of any third-party programs to automate game actions (farming, mining, chat, etc.).",
+    "3b": "3b. Cheats: The use of cheats, bots, scripts, unapproved modifications, or the intentional exploitation of bugs for personal gain.",
+    "4a": "4a. False Identity: Pretending to be an Administrator, Moderator, or Staff to deceive others.",
+    "4b": "4b. Manipulation: Using emotional blackmail or false accusations to gain unfair advantages or falsely report players.",
+    "5a": "5a. Promotion or Confession of Crimes: Confessing, planning, promoting, or encouraging real-world crimes in the chat (e.g., pedophilia, terrorism, death threats, self-harm).",
+    "5b": "5b. Doxxing: Sharing personal and confidential information of others without their consent.",
+    "6a": "6a. Multi-Accounting and Trading: Multiple accounts per IP are allowed, but playing simultaneously on multiple accounts is forbidden. Account sharing is punishable. Character trading is strictly limited to the official system; outside trading results in a ban.",
+}
+PUNICAO_PERMANENTE = 4102444800.0  # 2100-01-01: "perm"
+_UNIDADES_TEMPO = (
+    (('min', 'mins', 'minute', 'minutes', 'minuto', 'minutos', 'm'), 60),
+    (('h', 'hour', 'hours', 'hora', 'horas'), 3600),
+    (('d', 'day', 'days', 'dia', 'dias'), 86400),
+    (('w', 'week', 'weeks', 'semana', 'semanas'), 7 * 86400),
+    (('month', 'months', 'mes', 'mês', 'meses'), 30 * 86400),
+    (('y', 'year', 'years', 'ano', 'anos'), 365 * 86400),
+)
+
+def _ler_duracao(partes, i):
+    """partes[i:] comeca com o tempo: "30 days", "30d", "1 semana", "perm".
+    Devolve (segundos ou None = permanente, proximo indice) ou (False, i)."""
+    if i >= len(partes): return False, i
+    t = partes[i].lower()
+    if t in ('perm', 'permanent', 'permanente', 'forever'): return None, i + 1
+    m = re.match(r'^(\d+)([a-zçê]*)$', t)
+    if not m: return False, i
+    n, unidade, prox = int(m.group(1)), m.group(2), i + 1
+    if not unidade and prox < len(partes): unidade, prox = partes[prox].lower(), prox + 1
+    for nomes, seg in _UNIDADES_TEMPO:
+        if unidade in nomes: return max(1, n) * seg, prox
+    return False, i
+
+def _ler_motivo(partes):
+    if not partes: return None
+    codigo = partes[0].lower()
+    if codigo in REGRAS: return REGRAS[codigo]
+    if codigo in ('other', 'outro', 'outros'): partes = partes[1:]
+    texto = ' '.join(partes).strip()
+    return texto[:300] or None
+
+def formatar_duracao(seg):
+    """Tempo restante pro jogador: "1 year", "2 months", "1 week", "3 days"..."""
+    if seg is None or seg > 50 * 365 * 86400: return "permanent"
+    seg = max(1, int(math.ceil(seg)))
+    def _u(n, nome): return f"{n} {nome}" + ("" if n == 1 else "s")
+    if seg >= 365 * 86400: return _u(seg // (365 * 86400), "year")
+    if seg >= 60 * 86400: return _u(seg // (30 * 86400), "month")
+    if seg % (7 * 86400) == 0: return _u(seg // (7 * 86400), "week")  # "1 week" na hora do /mute
+    if seg >= 86400: return _u(int(math.ceil(seg / 86400)), "day")
+    if seg >= 3600: return _u(int(math.ceil(seg / 3600)), "hour")
+    if seg >= 60: return _u(int(math.ceil(seg / 60)), "minute")
+    return _u(seg, "second")
+
+def punicao_da_conta(c, user_id, tipo):
+    """(fim, motivo) do ban/mute ativo da conta, ou None. tipo: 'ban' ou 'mute'."""
+    c.execute(f"SELECT {tipo}_until, {tipo}_reason FROM users WHERE id = %s", (user_id,))
+    row = c.fetchone()
+    if row and row[0] and float(row[0]) > time.time(): return float(row[0]), row[1] or ""
+    return None
+
+def _comando_punicao(sid, cmd, partes):
+    """/ban, /mute, /unban, /unmute: acha a conta pelo nome do personagem."""
+    tipo = 'ban' if cmd in ('ban', 'unban') else 'mute'
+    tirar = cmd.startswith('un')
+    if len(partes) < 2:
+        chat_sistema(sid, next(u for c_, u, _ in ADMIN_COMANDOS if c_ == cmd), 'red')
+        return
+    # Nome pode ter espaco: vai ate' o tempo (ou ate' o fim, no unban/unmute).
+    if tirar:
+        nome, segundos, motivo = ' '.join(partes[1:]), 0, None
+    else:
+        j = next((k for k in range(2, len(partes)) if _ler_duracao(partes, k)[0] is not False), None)
+        if j is None:
+            chat_sistema(sid, "Missing time. Ex: /" + cmd + " Lukan 30 days 1a  (perm = permanent)", 'red')
+            return
+        nome = ' '.join(partes[1:j])
+        segundos, k = _ler_duracao(partes, j)
+        motivo = _ler_motivo(partes[k:])
+        if not motivo:
+            chat_sistema(sid, "Missing reason: rule code (1a, 2b... see /rules) or Other <text>.", 'red')
+            return
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        c = conn.cursor()
+        c.execute("SELECT user_id, name FROM characters WHERE LOWER(name) = LOWER(%s) AND deleted_at IS NULL", (nome,))
+        row = c.fetchone()
+        if not row:
+            chat_sistema(sid, f"Character '{nome}' not found.", 'red')
+            return
+        user_id, nome = row
+        if eh_admin({'name': nome, 'user_id': user_id}):
+            chat_sistema(sid, "Can't punish an admin account.", 'red')
+            return
+        fim = 0.0 if tirar else (PUNICAO_PERMANENTE if segundos is None else time.time() + segundos)
+        c.execute(f"UPDATE users SET {tipo}_until = %s, {tipo}_reason = %s WHERE id = %s", (fim, motivo, user_id))
+        conn.commit()
+        c.close()
+    except Exception:
+        traceback.print_exc()
+        chat_sistema(sid, "Database error (see server log).", 'red')
+        return
+    finally:
+        if conn: db_pool.putconn(conn)
+    duracao = formatar_duracao(None if segundos is None else segundos)
+    # Personagens online dessa conta: mute vale na hora; ban derruba.
+    for s_o, p_o in list(online_players.items()):
+        if str(p_o.get('user_id')) != str(user_id): continue
+        if tipo == 'mute':
+            p_o['_mute_admin'] = None if tirar else (fim, motivo)
+            if not tirar: chat_sistema(s_o, f"You are muted for {duracao}, motive: {motivo}", 'red')
+            else: chat_sistema(s_o, "You are no longer muted.")
+        elif not tirar:
+            _queue_save(p_o)
+            try: socketio.emit('force_disconnect', {"reason": "You have been banned."}, room=s_o)
+            except Exception: pass
+            def _derrubar(s_o=s_o):
+                socketio.sleep(1.0)
+                try: socketio.server.disconnect(s_o, namespace='/')
+                except Exception: pass
+            socketio.start_background_task(_derrubar)
+    if tirar: chat_sistema(sid, f"{'Unbanned' if tipo == 'ban' else 'Unmuted'} {nome} (account).")
+    else: chat_sistema(sid, f"{'Banned' if tipo == 'ban' else 'Muted'} {nome} (account) for {duracao}: {motivo}")
+
 def comando_admin(sid, p, texto, canal='local'):
     partes = texto[1:].split()
     if not partes: return
@@ -4529,6 +4685,12 @@ def comando_admin(sid, p, texto, canal='local'):
     if cmd in ('help', 'admin'):
         for _, uso, desc in ADMIN_COMANDOS:
             chat_sistema(sid, f"Admin: {uso}  - {desc}")
+        return
+    if cmd in ('ban', 'unban', 'mute', 'unmute'):
+        _comando_punicao(sid, cmd, partes)
+        return
+    if cmd == 'rules':
+        for texto_regra in REGRAS.values(): chat_sistema(sid, texto_regra)
         return
     if cmd == 'emergency':
         if len(partes) < 2 or partes[1].lower() not in ('off', 'login', 'total'):
@@ -4934,6 +5096,12 @@ def _filtrar_mensagem_chat(sid, p, texto):
     if not msg: return None
     agora = time.time()
     hist = chat_historico.setdefault(nome, {'msgs': [], 'avisos': [], 'palavroes': []})
+
+    # Mute do admin (/mute): vale pra conta, em todo chat.
+    mute_admin = p.get('_mute_admin')
+    if mute_admin and mute_admin[0] > agora:
+        chat_sistema(sid, f"You are muted for {formatar_duracao(mute_admin[0] - agora)}, motive: {mute_admin[1]}", 'red')
+        return None
 
     # Mutado: nao conta como spam de novo, so' lembra quanto falta.
     fim_mute = chat_mutes.get(nome, 0)

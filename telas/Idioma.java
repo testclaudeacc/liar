@@ -120,6 +120,17 @@ public final class Idioma {
 
     /** Mesma palavra em ingles com sentidos diferentes ("Back" = voltar ou
      * costas): chave propria no TSV, e em ingles mostra o texto en. */
+    private static final Pattern DURACAO = Pattern.compile("^(\\d+) (second|minute|hour|day|week|month|year)s?$");
+
+    /** "1 week" / "30 days" (tempo de ban/mute do servidor) -> idioma atual; o resto volta igual. */
+    public static String duracao(String d) {
+        if (d == null) return null;
+        Matcher m = DURACAO.matcher(d);
+        if (!m.matches()) return d;
+        String unidade = d.substring(m.group(1).length() + 1);
+        return trc("{0} " + unidade + " (duration)", "{0} " + unidade).replace("{0}", m.group(1));
+    }
+
     public static String trc(String chave, String en) {
         if (atual() == 0) return en;
         carregar();
@@ -146,7 +157,7 @@ public final class Idioma {
             int maior = 0;
             for (int ix : indices) maior = Math.max(maior, ix + 1);
             Object[] args = new Object[maior];
-            for (int g = 0; g < indices.length && g < m.groupCount(); g++) args[indices[g]] = m.group(g + 1);
+            for (int g = 0; g < indices.length && g < m.groupCount(); g++) args[indices[g]] = duracao(m.group(g + 1));
             return preencher((String) mod[1], args);
         }
         return texto;

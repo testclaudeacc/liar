@@ -561,6 +561,33 @@ public class AuthScreen extends ScreenAdapter {
         content.add(painel);
     }
 
+    /** Ban: "Account banned", tempo que falta (ou permanente) e o motivo (regra ou texto do admin). */
+    private void telaBanido(JsonValue ban) {
+        limparConteudo();
+        Label titulo = new Label(tr("Account banned"), skin);
+        titulo.setColor(Color.valueOf("ff4a4a"));
+        titulo.setAlignment(Align.center);
+        boolean permanente = ban.getBoolean("permanent", false);
+        String tempo = permanente ? tr("Permanent") : tr("Time left: {0}", Idioma.duracao(ban.getString("duration", "")));
+        Label duracao = new Label(tempo, skin);
+        duracao.setAlignment(Align.center);
+        Label motivo = new Label(tr("Reason: {0}", ban.getString("reason", "")), skin);
+        motivo.setWrap(true);
+        motivo.setAlignment(Align.center);
+        TextButton ok = new TextButton("OK", skin);
+        ok.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { telaMenuPrincipal(); }
+        });
+        Table painel = criarPainel();
+        float largura = mobile ? 460 : 380;
+        painel.add(titulo).width(largura).pad(mobile ? 18 : 12).padBottom(6).row();
+        painel.add(duracao).width(largura).padBottom(10).row();
+        painel.add(motivo).width(largura).padLeft(12).padRight(12).padBottom(mobile ? 14 : 10).row();
+        painel.add(ok).width(mobile ? 150 : 110).height(mobile ? 72 : 48).padBottom(mobile ? 18 : 12);
+        content.add(painel);
+        definirRodape();
+    }
+
     private void telaErro(String texto, Runnable aoOk) {
         limparConteudo();
         Label label = new Label(Idioma.trServidor(texto), skin); // mensagem do servidor (ingles) tambem traduz
@@ -893,6 +920,9 @@ public class AuthScreen extends ScreenAdapter {
                         }
                     }
                     telaSelecaoPersonagem();
+                } else if (statusCode == 403 && body != null && body.has("banned")) {
+                    // Conta banida (/ban do admin): tela com o motivo e quanto falta.
+                    telaBanido(body.get("banned"));
                 } else if (statusCode == 401) {
                     // Token vencido/invalido (ou senha trocada): pede login de novo.
                     Sessao.limpar();
