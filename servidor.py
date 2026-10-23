@@ -160,7 +160,12 @@ MOB_DB = {k.lower(): v for k, v in MOB_DB.items()}
 # O servidor so' manda o que ja foi liberado (montar_bestiario).
 # ---------------------------------------------------------------------------
 BESTIARIO_MARCOS = (1, 20, 100, 500)
+# Boss (super raro): 1 descobre, 2 cobre, 3 prata, 5 ouro.
+BESTIARIO_MARCOS_BOSS = (1, 2, 3, 5)
 BESTIARIO_BONUS_OURO = 0.05
+
+def bestiario_marcos(tipo):
+    return BESTIARIO_MARCOS_BOSS if MOB_DB.get(tipo, {}).get('boss') else BESTIARIO_MARCOS
 
 def bestiario_kills(p, tipo):
     # Da CONTA (users.bestiary): todos os personagens dela somam no mesmo.
@@ -169,15 +174,15 @@ def bestiario_kills(p, tipo):
     try: return int(b.get(tipo, 0))
     except (TypeError, ValueError): return 0
 
-def bestiario_nivel(kills):
+def bestiario_nivel(kills, tipo=None):
     # 0 = nao descoberto, 1 = descoberto, 2 = cobre, 3 = prata, 4 = ouro
-    return sum(1 for m in BESTIARIO_MARCOS if kills >= m)
+    return sum(1 for m in bestiario_marcos(tipo) if kills >= m)
 
 def montar_bestiario(p):
     entradas = []
     for i, (tipo, info) in enumerate(MOB_DB.items()):
         kills = bestiario_kills(p, tipo)
-        nivel = bestiario_nivel(kills)
+        nivel = bestiario_nivel(kills, tipo)
         e = {"id": i + 1, "tier": nivel}
         if nivel >= 1:
             e["type"] = tipo
@@ -213,7 +218,7 @@ def bestiario_registrar_kill(sid, p, tipo):
         p['bestiary'] = b
     antes = bestiario_kills(p, tipo)
     b[tipo] = antes + 1
-    nivel_antes, nivel_depois = bestiario_nivel(antes), bestiario_nivel(antes + 1)
+    nivel_antes, nivel_depois = bestiario_nivel(antes, tipo), bestiario_nivel(antes + 1, tipo)
     if nivel_depois > nivel_antes:
         nome = MOB_DB[tipo].get("name", tipo.capitalize())
         socketio.emit('bestiary_unlock', {"type": tipo, "name": nome, "tier": nivel_depois}, room=sid)
@@ -223,7 +228,7 @@ def bestiario_registrar_kill(sid, p, tipo):
         socketio.emit('bestiary_kills', {"type": tipo, "kills": antes + 1}, room=sid)
 
 def bestiario_ouro(p, tipo):
-    return bestiario_kills(p, tipo) >= BESTIARIO_MARCOS[-1]
+    return bestiario_kills(p, tipo) >= bestiario_marcos(tipo)[-1]
 
 NPC_DB = {
     # price (em cobre) + quest: botao "Pay" no dialogo (handle_npc_pay). Pagar
@@ -4898,7 +4903,7 @@ def comando_admin(sid, p, texto, canal='local'):
             if nivel not in ADMIN_BESTIARIO_KILLS:
                 chat_sistema(sid, "Level must be 0, 1, 2, 3 or clear.", 'red')
                 return
-            b[tipo] = ADMIN_BESTIARIO_KILLS[nivel]
+            b[tipo] = bestiario_marcos(tipo)[nivel]  # boss: 1/2/3/5
         _queue_save(p)
         socketio.emit('bestiary', montar_bestiario(p), room=sid)
         chat_sistema(sid, f"Bestiary: {tipo} set to {valor}.")
