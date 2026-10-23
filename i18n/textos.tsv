@@ -21,22 +21,22 @@ No	Não	No
 Language	Idioma	Idioma
 Language changed. Re-enter the world to update every screen.	Idioma alterado. Entre no mundo de novo para atualizar todas as telas.	Idioma cambiado. Vuelve a entrar al mundo para actualizar todas las pantallas.
 HP/MP bars	Barras de HP/MP	Barras de HP/MP
-Arc	Arco	Arco
-Square	Reta	Recta
+Arc	Semi Arco	Semiarco
+Square	Retangular	Rectangular
 Portrait ring	Anel do retrato	Anillo del retrato
 Experience	Experiência	Experiencia
 Defense	Defesa	Defensa
 Show HP bar	Mostrar barra de HP	Mostrar barra de HP
 Always	Sempre	Siempre
-Only target	Só o alvo	Solo el objetivo
-Only enemies	Só inimigos	Solo enemigos
+Only target	Alvo	Objetivo
+Only enemies	Inimigos	Enemigos
 Health bar size	Tamanho da barra de vida	Tamaño de la barra de vida
 UI font size	Tamanho do texto	Tamaño del texto
 Smaller	Menor	Más pequeño
 Small	Pequeno	Pequeño
 Default	Padrão	Normal
 Big	Grande	Grande
-Bigger	Maior	Más grande
+Bigger	Extra grande	Extra grande
 Lighting quality	Qualidade da luz	Calidad de luz
 High	Alta	Alta
 Medium	Média	Media
@@ -51,24 +51,11 @@ Max	Máximo	Máximo
 Performance stats	Estatísticas de desempenho	Estadísticas de rendimiento
 Auto target	Alvo automático	Objetivo automático
 All	Todos	Todos
-Not others'	Menos os dos outros	Menos los de otros
-Only mine	Só os meus	Solo los míos
-Mine + party	Meus + party	Míos + grupo
+Not others'	Exceto de outros	Excepto de otros
+Only mine	Meus	Míos
+Mine + party	Festa	Grupo
 UI font size: the chat text and potion cooldown numbers update after re-entering the world.	Tamanho do texto: o chat e os números de cooldown das poções mudam ao entrar no mundo de novo.	Tamaño del texto: el chat y los números de enfriamiento de pociones cambian al volver a entrar al mundo.
 Language of menus, messages and descriptions. Item, creature and spell names stay in English for everyone.	Idioma dos menus, mensagens e descrições. Nomes de itens, criaturas e magias ficam em inglês para todos.	Idioma de menús, mensajes y descripciones. Los nombres de objetos, criaturas y hechizos quedan en inglés para todos.
-How close the camera is. A higher zoom shows less of the map around you.	Quão perto fica a câmera. Zoom maior mostra menos do mapa ao seu redor.	Qué tan cerca está la cámara. Más zoom muestra menos del mapa a tu alrededor.
-Switches between window and full screen (also F11 or Alt+Enter).	Alterna entre janela e tela cheia (também F11 ou Alt+Enter).	Cambia entre ventana y pantalla completa (también F11 o Alt+Enter).
-8 directions lets you walk diagonally. 4 directions walks only up, down, left and right.	8 direções deixa andar na diagonal. 4 direções anda só para cima, baixo, esquerda e direita.	8 direcciones permite caminar en diagonal. 4 direcciones camina solo arriba, abajo, izquierda y derecha.
-How your HP and MP are shown on the screen: arcs around the portrait or straight bars.	Como seu HP e MP aparecem na tela: arcos em volta do retrato ou barras retas.	Cómo se muestran tu HP y MP: arcos alrededor del retrato o barras rectas.
-What the ring around your portrait shows: experience, defense or your class skill progress.	O que o anel em volta do retrato mostra: experiência, defesa ou o progresso da skill da sua classe.	Lo que muestra el anillo del retrato: experiencia, defensa o el progreso de la habilidad de tu clase.
-Health bars over heads: on everyone, only on your target, or only on enemies.	Barras de vida em cima da cabeça: em todos, só no seu alvo ou só em inimigos.	Barras de vida sobre las cabezas: en todos, solo en tu objetivo o solo en enemigos.
-Width of the health bars over players and creatures.	Largura das barras de vida em cima de players e criaturas.	Ancho de las barras de vida sobre jugadores y criaturas.
-Size of names, damage numbers, item and coin numbers, descriptions and chat.	Tamanho dos nomes, números de dano, números de itens e moedas, descrições e chat.	Tamaño de nombres, números de daño, números de objetos y monedas, descripciones y chat.
-Detail of lights at dusk, at night and in caves. Lower gives more FPS. Off keeps only the day/night color.	Detalhe das luzes no entardecer, à noite e nas cavernas. Mais baixa dá mais FPS. Desligado deixa só a cor do dia/noite.	Detalle de las luces al atardecer, de noche y en cuevas. Más baja da más FPS. Apagado deja solo el color del día/noche.
-Reduced hides blood on the ground, night details (fireflies) and the shadow of flying creatures. Gives more FPS.	Reduzido esconde o sangue no chão, os detalhes noturnos (vagalumes) e a sombra das criaturas voadoras. Dá mais FPS.	Reducido oculta la sangre en el suelo, los detalles nocturnos (luciérnagas) y la sombra de las criaturas voladoras. Da más FPS.
-60 saves battery. Max runs as fast as your screen allows (90, 120 or 144 Hz).	60 economiza bateria. Máximo roda o quanto sua tela permitir (90, 120 ou 144 Hz).	60 ahorra batería. Máximo va tan rápido como tu pantalla permita (90, 120 o 144 Hz).
-Shows how long each part of the game takes per frame, to find what slows your device.	Mostra quanto tempo cada parte do jogo leva por quadro, para achar o que deixa seu aparelho lento.	Muestra cuánto tarda cada parte del juego por cuadro, para encontrar qué hace lento tu dispositivo.
-Which creatures the auto target key (middle mouse button) can pick.	Quais criaturas a tecla de alvo automático (botão do meio do mouse) pode escolher.	Qué criaturas puede elegir la tecla de objetivo automático (botón central del ratón).
 Map	Mapa	Mapa
 Center	Centralizar	Centrar
 Party	Party	Grupo
@@ -340,7 +327,7 @@ Auto Target	Alvo automático	Objetivo automático
 Collect Bags	Pegar bolsas	Recoger bolsas
 PLAY	JOGAR	JUGAR
 Play	Jogar	Jugar
-Register	Registrar	Registrarse
+Register	Cadastrar-se	Registrarse
 Connecting...	Conectando...	Conectando...
 Failed to connect to the server.	Não foi possível conectar ao servidor.	No se pudo conectar al servidor.
 Checking Version...	Verificando versão...	Verificando versión...
@@ -433,3 +420,18 @@ Potions, fresh from the cauldron. Don't ask what's in them.	Poções, fresquinha
 Give me {0} to sail by the worlds	Me dê {0} para navegar pelos mundos	Dame {0} para navegar por los mundos
 Hmm... by far an entity from the ancient realm that i was waiting for.	Hmm... finalmente uma entidade do reino antigo que eu esperava.	Hmm... por fin una entidad del reino antiguo que estaba esperando.
 Language:	Idioma:	Idioma:
+
+How close the camera is to your character.	Distância da câmera até o seu personagem.	Distancia de la cámara a tu personaje.
+Play in full screen or in a window.	Jogar em tela cheia ou em janela.	Jugar en pantalla completa o en ventana.
+Directions your character can walk.	Direções em que seu personagem pode andar.	Direcciones en las que tu personaje puede caminar.
+Shape of your health and mana bars on the screen.	Formato das suas barras de vida e mana na tela.	Forma de tus barras de vida y maná en la pantalla.
+Progress shown on the ring around your portrait.	Progresso mostrado no anel em volta do seu retrato.	Progreso que muestra el anillo alrededor de tu retrato.
+Health bars over the heads of players and creatures.	Barras de vida em cima da cabeça de jogadores e criaturas.	Barras de vida sobre la cabeza de jugadores y criaturas.
+Width of the health bars over heads.	Largura das barras de vida em cima das cabeças.	Ancho de las barras de vida sobre las cabezas.
+Size of names, numbers, descriptions and chat text.	Tamanho dos nomes, números, descrições e textos do chat.	Tamaño de nombres, números, descripciones y texto del chat.
+Lights and shadows at night and in caves. Lower quality gives more FPS.	Luzes e sombras à noite e nas cavernas. Qualidade menor dá mais FPS.	Luces y sombras de noche y en cuevas. Menor calidad da más FPS.
+Visual details: blood on the ground, fireflies at night and shadows of flying creatures.	Detalhes visuais: sangue no chão, vagalumes à noite e sombra das criaturas voadoras.	Detalles visuales: sangre en el suelo, luciérnagas de noche y sombra de las criaturas voladoras.
+Maximum frames per second. A lower limit saves battery.	Máximo de quadros por segundo. Um limite menor economiza bateria.	Máximo de cuadros por segundo. Un límite menor ahorra batería.
+Shows what is slowing down the game on your device.	Mostra o que está deixando o jogo lento no seu aparelho.	Muestra qué está haciendo lento el juego en tu dispositivo.
+Creatures the auto target key can pick.	Criaturas que a tecla de alvo automático pode escolher.	Criaturas que puede elegir la tecla de objetivo automático.
+2 Silver Coins	2 moedas de prata	2 monedas de plata

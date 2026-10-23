@@ -2972,7 +2972,7 @@ public class WorldScreen extends ScreenAdapter {
             aplicarTamanhoFonte();
         })).left().padTop(6).row();
         // Desempenho: menos visual = mais FPS (celular fraco).
-        secao.add(linhaDeEscolha("Lighting quality", new String[]{"High", "Medium", "Low", "Off"}, Controles.qualidadeLuz(), i -> {
+        secao.add(linhaDeEscolha("Lighting quality", new String[]{"High", "Medium", "Low"}, Controles.qualidadeLuz(), i -> {
             Controles.definirQualidadeLuz(i);
             iluminacao.qualidade = i;
         })).left().padTop(6).row();
@@ -3008,19 +3008,19 @@ public class WorldScreen extends ScreenAdapter {
     // ---- Dica (popup pequeno) de cada opcao do Options ----
     private static final java.util.Map<String, String> DICAS_OPCOES = new java.util.HashMap<>();
     static {
-        DICAS_OPCOES.put("Camera Zoom", "How close the camera is. A higher zoom shows less of the map around you.");
-        DICAS_OPCOES.put("Full Screen", "Switches between window and full screen (also F11 or Alt+Enter).");
-        DICAS_OPCOES.put("Moving style", "8 directions lets you walk diagonally. 4 directions walks only up, down, left and right.");
-        DICAS_OPCOES.put("HP/MP bars", "How your HP and MP are shown on the screen: arcs around the portrait or straight bars.");
-        DICAS_OPCOES.put("Portrait ring", "What the ring around your portrait shows: experience, defense or your class skill progress.");
-        DICAS_OPCOES.put("Show HP bar", "Health bars over heads: on everyone, only on your target, or only on enemies.");
-        DICAS_OPCOES.put("Health bar size", "Width of the health bars over players and creatures.");
-        DICAS_OPCOES.put("UI font size", "Size of names, damage numbers, item and coin numbers, descriptions and chat.");
-        DICAS_OPCOES.put("Lighting quality", "Detail of lights at dusk, at night and in caves. Lower gives more FPS. Off keeps only the day/night color.");
-        DICAS_OPCOES.put("Effects", "Reduced hides blood on the ground, night details (fireflies) and the shadow of flying creatures. Gives more FPS.");
-        DICAS_OPCOES.put("FPS limit", "60 saves battery. Max runs as fast as your screen allows (90, 120 or 144 Hz).");
-        DICAS_OPCOES.put("Performance stats", "Shows how long each part of the game takes per frame, to find what slows your device.");
-        DICAS_OPCOES.put("Auto target", "Which creatures the auto target key (middle mouse button) can pick.");
+        DICAS_OPCOES.put("Camera Zoom", "How close the camera is to your character.");
+        DICAS_OPCOES.put("Full Screen", "Play in full screen or in a window.");
+        DICAS_OPCOES.put("Moving style", "Directions your character can walk.");
+        DICAS_OPCOES.put("HP/MP bars", "Shape of your health and mana bars on the screen.");
+        DICAS_OPCOES.put("Portrait ring", "Progress shown on the ring around your portrait.");
+        DICAS_OPCOES.put("Show HP bar", "Health bars over the heads of players and creatures.");
+        DICAS_OPCOES.put("Health bar size", "Width of the health bars over heads.");
+        DICAS_OPCOES.put("UI font size", "Size of names, numbers, descriptions and chat text.");
+        DICAS_OPCOES.put("Lighting quality", "Lights and shadows at night and in caves. Lower quality gives more FPS.");
+        DICAS_OPCOES.put("Effects", "Visual details: blood on the ground, fireflies at night and shadows of flying creatures.");
+        DICAS_OPCOES.put("FPS limit", "Maximum frames per second. A lower limit saves battery.");
+        DICAS_OPCOES.put("Performance stats", "Shows what is slowing down the game on your device.");
+        DICAS_OPCOES.put("Auto target", "Creatures the auto target key can pick.");
     }
     private Table popupDica;
     private Label textoDica;
@@ -4616,7 +4616,7 @@ public class WorldScreen extends ScreenAdapter {
     // linha do resto da fala - ver DialogoNPCUI.moeda()) reaproveitado nas
     // 2 situacoes abaixo.
     private final String DIALOGO_NPC_PEDIDO = // por instancia: segue o idioma ao reentrar no mundo
-        tr("Give me {0} to sail by the worlds", DialogoNPCUI.moeda("2 Silver Coins"));
+        tr("Give me {0} to sail by the worlds", DialogoNPCUI.moeda(tr("2 Silver Coins")));
     // 1a vez: discurso completo (2 paginas - Next na 1a, Close na 2a).
     // Depois de visto (ver npcDialogoVisto): so' o "pedido"/ultima pagina,
     // direto - a pedido do usuario ("ele sempre fala o ultimo dialogo").

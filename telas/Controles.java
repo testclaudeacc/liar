@@ -221,8 +221,8 @@ public final class Controles {
     public static float multFonte() { return MULT_FONTE[tamanhoFonte()]; }
     public static void definirTamanhoFonte(int i) { Preferences p = prefs(); p.putInteger("ui_font_size", i); p.flush(); }
 
-    /** 0 High, 1 Medium, 2 Low, 3 Off (so' a cor do dia/noite, sem as luzes). */
-    public static int qualidadeLuz() { return Math.max(0, Math.min(3, prefs().getInteger("light_quality", 0))); }
+    /** 0 High, 1 Medium, 2 Low ("Off" saiu: algumas hunts ficavam escuras demais). */
+    public static int qualidadeLuz() { return Math.max(0, Math.min(2, prefs().getInteger("light_quality", 0))); }
     public static void definirQualidadeLuz(int i) { Preferences p = prefs(); p.putInteger("light_quality", i); p.flush(); }
 
     /** Effects Reduced: sem sangue no chao, sem tiles noturnos (vagalumes) e sem sombra de mob voando. */
