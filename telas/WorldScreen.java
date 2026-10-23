@@ -146,6 +146,7 @@ public class WorldScreen extends ScreenAdapter {
         float origemX, origemY, destinoX, destinoY, duracao = 1f, progresso = 1f;
         String direcaoPendente = null;
         float ultimaDuracaoPasso = 0.45f; // duracao do ultimo passo de verdade (pra suavizar correcoes)
+        int passosDados; // a animacao de andar continua de um passo pro outro
         // Depois de um passo, espera um tiquinho antes do quadro parado - o
         // proximo passo do servidor costuma chegar logo e o mob nao "pisca"
         // parado entre um SQM e outro (mob.gd: timer de 0.12s).
@@ -219,6 +220,7 @@ public class WorldScreen extends ScreenAdapter {
             if (!fila.isEmpty()) duracao *= 0.75f;
             progresso = 0f;
             movendo = true;
+            passosDados++;
         }
 
         boolean andandoVisual() { return movendo || tempoDesdeParou < 0.12f; }
@@ -374,7 +376,7 @@ public class WorldScreen extends ScreenAdapter {
     private TextureRegion quadroDoMob(MobVisual mob) {
         if (!mob.morto && voa(mob)) return quadroAsas(mob.animacao, mob.direcao, mob.id.hashCode(), andandoVoo(mob));
         return quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso,
-            mobsPassoComIdle.contains(tipoDe(mob)));
+            mobsPassoComIdle.contains(tipoDe(mob)), mob.passosDados, mob.duracao);
     }
 
     /** Tipos com MOB_DB "walk_idle" (ex: Mountain Troll): por SQM anda
@@ -2698,7 +2700,7 @@ public class WorldScreen extends ScreenAdapter {
                 cores.add(Color.WHITE);
                 dyQuadro = dyDoMob(mob) / ESCALA_SPRITE; // mob que voa: corpo parado na foto tambem
             } else if (animMorphAlvo != null) {
-                quadros.add(quadroAtual(animMorphAlvo, j.movendo, j.direcao, j.progresso()));
+                quadros.add(quadroAtual(animMorphAlvo, j));
                 cores.add(Color.WHITE);
             } else if (j != null) {
                 List<CamadaSkin> camadas = skinsJogadores.get(j.nome);
@@ -5700,7 +5702,7 @@ public class WorldScreen extends ScreenAdapter {
             if (a.morte != null) return a.morte;
             return a == animacaoBase ? a.idleBaixo : null;
         }
-        return quadroAtual(a, j.movendo, j.direcao, j.progresso());
+        return quadroAtual(a, j.movendo, j.direcao, j.progresso(), false, j.passosDados, j.duracaoPasso());
     }
 
     private boolean estaMorto(Jogador j) {
@@ -5710,17 +5712,28 @@ public class WorldScreen extends ScreenAdapter {
         return remotos.get(j.nome) == j && remotosMortos.contains(j.nome);
     }
 
-    private TextureRegion quadroAtual(AnimacaoCorpo a, boolean movendo, String direcao, float progresso) {
-        return quadroAtual(a, movendo, direcao, progresso, false);
-    }
+    /** Teto de quadros de andar por segundo: muito rapido (lv alto, /speed) o
+     * ciclo esticava por varios passos em vez de piscar a ponto de parecer parado. */
+    private static final float ANIM_MAX_QUADROS_SEG = 10f;
 
-    private TextureRegion quadroAtual(AnimacaoCorpo a, boolean movendo, String direcao, float progresso, boolean comIdle) {
-        if (movendo && comIdle) {
-            // idle, andar1, idle, andar2 dentro do mesmo SQM.
-            int fase = Math.min(3, (int) (progresso * 4f));
-            if (fase % 2 == 0) movendo = false;
-            else {
-                int i = fase / 2;
+    /** passos + progresso = quanto ja' andou; o quadro sai disso (continua de um
+     * SQM pro outro). Normal: 2 quadros por SQM (x ciclosPorPasso). comIdle
+     * (MOB_DB walk_idle): idle, andar1, idle, andar2 - o ciclo ocupa 2 SQMs. */
+    private TextureRegion quadroAtual(AnimacaoCorpo a, boolean movendo, String direcao, float progresso,
+                                      boolean comIdle, int passos, float duracaoPasso) {
+        if (movendo) {
+            float porPasso = 2f * a.ciclosPorPasso;
+            if (duracaoPasso > 0f) porPasso = Math.min(porPasso, ANIM_MAX_QUADROS_SEG * a.ciclosPorPasso * duracaoPasso);
+            long indice = (long) Math.floor((passos + Math.min(0.999f, progresso)) * porPasso);
+            int i;
+            if (comIdle) {
+                int fase = (int) (indice % 4);
+                if (fase % 2 == 0) { movendo = false; i = 0; }
+                else i = fase / 2;
+            } else {
+                i = (int) (indice % 2);
+            }
+            if (movendo) {
                 switch (direcao) {
                     case "up": return a.andarCima[i];
                     case "left": return a.andarEsquerda[i];
@@ -5729,21 +5742,11 @@ public class WorldScreen extends ScreenAdapter {
                 }
             }
         }
-        if (!movendo) {
-            switch (direcao) {
-                case "up": return a.idleCima;
-                case "left": return a.idleEsquerda;
-                case "right": return a.idleDireita;
-                default: return a.idleBaixo;
-            }
-        }
-        int quadros = 2 * a.ciclosPorPasso;
-        int indiceFrame = Math.min(quadros - 1, (int) (progresso * quadros)) % 2;
         switch (direcao) {
-            case "up": return a.andarCima[indiceFrame];
-            case "left": return a.andarEsquerda[indiceFrame];
-            case "right": return a.andarDireita[indiceFrame];
-            default: return a.andarBaixo[indiceFrame];
+            case "up": return a.idleCima;
+            case "left": return a.idleEsquerda;
+            case "right": return a.idleDireita;
+            default: return a.idleBaixo;
         }
     }
 
@@ -5830,7 +5833,7 @@ public class WorldScreen extends ScreenAdapter {
             boolean voaMorph = !estaMorto(j) && tipoMorph != null && mobsBateAsas.contains(tipoMorph);
             TextureRegion q = estaMorto(j) && animMob.morte != null ? animMob.morte
                 : voaMorph ? quadroAsas(animMob, j.direcao, j.nome.hashCode(), j.movendo)
-                : quadroAtual(animMob, j.movendo, j.direcao, j.progresso());
+                : quadroAtual(animMob, j);
             float dyMorph = voaMorph ? dyAsas(j.nome.hashCode(), j.movendo) : 0f;
             if (!estaMorto(j) && tipoMorph != null && mobsComSombra.contains(tipoMorph)) desenharSombraVoo(ancoraX, ancoraY);
             float lm = q.getRegionWidth() * ESCALA_SPRITE, am = q.getRegionHeight() * ESCALA_SPRITE;
@@ -7131,7 +7134,7 @@ public class WorldScreen extends ScreenAdapter {
         float altura = quadroAtual(animacaoBase, j).getRegionHeight() * ESCALA_SPRITE;
         // Possuindo um mob: nome e altura do mob (igual desenharNomeMob).
         AnimacaoCorpo animMob = animacaoMorph(j.nome);
-        if (animMob != null) altura = quadroAtual(animMob, j.movendo, j.direcao, j.progresso()).getRegionHeight() * ESCALA_SPRITE;
+        if (animMob != null) altura = quadroAtual(animMob, j).getRegionHeight() * ESCALA_SPRITE;
         // Barra de vida (Settings > Show HP bar): logo acima da cabeca, o nome sobe um pouco.
         boolean comBarra = !estaMorto(j) && mostrarBarraJogador(j);
         if (comBarra) {

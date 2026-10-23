@@ -29,6 +29,8 @@ public class Jogador {
     public boolean movendo = false;
 
     private float origemX, origemY, destinoX, destinoY, progresso;
+    /** Passos ja' comecados (a animacao de andar continua de um passo pro outro). */
+    public int passosDados;
     /** Duracao de cada METADE do passo (o speed_modifier do SQM de saida vale
      * na 1a metade e o do SQM de chegada na 2a - muda no meio do passo). */
     private float duracao1 = TEMPO_PASSO / 2f, duracao2 = TEMPO_PASSO / 2f;
@@ -87,6 +89,7 @@ public class Jogador {
         duracao1 = base / Math.max(0.1f, multVelocidade);
         duracao2 = base / Math.max(0.1f, multVelocidadeDestino);
         movendo = true;
+        passosDados++;
     }
 
     /** Passo na diagonal leva √2 vezes mais (anda a mesma distancia por
@@ -152,6 +155,7 @@ public class Jogador {
         progresso = 0f;
         duracao1 = duracao2 = dur * fatorDiagonal(alvoX - x, alvoY - y) / 2f;
         movendo = true;
+        passosDados++;
     }
 
     /** Passo em andamento: de onde saiu e pra onde vai (parado: a posicao atual). */
@@ -218,6 +222,8 @@ public class Jogador {
      * (parado) vale 1.0 - sem uso nesse caso, ja' que a animacao parada nao
      * depende disso. */
     public float progresso() { return progresso; }
+    /** Duracao do passo atual inteiro (s). */
+    public float duracaoPasso() { return duracao1 + duracao2; }
 
     public float posicaoSalvarX() { return movendo ? destinoX : x; }
 
