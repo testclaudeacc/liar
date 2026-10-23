@@ -5765,7 +5765,7 @@ public final class BookMenuUI {
     private int bestiarioSelecionado = -1; // "id" da entrada
     private static final String[] MEDALHAS = {"sheet/r30_c9", "sheet/r31_c13", "sheet/r32_c7"}; // cobre, prata, ouro
     private static final int COLUNAS_BESTIARIO = 4;
-    private static final float SLOT_BESTIARIO = 58f;
+    private static final float SLOT_BESTIARIO = CELULAR ? 72f : 64f; // maior, igual os slots da bag
 
     /** Medalha do nivel (2 = cobre, 3 = prata, 4 = ouro), ou null. */
     public TextureAtlas.AtlasRegion medalhaDoNivel(int nivel) {
@@ -5888,9 +5888,16 @@ public final class BookMenuUI {
         if (tira != null) camadaImagem.add(new MobAnimado(tira)).size(SLOT_BESTIARIO * 0.62f).padTop(6);
         Table camadaNumero = new Table();
         camadaNumero.top().left();
+        // Boss: caveira no canto de cima, antes do numero.
+        TextureAtlas.AtlasRegion caveira = e.getBoolean("boss", false) ? atlas.findRegion("ui/CritIcon") : null;
+        if (caveira != null) {
+            Image c = new Image(new TextureRegionDrawable(caveira));
+            c.setScaling(Scaling.fit);
+            camadaNumero.add(c).size(SLOT_BESTIARIO * 0.24f).pad(3, 3, 0, 0);
+        }
         Label numero = new LabelPixel(String.valueOf(id), skin.get("hud", Label.LabelStyle.class));
         escalarFonte(numero, 0.65f);
-        camadaNumero.add(numero).pad(2, 4, 0, 0);
+        camadaNumero.add(numero).pad(2, caveira != null ? 2 : 4, 0, 0);
         Table camadaMedalha = new Table();
         camadaMedalha.bottom().right();
         TextureAtlas.AtlasRegion medalha = medalhaDoNivel(nivel);

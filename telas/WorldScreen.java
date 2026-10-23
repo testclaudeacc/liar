@@ -7167,7 +7167,14 @@ public class WorldScreen extends ScreenAdapter {
         // todo o resto do arquivo (ancoraX/Y, camera.position).
         String nomeVisivel = animMob != null ? nomeDoMorph(j.nome) : nomeVisivel(j.nome);
         layout.setText(font, nomeVisivel);
-        float nomeXBruto = ancoraX - layout.width / 2f;
+        // Possuindo um boss: nome carmesim com a caveira na esquerda (igual desenharNomeMob).
+        String tipoMorph = animMob != null ? morfos.get(j.nome) : null;
+        boolean boss = tipoMorph != null && mobsBoss.contains(tipoMorph.toLowerCase());
+        if (boss && regiaoCaveiraBoss == null) regiaoCaveiraBoss = atlas.findRegion("ui/CritIcon");
+        boolean comCaveira = boss && regiaoCaveiraBoss != null;
+        float tamCaveira = comCaveira ? Math.max(6f, font.getCapHeight() + 2f) : 0f;
+        float folgaCaveira = comCaveira ? 1f : 0f;
+        float nomeXBruto = ancoraX - (tamCaveira + folgaCaveira + layout.width) / 2f + tamCaveira + folgaCaveira;
         // Gap acima da cabeca reduzido de 14 pra 4 - o +14 antigo era
         // proporcional ao personagem de 32px/ESCALA_SPRITE=2x; com o
         // personagem agora em 16px (ESCALA_SPRITE=1x) o nome ficava flutuando
@@ -7183,8 +7190,12 @@ public class WorldScreen extends ScreenAdapter {
             float[] vida = vidaRemotos.get(j.nome);
             if (vida != null && vida[1] > 0f) pct = vida[0] / vida[1];
         }
+        if (comCaveira) {
+            batch.draw(regiaoCaveiraBoss, nomeX - folgaCaveira - tamCaveira,
+                nomeY - font.getCapHeight() / 2f - tamCaveira / 2f, tamCaveira, tamCaveira);
+        }
         Color anterior = new Color(font.getColor());
-        font.setColor(corDaVida(pct));
+        font.setColor(boss ? COR_BOSS : corDaVida(pct));
         font.draw(batch, nomeVisivel, nomeX, nomeY);
         font.setColor(anterior);
     }

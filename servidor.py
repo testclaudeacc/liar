@@ -188,6 +188,7 @@ def montar_bestiario(p):
             e["type"] = tipo
             e["name"] = info.get("name", tipo.capitalize())
             e["kills"] = kills
+            if info.get("boss"): e["boss"] = True  # caveira no slot do bestiary
         if nivel >= 2:
             e["hp"] = info.get("hp", 40)
         if nivel >= 3:
