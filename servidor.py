@@ -124,8 +124,7 @@ MOB_DB = {
                        {"item": "res://sprites/items/Ranger/Weapons/IronBow.tres", "chance": 0.025}],
              "currency": {"min": 25, "max": 42}},
     "spider": {"name": "Black Spider", "speed_mult": 2.4, "hp": 400, "xp": 92, "attack": 50.0, "attack_min": 48, "attack_max": 52, "hit": "PoisonPhysATK",
-                       "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.05},
-                                 {"one_of": ITENS_LV20_ARMADURA, "chance": 0.03},
+                       "drops": [{"one_of": ITENS_LV20_ARMADURA, "chance": 0.03},
                                  {"one_of": ITENS_LV20_ARMAS, "chance": 0.015},
                                  {"one_of": ITENS_LV20_JOIAS, "chance": 0.02}],
                        "currency": {"min": 35, "max": 50}},
@@ -133,8 +132,7 @@ MOB_DB = {
     # respawn padrao 30 min (o respawn_time do Tiled ainda manda, se tiver).
     "spidermother": {"name": "Spider Mother", "boss": True, "respawn": 1800, "speed_mult": 1.6, "hp": 20000, "xp": 10000,
                        "attack": 90.0, "attack_min": 80, "attack_max": 100, "hit": "PoisonPhysATK",
-                       "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.5},
-                                 {"one_of": ITENS_LV20_ARMADURA, "chance": 0.5},
+                       "drops": [{"one_of": ITENS_LV20_ARMADURA, "chance": 0.5},
                                  {"one_of": ITENS_LV20_ARMAS, "chance": 0.3},
                                  {"one_of": ITENS_LV20_JOIAS, "chance": 0.25}],
                        "currency": {"min": 400, "max": 700}},
@@ -144,8 +142,7 @@ MOB_DB = {
                        "currency": {"min": 70, "max": 100}},
     "soullessbody": {"name": "Soulless Body", "boss": True, "respawn": 1800, "speed_mult": 2, "hp": 80000, "xp": 1000000,
                        "attack": 180.0, "attack_min": 160, "attack_max": 200,
-                       "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.5},
-                                 {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
+                       "drops": [{"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25}],
                        "currency": {"min": 4000, "max": 7000}},
 }
@@ -433,13 +430,13 @@ def validate_item(item_path):
 SLOTS_VALIDOS = {"Helm", "Gloves", "Chest", "Boots", "Necklace", "Ring", "MainHand", "Hand"}
 
 ITEM_DB = {
-    "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"name": "Wooden Flute", "type": "Flute", "req_level": 0, "req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "Musicality", "fourth_stat_value": 1, "mana_cost": 2, "cap": 15.0},
+    "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"name": "Wooden Flute", "type": "Flute", "req_level": 0, "req_class": "Bard", "bonus_damage": 2, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 2, "cap": 15.0},
     "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"name": "Basic Music Sheet", "type": "Music Sheet", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 2, "cap": 15.0},
-    "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 2, "cap": 15.0},
+    "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 3, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "cap": 15.0},
     "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 0, "defense": 3, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 15.0},
-    "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 1, "mana_cost": 3, "cap": 15.0},
+    "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 3, "cap": 15.0},
     "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 1, "cap": 15.0},
-    "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 2, "cap": 15.0},
+    "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 3, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "cap": 15.0},
     "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 2, "ammo": True, "price": 1, "max_stack": 9999, "cap": 0.1},
     # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
     # Materiais (drop de mob): so' nome, "Material" e cap na descricao; o NPC paga sell_price.
@@ -525,11 +522,11 @@ ITEM_DB = {
     # Armas lv 10: 6 de ADC e 2 de Atk (o dobro de uma peca de set). Basic Dagger:
     # metade do ADC de uma espada, mas bate 1.1x mais rapido ("atk_speed") -
     # mais que isso o Knight passa o DPS do Mage (a velocidade multiplica o golpe todo).
-    "res://sprites/items/Knight/Weapons/BasicDagger.tres": {"name": "Basic Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 10, "req_class": "Knight", "bonus_damage": 7, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 7, "atk_speed": 1.1, "price": 1000, "icon": "sheet/r98_c3", "cap": 8.0},
+    "res://sprites/items/Knight/Weapons/BasicDagger.tres": {"name": "Basic Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 10, "req_class": "Knight", "bonus_damage": 14, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "atk_speed": 1.1, "price": 1000, "icon": "sheet/r98_c3", "cap": 8.0},
     # atk_hit/atk_proj: efeito e projetil do ataque basico (no lugar do da classe).
-    "res://sprites/items/Mage/Weapons/RubyStaff.tres": {"name": "Ruby Staff", "type": "Staff", "slot": "MainHand", "req_level": 10, "req_class": "Mage", "bonus_damage": 4, "defense": 0, "stamina": 0, "mana": 20, "fourth_stat_type": "Magic", "fourth_stat_value": 4, "mana_cost": 5, "atk_hit": "Fire", "atk_proj": "res://ui/FireProjectile.png", "price": 1000, "icon": "sheet/r104_c8", "cap": 15.0},
-    "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 4, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 4, "mana_cost": 2, "atk_hit": "RattleHit", "atk_proj": "res://ui/items/RattleProjectile.png", "price": 1000, "icon": "ui/armas/wooden rattle", "cap": 10.0},
-    "res://sprites/items/Ranger/Weapons/IronBow.tres": {"name": "Iron Bow", "type": "Bow", "slot": "MainHand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 4, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 4, "price": 1000, "icon": "sheet/r93_c9", "cap": 15.0},
+    "res://sprites/items/Mage/Weapons/RubyStaff.tres": {"name": "Ruby Staff", "type": "Staff", "slot": "MainHand", "req_level": 10, "req_class": "Mage", "bonus_damage": 8, "defense": 0, "stamina": 0, "mana": 20, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 5, "atk_hit": "Fire", "atk_proj": "res://ui/FireProjectile.png", "price": 1000, "icon": "sheet/r104_c8", "cap": 15.0},
+    "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 8, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 2, "atk_hit": "RattleHit", "atk_proj": "res://ui/items/RattleProjectile.png", "price": 1000, "icon": "ui/armas/wooden rattle", "cap": 10.0},
+    "res://sprites/items/Ranger/Weapons/IronBow.tres": {"name": "Iron Bow", "type": "Bow", "slot": "MainHand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 8, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1000, "icon": "sheet/r93_c9", "cap": 15.0},
     # Segunda mao lv 10 (drop das 2 vespas, 2% cada; a flecha vende no Luke):
     # ADC 6, Stamina/Mana 15 (shield tambem Defense 6 + Armour 2).
     "res://sprites/items/Mage/SecondHand/CrimsonTome.tres": {"name": "Crimson Tome", "type": "Book", "slot": "Hand", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 15, "fourth_stat_type": "Magic", "fourth_stat_value": 9, "price": 500, "icon": "sheet/r60_c10", "cap": 15.0},
@@ -549,26 +546,25 @@ ITEM_DB = {
     "res://sprites/items/Bronze/BronzeChestplate.tres": {"name": "Bronze Chestplate", "type": "Chestplate", "slot": "Chest", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "armour": 4, "stamina": 25, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Bronze", "set_bonus": {"still_dr": 10}, "set_desc": "10% less damage taken while standing still", "price": 800, "icon": "sheet/r4_c2", "cap": 20.0},
     "res://sprites/items/Bronze/BronzeGloves.tres": {"name": "Bronze Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "armour": 4, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Bronze", "set_bonus": {"still_dr": 10}, "set_desc": "10% less damage taken while standing still", "price": 400, "icon": "sheet/r21_c3", "cap": 6.0},
     "res://sprites/items/Bronze/BronzeBoots.tres": {"name": "Bronze Boots", "type": "Boots", "slot": "Boots", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "armour": 4, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Bronze", "set_bonus": {"still_dr": 10}, "set_desc": "10% less damage taken while standing still", "price": 400, "icon": "sheet/r10_c14", "cap": 10.0},
-    "res://sprites/items/Bronze/BronzeShield.tres": {"name": "Bronze Shield", "type": "Shield", "slot": "Hand", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 10, "armour": 3, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Bronze", "set_bonus": {"still_dr": 10}, "set_desc": "10% less damage taken while standing still", "price": 1200, "icon": "sheet/r71_c12", "cap": 22.0},
-    # Axe: duas maos (tira o escudo); parte da defesa do escudo virou dano. Dano
-    # base parecido entre as classes (Mage/Bard/Ranger 26 no lv 20); Knight um
-    # pouco menos (Axe 24; Bronze Dagger 20 x1.1 de velocidade + escudo).
-    # Escudo nao tem ADC (so' defesa/armour).
-    "res://sprites/items/Knight/Weapons/BronzeAxe.tres": {"name": "Bronze Axe", "type": "Axe", "slot": "MainHand", "req_level": 20, "req_class": "Knight", "bonus_damage": 12, "defense": 0, "armour": 0, "stamina": 30, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 12, "two_handed": True, "price": 2500, "icon": "sheet/r92_c12", "cap": 18.0},
-    "res://sprites/items/Knight/Weapons/BronzeDagger.tres": {"name": "Bronze Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 20, "req_class": "Knight", "bonus_damage": 10, "defense": 0, "armour": 0, "stamina": 25, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 10, "atk_speed": 1.1, "price": 2500, "icon": "sheet/r98_c0", "cap": 8.0},
+    "res://sprites/items/Bronze/BronzeShield.tres": {"name": "Bronze Shield", "type": "Shield", "slot": "Hand", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 10, "armour": 3, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1200, "icon": "sheet/r71_c12", "cap": 22.0},
+    # Armas so' tem ataque; ADC fica pra offhand (book/sheet/flecha). Escudo: so'
+    # defesa/armour. Axe: duas maos, mais DPS que Dagger + escudo (24 contra
+    # 18 x1.1 de velocidade = 19.8). Set Bronze nao conta o escudo.
+    "res://sprites/items/Knight/Weapons/BronzeAxe.tres": {"name": "Bronze Axe", "type": "Axe", "slot": "MainHand", "req_level": 20, "req_class": "Knight", "bonus_damage": 24, "defense": 0, "armour": 0, "stamina": 30, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "two_handed": True, "price": 2500, "icon": "sheet/r92_c12", "cap": 18.0},
+    "res://sprites/items/Knight/Weapons/BronzeDagger.tres": {"name": "Bronze Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 20, "req_class": "Knight", "bonus_damage": 18, "defense": 0, "armour": 0, "stamina": 25, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "atk_speed": 1.1, "price": 2500, "icon": "sheet/r98_c0", "cap": 8.0},
     "res://sprites/items/Weaver/WeaverHat.tres": {"name": "Weaver Hat", "type": "Hat", "slot": "Helm", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 5, "mana": 20, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 500, "icon": "sheet/r25_c3", "cap": 5.0},
     "res://sprites/items/Weaver/WeaverRobe.tres": {"name": "Weaver Robe", "type": "Robe", "slot": "Chest", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 10, "mana": 35, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 800, "icon": "sheet/r3_c9", "cap": 10.0},
     "res://sprites/items/Weaver/WeaverGloves.tres": {"name": "Weaver Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 5, "mana": 15, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 400, "icon": "sheet/r20_c11", "cap": 3.0},
     "res://sprites/items/Weaver/WeaverBoots.tres": {"name": "Weaver Boots", "type": "Boots", "slot": "Boots", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 5, "mana": 15, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 400, "icon": "sheet/r10_c6", "cap": 5.0},
-    "res://sprites/items/Mage/Weapons/VenomStaff.tres": {"name": "Venom Staff", "type": "Staff", "slot": "MainHand", "req_level": 20, "req_class": "Mage", "bonus_damage": 7, "defense": 0, "armour": 0, "stamina": 0, "mana": 30, "fourth_stat_type": "Magic", "fourth_stat_value": 7, "mana_cost": 6, "atk_hit": "PoisonCloud", "atk_proj": "res://ui/PoisonProjectile.png", "price": 2500, "icon": "sheet/r105_c8", "cap": 15.0},
-    "res://sprites/items/Bard/Weapons/WoodenHarp.tres": {"name": "Wooden Lyre", "type": "Lyre", "slot": "MainHand", "req_level": 20, "req_class": "Bard", "bonus_damage": 7, "defense": 0, "armour": 0, "stamina": 15, "mana": 20, "fourth_stat_type": "Musicality", "fourth_stat_value": 7, "mana_cost": 3, "price": 2500, "icon": "ui/armas/Wooden Lyre", "cap": 12.0},
+    "res://sprites/items/Mage/Weapons/VenomStaff.tres": {"name": "Venom Staff", "type": "Staff", "slot": "MainHand", "req_level": 20, "req_class": "Mage", "bonus_damage": 14, "defense": 0, "armour": 0, "stamina": 0, "mana": 30, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 6, "atk_hit": "PoisonCloud", "atk_proj": "res://ui/PoisonProjectile.png", "price": 2500, "icon": "sheet/r105_c8", "cap": 15.0},
+    "res://sprites/items/Bard/Weapons/WoodenHarp.tres": {"name": "Wooden Lyre", "type": "Lyre", "slot": "MainHand", "req_level": 20, "req_class": "Bard", "bonus_damage": 14, "defense": 0, "armour": 0, "stamina": 15, "mana": 20, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 3, "price": 2500, "icon": "ui/armas/Wooden Lyre", "cap": 12.0},
     "res://sprites/items/Mage/SecondHand/ObsidianTome.tres": {"name": "Nocturne Book", "type": "Book", "slot": "Hand", "req_level": 20, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "armour": 0, "stamina": 0, "mana": 25, "fourth_stat_type": "Magic", "fourth_stat_value": 12, "price": 1200, "icon": "sheet/r61_c15", "cap": 15.0},
     "res://sprites/items/Bard/SecondHand/ObsidianScore.tres": {"name": "Nocturne Sheet", "type": "Music Sheet", "slot": "Hand", "req_level": 20, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "armour": 0, "stamina": 20, "mana": 20, "fourth_stat_type": "Musicality", "fourth_stat_value": 12, "price": 1200, "icon": "sheet/r51_c7", "cap": 15.0},
     "res://sprites/items/Hunter/HunterHat.tres": {"name": "Hunter Hat", "type": "Hat", "slot": "Helm", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "armour": 3, "stamina": 10, "mana": 5, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Hunter", "set_bonus": {"ammo_save": 10}, "set_desc": "10% chance to save ammo", "price": 500, "icon": "sheet/r24_c8", "cap": 6.0},
     "res://sprites/items/Hunter/HunterChestplate.tres": {"name": "Hunter Chestplate", "type": "Chestplate", "slot": "Chest", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "armour": 3, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Hunter", "set_bonus": {"ammo_save": 10}, "set_desc": "10% chance to save ammo", "price": 800, "icon": "sheet/r3_c12", "cap": 14.0},
     "res://sprites/items/Hunter/HunterGloves.tres": {"name": "Hunter Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "armour": 3, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Hunter", "set_bonus": {"ammo_save": 10}, "set_desc": "10% chance to save ammo", "price": 400, "icon": "sheet/r21_c7", "cap": 4.0},
     "res://sprites/items/Hunter/HunterBoots.tres": {"name": "Hunter Boots", "type": "Boots", "slot": "Boots", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "armour": 3, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Hunter", "set_bonus": {"ammo_save": 10}, "set_desc": "10% chance to save ammo", "price": 400, "icon": "sheet/r10_c8", "cap": 7.0},
-    "res://sprites/items/Ranger/Weapons/BronzeBow.tres": {"name": "Bronze Bow", "type": "Bow", "slot": "MainHand", "req_level": 20, "req_class": "Ranger", "bonus_damage": 7, "defense": 0, "armour": 0, "stamina": 30, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 7, "price": 2500, "icon": "sheet/r93_c14", "cap": 15.0},
+    "res://sprites/items/Ranger/Weapons/BronzeBow.tres": {"name": "Bronze Bow", "type": "Bow", "slot": "MainHand", "req_level": 20, "req_class": "Ranger", "bonus_damage": 14, "defense": 0, "armour": 0, "stamina": 30, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 2500, "icon": "sheet/r93_c14", "cap": 15.0},
     "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres": {"name": "Bronze Arrow", "type": "Arrow", "slot": "Hand", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "armour": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 12, "ammo": True, "max_stack": 9999, "atk_proj": "res://ui/BronzeArrowProjectile.png", "price": 4, "icon": "sheet/r90_c10", "cap": 0.1},
     # Joias lv 20: sem ADC, universais (mana/defesa pela classe, 2x a Ruby).
     "res://sprites/items/Jewelry/BronzeRing.tres": {"name": "Bronze Ring", "type": "Ring", "slot": "Ring", "req_level": 20, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "universal": True, "universal_mult": 2, "price": 2000, "icon": "sheet/r64_c10", "cap": 0.5},
@@ -662,7 +658,8 @@ CAP_POR_NIVEL = 10.0
 # client mostra como Melee/Magic/Focus/Musicality). Magic no Bard aparece
 # como Musicality (o Bard usa os sets do Mage). No dano tudo vale igual 1:2.
 # ADC (fourth stat) estilo Tibia: 1 de ADC = +1 de dano (igual 1 nivel da skill
-# da classe; nao reduz dano). So' armas e offhands tem ADC; armadura da' HP/defesa.
+# da classe; nao reduz dano). Arma tem ataque, nao ADC; ADC so' na offhand
+# (book, sheet, flecha) e, no futuro, pouco em item raro.
 FOURTH_STAT_MULTIPLIERS = {"Magic": 1.0, "Focus": 1.0, "Musicality": 1.0, "Melee": 1.0, "Class": 1.0}
 # Joias "universal": True (Ruby Ring/Necklace) - sem ADC; o que dao depende da
 # classe de quem usa (mago mais mana que defesa, knight o contrario).
