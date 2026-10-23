@@ -126,7 +126,7 @@ public final class BookMenuUI {
     private final Map<String, Label> valoresStatus = new LinkedHashMap<>();
     private JsonValue ultimasSkills;
     private int nivelAtual = 1;
-    private int expAtual = 0;
+    private long expAtual = 0;
     private int killsAtual = 0;
     private static final float LARGURA_BARRA_SKILL = 285f;
     private static final float ALTURA_BARRA_SKILL = 24f;
@@ -1609,9 +1609,9 @@ public final class BookMenuUI {
         return 1.0f;
     }
 
-    private static int getExpForLevel(int level) {
+    private static long getExpForLevel(int level) {
         if (level <= 1) return 0;
-        return (int) ((50.0 / 3.0) * (Math.pow(level, 3) - 6 * Math.pow(level, 2) + 17 * level - 12));
+        return (long) ((50.0 / 3.0) * (Math.pow(level, 3) - 6 * Math.pow(level, 2) + 17 * level - 12));
     }
 
     private static String formatarNumero(long valor) {
@@ -1628,7 +1628,7 @@ public final class BookMenuUI {
      * Campos opcionais lidos de "skills" (o servidor ainda nao manda todos):
      * fullness (0-FULLNESS_MAX), crit_chance, block_chance e total_exp.
      */
-    public void atualizarSkills(JsonValue skills, int level, int exp, int kills) {
+    public void atualizarSkills(JsonValue skills, int level, long exp, int kills) {
         this.ultimasSkills = skills;
         // Magias aprendidas (servidor.py: skills["spells_known"]).
         JsonValue conhecidas = skills != null ? skills.get("spells_known") : null;
@@ -1646,8 +1646,9 @@ public final class BookMenuUI {
         this.expAtual = exp;
         this.killsAtual = kills;
 
-        int expAtualNivel = getExpForLevel(level);
-        int expProximo = getExpForLevel(level + 1);
+        // long: em level alto (lv ~505+) o XP passa de 2,1 bi e o int estourava.
+        long expAtualNivel = getExpForLevel(level);
+        long expProximo = getExpForLevel(level + 1);
         float pctNivel = expProximo > expAtualNivel ? (float) (exp - expAtualNivel) / (expProximo - expAtualNivel) : 0f;
         atualizarBarra(barraNivel, level, pctNivel);
 

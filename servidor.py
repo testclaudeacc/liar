@@ -125,8 +125,6 @@ MOB_DB = {
              "currency": {"min": 25, "max": 42}},
     "spider": {"name": "Black Spider", "speed_mult": 2.4, "hp": 400, "xp": 92, "attack": 50.0, "attack_min": 48, "attack_max": 52, "hit": "PoisonPhysATK",
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.05},
-                                 {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
-                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
                                  {"one_of": ITENS_LV20_ARMADURA, "chance": 0.03},
                                  {"one_of": ITENS_LV20_ARMAS, "chance": 0.015},
                                  {"one_of": ITENS_LV20_JOIAS, "chance": 0.02}],
@@ -136,8 +134,6 @@ MOB_DB = {
     "spidermother": {"name": "Spider Mother", "boss": True, "respawn": 1800, "speed_mult": 1.6, "hp": 20000, "xp": 10000,
                        "attack": 90.0, "attack_min": 80, "attack_max": 100, "hit": "PoisonPhysATK",
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.5},
-                                 {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
-                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
                                  {"one_of": ITENS_LV20_ARMADURA, "chance": 0.5},
                                  {"one_of": ITENS_LV20_ARMAS, "chance": 0.3},
                                  {"one_of": ITENS_LV20_JOIAS, "chance": 0.25}],
@@ -3139,7 +3135,11 @@ def _gravar_um(player_data):
             if player_data.get('position_ack_sid'):
                 socketio.emit('position_saved', {'name': player_data.get('name', '')}, room=player_data['position_ack_sid'])
         except Exception as e:
-            print(f"[DB_WORKER_ERROR] {e}")
+            # Save perdido: deixa claro de quem (antes so' o erro, sem o nome).
+            print(f"[DB_WORKER_ERROR] save de '{player_data.get('name')}' (user {player_data.get('user_id')}) falhou: {e}")
+            try:
+                if conn: conn.rollback()
+            except Exception: pass
         finally:
             if conn: db_pool.putconn(conn)
 
@@ -3184,6 +3184,14 @@ def init_db():
                         currency INTEGER DEFAULT 0,
                         time_played INTEGER DEFAULT 0)''')
         c.execute("ALTER TABLE characters ADD COLUMN IF NOT EXISTS time_played INTEGER DEFAULT 0")
+        # exp/currency em BIGINT: INTEGER estoura em ~2,1 bi (lv ~505 de XP) e
+        # ai' TODO save do personagem falhava - relogar voltava pro ultimo save bom.
+        for coluna in ('exp', 'currency'):
+            c.execute("SELECT data_type FROM information_schema.columns WHERE table_name = 'characters' AND column_name = %s", (coluna,))
+            tipo = c.fetchone()
+            if tipo and tipo[0] == 'integer':
+                c.execute(f"ALTER TABLE characters ALTER COLUMN {coluna} TYPE BIGINT")
+                print(f"[DB] characters.{coluna} -> BIGINT")
         # Guarda, por NPC, se o jogador ja viu o dialogo completo dele (ex:
         # {"kharon": true}) - pra nao repetir a fala de 1a vez (nem a
         # "quest"/pedido do NPC) toda vez que ele conversa de novo.

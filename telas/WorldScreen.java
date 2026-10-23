@@ -3522,7 +3522,7 @@ public class WorldScreen extends ScreenAdapter {
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
                 bookMenu.atualizarEquipados(data.get("equipped_items"));
                 atualizarMunicao(data.get("equipped_items"));
-                bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getInt("exp", 0), data.getInt("kills", 0));
+                bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getLong("exp", 0L), data.getInt("kills", 0));
             }
             JsonValue dialogosVistos = data.get("npc_dialogue_state");
             if (dialogosVistos != null) {
@@ -4453,7 +4453,7 @@ public class WorldScreen extends ScreenAdapter {
         socket.on("sync_stats", (nomeEvt, data) -> {
             if (data == null) return;
             bookMenu.atualizarCapacidade(data.getFloat("cap_atual", 0f), data.getFloat("cap_maximo", 100f));
-            bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getInt("exp", 0), data.getInt("kills", 0));
+            bookMenu.atualizarSkills(data.get("skills"), data.getInt("level", 1), data.getLong("exp", 0L), data.getInt("kills", 0));
             // Com fome (Fullness < 10, servidor.py::FOME_LIMITE): icone e 10% mais lento.
             JsonValue skillsFome = data.get("skills");
             boolean comFome = (skillsFome != null ? skillsFome.getFloat("fullness", BookMenuUI.FULLNESS_MAX) : BookMenuUI.FULLNESS_MAX) < FOME_LIMITE;
