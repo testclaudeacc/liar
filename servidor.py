@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.46"
+SERVER_VERSION = "v0.47"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -68,6 +68,15 @@ try:
         print("Pool de conexões PostgreSQL criado com sucesso.")
 except Exception as e:
     print(f"Erro fatal ao conectar ao PostgreSQL: {e}")
+
+# Itens level 20 (Black Spider; a Spider Mother com chance bem maior).
+ITENS_LV20_ARMADURA = ["res://sprites/items/%s.tres" % c for c in (
+    "Bronze/BronzeHelmet", "Bronze/BronzeChestplate", "Bronze/BronzeGloves", "Bronze/BronzeBoots", "Bronze/BronzeShield",
+    "Weaver/WeaverHat", "Weaver/WeaverRobe", "Weaver/WeaverGloves", "Weaver/WeaverBoots",
+    "Hunter/HunterHat", "Hunter/HunterChestplate", "Hunter/HunterGloves", "Hunter/HunterBoots")]
+ITENS_LV20_ARMAS = ["res://sprites/items/%s.tres" % c for c in (
+    "Knight/Weapons/BronzeAxe", "Knight/Weapons/BronzeDagger", "Mage/Weapons/VenomStaff",
+    "Bard/Weapons/WoodenHarp", "Ranger/Weapons/BronzeBow")]
 
 MOB_DB = {
     # attack_min/attack_max: faixa do golpe (sem elas: attack -15%..+15%, igual o
@@ -115,7 +124,9 @@ MOB_DB = {
     "spider": {"name": "Black Spider", "speed_mult": 2.4, "hp": 400, "xp": 92, "attack": 50.0, "attack_min": 48, "attack_max": 52, "hit": "PoisonPhysATK",
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.05},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
-                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02}],
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
+                                 {"one_of": ITENS_LV20_ARMADURA, "chance": 0.03},
+                                 {"one_of": ITENS_LV20_ARMAS, "chance": 0.015}],
                        "currency": {"min": 35, "max": 50}},
     # Boss: nome carmesim + caveira no client (lista 'mob_boss' do sync).
     # respawn padrao 30 min (o respawn_time do Tiled ainda manda, se tiver).
@@ -123,7 +134,9 @@ MOB_DB = {
                        "attack": 90.0, "attack_min": 80, "attack_max": 100, "hit": "PoisonPhysATK",
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.5},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
-                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25}],
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
+                                 {"one_of": ITENS_LV20_ARMADURA, "chance": 0.5},
+                                 {"one_of": ITENS_LV20_ARMAS, "chance": 0.3}],
                        "currency": {"min": 400, "max": 700}},
     # walk_idle: anda idle, andar1, idle, andar2 por SQM (client: mob_walk_idle).
     "mountaintroll": {"name": "Mountain Troll", "walk_idle": True, "speed_mult": 2.4, "hp": 800, "xp": 184,
@@ -235,6 +248,7 @@ NPC_DB = {
         "res://sprites/spells/ArrowBarrage.tres", "res://sprites/spells/SmallVines.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Ranger/SecondHand/StarterArrow.tres", "res://sprites/items/Ranger/SecondHand/FlintArrow.tres",
+        "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres",
         "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
         "res://sprites/items/Bard/Weapons/RawFlute.tres", "res://sprites/items/Ranger/Weapons/RawBow.tres",
         "res://sprites/items/Outlander/OutlanderHelm.tres", "res://sprites/items/Outlander/OutlanderCape.tres",
@@ -325,7 +339,10 @@ CHANCE_ADC_DA_CLASSE = 1.0 / 3.0
 
 def _sortear_variante(opcoes, classe):
     da_classe = ADC_DA_CLASSE.get(classe, ("",))[0] if classe else ""
-    minhas = [o for o in opcoes if ITEM_DB.get(o, {}).get("fourth_stat_type") == da_classe]
+    # Da classe: ADC dela ou item so' dela (ex: Bronze Helmet pro Knight).
+    minhas = [o for o in opcoes if ITEM_DB.get(o, {}).get("fourth_stat_type") == da_classe
+              or (classe and ITEM_DB.get(o, {}).get("req_class", "All") not in ("All", "")
+                  and classe in str(ITEM_DB.get(o, {}).get("req_class")).split("/"))]
     outras = [o for o in opcoes if o not in minhas]
     if minhas and outras:
         return random.choice(minhas if random.random() < CHANCE_ADC_DA_CLASSE else outras)
@@ -347,6 +364,8 @@ def rolar_loot(mob_type_id, classe=None):
         itens_rolados.append({"item": item_path, "qty": random.randint(min_qty, max_qty)})
     return itens_rolados
 
+LOOT_ROLLS_BOSS = 5
+
 def rolar_currency(mob_type_id):
     faixa = MOB_DB.get(mob_type_id, {}).get("currency", {})
     minimo = max(0, int(faixa.get("min", 0)))
@@ -356,6 +375,8 @@ def rolar_currency(mob_type_id):
     return random.randint(minimo, maximo)
 
 CRIT_CHANCE = 0.10
+# Set Bronze: "parado" = sem dar passo ha' esse tempo.
+PARADO_SEG = 1.0
 # Chance do ataque básico do player errar o mob (dano 0, "Miss" no client).
 MISS_CHANCE_PLAYER = 0.01
 BLOCK_CHANCE = 0.10
@@ -521,6 +542,29 @@ ITEM_DB = {
     "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Chest", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 15.0},
     "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 5.0},
     "res://sprites/items/Outlander/OutlanderBoots.tres": {"name": "Outlander Boots", "type": "Boots", "slot": "Boots", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 400, "icon": "sheet/r10_c7", "set": "Outlander", "set_xp": 5, "cap": 10.0},
+    # ===== Level 20 (Black Spider / Spider Mother) =====
+    # Sets: "set_bonus" vale com todas as pecas (bonus_set); "set_desc" e' o texto do client.
+    # Knight (tank): armour/defense altos. Mage/Bard: mana boa e pouca defesa (mana shield).
+    "res://sprites/items/Bronze/BronzeHelmet.tres": {"name": "Bronze Helmet", "type": "Helm", "slot": "Helm", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 3, "armour": 2, "stamina": 15, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Bronze", "set_bonus": {"still_dr": 10}, "set_desc": "10% less damage taken while standing still", "price": 500, "icon": "sheet/r23_c12", "cap": 12.0},
+    "res://sprites/items/Bronze/BronzeChestplate.tres": {"name": "Bronze Chestplate", "type": "Chestplate", "slot": "Chest", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 5, "armour": 3, "stamina": 25, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Bronze", "set_bonus": {"still_dr": 10}, "set_desc": "10% less damage taken while standing still", "price": 800, "icon": "sheet/r4_c2", "cap": 20.0},
+    "res://sprites/items/Bronze/BronzeGloves.tres": {"name": "Bronze Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 2, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Bronze", "set_bonus": {"still_dr": 10}, "set_desc": "10% less damage taken while standing still", "price": 400, "icon": "sheet/r21_c3", "cap": 6.0},
+    "res://sprites/items/Bronze/BronzeBoots.tres": {"name": "Bronze Boots", "type": "Boots", "slot": "Boots", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 2, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Bronze", "set_bonus": {"still_dr": 10}, "set_desc": "10% less damage taken while standing still", "price": 400, "icon": "sheet/r10_c14", "cap": 10.0},
+    "res://sprites/items/Bronze/BronzeShield.tres": {"name": "Bronze Shield", "type": "Shield", "slot": "Hand", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 10, "armour": 3, "stamina": 20, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 8, "set": "Bronze", "set_bonus": {"still_dr": 10}, "set_desc": "10% less damage taken while standing still", "price": 1200, "icon": "sheet/r71_c12", "cap": 22.0},
+    # Axe: duas maos (tira o escudo); a defesa que o escudo daria virou dano.
+    "res://sprites/items/Knight/Weapons/BronzeAxe.tres": {"name": "Bronze Axe", "type": "Axe", "slot": "MainHand", "req_level": 20, "req_class": "Knight", "bonus_damage": 14, "defense": 0, "armour": 0, "stamina": 30, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 14, "two_handed": True, "price": 2500, "icon": "sheet/r92_c12", "cap": 18.0},
+    "res://sprites/items/Knight/Weapons/BronzeDagger.tres": {"name": "Bronze Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 20, "req_class": "Knight", "bonus_damage": 6, "defense": 0, "armour": 0, "stamina": 25, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 6, "atk_speed": 1.1, "price": 2500, "icon": "sheet/r98_c0", "cap": 8.0},
+    "res://sprites/items/Weaver/WeaverHat.tres": {"name": "Weaver Hat", "type": "Hat", "slot": "Helm", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 1, "armour": 0, "stamina": 5, "mana": 20, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 500, "icon": "sheet/r25_c3", "cap": 5.0},
+    "res://sprites/items/Weaver/WeaverRobe.tres": {"name": "Weaver Robe", "type": "Robe", "slot": "Chest", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 10, "mana": 35, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 800, "icon": "sheet/r3_c9", "cap": 10.0},
+    "res://sprites/items/Weaver/WeaverGloves.tres": {"name": "Weaver Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 0, "stamina": 5, "mana": 15, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 400, "icon": "sheet/r20_c11", "cap": 3.0},
+    "res://sprites/items/Weaver/WeaverBoots.tres": {"name": "Weaver Boots", "type": "Boots", "slot": "Boots", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 0, "stamina": 5, "mana": 15, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 400, "icon": "sheet/r10_c6", "cap": 5.0},
+    "res://sprites/items/Mage/Weapons/VenomStaff.tres": {"name": "Venom Staff", "type": "Staff", "slot": "MainHand", "req_level": 20, "req_class": "Mage", "bonus_damage": 7, "defense": 0, "armour": 0, "stamina": 0, "mana": 30, "fourth_stat_type": "Magic", "fourth_stat_value": 7, "mana_cost": 6, "atk_hit": "PoisonCloud", "atk_proj": "res://ui/PoisonProjectile.png", "price": 2500, "icon": "sheet/r105_c8", "cap": 15.0},
+    "res://sprites/items/Bard/Weapons/WoodenHarp.tres": {"name": "Wooden Harp", "type": "Harp", "slot": "MainHand", "req_level": 20, "req_class": "Bard", "bonus_damage": 7, "defense": 0, "armour": 0, "stamina": 15, "mana": 20, "fourth_stat_type": "Musicality", "fourth_stat_value": 7, "mana_cost": 3, "price": 2500, "icon": "ui/items/StarterFlute", "cap": 12.0},
+    "res://sprites/items/Hunter/HunterHat.tres": {"name": "Hunter Hat", "type": "Hat", "slot": "Helm", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 1, "armour": 1, "stamina": 10, "mana": 5, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Hunter", "set_bonus": {"ammo_save": 10}, "set_desc": "10% chance to save ammo", "price": 500, "icon": "sheet/r24_c8", "cap": 6.0},
+    "res://sprites/items/Hunter/HunterChestplate.tres": {"name": "Hunter Chestplate", "type": "Chestplate", "slot": "Chest", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 2, "armour": 2, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Hunter", "set_bonus": {"ammo_save": 10}, "set_desc": "10% chance to save ammo", "price": 800, "icon": "sheet/r3_c12", "cap": 14.0},
+    "res://sprites/items/Hunter/HunterGloves.tres": {"name": "Hunter Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Hunter", "set_bonus": {"ammo_save": 10}, "set_desc": "10% chance to save ammo", "price": 400, "icon": "sheet/r21_c7", "cap": 4.0},
+    "res://sprites/items/Hunter/HunterBoots.tres": {"name": "Hunter Boots", "type": "Boots", "slot": "Boots", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 1, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Hunter", "set_bonus": {"ammo_save": 10}, "set_desc": "10% chance to save ammo", "price": 400, "icon": "sheet/r10_c8", "cap": 7.0},
+    "res://sprites/items/Ranger/Weapons/BronzeBow.tres": {"name": "Bronze Bow", "type": "Bow", "slot": "MainHand", "req_level": 20, "req_class": "Ranger", "bonus_damage": 7, "defense": 0, "armour": 0, "stamina": 30, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 7, "price": 2500, "icon": "sheet/r93_c14", "cap": 15.0},
+    "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres": {"name": "Bronze Arrow", "type": "Arrow", "slot": "Hand", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "armour": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 12, "ammo": True, "max_stack": 9999, "atk_proj": "res://ui/BronzeArrowProjectile.png", "price": 4, "icon": "sheet/r90_c10", "cap": 0.1},
 }
 # Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
 # que aparece na descricao.
@@ -542,7 +586,7 @@ ALCANCE_RANGED_SQM = 5
 CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage", "defense", "armour",
                        "stamina", "mana", "fourth_stat_type", "fourth_stat_value", "ammo", "mana_cost",
                        "fullness", "stackable", "heal_hp", "heal_mp", "icon", "cap", "usable",
-                       "regen_hp", "regen_mp", "regen_seg", "price", "sell_price", "set", "set_xp", "training", "ammo_save",
+                       "regen_hp", "regen_mp", "regen_seg", "price", "sell_price", "set", "set_xp", "set_desc", "two_handed", "training", "ammo_save",
                        "spell", "spell_mana", "spell_cd", "spell_dmg", "spell_desc", "spell_area",
                        "spell_bleed_ticks", "spell_bleed_pct", "spell_bleed_every", "spell_slot",
                        "spell_hits", "spell_hit_every", "spell_dot", "spell_slow",
@@ -657,21 +701,37 @@ def obter_dados_item(item_path, classe=None):
 
 def obter_req_class_item(item_path): return obter_dados_item(item_path).get("req_class", "All")
 
-def bonus_xp_set(p):
-    """% de XP extra dos sets completos equipados (ex: Outlander 4/4 = 5%)."""
+def classe_pode_usar(req_class, classe):
+    """req_class "All", uma classe ou varias separadas por "/" (ex: "Mage/Bard")."""
+    return req_class in (None, "", "All") or classe in str(req_class).split("/")
+
+def bonus_set(p):
+    """Bonus dos sets completos equipados, somados: {"xp": %, "crit": %,
+    "ammo_save": %, "still_dr": %}. "set_xp" (antigo) conta como "xp"."""
     equipados = p.get('equipped_items', {})
-    if not isinstance(equipados, dict): return 0.0
+    if not isinstance(equipados, dict): return {}
     usados = {}
     for inst in equipados.values():
         if not isinstance(inst, dict): continue
         nome_set = ITEM_DB.get(inst.get('item'), {}).get('set')
         if nome_set: usados.setdefault(nome_set, set()).add(inst.get('item'))
-    total = 0.0
+    total = {}
     for nome_set, pecas in usados.items():
         do_set = [k for k, v in ITEM_DB.items() if v.get('set') == nome_set]
-        if len(pecas) >= len(do_set):
-            total += float(ITEM_DB[do_set[0]].get('set_xp', 0))
+        if len(pecas) < len(do_set): continue
+        info = ITEM_DB[do_set[0]]
+        if info.get('set_xp'): total['xp'] = total.get('xp', 0.0) + float(info['set_xp'])
+        for k, v in (info.get('set_bonus') or {}).items():
+            total[k] = total.get(k, 0.0) + float(v)
     return total
+
+def bonus_xp_set(p):
+    """% de XP extra dos sets completos equipados (ex: Outlander 4/4 = 5%)."""
+    return bonus_set(p).get('xp', 0.0)
+
+def chance_critico(p):
+    """Crit do player: base + set (ex: Weaver 4/4 = +5%)."""
+    return CRIT_CHANCE + bonus_set(p).get('crit', 0.0) / 100.0
 
 def somar_bonus_combate_equipados(equipped_items, classe=None):
     total = {"bonus_damage": 0, "bonus_defense": 0.0, "bonus_hp": 0.0, "bonus_mp": 0.0}
@@ -930,8 +990,7 @@ def _slots_com_classe_invalida(p):
     invalidos = set()
     for slot, inst in equipados.items():
         if not isinstance(inst, dict): continue
-        req_class = obter_req_class_item(inst.get('item'))
-        if req_class != "All" and req_class != player_class:
+        if not classe_pode_usar(obter_req_class_item(inst.get('item')), player_class):
             invalidos.add(slot)
     return invalidos
 
@@ -961,6 +1020,7 @@ def _montar_payload_sync_stats(p):
         # Aba de skills: "35+12" (skill + ADC dos equips que valem pra classe) e
         # "24+5" (defense + o que os itens tiram de dano: defense 1:2 + armour 1:1).
         skills['adc_itens'], skills['def_itens'] = bonus_itens_skills(p)
+        skills['crit_chance'] = round(chance_critico(p) * 100.0, 1)
     return {
         'skills': skills, 'base_damage': new_dmg, 'defense_value': new_def,
         'level': level, 'exp': p.get('exp', 0), 'kills': p.get('kills', 0),
@@ -2358,6 +2418,10 @@ def _mob_atacar(mob_id, m, target_sid, now, ataque=None):
         dano_final = max(1, int(round(golpe - def_value)))
         critico = random.random() < MOB_CRIT_CHANCE
         if critico: dano_final *= 2
+    # Set Bronze completo: parado (sem andar ha' PARADO_SEG) toma menos dano.
+    reducao_parado = bonus_set(target_player).get('still_dr', 0.0)
+    if dano_final > 0 and reducao_parado > 0 and now - target_player.get('last_move_time', 0) >= PARADO_SEG:
+        dano_final = max(1, int(round(dano_final * (1.0 - reducao_parado / 100.0))))
     # Medalha de ouro no bestiary desse mob: -5% do dano recebido dele.
     if dano_final > 0 and bestiario_ouro(target_player, m.get('type_id')):
         dano_final = max(1, int(round(dano_final * (1.0 - BESTIARIO_BONUS_OURO))))
@@ -2554,7 +2618,7 @@ def handle_hit_morph(data):
         min_dano = max(1, int(base_dmg * 0.85))
         max_dano = max(min_dano, int(base_dmg * 1.15))
         dano = random.randint(min_dano, max_dano) if max_dano > min_dano else base_dmg
-        critico = random.random() < CRIT_CHANCE
+        critico = random.random() < chance_critico(p)
         if critico: dano *= 2
         mult_admin = admin_mult(p, 'admin_dmg', 1000.0)
         if mult_admin != 1.0: dano = max(1, int(round(dano * mult_admin)))
@@ -5299,8 +5363,15 @@ def _recompensar_morte_mob(mob_id, mob_type_id, mob_data, room, now):
     for participant_sid in mob_data['dmg_tracker']:
         if participant_sid not in online_players: continue
         part_name = online_players[participant_sid].get('name', '')
-        itens_rolados = rolar_loot(mob_type_id, online_players[participant_sid].get('class_name'))
-        currency_rolada = rolar_currency(mob_type_id)
+        # Boss: rola a tabela LOOT_ROLLS_BOSS vezes (itens e moedas somam).
+        rolls = int(MOB_DB.get(mob_type_id, {}).get('loot_rolls', LOOT_ROLLS_BOSS if MOB_DB.get(mob_type_id, {}).get('boss') else 1))
+        itens_rolados, currency_rolada = [], 0
+        for _ in range(max(1, rolls)):
+            for novo in rolar_loot(mob_type_id, online_players[participant_sid].get('class_name')):
+                junto = next((i for i in itens_rolados if i['item'] == novo['item'] and eh_empilhavel(novo['item'])), None)
+                if junto: junto['qty'] = min(obter_max_stack(novo['item']), junto['qty'] + novo['qty'])
+                else: itens_rolados.append(novo)
+            currency_rolada += rolar_currency(mob_type_id)
         loot_id = f"loot_{mob_id}_{int(now * 1000)}_{len(owner_sids)}"
         # has_items só reflete itens de verdade (pra sprite dourada da bag);
         # bag só com currency usa a sprite comum mesmo assim.
@@ -5329,7 +5400,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
         emit('spell_result', {'item': caminho, 'reason': motivo}, room=sid)
     if caminho not in magias_conhecidas(p): return falha('unknown')
     if int(p.get('level', 1) or 1) < int(dados.get('req_level', 0) or 0): return falha('level')
-    if dados.get('req_class', 'All') not in ('All', p.get('class_name')): return falha('class')
+    if not classe_pode_usar(dados.get('req_class', 'All'), p.get('class_name')): return falha('class')
     # Arma de treino equipada: so' o golpe normal (sem magia).
     if arma_principal(p).get('training'): return falha('training')
     if morph_de(p): return falha('no_target')  # possuindo um mob: so' o golpe dele
@@ -5382,7 +5453,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
     if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
     base = base_dmg * float(dados.get('spell_dmg', 100) or 100) / 100.0
     dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
-    critico = random.random() < CRIT_CHANCE
+    critico = random.random() < chance_critico(p)
     if critico: dano *= 2
     # Skill da magia (ex: +5 golpes de Magic): no maximo 1 vez por cooldown dela.
     skill_magia = dados.get('spell_skill')
@@ -5436,7 +5507,7 @@ def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, 
             if m is not mob_ref or m.get('hp', 0) <= 0 or p is None or p.get('is_dead'): return
             base = base_dmg * pct / 100.0
             dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
-            critico = random.random() < CRIT_CHANCE  # cada flecha sorteia o proprio crit
+            critico = random.random() < chance_critico(p)  # cada flecha sorteia o proprio crit
             if critico: dano *= 2
             _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, time.time(), {**extra, 'is_crit': critico})
             if skill: _dar_hits_skill(sid, p, skill, 1)
@@ -5583,7 +5654,7 @@ def handle_hit_mob(data):
         max_dano = max(min_dano, int(base_dmg * 1.15))
         dano_final = random.randint(min_dano, max_dano) if max_dano > min_dano else base_dmg
         
-        is_crit = random.random() < CRIT_CHANCE
+        is_crit = random.random() < chance_critico(p)
         if is_crit: dano_final *= 2
         if reduzido: dano_final = max(1, int(dano_final * DANO_RANGED_COLADO_MULT))
         # Medalha de ouro no bestiary desse mob: +5% de dano (arredonda no sorteio).
@@ -5601,7 +5672,8 @@ def handle_hit_mob(data):
             dano_final, is_crit, is_miss, reduzido = dano_arma_treino(mob_data.get('max_hp', mob_data['hp']), True), False, False, False
         
         # Arco com "ammo_save" (Raw Bow): chance de nao gastar a flecha.
-        if precisa_municao and random.random() * 100 < float(arma_principal(p).get('ammo_save', 0) or 0):
+        # Set Hunter completo: +10% em cima.
+        if precisa_municao and random.random() * 100 < float(arma_principal(p).get('ammo_save', 0) or 0) + bonus_set(p).get('ammo_save', 0.0):
             precisa_municao = False
         if precisa_municao:
             restante_municao, esgotou_municao = consumir_municao(p)
@@ -6566,8 +6638,7 @@ def handle_equip_item(data):
         if slot_do_item(alvo.get('item')) != slot: return
         # Item de outra classe: recusa (o client ja' trava o botao; a punicao
         # de _slots_com_classe_invalida fica pra quem ja' tinha equipado).
-        req_class = obter_req_class_item(alvo.get('item'))
-        if req_class != "All" and req_class != p.get('class_name', 'Knight'): return
+        if not classe_pode_usar(obter_req_class_item(alvo.get('item')), p.get('class_name', 'Knight')): return
         # Level minimo do item (antes nao era checado no servidor).
         try:
             if int(ITEM_DB.get(alvo.get('item'), {}).get('req_level', 0) or 0) > int(p.get('level', 1) or 1): return
@@ -6592,6 +6663,12 @@ def handle_equip_item(data):
         inventario.remove(alvo)
         if anterior is not None: inventario.append(anterior)
         equipados[slot] = alvo
+        # Arma de duas maos (Bronze Axe): sai o que estiver na outra mao.
+        if slot == 'MainHand' and ITEM_DB.get(alvo.get('item'), {}).get('two_handed') and isinstance(equipados.get('Hand'), dict):
+            inventario.append(equipados.pop('Hand'))
+        elif slot == 'Hand' and isinstance(equipados.get('MainHand'), dict) \
+                and ITEM_DB.get(equipados['MainHand'].get('item'), {}).get('two_handed'):
+            inventario.append(equipados.pop('MainHand'))
 
         p['inventory'] = inventario; p['equipped_items'] = equipados
         _queue_save(p)
@@ -8389,7 +8466,7 @@ def magia_disponivel_na_loja(p, item_path):
     dados = ITEM_DB.get(item_path, {})
     if item_path in magias_conhecidas(p): return False
     if int(p.get('level', 1) or 1) < int(dados.get('req_level', 0) or 0): return False
-    return dados.get('req_class', 'All') in ('All', p.get('class_name'))
+    return classe_pode_usar(dados.get('req_class', 'All'), p.get('class_name'))
 
 def magias_conhecidas(p):
     s = p.get('skills') if isinstance(p.get('skills'), dict) else {}

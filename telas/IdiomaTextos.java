@@ -448,6 +448,11 @@ final class IdiomaTextos {
             + "Trade	Troca	Intercambio\n"
             + "Message	Mensagem	Mensaje\n"
             + "1 day ago	h\u00e1 1 dia	hace 1 d\u00eda\n"
+            + "Bonus: {0}	B\u00f4nus: {0}	Bono: {0}\n"
+            + "Two-Handed	Duas m\u00e3os	Dos manos\n"
+            + "10% less damage taken while standing still	10% menos dano recebido parado	10% menos da\u00f1o recibido quieto\n"
+            + "+5% Crit Chance	+5% de chance de cr\u00edtico	+5% de probabilidad cr\u00edtica\n"
+            + "10% chance to save ammo	10% de chance de economizar muni\u00e7\u00e3o	10% de probabilidad de ahorrar munici\u00f3n\n"
         ,
     };
 }

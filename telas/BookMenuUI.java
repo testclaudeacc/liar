@@ -437,6 +437,8 @@ public final class BookMenuUI {
         final String efeitoAtaque, projetilAtaque; // "atk_hit"/"atk_proj": no lugar do da classe (Ruby Staff = fogo)
         final String conjunto; // set (ex: "Outlander"); null = nenhum
         final int conjuntoXp;  // % de XP extra com o set completo
+        final String conjuntoDesc; // "set_desc": bonus do set em texto (ex: "+5% Crit Chance")
+        final boolean duasMaos;    // "two_handed": tira o que estiver na outra mao
 
         EquipStats(JsonValue d) {
             this.magia = d.getString("spell", null);
@@ -461,6 +463,8 @@ public final class BookMenuUI {
             this.projetilAtaque = d.getString("atk_proj", null);
             this.conjunto = d.getString("set", null);
             this.conjuntoXp = d.getInt("set_xp", 0);
+            this.conjuntoDesc = d.getString("set_desc", null);
+            this.duasMaos = d.getBoolean("two_handed", false);
             this.cap = d.getFloat("cap", 0f);
             this.regenHp = d.getInt("regen_hp", 0);
             this.regenMp = d.getInt("regen_mp", 0);
@@ -876,6 +880,13 @@ public final class BookMenuUI {
         return criarPreenchimentoBarra(new Color(0.35f, 0.35f, 0.35f, 1f));
     }
 
+    /** req_class: "All", uma classe ou varias com "/" (ex: "Mage/Bard") - igual servidor.py::classe_pode_usar. */
+    static boolean classePode(String reqClass, String classe) {
+        if (reqClass == null || reqClass.isEmpty() || "All".equalsIgnoreCase(reqClass)) return true;
+        for (String c : reqClass.split("/")) if (c.equalsIgnoreCase(classe)) return true;
+        return false;
+    }
+
     private static Color corClasse(String classe) {
         if (classe == null) return Color.LIGHT_GRAY;
         switch (classe) {
@@ -1026,9 +1037,11 @@ public final class BookMenuUI {
         }
         bloco.add(linhaStat(tr("Req. Lv {0}", dados.reqLevel), COR_REQUISITO)).left().row();
         // Vermelho = classe errada (o servidor pune quem equipa item de outra classe).
-        boolean classeCerta = "All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass);
+        boolean classeCerta = classePode(dados.reqClass, classeJogador);
         bloco.add(linhaStat(("All".equals(dados.reqClass) ? tr("Universal") : dados.reqClass) + " " + dados.tipo,
-            classeCerta ? corClasse(dados.reqClass) : Color.valueOf("ff4a4a"))).left().row();
+            classeCerta ? corClasse(dados.reqClass.contains("/") ? classeJogador : dados.reqClass) : Color.valueOf("ff4a4a"))).left().row();
+        // Duas maos (Bronze Axe): sem escudo/offhand.
+        if (dados.duasMaos) bloco.add(linhaStat(tr("Two-Handed"), Color.LIGHT_GRAY)).left().row();
         adicionarLinhaStat(bloco, "Attack", dados.bonusDamage, base == null ? 0 : base.bonusDamage, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Defense", dados.defense, base == null ? 0 : base.defense, comparar, Color.WHITE);
         adicionarLinhaStat(bloco, "Armour", dados.armour, base == null ? 0 : base.armour, comparar, Color.WHITE);
@@ -1127,6 +1140,8 @@ public final class BookMenuUI {
             }
             linha.add(linhaStat(tr("Extra XP"), cor));
             bloco.add(linha).left().padTop(4).row();
+        } else if (dados.conjuntoDesc != null && !dados.conjuntoDesc.isEmpty()) {
+            bloco.add(linhaStat(tr("Bonus: {0}", tr(dados.conjuntoDesc)), completo ? COR_SET : COR_SET_OFF)).left().padTop(4).row();
         }
     }
 
@@ -1207,7 +1222,7 @@ public final class BookMenuUI {
     private boolean podeEquipar(String caminho) {
         EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
         if (dados == null) return true;
-        return ("All".equals(dados.reqClass) || classeJogador.equals(dados.reqClass)) && dados.reqLevel <= nivelAtual;
+        return classePode(dados.reqClass, classeJogador) && dados.reqLevel <= nivelAtual;
     }
 
     private void equiparSelecionado() {
@@ -4829,7 +4844,7 @@ public final class BookMenuUI {
             EquipStats d = e.getValue();
             if (d.magia == null || d.magia.isEmpty() || conheceMagia(e.getKey())) continue;
             if (d.reqLevel <= levelAntes || d.reqLevel > levelAgora) continue;
-            if (!"All".equalsIgnoreCase(d.reqClass) && !d.reqClass.equalsIgnoreCase(classeJogador)) continue;
+            if (!classePode(d.reqClass, classeJogador)) continue;
             lista.add(e.getKey());
         }
         return lista;
@@ -5066,7 +5081,7 @@ public final class BookMenuUI {
         String busca = mercadoBusca.getText().trim().toLowerCase();
         if (!busca.isEmpty() && !nomeExibicao(caminho).toLowerCase().contains(busca)) return false;
         int c = mercadoClasse.getSelectedIndex();
-        if (c >= 1 && c <= 4 && !("All".equals(d.reqClass) || FILTRO_CLASSES[c].equals(d.reqClass))) return false;
+        if (c >= 1 && c <= 4 && !classePode(d.reqClass, FILTRO_CLASSES[c])) return false;
         if (c == 5 && !"All".equals(d.reqClass)) return false;
         int n = mercadoNivel.getSelectedIndex();
         if (n >= 1) {
