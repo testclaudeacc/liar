@@ -13269,604 +13269,611 @@ ui/Brazil
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/ClassIcon
+ui/BronzeArrowProjectile
   rotate: false
   xy: 176, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/Confirm
+ui/ClassIcon
   rotate: false
   xy: 192, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/CritIcon
+ui/Confirm
   rotate: false
   xy: 208, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/DefenseIcon
+ui/CritIcon
   rotate: false
   xy: 224, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/Discord
+ui/DefenseIcon
   rotate: false
   xy: 240, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/DodgeIcon
+ui/Discord
   rotate: false
   xy: 256, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
-ui/FireProjectile
+ui/DodgeIcon
   rotate: false
   xy: 272, 912
+  size: 16, 16
+  orig: 16, 16
+  offset: 0, 0
+  index: -1
+ui/FireProjectile
+  rotate: false
+  xy: 288, 912
   size: 13, 9
   orig: 13, 9
   offset: 0, 0
   index: -1
 ui/FlintArrowProjectile
   rotate: false
-  xy: 288, 912
+  xy: 304, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/FocusIcon
   rotate: false
-  xy: 304, 912
+  xy: 320, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/GuildIcon
   rotate: false
-  xy: 320, 912
+  xy: 336, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/HPIcon
   rotate: false
-  xy: 336, 912
+  xy: 352, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/HungerIcon
   rotate: false
-  xy: 352, 912
+  xy: 368, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Joystick_Middle
   rotate: false
-  xy: 368, 912
+  xy: 384, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/KnightIcon
   rotate: false
-  xy: 384, 912
+  xy: 400, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Knight_Icon
   rotate: false
-  xy: 400, 912
+  xy: 416, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Logout
   rotate: false
-  xy: 416, 912
+  xy: 432, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/MPIcon
   rotate: false
-  xy: 432, 912
+  xy: 448, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/MageIcon
   rotate: false
-  xy: 448, 912
+  xy: 464, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Mage_Icon
   rotate: false
-  xy: 464, 912
+  xy: 480, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/ManaIcon
   rotate: false
-  xy: 480, 912
+  xy: 496, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/MeeleIcon
   rotate: false
-  xy: 496, 912
+  xy: 512, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/MusicalityIcon
   rotate: false
-  xy: 512, 912
+  xy: 528, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Negate
   rotate: false
-  xy: 528, 912
+  xy: 544, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/NextLevelIcon
   rotate: false
-  xy: 544, 912
+  xy: 560, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/NotificationIcon
   rotate: false
-  xy: 560, 912
+  xy: 576, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/OfflineIcon
   rotate: false
-  xy: 576, 912
+  xy: 592, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/OnlineIcon
   rotate: false
-  xy: 592, 912
+  xy: 608, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/PkIcon
   rotate: false
-  xy: 608, 912
+  xy: 624, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/PoisonProjectile
   rotate: false
-  xy: 624, 912
+  xy: 640, 912
   size: 13, 9
   orig: 13, 9
   offset: 0, 0
   index: -1
 ui/RangerIcon
   rotate: false
-  xy: 640, 912
+  xy: 656, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Ranger_Icon
   rotate: false
-  xy: 656, 912
+  xy: 672, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Red Mushroom
   rotate: false
-  xy: 672, 912
+  xy: 688, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Russian
   rotate: false
-  xy: 688, 912
+  xy: 704, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/SellerIcon
   rotate: false
-  xy: 704, 912
+  xy: 720, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/SettingsIcon
   rotate: false
-  xy: 720, 912
+  xy: 736, 912
   size: 11, 9
   orig: 11, 9
   offset: 0, 0
   index: -1
 ui/Spain
   rotate: false
-  xy: 736, 912
+  xy: 752, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Star
   rotate: false
-  xy: 752, 912
+  xy: 768, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/ThornSeed
   rotate: false
-  xy: 768, 912
+  xy: 784, 912
   size: 15, 15
   orig: 15, 15
   offset: 0, 0
   index: -1
 ui/TimeIcon
   rotate: false
-  xy: 784, 912
+  xy: 800, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/TotalKills
   rotate: false
-  xy: 800, 912
+  xy: 816, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/TotalXP
   rotate: false
-  xy: 816, 912
+  xy: 832, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Trash
   rotate: false
-  xy: 832, 912
+  xy: 848, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Wasp_Wing
   rotate: false
-  xy: 848, 912
+  xy: 864, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/Wolf_Fur
   rotate: false
-  xy: 864, 912
+  xy: 880, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/XPIcon
   rotate: false
-  xy: 880, 912
+  xy: 896, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Aqua Lyre
   rotate: false
-  xy: 896, 912
+  xy: 912, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Bard
   rotate: false
-  xy: 912, 912
+  xy: 928, 912
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Demon Horn
   rotate: false
-  xy: 928, 912
+  xy: 0, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Knight
   rotate: false
-  xy: 0, 928
+  xy: 16, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Mage
   rotate: false
-  xy: 16, 928
+  xy: 32, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Ornated Wooden Flute
   rotate: false
-  xy: 32, 928
+  xy: 48, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Primite Wooden Flute
   rotate: false
-  xy: 48, 928
+  xy: 64, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Ranger
   rotate: false
-  xy: 64, 928
+  xy: 80, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Ruby Necklace
   rotate: false
-  xy: 80, 928
+  xy: 96, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Ruby Ring
   rotate: false
-  xy: 96, 928
+  xy: 112, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/Wooden Lyre
   rotate: false
-  xy: 112, 928
+  xy: 128, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/armas/wooden rattle
   rotate: false
-  xy: 128, 928
+  xy: 144, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/buttons/IconBtn
   rotate: false
-  xy: 144, 928
+  xy: 160, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/buttons/IgnoreBtn
   rotate: false
-  xy: 160, 928
+  xy: 176, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/currency/BagIcon
   rotate: false
-  xy: 176, 928
+  xy: 192, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/currency/BasicBag
   rotate: false
-  xy: 192, 928
+  xy: 208, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/currency/Copper
   rotate: false
-  xy: 208, 928
+  xy: 224, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/currency/Gold
   rotate: false
-  xy: 224, 928
+  xy: 240, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/currency/GoldBag
   rotate: false
-  xy: 240, 928
+  xy: 256, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/currency/Platinum
   rotate: false
-  xy: 256, 928
+  xy: 272, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/currency/Silver
   rotate: false
-  xy: 272, 928
+  xy: 288, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Arrow1
   rotate: false
-  xy: 288, 928
+  xy: 304, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Bleed
   rotate: false
-  xy: 304, 928
+  xy: 320, 928
   size: 9, 8
   orig: 9, 8
   offset: 0, 0
   index: -1
 ui/items/Blood1
   rotate: false
-  xy: 320, 928
+  xy: 336, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Blood2
   rotate: false
-  xy: 336, 928
+  xy: 352, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Blood3
   rotate: false
-  xy: 352, 928
+  xy: 368, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/HitHitbox
   rotate: false
-  xy: 368, 928
+  xy: 384, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Mana_2
   rotate: false
-  xy: 384, 928
+  xy: 400, 928
   size: 16, 9
   orig: 16, 9
   offset: 0, 0
   index: -1
 ui/items/Music1_1
   rotate: false
-  xy: 400, 928
+  xy: 416, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/RattleProjectile
   rotate: false
-  xy: 416, 928
+  xy: 432, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterArrow
   rotate: false
-  xy: 432, 928
+  xy: 448, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterBook
   rotate: false
-  xy: 448, 928
+  xy: 464, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterBow
   rotate: false
-  xy: 464, 928
+  xy: 480, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterFlute
   rotate: false
-  xy: 480, 928
+  xy: 496, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterMusicsheet
   rotate: false
-  xy: 496, 928
+  xy: 512, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterShield
   rotate: false
-  xy: 512, 928
+  xy: 528, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterStaff
   rotate: false
-  xy: 528, 928
+  xy: 544, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/StarterSword
   rotate: false
-  xy: 544, 928
+  xy: 560, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/items/Trade
   rotate: false
-  xy: 560, 928
+  xy: 576, 928
   size: 9, 8
   orig: 9, 8
   offset: 0, 0
   index: -1
 ui/party/Leader
   rotate: false
-  xy: 576, 928
+  xy: 592, 928
   size: 16, 16
   orig: 16, 16
   offset: 0, 0
   index: -1
 ui/slots/ShieldSlot
   rotate: false
-  xy: 592, 928
+  xy: 608, 928
   size: 15, 15
   orig: 15, 15
   offset: 0, 0
