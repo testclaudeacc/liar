@@ -5612,9 +5612,14 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Largura de 1 quadro da sheet: as sheets completas tem 11 quadros
      * (16x16 -> 176 de largura, 32x32 -> 352). Fora disso, 16. */
+    /** Largura de 1 quadro: a sheet tem 11 quadros (padrao) ou 13 (lados com
+     * 2 passos, ver QUADROS_SHEET_LADOS_EXTRA) numa fileira so', de qualquer
+     * tamanho (16x16, 32x32, 40x32...). Sem bater com 11 nem 13: 16px. */
     private static int larguraQuadro(TextureRegion tex) {
         int w = tex.getRegionWidth();
-        return w % 11 == 0 && w / 11 >= FRAME_LARGURA ? w / 11 : FRAME_LARGURA;
+        if (w % 11 == 0 && w / 11 >= FRAME_LARGURA) return w / 11;
+        if (w % QUADROS_SHEET_LADOS_EXTRA == 0 && w / QUADROS_SHEET_LADOS_EXTRA >= FRAME_LARGURA) return w / QUADROS_SHEET_LADOS_EXTRA;
+        return FRAME_LARGURA;
     }
 
     private TextureRegion[] regioes(TextureRegion tex, int[] indices) {
