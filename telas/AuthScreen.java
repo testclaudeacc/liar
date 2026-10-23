@@ -746,6 +746,7 @@ public class AuthScreen extends ScreenAdapter {
      * so' cadastra depois de marcar o aceite; a versao aceita vai junto pro /register. */
     private void telaTermos(String em, String pw) {
         limparConteudo();
+        ocultarTitulo(); // janela alta: sem o "MITERA ONLINE" ela sobe e o rodape nao e' empurrado
         Label texto = new Label(TermosTexto.texto(Idioma.atual()), skin);
         texto.setWrap(true);
         texto.setAlignment(Align.topLeft);
