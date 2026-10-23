@@ -4650,8 +4650,18 @@ def formatar_duracao(seg):
     if seg >= 60: return _u(int(math.ceil(seg / 60)), "minute")
     return _u(seg, "second")
 
+def conta_admin(c, user_id):
+    """A CONTA e' de admin (qualquer personagem dela)? Com ADMIN_USER_IDS no .env
+    vale o id; sem ele, ter um personagem com nome de admin."""
+    if ADMIN_USER_IDS: return str(user_id) in ADMIN_USER_IDS
+    c.execute("SELECT 1 FROM characters WHERE user_id = %s AND LOWER(name) = ANY(%s) LIMIT 1",
+              (user_id, list(ADMIN_NOMES)))
+    return c.fetchone() is not None
+
 def punicao_da_conta(c, user_id, tipo):
-    """(fim, motivo) do ban/mute ativo da conta, ou None. tipo: 'ban' ou 'mute'."""
+    """(fim, motivo) do ban/mute ativo da conta, ou None. tipo: 'ban' ou 'mute'.
+    Conta de admin nunca fica presa (mesmo que um ban tenha passado antes)."""
+    if conta_admin(c, user_id): return None
     c.execute(f"SELECT {tipo}_until, {tipo}_reason FROM users WHERE id = %s", (user_id,))
     row = c.fetchone()
     if row and row[0] and float(row[0]) > time.time(): return float(row[0]), row[1] or ""
@@ -4718,7 +4728,8 @@ def _comando_punicao(sid, cmd, partes):
             if not motivo:
                 chat_sistema(sid, "Missing reason: rule code (1a, 2b... see /rules) or Other <text>.", 'red')
                 return
-        if eh_admin({'name': nome, 'user_id': user_id}):
+        # Conta inteira (nao so' o personagem): um alt da conta do admin tambem e' protegido.
+        if conta_admin(c, user_id):
             chat_sistema(sid, "Can't punish an admin account.", 'red')
             return
         fim = 0.0 if tirar else time.time() + (PUNICAO_PERMANENTE_SEG if segundos is None else segundos)
