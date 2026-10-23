@@ -12,7 +12,7 @@ def versaoCodigo = versao[1].toInteger() * 1000 + versao[2].toInteger()
 // storeFile, storePassword, keyAlias, keyPassword. Sem ele, o release sai sem assinar.
 def arquivoKeystore = rootProject.file('keystore.properties')
 def keystore = new Properties()
-if (arquivoKeystore.exists()) arquivoKeystore.withInputStream { keystore.load(it) }
+if (arquivoKeystore.exists()) arquivoKeystore.withReader('UTF-8') { keystore.load(it) }  // UTF-8: senha com simbolo (§, ª, º...) le certo
 
 android {
     // ID do app (tipo o "CPF" dele no Android). Defina em gradle.properties
