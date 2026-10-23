@@ -253,9 +253,6 @@ NPC_DB = {
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Ranger/SecondHand/StarterArrow.tres", "res://sprites/items/Ranger/SecondHand/FlintArrow.tres",
         "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres",
-    # Joias lv 20: sem ADC, universais (mana/defesa pela classe, 2x a Ruby).
-    "res://sprites/items/Jewelry/BronzeRing.tres": {"name": "Bronze Ring", "type": "Ring", "slot": "Ring", "req_level": 20, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "universal": True, "universal_mult": 2, "price": 2000, "icon": "sheet/r64_c10", "cap": 0.5},
-    "res://sprites/items/Jewelry/BronzeNecklace.tres": {"name": "Bronze Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 20, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "universal": True, "universal_mult": 2, "price": 2000, "icon": "sheet/r1_c5", "cap": 0.5},
         "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
         "res://sprites/items/Bard/Weapons/RawFlute.tres", "res://sprites/items/Ranger/Weapons/RawBow.tres",
         "res://sprites/items/Outlander/OutlanderHelm.tres", "res://sprites/items/Outlander/OutlanderCape.tres",
@@ -577,6 +574,9 @@ ITEM_DB = {
     "res://sprites/items/Hunter/HunterBoots.tres": {"name": "Hunter Boots", "type": "Boots", "slot": "Boots", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 1, "armour": 3, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Hunter", "set_bonus": {"ammo_save": 10}, "set_desc": "10% chance to save ammo", "price": 400, "icon": "sheet/r10_c8", "cap": 7.0},
     "res://sprites/items/Ranger/Weapons/BronzeBow.tres": {"name": "Bronze Bow", "type": "Bow", "slot": "MainHand", "req_level": 20, "req_class": "Ranger", "bonus_damage": 7, "defense": 0, "armour": 0, "stamina": 30, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 7, "price": 2500, "icon": "sheet/r93_c14", "cap": 15.0},
     "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres": {"name": "Bronze Arrow", "type": "Arrow", "slot": "Hand", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "armour": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 12, "ammo": True, "max_stack": 9999, "atk_proj": "res://ui/BronzeArrowProjectile.png", "price": 4, "icon": "sheet/r90_c10", "cap": 0.1},
+    # Joias lv 20: sem ADC, universais (mana/defesa pela classe, 2x a Ruby).
+    "res://sprites/items/Jewelry/BronzeRing.tres": {"name": "Bronze Ring", "type": "Ring", "slot": "Ring", "req_level": 20, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "universal": True, "universal_mult": 2, "price": 2000, "icon": "sheet/r64_c10", "cap": 0.5},
+    "res://sprites/items/Jewelry/BronzeNecklace.tres": {"name": "Bronze Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 20, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "universal": True, "universal_mult": 2, "price": 2000, "icon": "sheet/r1_c5", "cap": 0.5},
 }
 
 # Armour das pecas de set (Helm/Chest/Gloves/Boots) por formula, nao a mao:
