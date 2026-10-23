@@ -1096,7 +1096,10 @@ public class WorldScreen extends ScreenAdapter {
         spriteBase = atlas.findRegion("sprites/base/BaseSoul");
         animacaoBase = criarAnimacao(spriteBase);
 
-        notifChat = atlas.findRegion("sprites/notifications/Chat");
+        // Balao de chat 16x16 (96,832 no atlas), desenhado pequeno igual o icone
+        // de veneno/sangue, mas do lado DIREITO do player. Sem ele: o antigo.
+        notifChat = atlas.findRegion("sheet/r83_c6");
+        if (notifChat == null) notifChat = atlas.findRegion("sprites/notifications/Chat");
         iconeLiderParty = atlas.findRegion("ui/party/PT_Crown");
         balaoTrade = atlas.findRegion("ui/items/Trade");
         iconeMembroParty = atlas.findRegion("ui/party/PT_Shield");
@@ -4826,8 +4829,18 @@ public class WorldScreen extends ScreenAdapter {
         if (npc == null || notifChat == null) return;
         float ancoraX = Math.round(npc.movimento.x / camera.zoom) * camera.zoom;
         float ancoraY = Math.round(npc.movimento.y / camera.zoom) * camera.zoom;
-        batch.draw(notifChat, ancoraX + 2f, ancoraY + 9.5f,
-            notifChat.getRegionWidth(), notifChat.getRegionHeight());
+        desenharBalao(notifChat, ancoraX, ancoraY);
+    }
+
+    /** Balaozinho ao lado da cabeca (ancora = pes, ja' no grid da camera). O de
+     * chat vai reduzido (TAM_ICONE_SANGRA) no espelho do icone de veneno/sangue
+     * (que fica a esquerda); settings/menu/trade seguem no tamanho original. */
+    private void desenharBalao(TextureRegion balao, float ancoraX, float ancoraY) {
+        if (balao == notifChat) {
+            batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, TAM_ICONE_SANGRA, TAM_ICONE_SANGRA);
+        } else {
+            batch.draw(balao, ancoraX + 2f, ancoraY + 9.5f, balao.getRegionWidth(), balao.getRegionHeight());
+        }
     }
 
     /** Grade de colisao completa (32px/SQM, mesmo formato que
@@ -5149,18 +5162,14 @@ public class WorldScreen extends ScreenAdapter {
         desenharBalaoInteracaoNPC(npcMaisProximoParaConversar());
         TextureRegion notifAtual = notificacaoAtual();
         if (notifAtual != null) {
-            float nx = local.x + 2f;
-            float ny = local.y + 9.5f;
-            batch.draw(notifAtual, nx, ny, notifAtual.getRegionWidth(), notifAtual.getRegionHeight());
+            desenharBalao(notifAtual, Math.round(local.x / camera.zoom) * camera.zoom, Math.round(local.y / camera.zoom) * camera.zoom);
         }
         desenharIconeParty(local);
         for (Jogador j : remotos.values()) desenharIconeParty(j);
         for (Jogador j : remotos.values()) {
             TextureRegion balao = convitesTrade.contains(j.nome) && balaoTrade != null ? balaoTrade : balaoRemoto(j.nome);
             if (balao == null || estaMorto(j)) continue;
-            float bx = Math.round(j.x / camera.zoom) * camera.zoom + 2f;
-            float by = Math.round(j.y / camera.zoom) * camera.zoom + 9.5f;
-            batch.draw(balao, bx, by, balao.getRegionWidth(), balao.getRegionHeight());
+            desenharBalao(balao, Math.round(j.x / camera.zoom) * camera.zoom, Math.round(j.y / camera.zoom) * camera.zoom);
         }
         enviarEstadoBalao();
         atualizarBotoesPainel();
