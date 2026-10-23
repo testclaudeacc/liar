@@ -1004,6 +1004,9 @@ public class WorldScreen extends ScreenAdapter {
     // uma tela de verdade ainda (BookMenu nao foi portado), entao o proprio
     // clique no botao liga/desliga esse flag.
     private TextureRegion notifChat, notifConfig, notifMenu;
+    /** Quadros do balao de chat animado (null = balao parado). */
+    private TextureRegion[] quadrosChat;
+    private static final float QUADRO_CHAT_SEG = 0.25f;
     /** Balao com X: em cima do corpo de quem saiu do jogo em battle (servidor: is_away). */
     private TextureRegion notifSaiu;
     /** Baloes no estilo do de chat (ui/baloes/), desenhados na metade do tamanho. */
@@ -1107,8 +1110,18 @@ public class WorldScreen extends ScreenAdapter {
 
         // Balao de chat 16x16 (96,832 no atlas), desenhado pequeno igual o icone
         // de veneno/sangue, mas do lado DIREITO do player. Sem ele: o antigo.
-        notifChat = atlas.findRegion("sheet/r83_c6");
-        if (notifChat == null) notifChat = atlas.findRegion("sprites/notifications/Chat");
+        // Chat animado (ui/baloes/BalaoChat: tira de 3 quadros, bolinhas pulando).
+        // Sem ele: o balao 16x16 de 96,832, e por ultimo o antigo.
+        TextureRegion tiraChat = atlas.findRegion("ui/baloes/BalaoChat");
+        if (tiraChat != null) {
+            int l = tiraChat.getRegionWidth() / 3;
+            quadrosChat = new TextureRegion[3];
+            for (int i = 0; i < 3; i++) quadrosChat[i] = new TextureRegion(tiraChat, i * l, 0, l, tiraChat.getRegionHeight());
+            notifChat = quadrosChat[0];
+        } else {
+            notifChat = atlas.findRegion("sheet/r83_c6");
+            if (notifChat == null) notifChat = atlas.findRegion("sprites/notifications/Chat");
+        }
         iconeLiderParty = atlas.findRegion("ui/party/PT_Crown");
         balaoTrade = regiaoOu("ui/baloes/BalaoTrade", "ui/items/Trade");
         iconeMembroParty = atlas.findRegion("ui/party/PT_Shield");
@@ -4855,7 +4868,10 @@ public class WorldScreen extends ScreenAdapter {
      * chat vai reduzido (TAM_ICONE_SANGRA) no espelho do icone de veneno/sangue
      * (que fica a esquerda); settings/menu/trade seguem no tamanho original. */
     private void desenharBalao(TextureRegion balao, float ancoraX, float ancoraY) {
-        if (balao == notifChat || baloesPequenos.contains(balao)) {
+        if (balao == notifChat && quadrosChat != null) {
+            balao = quadrosChat[(int) (com.badlogic.gdx.utils.TimeUtils.millis() / (long) (QUADRO_CHAT_SEG * 1000f)) % quadrosChat.length];
+            batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, balao.getRegionWidth() / 2f, balao.getRegionHeight() / 2f);
+        } else if (balao == notifChat || baloesPequenos.contains(balao)) {
             // Metade do tamanho do sprite (o de chat 16x16 vira 8x8; os de
             // settings/inventario/trade/logout, 26x25, ficam 13x12.5).
             batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, balao.getRegionWidth() / 2f, balao.getRegionHeight() / 2f);
