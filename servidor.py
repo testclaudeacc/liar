@@ -3326,24 +3326,11 @@ def enviar_email_verificacao(email, link):
         server.sendmail(GMAIL_SENDER, email, msg.as_string())
 
 # ---------------------------------------------------------------------------
-# TERMOS DE USO: textos em termos/termos_<idioma>.txt (pt, en, es). Mudou o
-# texto de verdade? Suba TERMOS_VERSAO (o cadastro grava qual versao foi aceita).
+# TERMOS DE USO: o texto fica no client (telas/TermosTexto.java, gerado de
+# termos/*.txt por tools/gerar_termos.py). Aqui so' a versao: mudou o texto de
+# verdade? Suba TERMOS_VERSAO e rode o gerador (o cadastro grava a versao aceita).
 # ---------------------------------------------------------------------------
 TERMOS_VERSAO = "2026-10-23"
-_PASTA_TERMOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'termos')
-
-def texto_termos(idioma):
-    idioma = idioma if idioma in ('pt', 'en', 'es') else 'en'
-    try:
-        with open(os.path.join(_PASTA_TERMOS, f'termos_{idioma}.txt'), encoding='utf-8') as f:
-            return f.read()
-    except OSError:
-        traceback.print_exc()
-        return ""
-
-@app.route('/terms', methods=['GET'])
-def terms():
-    return jsonify({"version": TERMOS_VERSAO, "text": texto_termos(str(request.args.get('lang') or 'en')[:5])}), 200
 
 def _criar_pendente(c, email, hashed_password, termos=None):
     """Grava/troca o cadastro pendente com um token novo (o link anterior deixa de valer).

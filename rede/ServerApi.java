@@ -49,10 +49,6 @@ public class ServerApi {
         post("/register", body, callback);
     }
 
-    /** Termos de Uso no idioma ("pt", "en", "es"): {version, text}. */
-    public static void getTerms(String lang, ApiCallback callback) {
-        get("/terms?lang=" + lang, callback);
-    }
 
     /** Manda outro link de verificacao (o anterior expira). */
     public static void resendVerification(String email, ApiCallback callback) {

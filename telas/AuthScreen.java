@@ -742,11 +742,11 @@ public class AuthScreen extends ScreenAdapter {
         definirRodape(voltarBtn, criarBtn);
     }
 
-    /** Termos de Uso (texto vem do servidor, no idioma atual): so' cadastra
-     * depois de marcar o aceite; a versao aceita vai junto pro /register. */
+    /** Termos de Uso (texto embutido no client, TermosTexto, no idioma atual):
+     * so' cadastra depois de marcar o aceite; a versao aceita vai junto pro /register. */
     private void telaTermos(String em, String pw) {
         limparConteudo();
-        Label texto = new Label(tr("Loading..."), skin);
+        Label texto = new Label(TermosTexto.texto(Idioma.atual()), skin);
         texto.setWrap(true);
         texto.setAlignment(Align.topLeft);
         Table caixaTexto = new Table();
@@ -755,7 +755,7 @@ public class AuthScreen extends ScreenAdapter {
         ScrollPane rolagem = new ScrollPane(caixaTexto, skin);
         rolagem.setFadeScrollBars(false);
         rolagem.setScrollingDisabled(true, false);
-        String[] versao = {null};
+        String[] versao = {TermosTexto.VERSAO};
 
         CheckBox.CheckBoxStyle estiloCheck = new CheckBox.CheckBoxStyle();
         TextureAtlas.AtlasRegion on = atlas.findRegion("ui/Gui_checkbox_mark"), off = atlas.findRegion("ui/Gui_button_Press");
@@ -766,6 +766,8 @@ public class AuthScreen extends ScreenAdapter {
         CheckBox aceito = new CheckBox(" " + tr("I have read and agree to the Terms of Use"), estiloCheck);
         aceito.getImageCell().size(mobile ? 36 : 28);
         aceito.getLabel().setWrap(true);
+        // Com wrap o label precisa de largura fixa (sem ela quebrava letra por letra).
+        aceito.getLabelCell().width((mobile ? 620 : 520) - (mobile ? 56 : 46)).left();
 
         Table painel = criarPainel();
         Label titulo = new Label(tr("Terms of Use"), skin);
@@ -784,19 +786,6 @@ public class AuthScreen extends ScreenAdapter {
         Runnable atualizar = () -> criarBtn.setDisabled(!aceito.isChecked() || versao[0] == null);
         aceito.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { atualizar.run(); }
-        });
-        String idioma = Idioma.atual() == 1 ? "pt" : Idioma.atual() == 2 ? "es" : "en";
-        ServerApi.getTerms(idioma, new ServerApi.ApiCallback() {
-            @Override public void onResponse(int statusCode, JsonValue body) {
-                if (statusCode == 200 && body != null && !body.getString("text", "").isEmpty()) {
-                    texto.setText(body.getString("text", ""));
-                    versao[0] = body.getString("version", null);
-                } else {
-                    texto.setText(tr("Could not load the Terms of Use. Try again later."));
-                }
-                atualizar.run();
-            }
-            @Override public void onFailure(String motivo) { texto.setText(Idioma.trServidor(motivo)); }
         });
         criarBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
