@@ -1007,8 +1007,10 @@ public class WorldScreen extends ScreenAdapter {
     /** Quadros do balao de chat animado (null = balao parado). */
     private TextureRegion[] quadrosChat;
     private static final float QUADRO_CHAT_SEG = 0.25f;
-    /** Baloes de ui/baloes/ (26x24) desenhados a 1/3: ~9x8, do tamanho do balao de chat antigo. */
-    private static final float ESCALA_BALAO = 1f / 3f;
+    /** Baloes de ui/baloes/ (26x24) desenhados pequenos: ~7x6.5. */
+    private static final float ESCALA_BALAO = 0.27f;
+    /** Altura do pe' do balao acima da ancora (pes) do personagem. */
+    private static final float ALTURA_BALAO = 13f;
     /** Balao com X: em cima do corpo de quem saiu do jogo em battle (servidor: is_away). */
     private TextureRegion notifSaiu;
     /** Baloes no estilo do de chat (ui/baloes/), desenhados na metade do tamanho. */
@@ -4873,9 +4875,9 @@ public class WorldScreen extends ScreenAdapter {
         if (balao == notifChat && quadrosChat != null) {
             // Resto da divisao ainda em long (o (int) antes estourava pra negativo -> indice -1).
             balao = quadrosChat[(int) ((com.badlogic.gdx.utils.TimeUtils.millis() / (long) (QUADRO_CHAT_SEG * 1000f)) % quadrosChat.length)];
-            batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, balao.getRegionWidth() * ESCALA_BALAO, balao.getRegionHeight() * ESCALA_BALAO);
+            batch.draw(balao, ancoraX + 1f, ancoraY + ALTURA_BALAO, balao.getRegionWidth() * ESCALA_BALAO, balao.getRegionHeight() * ESCALA_BALAO);
         } else if (baloesPequenos.contains(balao)) {
-            batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, balao.getRegionWidth() * ESCALA_BALAO, balao.getRegionHeight() * ESCALA_BALAO);
+            batch.draw(balao, ancoraX + 1f, ancoraY + ALTURA_BALAO, balao.getRegionWidth() * ESCALA_BALAO, balao.getRegionHeight() * ESCALA_BALAO);
         } else if (balao == notifChat) {
             // Balao 16x16 antigo (sem o BalaoChat no atlas): 8x8.
             batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, balao.getRegionWidth() / 2f, balao.getRegionHeight() / 2f);
