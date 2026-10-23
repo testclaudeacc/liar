@@ -3572,8 +3572,8 @@ def get_characters():
         if ban:
             restante = ban[0] - time.time()
             return jsonify({"banned": {"reason": ban[1], "remaining": int(restante),
-                                       "permanent": ban[0] >= PUNICAO_PERMANENTE,
-                                       "duration": formatar_duracao(None if ban[0] >= PUNICAO_PERMANENTE else restante)}}), 403
+                                       "permanent": punicao_permanente(ban[0]),
+                                       "duration": formatar_duracao(restante)}}), 403
         c.execute("SELECT name, class_name, level, exp, pos_x, pos_y, direction, skins, floor, inventory, equipped_items, skills, time_played, npc_dialogue_state FROM characters WHERE user_id = %s AND deleted_at IS NULL ORDER BY id ASC", (user_id,))
         char_list = []
         for row in c.fetchall():
@@ -3619,7 +3619,7 @@ def delete_character():
         if str(dados['name']) in players_by_name: return jsonify({"erro": "Character is online."}), 409
         # Nao apaga de verdade: renomeia pra "<nome>#del#<aleatorio>" e marca
         # deleted_at. Some da selecao de personagens, do ranking e libera o
-        # nome; da' pra recuperar no banco (ver RECUPERAR_PERSONAGEM.md).
+        # nome; o admin recupera com /restore por APAGADO_DIAS (depois some de vez).
         nome_antigo = str(dados['name'])
         nome_apagado = f"{nome_antigo}#del#{secrets.token_hex(6)}"
         c.execute("""UPDATE characters SET name = %s, deleted_at = %s
@@ -4437,11 +4437,12 @@ ADMIN_COMANDOS = [
     ("npcs", "/npcs", "NPCs lidos do mapa e se estao ativos"),
     ("mobs", "/mobs", "lista os mobs (nomes pro /summons)"),
     ("summons", "/summons <mob> [quantidade]", "cria mobs nos SQMs livres em volta (nao renascem)"),
-    ("ban", "/ban <nome> <tempo> <regra|Other motivo>", "bane a conta (ex: /ban Lukan 30 days 1a; tempo: 1 week, 2 meses, 1 ano, perm)"),
+    ("ban", "/ban <nome> <tempo> <regra|Other motivo>", "bane a conta (ex: /ban Lukan 30 days 1a, /ban Lukan 1a perma; tempo: 1 week, 2 meses, 1 ano)"),
     ("unban", "/unban <nome>", "tira o ban da conta"),
     ("mute", "/mute <nome> <tempo> <regra|Other motivo>", "muta a conta no chat (ex: /mute Lukan 1 week 2a)"),
     ("unmute", "/unmute <nome>", "tira o mute da conta"),
     ("rules", "/rules", "lista as regras (codigos pro /ban e /mute)"),
+    ("restore", "/restore [nome]", "volta um personagem apagado (ate' 30 dias) pra conta dele; sem nome lista os apagados"),
     ("level", "/level <1-1000>", "muda seu level (sobe ou desce; XP vai pro inicio do level)"),
     ("speed", "/speed <valor>|reset", "multiplica sua velocidade (fica salvo); reset volta ao normal"),
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
@@ -4562,7 +4563,12 @@ REGRAS = {
     "5b": "5b. Doxxing: Sharing personal and confidential information of others without their consent.",
     "6a": "6a. Multi-Accounting and Trading: Multiple accounts per IP are allowed, but playing simultaneously on multiple accounts is forbidden. Account sharing is punishable. Character trading is strictly limited to the official system; outside trading results in a ban.",
 }
-PUNICAO_PERMANENTE = 4102444800.0  # 2100-01-01: "perm"
+# "perm"/"perma": 100 anos (na pratica, pra sempre). Mais de 50 anos = mostra "permanent".
+PUNICAO_PERMANENTE_SEG = 100 * 365 * 86400
+PUNICAO_PERMANENTE_LIMIAR = 50 * 365 * 86400
+
+def punicao_permanente(fim):
+    return fim - time.time() > PUNICAO_PERMANENTE_LIMIAR
 _UNIDADES_TEMPO = (
     (('min', 'mins', 'minute', 'minutes', 'minuto', 'minutos', 'm'), 60),
     (('h', 'hour', 'hours', 'hora', 'horas'), 3600),
@@ -4577,7 +4583,7 @@ def _ler_duracao(partes, i):
     Devolve (segundos ou None = permanente, proximo indice) ou (False, i)."""
     if i >= len(partes): return False, i
     t = partes[i].lower()
-    if t in ('perm', 'permanent', 'permanente', 'forever'): return None, i + 1
+    if t in ('perm', 'perma', 'permanent', 'permanente', 'forever'): return None, i + 1
     m = re.match(r'^(\d+)([a-zçê]*)$', t)
     if not m: return False, i
     n, unidade, prox = int(m.group(1)), m.group(2), i + 1
@@ -4596,7 +4602,7 @@ def _ler_motivo(partes):
 
 def formatar_duracao(seg):
     """Tempo restante pro jogador: "1 year", "2 months", "1 week", "3 days"..."""
-    if seg is None or seg > 50 * 365 * 86400: return "permanent"
+    if seg is None or seg > PUNICAO_PERMANENTE_LIMIAR: return "permanent"
     seg = max(1, int(math.ceil(seg)))
     def _u(n, nome): return f"{n} {nome}" + ("" if n == 1 else "s")
     if seg >= 365 * 86400: return _u(seg // (365 * 86400), "year")
@@ -4614,41 +4620,66 @@ def punicao_da_conta(c, user_id, tipo):
     if row and row[0] and float(row[0]) > time.time(): return float(row[0]), row[1] or ""
     return None
 
+def _achar_personagem(c, partes, i):
+    """Nome do personagem a partir de partes[i] (pode ter espaco): tenta o mais
+    comprido que existe. (user_id, nome, proximo indice) ou None."""
+    for n in range(min(3, len(partes) - i), 0, -1):
+        nome = ' '.join(partes[i:i + n])
+        c.execute("SELECT user_id, name FROM characters WHERE LOWER(name) = LOWER(%s) AND deleted_at IS NULL", (nome,))
+        row = c.fetchone()
+        if row: return row[0], row[1], i + n
+    return None
+
+def _separar_tempo_e_motivo(resto):
+    """Tempo antes ou depois do motivo: "30 days 1a" ou "1a perma".
+    (segundos ou None = permanente, motivo) ou (False, None)."""
+    d, k = _ler_duracao(resto, 0)
+    if d is not False: return d, _ler_motivo(resto[k:])
+    for ini in (len(resto) - 2, len(resto) - 1):
+        if ini < 1: continue
+        d, k = _ler_duracao(resto, ini)
+        if d is not False and k == len(resto): return d, _ler_motivo(resto[:ini])
+    return False, None
+
+def _log_admin(p, texto):
+    """Toda acao de admin fica em admin_log.txt (quem, quando, o que)."""
+    try:
+        with open(ADMIN_LOG_ARQUIVO, 'a', encoding='utf-8') as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}\t{p.get('name', '?')} (user {p.get('user_id', '?')})\t{texto}\n")
+    except Exception:
+        traceback.print_exc()
+
+ADMIN_LOG_ARQUIVO = 'admin_log.txt'
+
 def _comando_punicao(sid, cmd, partes):
     """/ban, /mute, /unban, /unmute: acha a conta pelo nome do personagem."""
     tipo = 'ban' if cmd in ('ban', 'unban') else 'mute'
     tirar = cmd.startswith('un')
     if len(partes) < 2:
-        chat_sistema(sid, next(u for c_, u, _ in ADMIN_COMANDOS if c_ == cmd), 'red')
+        chat_sistema(sid, "Usage: " + next(u for c_, u, _ in ADMIN_COMANDOS if c_ == cmd), 'red')
         return
-    # Nome pode ter espaco: vai ate' o tempo (ou ate' o fim, no unban/unmute).
-    if tirar:
-        nome, segundos, motivo = ' '.join(partes[1:]), 0, None
-    else:
-        j = next((k for k in range(2, len(partes)) if _ler_duracao(partes, k)[0] is not False), None)
-        if j is None:
-            chat_sistema(sid, "Missing time. Ex: /" + cmd + " Lukan 30 days 1a  (perm = permanent)", 'red')
-            return
-        nome = ' '.join(partes[1:j])
-        segundos, k = _ler_duracao(partes, j)
-        motivo = _ler_motivo(partes[k:])
-        if not motivo:
-            chat_sistema(sid, "Missing reason: rule code (1a, 2b... see /rules) or Other <text>.", 'red')
-            return
     conn = None
     try:
         conn = db_pool.getconn()
         c = conn.cursor()
-        c.execute("SELECT user_id, name FROM characters WHERE LOWER(name) = LOWER(%s) AND deleted_at IS NULL", (nome,))
-        row = c.fetchone()
-        if not row:
-            chat_sistema(sid, f"Character '{nome}' not found.", 'red')
+        achado = _achar_personagem(c, partes, 1)
+        if not achado:
+            chat_sistema(sid, f"Character '{partes[1]}' not found.", 'red')
             return
-        user_id, nome = row
+        user_id, nome, k = achado
+        segundos, motivo = 0, None
+        if not tirar:
+            segundos, motivo = _separar_tempo_e_motivo(partes[k:])
+            if segundos is False:
+                chat_sistema(sid, f"Missing time. Ex: /{cmd} {nome} 30 days 1a  |  /{cmd} {nome} 1a perma", 'red')
+                return
+            if not motivo:
+                chat_sistema(sid, "Missing reason: rule code (1a, 2b... see /rules) or Other <text>.", 'red')
+                return
         if eh_admin({'name': nome, 'user_id': user_id}):
             chat_sistema(sid, "Can't punish an admin account.", 'red')
             return
-        fim = 0.0 if tirar else (PUNICAO_PERMANENTE if segundos is None else time.time() + segundos)
+        fim = 0.0 if tirar else time.time() + (PUNICAO_PERMANENTE_SEG if segundos is None else segundos)
         c.execute(f"UPDATE users SET {tipo}_until = %s, {tipo}_reason = %s WHERE id = %s", (fim, motivo, user_id))
         conn.commit()
         c.close()
@@ -4658,7 +4689,7 @@ def _comando_punicao(sid, cmd, partes):
         return
     finally:
         if conn: db_pool.putconn(conn)
-    duracao = formatar_duracao(None if segundos is None else segundos)
+    duracao = formatar_duracao(segundos)
     # Personagens online dessa conta: mute vale na hora; ban derruba.
     for s_o, p_o in list(online_players.items()):
         if str(p_o.get('user_id')) != str(user_id): continue
@@ -4678,16 +4709,82 @@ def _comando_punicao(sid, cmd, partes):
     if tirar: chat_sistema(sid, f"{'Unbanned' if tipo == 'ban' else 'Unmuted'} {nome} (account).")
     else: chat_sistema(sid, f"{'Banned' if tipo == 'ban' else 'Muted'} {nome} (account) for {duracao}: {motivo}")
 
+# Personagem apagado fica 30 dias como "<nome>#del#<hex>" (da' pra /restore);
+# depois disso e' excluido de vez (purgar_apagados_loop).
+APAGADO_DIAS = 30
+
+def _comando_restore(sid, partes):
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        c = conn.cursor()
+        if len(partes) < 2:
+            c.execute("SELECT name, deleted_at FROM characters WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 15")
+            linhas = c.fetchall()
+            if not linhas: chat_sistema(sid, "No deleted characters.")
+            for nome_del, quando in linhas:
+                dias = APAGADO_DIAS - int((time.time() - float(quando)) // 86400)
+                chat_sistema(sid, f"{nome_del.split('#del#')[0]}  - deleted, {max(0, dias)} day(s) left to restore")
+            chat_sistema(sid, "Usage: /restore <name>")
+            return
+        nome = ' '.join(partes[1:])
+        c.execute("""SELECT id, user_id, name FROM characters WHERE deleted_at IS NOT NULL
+                     AND LOWER(name) LIKE LOWER(%s) ORDER BY deleted_at DESC LIMIT 1""", (nome + '#del#%',))
+        row = c.fetchone()
+        if not row:
+            chat_sistema(sid, f"No deleted character named '{nome}' (deleted more than {APAGADO_DIAS} days ago is gone).", 'red')
+            return
+        char_id, user_id, nome_del = row
+        original = nome_del.split('#del#')[0]
+        c.execute("SELECT COUNT(*) FROM characters WHERE user_id = %s AND deleted_at IS NULL", (user_id,))
+        if c.fetchone()[0] >= 4:
+            chat_sistema(sid, f"Can't restore {original}: the account has no free character slot (4/4).", 'red')
+            return
+        c.execute("SELECT 1 FROM characters WHERE LOWER(name) = LOWER(%s) AND deleted_at IS NULL", (original,))
+        if c.fetchone():
+            chat_sistema(sid, f"Can't restore {original}: another character is using this name. Rename it first.", 'red')
+            return
+        c.execute("UPDATE characters SET name = %s, deleted_at = NULL WHERE id = %s", (original, char_id))
+        conn.commit()
+        _ranking_cache.clear()
+        chat_sistema(sid, f"Restored {original} to its account.")
+    except Exception:
+        traceback.print_exc()
+        chat_sistema(sid, "Database error (see server log).", 'red')
+    finally:
+        if conn: db_pool.putconn(conn)
+
+def purgar_apagados_loop():
+    """De hora em hora: exclui de vez quem foi apagado ha' mais de APAGADO_DIAS."""
+    while True:
+        conn = None
+        try:
+            conn = db_pool.getconn()
+            c = conn.cursor()
+            c.execute("DELETE FROM characters WHERE deleted_at IS NOT NULL AND deleted_at < %s",
+                      (time.time() - APAGADO_DIAS * 86400,))
+            if c.rowcount: print(f"[DB] {c.rowcount} personagem(ns) apagado(s) ha' mais de {APAGADO_DIAS} dias excluido(s)")
+            conn.commit()
+        except Exception:
+            traceback.print_exc()
+        finally:
+            if conn: db_pool.putconn(conn)
+        socketio.sleep(3600)
+
 def comando_admin(sid, p, texto, canal='local'):
     partes = texto[1:].split()
     if not partes: return
     cmd = partes[0].lower()
+    _log_admin(p, texto)
     if cmd in ('help', 'admin'):
         for _, uso, desc in ADMIN_COMANDOS:
             chat_sistema(sid, f"Admin: {uso}  - {desc}")
         return
     if cmd in ('ban', 'unban', 'mute', 'unmute'):
         _comando_punicao(sid, cmd, partes)
+        return
+    if cmd == 'restore':
+        _comando_restore(sid, partes)
         return
     if cmd == 'rules':
         for texto_regra in REGRAS.values(): chat_sistema(sid, texto_regra)
@@ -9053,6 +9150,7 @@ VERSAO_SERVIDOR = "2026-10-09 alma + portal do despertar"
 print(f"[SERVIDOR] Versao {VERSAO_SERVIDOR} (client exigido: {SERVER_VERSION})")
 socketio.start_background_task(regen_loop)
 socketio.start_background_task(battle_loop)
+socketio.start_background_task(purgar_apagados_loop)
 socketio.start_background_task(autosave_loop)
 socketio.start_background_task(loot_cleanup_loop)
 socketio.start_background_task(trade_invite_cleanup_loop)

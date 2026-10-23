@@ -7,3 +7,4 @@ mapas_colisao.json
 __pycache__/
 emergencia.txt
 backups/
+admin_log.txt
