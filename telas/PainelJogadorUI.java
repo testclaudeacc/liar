@@ -54,8 +54,10 @@ public class PainelJogadorUI {
     private static final float TAM_ICONE_BOTAO = 26f;
     private static final float TAM_MINI = 44f;
     /** No PC a janela fica menor (no celular continua do tamanho de antes). */
-    private static final float ESCALA_PC = 0.8f;
-    private static final float ESCALA_CELULAR = 1.15f;
+    private static final float ESCALA_PC = 0.95f;
+    private static final float ESCALA_CELULAR = 1.3f;
+    // Largura real dos botoes/janela: cresce se o texto traduzido nao couber.
+    private float larguraBotao = LARGURA_BOTAO;
 
     // Cores dos botoes: as mesmas das notificacoes (HudVitais.COR_NOTIF_*)
     // - amigo rosa, trade amarelo, party azul - e o resto no mesmo tom.
@@ -142,14 +144,21 @@ public class PainelJogadorUI {
         // ---- Botoes de baixo (ordem do mock, esquerda -> direita) ----
         botaoAmigo = botaoTexto("ui/buttons/FriendsBtn", "Add Friend", estiloAddFriend, TAM_ICONE_BOTAO);
         botaoIgnorar = botaoTexto("ui/buttons/IgnoreBtn", "Block", estiloBlock, TAM_ICONE_BOTAO);
-        botaoParty = botaoTexto("ui/buttons/PartyBtn", "Party", estiloTexto(COR_PARTY, Color.WHITE), TAM_ICONE_BOTAO);
-        botaoTrade = botaoTexto("ui/currency/Gold", "Trade", estiloTexto(COR_AMARELO, COR_TEXTO_ESCURO), TAM_ICONE_BOTAO);
-        botaoChat = botaoTexto("ui/ChatButton", "Message", estiloTexto(COR_MENSAGEM, Color.WHITE), TAM_ICONE_BOTAO);
+        botaoParty = botaoTexto("ui/buttons/PartyBtn", tr("Party"), estiloTexto(COR_PARTY, Color.WHITE), TAM_ICONE_BOTAO);
+        botaoTrade = botaoTexto("ui/currency/Gold", tr("Trade"), estiloTexto(COR_AMARELO, COR_TEXTO_ESCURO), TAM_ICONE_BOTAO);
+        botaoChat = botaoTexto("ui/ChatButton", tr("Message"), estiloTexto(COR_MENSAGEM, Color.WHITE), TAM_ICONE_BOTAO);
         acao(botaoAmigo, () -> ouvinte.alternarAmigo(nomeAtual));
         acao(botaoIgnorar, () -> ouvinte.alternarIgnorar(nomeAtual));
         acao(botaoParty, () -> ouvinte.convidarParty(nomeAtual));
         acao(botaoTrade, () -> ouvinte.convidarTrade(nomeAtual));
         acao(botaoChat, () -> ouvinte.abrirChat(nomeAtual));
+        // Largura: o maior texto que algum botao pode mostrar + icone e margens.
+        com.badlogic.gdx.graphics.g2d.GlyphLayout medida = new com.badlogic.gdx.graphics.g2d.GlyphLayout();
+        String[] textos = {tr("Add Friend"), tr("Added"), tr("Block"), tr("Blocked"), tr("Party"), tr("Trade"), tr("Message")};
+        for (String t : textos) {
+            medida.setText(botaoAmigo.getLabel().getStyle().font, t);
+            larguraBotao = Math.max(larguraBotao, (float) Math.ceil(medida.width * botaoAmigo.getLabel().getFontScaleX() + TAM_ICONE_BOTAO + 16f + 14f));
+        }
         montarBotoes();
 
         janela.setBackground(UiSkin.retangulo(COR_FUNDO, COR_BORDA, 1));
@@ -189,7 +198,7 @@ public class PainelJogadorUI {
         };
         conteudoArrastavel = conteudo;
         conteudo.add(barraIcones).left().padLeft(4f).row();
-        conteudo.add(janela).width(LARGURA);
+        conteudo.add(janela).width(Math.max(LARGURA, TAM_FOTO + 20f + larguraBotao + 40f));
         boolean mobile = com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android
             || com.badlogic.gdx.Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.iOS;
         // PC menor; celular um pouco maior (dedo).
@@ -299,7 +308,7 @@ public class PainelJogadorUI {
         if (seg < 60) return tr("just now");
         if (seg < 3600) return tr("{0}m ago", seg / 60);
         if (seg < 86400) return tr("{0}h ago", seg / 3600);
-        return tr("{0}d ago", seg / 86400);
+        return seg / 86400 == 1 ? tr("1 day ago") : tr("{0}d ago", seg / 86400);
     }
 
     /** Estado dos botoes (amigo/ignorado ficam verdes; IconBtn so' pra amigo). */
@@ -320,7 +329,7 @@ public class PainelJogadorUI {
         for (Button b : new Button[]{botaoAmigo, botaoIgnorar, botaoParty, botaoTrade, botaoChat}) {
             if (b == botaoParty && !mostrarParty) continue;
             if (b == botaoTrade && !mostrarTrade) continue;
-            botoes.add(b).width(LARGURA_BOTAO).height(ALTURA_BOTAO).padBottom(4f).row();
+            botoes.add(b).width(larguraBotao).height(ALTURA_BOTAO).padBottom(4f).row();
         }
     }
 

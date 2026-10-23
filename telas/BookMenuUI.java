@@ -1795,7 +1795,17 @@ public final class BookMenuUI {
         colunaDireita.add(separadorEquip()).growX().height(1).row();
         colunaDireita.add(scrollCores).grow().pad(6, 10, 8, 10);
 
-        vanityPage.add(colunaEsquerda).width(COLUNA_VANITY).growY();
+        // Coluna da esquerda do tamanho do maior nome de categoria / par de
+        // botoes (traducao comprida), nunca menor que COLUNA_VANITY.
+        float larguraVanity = COLUNA_VANITY;
+        for (String cat : CATEGORIAS_VANITY) {
+            Label medida = new LabelPixel(nomeCategoriaVanity(cat), skin.get("hud", Label.LabelStyle.class));
+            escalarFonte(medida, 0.8f);
+            larguraVanity = Math.max(larguraVanity, medida.getPrefWidth() + 36f + 14f + 16f + 6f);
+        }
+        float larguraBotao = UiSkin.larguraBotoes(0f, 20f, equipar, resetar);
+        larguraVanity = Math.max(larguraVanity, larguraBotao * 2f + 6f + 16f);
+        vanityPage.add(colunaEsquerda).width((float) Math.ceil(larguraVanity)).growY();
         vanityPage.add(colunaDireita).grow();
         atualizarVanity();
     }
@@ -1906,7 +1916,7 @@ public final class BookMenuUI {
             case "base": return tr("Skin");
             case "body": return tr("Clothe");
             case "helm": return tr("Hair/Hat");
-            case "acc": return tr("Back");
+            case "acc": return Idioma.trc("Back (body part)", "Back"); // costas, nao "voltar"
             default: return cat;
         }
     }

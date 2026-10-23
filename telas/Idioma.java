@@ -118,6 +118,15 @@ public final class Idioma {
         return args.length == 0 ? t : preencher(t, args);
     }
 
+    /** Mesma palavra em ingles com sentidos diferentes ("Back" = voltar ou
+     * costas): chave propria no TSV, e em ingles mostra o texto en. */
+    public static String trc(String chave, String en) {
+        if (atual() == 0) return en;
+        carregar();
+        String achado = mapas[atual].get(chave);
+        return achado != null ? achado : en;
+    }
+
     private static String preencher(String t, Object... args) {
         for (int i = 0; i < args.length; i++) t = t.replace("{" + i + "}", String.valueOf(args[i]));
         return t;

@@ -444,6 +444,10 @@ final class IdiomaTextos {
             + "Pay	Pagar	Pagar\n"
             + "Quests	Miss\u00f5es	Misiones\n"
             + "Market	Mercado	Mercado\n"
+            + "Back (body part)	Costas	Espalda\n"
+            + "Trade	Troca	Intercambio\n"
+            + "Message	Mensagem	Mensaje\n"
+            + "1 day ago	h\u00e1 1 dia	hace 1 d\u00eda\n"
         ,
     };
 }
