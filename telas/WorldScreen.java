@@ -4869,7 +4869,8 @@ public class WorldScreen extends ScreenAdapter {
      * (que fica a esquerda); settings/menu/trade seguem no tamanho original. */
     private void desenharBalao(TextureRegion balao, float ancoraX, float ancoraY) {
         if (balao == notifChat && quadrosChat != null) {
-            balao = quadrosChat[(int) (com.badlogic.gdx.utils.TimeUtils.millis() / (long) (QUADRO_CHAT_SEG * 1000f)) % quadrosChat.length];
+            // Resto da divisao ainda em long (o (int) antes estourava pra negativo -> indice -1).
+            balao = quadrosChat[(int) ((com.badlogic.gdx.utils.TimeUtils.millis() / (long) (QUADRO_CHAT_SEG * 1000f)) % quadrosChat.length)];
             batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, balao.getRegionWidth() / 2f, balao.getRegionHeight() / 2f);
         } else if (balao == notifChat || baloesPequenos.contains(balao)) {
             // Metade do tamanho do sprite (o de chat 16x16 vira 8x8; os de
