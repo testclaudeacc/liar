@@ -19,6 +19,12 @@ public final class SkinsUtil {
 
     /** Ordem de desenho das camadas (de baixo pra cima). */
     public static final String[] ORDEM_CAMADAS = {"base", "body", "helm", "acc"};
+    // Acessorio (capa, asa...): de frente e de lado fica ATRAS de tudo; de
+    // costas, na frente de tudo.
+    private static final String[] ORDEM_FRENTE = {"acc", "base", "body", "helm"};
+
+    /** Ordem de desenho das camadas (primeira = mais atras). costas = olhando pra cima. */
+    public static String[] ordemCamadas(boolean costas) { return costas ? ORDEM_CAMADAS : ORDEM_FRENTE; }
     public static final String BASE_PADRAO = "res://sprites/base/BaseSoul.png";
     public static final int FRAME_LARGURA = 16;
     // Indices na spritesheet: cima 0-2, baixo 3-5, esquerda 6-7, direita 8-9.
@@ -85,7 +91,7 @@ public final class SkinsUtil {
         private float alturaMaxima = 17f;
 
         public Preview(TextureAtlas atlas, JsonValue skins, int frame) {
-            for (String cat : ORDEM_CAMADAS) {
+            for (String cat : ordemCamadas(frame == FRAME_CIMA)) {
                 String caminho = caminho(skins, cat);
                 if (caminho == null && "base".equals(cat)) caminho = BASE_PADRAO;
                 TextureRegion tira = regiao(atlas, caminho);

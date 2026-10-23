@@ -2035,7 +2035,8 @@ public final class BookMenuUI {
         for (int i = 0; i < ANDAR_PREVIEW.length; i++) {
             Stack pilha = new Stack();
             float altura = 17f;
-            for (String cat : SkinsUtil.ORDEM_CAMADAS) {
+            // Preview 3 = de costas (acessorio na frente); os outros, atras.
+            for (String cat : SkinsUtil.ordemCamadas(i == 3)) {
                 String[] escolhida = skinsRascunho.get(cat);
                 String caminho = escolhida != null ? escolhida[0] : "base".equals(cat) ? SkinsUtil.BASE_PADRAO : null;
                 TextureAtlas.AtlasRegion tira = SkinsUtil.regiao(atlas, caminho);

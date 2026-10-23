@@ -925,6 +925,7 @@ public class WorldScreen extends ScreenAdapter {
     private static class CamadaSkin {
         final AnimacaoCorpo animacao;
         final Color cor;
+        boolean acessorio; // "acc": atras de tudo de frente/lado, na frente de costas
         CamadaSkin(AnimacaoCorpo animacao, Color cor) { this.animacao = animacao; this.cor = cor; }
     }
     // Camadas por nome de jogador (local e remotos), na ordem de desenho.
@@ -2062,7 +2063,7 @@ public class WorldScreen extends ScreenAdapter {
         List<TextureRegion> quadros = new ArrayList<>();
         List<Color> cores = new ArrayList<>();
         int alturaMax = 17;
-        for (String cat : SkinsUtil.ORDEM_CAMADAS) {
+        for (String cat : SkinsUtil.ordemCamadas(false)) { // retrato de frente: acessorio atras
             String caminho = SkinsUtil.caminho(skins, cat);
             if (caminho == null && "base".equals(cat)) caminho = SkinsUtil.BASE_PADRAO;
             TextureRegion tira = SkinsUtil.regiao(atlas, caminho);
@@ -5761,11 +5762,18 @@ public class WorldScreen extends ScreenAdapter {
         }
         // Camadas de skin (base, roupa, cabeca, acessorio) uma por cima da
         // outra, cada uma com a cor escolhida na aba Vanity.
-        for (CamadaSkin camada : camadas) {
-            TextureRegion quadro = quadroAtual(camada.animacao, j);
-            if (quadro == null) continue; // camada sem quadro de morte
-            batch.setColor(camada.cor.r, camada.cor.g, camada.cor.b, camada.cor.a * alfaFantasma);
-            batch.draw(quadro, x, ancoraY, largura, quadro.getRegionHeight() * ESCALA_SPRITE);
+        // Acessorio: de frente/lado vai primeiro (atras de tudo); de costas, por ultimo.
+        boolean costas = "up".equals(j.direcao);
+        for (int passada = 0; passada < 3; passada++) {
+            for (CamadaSkin camada : camadas) {
+                boolean desenhar = passada == 1 ? !camada.acessorio
+                    : camada.acessorio && (passada == 0) != costas;
+                if (!desenhar) continue;
+                TextureRegion quadro = quadroAtual(camada.animacao, j);
+                if (quadro == null) continue; // camada sem quadro de morte
+                batch.setColor(camada.cor.r, camada.cor.g, camada.cor.b, camada.cor.a * alfaFantasma);
+                batch.draw(quadro, x, ancoraY, largura, quadro.getRegionHeight() * ESCALA_SPRITE);
+            }
         }
         batch.setColor(Color.WHITE);
     }
@@ -5785,7 +5793,9 @@ public class WorldScreen extends ScreenAdapter {
                 anim = criarAnimacao(tira);
                 cacheAnimacoesSkin.put(caminho, anim);
             }
-            camadas.add(new CamadaSkin(anim, SkinsUtil.cor(SkinsUtil.corHex(skins, cat))));
+            CamadaSkin nova = new CamadaSkin(anim, SkinsUtil.cor(SkinsUtil.corHex(skins, cat)));
+            nova.acessorio = "acc".equals(cat);
+            camadas.add(nova);
         }
         skinsJogadores.put(nome, camadas);
         if (skinDeAlma(skins)) almas.add(nome); else almas.remove(nome);
@@ -6668,10 +6678,13 @@ public class WorldScreen extends ScreenAdapter {
             c.quadros.add(animacaoBase.morte != null ? animacaoBase.morte : animacaoBase.idleBaixo);
             c.cores.add(Color.WHITE);
         } else {
-            for (CamadaSkin camada : camadas) {
-                if (camada.animacao.morte == null) continue;
-                c.quadros.add(camada.animacao.morte);
-                c.cores.add(camada.cor);
+            // Corpo caido: acessorio atras (primeiro), igual de frente.
+            for (int passada = 0; passada < 2; passada++) {
+                for (CamadaSkin camada : camadas) {
+                    if (camada.acessorio != (passada == 0) || camada.animacao.morte == null) continue;
+                    c.quadros.add(camada.animacao.morte);
+                    c.cores.add(camada.cor);
+                }
             }
         }
         if (!c.quadros.isEmpty()) cadaveres.add(c);
