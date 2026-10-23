@@ -1475,6 +1475,10 @@ public final class BookMenuUI {
         statusDireita.add(linhaRegenMp).left().row();
         statusDireita.add(linhaStatus("ui/TotalXP", "Total EXP", "total_exp")).left().row();
         statusDireita.add(linhaStatus("ui/TotalKills", "Total Kills", "total_kills")).left().row();
+        // Coluna dos nomes do tamanho do maior (traducao comprida): o valor
+        // nunca fica por cima do nome, e continua alinhado entre as linhas.
+        alinharRotulosStatus(statusEsquerda);
+        alinharRotulosStatus(statusDireita);
 
         Table status = new Table();
         status.top().left();
@@ -1639,6 +1643,25 @@ public final class BookMenuUI {
         return v.getInt(0) + "+" + v.getInt(1);
     }
 
+    private static final Object ROTULO_STATUS = new Object();
+
+    /** Nomes de uma coluna de status com a largura do maior deles (minimo LARGURA_ROTULO_STATUS). */
+    private void alinharRotulosStatus(Table coluna) {
+        float maior = LARGURA_ROTULO_STATUS;
+        java.util.List<com.badlogic.gdx.scenes.scene2d.ui.Cell<?>> celulas = new java.util.ArrayList<>();
+        for (com.badlogic.gdx.scenes.scene2d.Actor a : coluna.getChildren()) {
+            if (!(a instanceof Table)) continue;
+            for (com.badlogic.gdx.scenes.scene2d.ui.Cell<?> c : ((Table) a).getCells()) {
+                if (c.getActor() instanceof Label && c.getActor().getUserObject() == ROTULO_STATUS) {
+                    maior = Math.max(maior, ((Label) c.getActor()).getPrefWidth());
+                    celulas.add(c);
+                }
+            }
+        }
+        for (com.badlogic.gdx.scenes.scene2d.ui.Cell<?> c : celulas) c.width((float) Math.ceil(maior));
+        coluna.invalidateHierarchy();
+    }
+
     private Table linhaStatus(String iconRegion, String rotulo, String chave) {
         Table linha = new Table();
         TextureAtlas.AtlasRegion region = iconRegion == null ? null : atlas.findRegion(iconRegion);
@@ -1651,7 +1674,8 @@ public final class BookMenuUI {
         }
         Label r = new LabelPixel(tr(rotulo), skin.get("hud", Label.LabelStyle.class));
         Label v = new LabelPixel("", skin.get("hud", Label.LabelStyle.class));
-        linha.add(r).left().width(LARGURA_ROTULO_STATUS);
+        linha.add(r).left().width(LARGURA_ROTULO_STATUS).padRight(6);
+        r.setUserObject(ROTULO_STATUS);
         linha.add(v).left();
         linha.padBottom(8);
         valoresStatus.put(chave, v);
