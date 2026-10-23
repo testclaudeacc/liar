@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.45"
+SERVER_VERSION = "v0.46"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -408,14 +408,14 @@ def validate_item(item_path):
 SLOTS_VALIDOS = {"Helm", "Gloves", "Chest", "Boots", "Necklace", "Ring", "MainHand", "Hand"}
 
 ITEM_DB = {
-    "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"name": "Wooden Flute", "type": "Flute", "req_level": 0, "req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "mana_cost": 2, "cap": 15.0},
-    "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"name": "Basic Music Sheet", "type": "Music Sheet", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "cap": 15.0},
-    "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 5, "cap": 15.0},
+    "res://sprites/items/Bard/Weapons/StarterFlute.tres": {"name": "Wooden Flute", "type": "Flute", "req_level": 0, "req_class": "Bard", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 5, "fourth_stat_type": "Musicality", "fourth_stat_value": 1, "mana_cost": 2, "cap": 15.0},
+    "res://sprites/items/Bard/SecondHand/StarterSheet.tres": {"name": "Basic Music Sheet", "type": "Music Sheet", "req_level": 0, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 2, "cap": 15.0},
+    "res://sprites/items/Knight/Weapons/StarterSword.tres": {"name": "Iron Sword", "type": "Sword", "req_level": 0, "req_class": "Knight", "bonus_damage": 1, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 2, "cap": 15.0},
     "res://sprites/items/Knight/SecondHand/StarterShield.tres": {"name": "Wooden Shield", "type": "Shield", "req_level": 0, "req_class": "Knight", "bonus_damage": 0, "defense": 3, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "", "fourth_stat_value": 0, "cap": 15.0},
-    "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 2, "mana_cost": 3, "cap": 15.0},
-    "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 3, "cap": 15.0},
-    "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 5, "cap": 15.0},
-    "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 3, "ammo": True, "price": 1, "max_stack": 9999, "cap": 0.1},
+    "res://sprites/items/Mage/Weapons/StarterStaff.tres": {"name": "Apprentice Staff", "type": "Staff", "req_level": 0, "req_class": "Mage", "bonus_damage": 1, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 1, "mana_cost": 3, "cap": 15.0},
+    "res://sprites/items/Mage/SecondHand/StarterBook.tres": {"name": "Apprentice Book", "type": "Book", "req_level": 0, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 10, "fourth_stat_type": "Magic", "fourth_stat_value": 1, "cap": 15.0},
+    "res://sprites/items/Ranger/Weapons/StarterBow.tres": {"name": "Wooden Bow", "type": "Bow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 1, "defense": 0, "stamina": 5, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 2, "cap": 15.0},
+    "res://sprites/items/Ranger/SecondHand/StarterArrow.tres": {"name": "Wooden Arrow", "type": "Arrow", "req_level": 0, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 2, "ammo": True, "price": 1, "max_stack": 9999, "cap": 0.1},
     # Comida: "fullness" = quanto enche a barra de Fullness por unidade comida.
     # Materiais (drop de mob): so' nome, "Material" e cap na descricao; o NPC paga sell_price.
     "res://sprites/items/Materials/WaspWing.tres": {"name": "Wasp Wing", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 5, "icon": "ui/Wasp_Wing", "stackable": True, "max_stack": 9999, "cap": 0.1},
@@ -476,14 +476,14 @@ ITEM_DB = {
     # pecas; com todas equipadas da' "set_xp"% de XP extra (bonus_xp_set).
     # Hunt lv 10-15 (Mushroom Spider / Wolf). Anel/colar: o drop sorteia o ADC
     # (uma variacao por skill, mesmo nome/icone - ver "one_of" no MOB_DB).
-    "res://sprites/items/Jewelry/RubyRingMelee.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5},
-    "res://sprites/items/Jewelry/RubyRingMagic.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Magic", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5},
-    "res://sprites/items/Jewelry/RubyRingFocus.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5},
-    "res://sprites/items/Jewelry/RubyRingMusicality.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5},
-    "res://sprites/items/Jewelry/RubyNecklaceMelee.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
-    "res://sprites/items/Jewelry/RubyNecklaceMagic.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Magic", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
-    "res://sprites/items/Jewelry/RubyNecklaceFocus.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
-    "res://sprites/items/Jewelry/RubyNecklaceMusicality.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "Musicality", "fourth_stat_value": 3, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5},
+    "res://sprites/items/Jewelry/RubyRingMelee.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5, "universal": True},
+    "res://sprites/items/Jewelry/RubyRingMagic.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5, "universal": True},
+    "res://sprites/items/Jewelry/RubyRingFocus.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5, "universal": True},
+    "res://sprites/items/Jewelry/RubyRingMusicality.tres": {"name": "Ruby Ring", "type": "Ring", "slot": "Ring", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1000, "icon": "ui/armas/Ruby Ring", "cap": 0.5, "universal": True},
+    "res://sprites/items/Jewelry/RubyNecklaceMelee.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5, "universal": True},
+    "res://sprites/items/Jewelry/RubyNecklaceMagic.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5, "universal": True},
+    "res://sprites/items/Jewelry/RubyNecklaceFocus.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5, "universal": True},
+    "res://sprites/items/Jewelry/RubyNecklaceMusicality.tres": {"name": "Ruby Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 1000, "icon": "ui/armas/Ruby Necklace", "cap": 0.5, "universal": True},
     # ---- Formula dos equipamentos por tier (T = req_level / 10) ----
     #   Peca de set (helm/chest/gloves/boots): ADC 3T, Armour 1T, Stamina 5T
     #   Arma (mao principal): ADC 6T, Atk 2T, Stamina/Mana 10(T+1)
@@ -500,23 +500,23 @@ ITEM_DB = {
     # Armas lv 10: 6 de ADC e 2 de Atk (o dobro de uma peca de set). Basic Dagger:
     # metade do ADC de uma espada, mas bate 1.1x mais rapido ("atk_speed") -
     # mais que isso o Knight passa o DPS do Mage (a velocidade multiplica o golpe todo).
-    "res://sprites/items/Knight/Weapons/BasicDagger.tres": {"name": "Basic Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 10, "req_class": "Knight", "bonus_damage": 2, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "atk_speed": 1.1, "price": 1000, "icon": "sheet/r98_c3", "cap": 8.0},
+    "res://sprites/items/Knight/Weapons/BasicDagger.tres": {"name": "Basic Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 10, "req_class": "Knight", "bonus_damage": 4, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 4, "atk_speed": 1.1, "price": 1000, "icon": "sheet/r98_c3", "cap": 8.0},
     # atk_hit/atk_proj: efeito e projetil do ataque basico (no lugar do da classe).
-    "res://sprites/items/Mage/Weapons/RubyStaff.tres": {"name": "Ruby Staff", "type": "Staff", "slot": "MainHand", "req_level": 10, "req_class": "Mage", "bonus_damage": 2, "defense": 0, "stamina": 0, "mana": 20, "fourth_stat_type": "Magic", "fourth_stat_value": 6, "mana_cost": 5, "atk_hit": "Fire", "atk_proj": "res://ui/FireProjectile.png", "price": 1000, "icon": "sheet/r104_c8", "cap": 15.0},
-    "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 2, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "mana_cost": 2, "atk_hit": "RattleHit", "atk_proj": "res://ui/items/RattleProjectile.png", "price": 1000, "icon": "ui/armas/wooden rattle", "cap": 10.0},
-    "res://sprites/items/Ranger/Weapons/IronBow.tres": {"name": "Iron Bow", "type": "Bow", "slot": "MainHand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 2, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 6, "price": 1000, "icon": "sheet/r93_c9", "cap": 15.0},
+    "res://sprites/items/Mage/Weapons/RubyStaff.tres": {"name": "Ruby Staff", "type": "Staff", "slot": "MainHand", "req_level": 10, "req_class": "Mage", "bonus_damage": 4, "defense": 0, "stamina": 0, "mana": 20, "fourth_stat_type": "Magic", "fourth_stat_value": 4, "mana_cost": 5, "atk_hit": "Fire", "atk_proj": "res://ui/FireProjectile.png", "price": 1000, "icon": "sheet/r104_c8", "cap": 15.0},
+    "res://sprites/items/Bard/Weapons/WoodenRattle.tres": {"name": "Wooden Rattle", "type": "Rattle", "slot": "MainHand", "req_level": 10, "req_class": "Bard", "bonus_damage": 4, "defense": 0, "stamina": 10, "mana": 10, "fourth_stat_type": "Musicality", "fourth_stat_value": 4, "mana_cost": 2, "atk_hit": "RattleHit", "atk_proj": "res://ui/items/RattleProjectile.png", "price": 1000, "icon": "ui/armas/wooden rattle", "cap": 10.0},
+    "res://sprites/items/Ranger/Weapons/IronBow.tres": {"name": "Iron Bow", "type": "Bow", "slot": "MainHand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 4, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 4, "price": 1000, "icon": "sheet/r93_c9", "cap": 15.0},
     # Segunda mao lv 10 (drop das 2 vespas, 2% cada; a flecha vende no Luke):
     # ADC 6, Stamina/Mana 15 (shield tambem Defense 6 + Armour 2).
-    "res://sprites/items/Mage/SecondHand/CrimsonTome.tres": {"name": "Crimson Tome", "type": "Book", "slot": "Hand", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 15, "fourth_stat_type": "Magic", "fourth_stat_value": 6, "price": 500, "icon": "sheet/r60_c10", "cap": 15.0},
-    "res://sprites/items/Bard/SecondHand/AzureScore.tres": {"name": "Azure Sheet", "type": "Music Sheet", "slot": "Hand", "req_level": 10, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 15, "mana": 15, "fourth_stat_type": "Musicality", "fourth_stat_value": 6, "price": 500, "icon": "sheet/r51_c3", "cap": 15.0},
-    "res://sprites/items/Knight/SecondHand/IronboundShield.tres": {"name": "Ironbound Shield", "type": "Shield", "slot": "Hand", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 6, "armour": 2, "stamina": 15, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 3, "price": 500, "icon": "sheet/r71_c2", "cap": 20.0},
-    "res://sprites/items/Ranger/SecondHand/FlintArrow.tres": {"name": "Flint Arrow", "type": "Arrow", "slot": "Hand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 6, "ammo": True, "price": 2, "max_stack": 9999, "atk_proj": "res://ui/FlintArrowProjectile.png", "icon": "sheet/r90_c7", "cap": 0.1},
+    "res://sprites/items/Mage/SecondHand/CrimsonTome.tres": {"name": "Crimson Tome", "type": "Book", "slot": "Hand", "req_level": 10, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 15, "fourth_stat_type": "Magic", "fourth_stat_value": 9, "price": 500, "icon": "sheet/r60_c10", "cap": 15.0},
+    "res://sprites/items/Bard/SecondHand/AzureScore.tres": {"name": "Azure Sheet", "type": "Music Sheet", "slot": "Hand", "req_level": 10, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 15, "mana": 15, "fourth_stat_type": "Musicality", "fourth_stat_value": 9, "price": 500, "icon": "sheet/r51_c3", "cap": 15.0},
+    "res://sprites/items/Knight/SecondHand/IronboundShield.tres": {"name": "Ironbound Shield", "type": "Shield", "slot": "Hand", "req_level": 10, "req_class": "Knight", "bonus_damage": 0, "defense": 6, "armour": 2, "stamina": 15, "mana": 0, "fourth_stat_type": "Melee", "fourth_stat_value": 6, "price": 500, "icon": "sheet/r71_c2", "cap": 20.0},
+    "res://sprites/items/Ranger/SecondHand/FlintArrow.tres": {"name": "Flint Arrow", "type": "Arrow", "slot": "Hand", "req_level": 10, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "Focus", "fourth_stat_value": 9, "ammo": True, "price": 2, "max_stack": 9999, "atk_proj": "res://ui/FlintArrowProjectile.png", "icon": "sheet/r90_c7", "cap": 0.1},
     "res://sprites/items/Materials/WolfFur.tres": {"name": "Wolf Fur", "type": "Material", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "sell_price": 15, "icon": "ui/Wolf_Fur", "stackable": True, "max_stack": 9999, "cap": 0.1},
     "res://sprites/items/Food/RedMushroom.tres": {"name": "Red Mushroom", "type": "Food", "req_level": 0, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "fullness": 1, "regen_hp": 1, "regen_mp": 0, "regen_seg": 10, "sound": "*Munch*", "sell_price": 5, "icon": "ui/Red Mushroom", "stackable": True, "max_stack": 9999, "cap": 0.1},
-    "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 10.0},
-    "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Chest", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 15.0},
-    "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 200, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 5.0},
-    "res://sprites/items/Outlander/OutlanderBoots.tres": {"name": "Outlander Boots", "type": "Boots", "slot": "Boots", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "Class", "fourth_stat_value": 3, "price": 400, "icon": "sheet/r10_c7", "set": "Outlander", "set_xp": 5, "cap": 10.0},
+    "res://sprites/items/Outlander/OutlanderHelm.tres": {"name": "Outlander Helm", "type": "Helm", "slot": "Helm", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r23_c5", "set": "Outlander", "set_xp": 5, "cap": 10.0},
+    "res://sprites/items/Outlander/OutlanderCape.tres": {"name": "Outlander Cape", "type": "Cape", "slot": "Chest", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 10, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r3_c11", "set": "Outlander", "set_xp": 5, "cap": 15.0},
+    "res://sprites/items/Outlander/OutlanderGloves.tres": {"name": "Outlander Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 200, "icon": "sheet/r20_c12", "set": "Outlander", "set_xp": 5, "cap": 5.0},
+    "res://sprites/items/Outlander/OutlanderBoots.tres": {"name": "Outlander Boots", "type": "Boots", "slot": "Boots", "req_level": 10, "req_class": "All", "bonus_damage": 0, "defense": 0, "armour": 1, "stamina": 5, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "price": 400, "icon": "sheet/r10_c7", "set": "Outlander", "set_xp": 5, "cap": 10.0},
 }
 # Cura das pocoes: 5 valores fixos (igual o dano, que varia), o maior e' o
 # que aparece na descricao.
@@ -544,9 +544,11 @@ CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage",
                        "spell_hits", "spell_hit_every", "spell_dot", "spell_slow",
                        "atk_speed", "atk_hit", "atk_proj")
 
-def montar_item_db_cliente():
+def montar_item_db_cliente(classe=None):
     db = {}
-    for item_path, dados in ITEM_DB.items():
+    for item_path in ITEM_DB:
+        # Joia universal: mostra a mana/defesa que ela da' pra classe do player.
+        dados = stats_item(item_path, classe)
         entrada = {k: dados[k] for k in CAMPOS_ITEM_CLIENTE if k in dados}
         entrada["slot"] = slot_do_item(item_path)
         if dados.get("spell"):
@@ -585,7 +587,22 @@ CAP_POR_NIVEL = 10.0
 # "Class": item universal (sets) - vira o ADC da classe de quem veste (o
 # client mostra como Melee/Magic/Focus/Musicality). Magic no Bard aparece
 # como Musicality (o Bard usa os sets do Mage). No dano tudo vale igual 1:2.
-FOURTH_STAT_MULTIPLIERS = {"Magic": 0.5, "Focus": 0.5, "Musicality": 0.5, "Melee": 0.5, "Class": 0.5}
+# ADC (fourth stat) estilo Tibia: 1 de ADC = +1 de dano E +1 de reducao de dano
+# (igual 1 nivel de skill). So' armas e offhands tem ADC; armadura da' HP/defesa.
+FOURTH_STAT_MULTIPLIERS = {"Magic": 1.0, "Focus": 1.0, "Musicality": 1.0, "Melee": 1.0, "Class": 1.0}
+# Joias "universal": True (Ruby Ring/Necklace) - sem ADC; o que dao depende da
+# classe de quem usa (mago mais mana que defesa, knight o contrario).
+JOIA_POR_CLASSE = {"Knight": {"defense": 4, "mana": 2}, "Ranger": {"defense": 3, "mana": 5},
+                   "Mage": {"defense": 2, "mana": 10}, "Bard": {"defense": 2, "mana": 10}}
+
+def stats_item(item_path, classe=None):
+    """Campos do ITEM_DB com os stats de joia universal ja' somados pra classe."""
+    dados = ITEM_DB.get(item_path, {})
+    if not dados.get("universal") or classe not in JOIA_POR_CLASSE: return dados
+    dados = dict(dados)
+    for campo, valor in JOIA_POR_CLASSE[classe].items():
+        dados[campo] = dados.get(campo, 0) + valor
+    return dados
 
 STARTING_EQUIPMENT = {
     "Knight":  [{"item": "res://sprites/items/Knight/Weapons/StarterSword.tres", "slot": "MainHand"}, {"item": "res://sprites/items/Knight/SecondHand/StarterShield.tres", "slot": "Hand"}],
@@ -618,19 +635,19 @@ def montar_kit_inicial(class_name):
 ADC_DA_CLASSE = {"Knight": ("Melee",), "Mage": ("Magic",), "Ranger": ("Focus",), "Bard": ("Musicality", "Magic")}
 
 def obter_dados_item(item_path, classe=None):
-    dados = ITEM_DB.get(item_path, {})
+    dados = stats_item(item_path, classe)
     bonus_damage = dados.get("bonus_damage", 0)
     adc_type = dados.get("fourth_stat_type", "None")
     adc_value = dados.get("fourth_stat_value", 0)
     if classe and adc_type not in ("None", "Class") and adc_type not in ADC_DA_CLASSE.get(classe, (adc_type,)):
         adc_value = 0  # ex: Ruby Ring de Focus num Knight
-    if adc_type != "None" and adc_value:
-        bonus_damage += adc_value * FOURTH_STAT_MULTIPLIERS.get(adc_type, 0.0)
+    adc = adc_value * FOURTH_STAT_MULTIPLIERS.get(adc_type, 0.0) if adc_type != "None" and adc_value else 0.0
+    bonus_damage += adc
     return {
         "req_class": dados.get("req_class", "All"),
-        # Armour (armaduras): 1 = 1 de dano a menos (1:1). Defense dos itens
-        # conta 1:2 em calc_player_stats, entao o armour entra dobrado aqui.
-        "bonus_damage": bonus_damage, "bonus_defense": dados.get("defense", 0) + 2 * dados.get("armour", 0),
+        # Armour (armaduras) e ADC: 1 = 1 de dano a menos (1:1). Defense dos itens
+        # conta 1:2 em calc_player_stats, entao os dois entram dobrados aqui.
+        "bonus_damage": bonus_damage, "bonus_defense": dados.get("defense", 0) + 2 * dados.get("armour", 0) + 2 * adc,
         "bonus_hp": dados.get("stamina", 0), "bonus_mp": dados.get("mana", 0),
     }
 
@@ -887,14 +904,17 @@ def calc_level_bonuses(level, player_class):
     speed_multiplier = 1.0 + (niveis_ganhos * SPEED_PCT_POR_LEVEL)
     return bonus_hp, bonus_mp, speed_multiplier
 
+# +1 de dano por level ganho.
+DANO_POR_LEVEL = 1.0
+
 def calc_player_stats(player_class, level, skills, bonus_dmg=0, bonus_def=0):
-    dmg = ((level - 1) * 0.5) + bonus_dmg
+    dmg = ((level - 1) * DANO_POR_LEVEL) + bonus_dmg
     # Defesa dos itens conta 1:2 (5 de defesa no escudo = 2.5 de reducao);
     # a skill defense conta 1:1 (mais abaixo).
     defense = 0.0 + bonus_def * 0.5
     adc = skills.get("adc", 0)
-    dmg += adc * 0.5
-    defense += adc * 0.5
+    dmg += adc
+    defense += adc
     
     # Skill base (a da classe + defense): 1 de dano e 1 de redução por nível,
     # igual pra todas as classes. ADC (acima) e itens continuam à parte.
@@ -4015,7 +4035,7 @@ def handle_join_game(data):
         max_hp_join, max_mp_join = calcular_max_vitais(data)
         extra_admin = {'admin_commands': [{'cmd': c, 'usage': u, 'desc': d} for c, u, d in ADMIN_COMANDOS],
                        'admin_args': argumentos_admin()} if eh_admin(data) else {}
-        emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(),
+        emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(data.get('class_name')),
                                         'mob_names': {t: i.get('name', t.capitalize()) for t, i in MOB_DB.items()},
                                         'mob_flap': [t for t, i in MOB_DB.items() if i.get('flap')],
                                         'mob_shadow': [t for t, i in MOB_DB.items() if i.get('shadow')], 'mob_boss': [t for t, i in MOB_DB.items() if i.get('boss')], 'soul': eh_alma(data), 'admin': eh_admin(data),
@@ -8172,11 +8192,14 @@ def bonus_itens_skills(p):
     if isinstance(equipados, dict):
         for inst in equipados.values():
             if not isinstance(inst, dict): continue
-            d = ITEM_DB.get(inst.get('item'), {})
+            d = stats_item(inst.get('item'), classe)
             tipo = d.get("fourth_stat_type", "None")
+            adc_item = 0
             if tipo != "None" and (tipo == "Class" or tipo in ADC_DA_CLASSE.get(classe, (tipo,))):
-                adc += int(d.get("fourth_stat_value", 0) or 0)
-            defesa += float(d.get("defense", 0) or 0) * 0.5 + float(d.get("armour", 0) or 0)
+                adc_item = int(d.get("fourth_stat_value", 0) or 0)
+            adc += adc_item
+            # ADC tambem reduz dano 1:1 (mesma conta de obter_dados_item).
+            defesa += float(d.get("defense", 0) or 0) * 0.5 + float(d.get("armour", 0) or 0) + adc_item
     return adc, defesa
 
 def regen_base_e_itens(p):
