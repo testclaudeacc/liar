@@ -904,8 +904,8 @@ def calc_level_bonuses(level, player_class):
     speed_multiplier = 1.0 + (niveis_ganhos * SPEED_PCT_POR_LEVEL)
     return bonus_hp, bonus_mp, speed_multiplier
 
-# +1 de dano por level ganho.
-DANO_POR_LEVEL = 1.0
+# +0.5 de dano por level ganho.
+DANO_POR_LEVEL = 0.5
 
 def calc_player_stats(player_class, level, skills, bonus_dmg=0, bonus_def=0):
     dmg = ((level - 1) * DANO_POR_LEVEL) + bonus_dmg
