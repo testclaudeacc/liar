@@ -2176,7 +2176,7 @@ public class WorldScreen extends ScreenAdapter {
         // Party: o icone vai trocando entre as 4 classes (devagar).
         adicionarLegendaParty(linhaPessoas);
         adicionarLegenda(linhaPessoas, MiniMapa.COR_MOB, tr("Monsters"));
-        for (String[] p : ICONES_PAPEL) adicionarLegendaIcone(linhaNpcs, regiaoCache(p[1]), p[2]);
+        for (String[] p : ICONES_PAPEL) adicionarLegendaIcone(linhaNpcs, regiaoCache(p[1]), tr(p[2]));
         Table legenda = new Table();
         legenda.left();
         legenda.add(linhaPessoas).left().row();
@@ -4686,7 +4686,7 @@ public class WorldScreen extends ScreenAdapter {
         // NPC que cobra (servidor.py::NPC_DB "price"): botao Pay na ultima pagina.
         if (!questFeita && NPCS_QUE_COBRAM.contains(npc.tipo.toLowerCase())) {
             String tipo = npc.tipo.toLowerCase();
-            dialogoNPC.definirAcao("Pay", atlas.findRegion("ui/SellerIcon"), () -> {
+            dialogoNPC.definirAcao(tr("Pay"), atlas.findRegion("ui/SellerIcon"), () -> {
                 if (socket.isConnected()) socket.emitRaw("npc_pay", GameSocket.obj(w -> w.set("npc_id", tipo)));
             });
         }

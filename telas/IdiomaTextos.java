@@ -442,6 +442,9 @@ final class IdiomaTextos {
             + "Shows what is slowing down the game on your device.	Mostra o que est\u00e1 deixando o jogo lento no seu aparelho.	Muestra qu\u00e9 est\u00e1 haciendo lento el juego en tu dispositivo.\n"
             + "Creatures the auto target key can pick.	Criaturas que a tecla de alvo autom\u00e1tico pode escolher.	Criaturas que puede elegir la tecla de objetivo autom\u00e1tico.\n"
             + "2 Silver Coins	2 moedas de prata	2 monedas de plata\n"
+            + "Pay	Pagar	Pagar\n"
+            + "Quests	Miss\u00f5es	Misiones\n"
+            + "Market	Mercado	Mercado\n"
         ,
     };
 }
