@@ -3650,7 +3650,6 @@ SKIN_DB = {
         _skin("sprites/body/Mage", "Mage Outfit", ["Mage"]),
         _skin("sprites/body/Ranger", "Ranger Outfit", ["Ranger"]),
         _skin("sprites/body/Bard", "Bard Outfit", ["Bard"]),
-        _skin("sprites/equip_previews/Bard-Manto", "Bard Mantle", ["Bard"]),
     ],
     "helm": [
         _skin("sprites/hair/MascHair1", "Hair 1"), _skin("sprites/hair/MascHair2", "Hair 2"),
@@ -3666,6 +3665,8 @@ SKIN_DB = {
     ],
     "acc": [
         _skin("sprites/equip_previews/Bard-Alaude", "Lute", ["Bard"]),
+        # Manto e' acessorio (capa): atras de frente/lado, na frente de costas.
+        _skin("sprites/equip_previews/Bard-Manto", "Bard Mantle", ["Bard"]),
     ],
 }
 
