@@ -3792,7 +3792,14 @@ public final class BookMenuUI {
         Table rodapeVenda = new Table();
         totalLoja = new com.badlogic.gdx.scenes.scene2d.ui.Container<>();
         totalLoja.left();
+        // Select All: tudo que o NPC compra vai pra cima (menos favoritos);
+        // com tudo ja' selecionado, limpa.
+        TextButton selecionarTudo = new TextButton(tr("Select All"), estiloPlano(new Color(0.3f, 0.3f, 0.3f, 1f), Color.WHITE));
+        selecionarTudo.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { selecionarTudoVenda(); }
+        });
         rodapeVenda.add(totalLoja).left().expandX();
+        rodapeVenda.add(selecionarTudo).height(40).minWidth(120).padRight(6);
         rodapeVenda.add(botaoVender).width(150).height(40);
         conteudoVenda = new Table();
         conteudoVenda.top();
@@ -4021,6 +4028,21 @@ public final class BookMenuUI {
             if (++n % COLUNAS_INVENTARIO == 0) lojaGridCompra.row();
         }
         atualizarBotaoAprender();
+    }
+
+    private void selecionarTudoVenda() {
+        if (!modoLoja || !abaLojaVenda) return;
+        boolean tudo = true;
+        for (InventoryItem item : inventoryItems) {
+            if (item.favorite || precoVenda(item.itemPath) <= 0) continue;
+            if (vendaSelecao.getOrDefault(item.instanceId, 0) < item.quantity) { tudo = false; break; }
+        }
+        if (tudo) vendaSelecao.clear();
+        else for (InventoryItem item : inventoryItems) {
+            if (item.favorite || precoVenda(item.itemPath) <= 0) continue;
+            vendaSelecao.put(item.instanceId, item.quantity);
+        }
+        atualizarTelaLoja();
     }
 
     private void atualizarGradesVenda() {
@@ -5001,7 +5023,7 @@ public final class BookMenuUI {
     private com.badlogic.gdx.scenes.scene2d.ui.SelectBox<String> mercadoClasse, mercadoNivel, mercadoTipo;
     private static final String[] FILTRO_CLASSES = {"All classes", "Knight", "Ranger", "Mage", "Bard", "Universal"};
     private static final String[] FILTRO_NIVEIS = {"All levels", "Lv 0-9", "Lv 10-19", "Lv 20-29", "Lv 30+"};
-    private static final String[] FILTRO_TIPOS = {"All types", "Weapons", "Off-hand", "Armor", "Ammo", "Potions", "Food", "Scrolls", "Other"};
+    private static final String[] FILTRO_TIPOS = {"All types", "Weapons", "Off-hand", "Armor", "Ammo", "Potions", "Food", "Scrolls", "Materials", "Other"};
 
     public boolean emMercado() { return modoMercado; }
 
@@ -5142,6 +5164,7 @@ public final class BookMenuUI {
         else if (d.ehPocao()) tipo = "Potions";
         else if (d.fullness > 0) tipo = "Food";
         else if (d.usavel) tipo = "Scrolls";
+        else if ("Material".equals(d.tipo)) tipo = "Materials"; // Wolf Fur, Wasp Stinger...
         else tipo = "Other";
         int t = mercadoTipo.getSelectedIndex();
         return t == 0 || FILTRO_TIPOS[t].equals(tipo);
