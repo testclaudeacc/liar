@@ -174,6 +174,8 @@ public class InvertedRealmsGame extends Game {
                         // ele o servidor recusa entrar no personagem.
                         w.set("token", com.teste.game.rede.Sessao.tokenSalvo());
                         w.set("name", personagem.name);
+                        // Versao: client velho e' recusado aqui tambem (nao so' no /check_version).
+                        w.set("version", com.teste.game.rede.ServerConfig.CLIENT_VERSION);
                         w.object("skins");
                         w.pop();
                     });

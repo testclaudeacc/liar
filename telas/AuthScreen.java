@@ -660,6 +660,8 @@ public class AuthScreen extends ScreenAdapter {
                             fetchCharacters();
                         } else if (statusCode == 403 && body != null && body.getBoolean("unverified", false)) {
                             telaVerificarEmail(em, tr("Your email is not verified yet."));
+                        } else if (statusCode == 426) {
+                            telaErro(tr("Version outdated, please update your game"), AuthScreen.this::telaMenuPrincipal);
                         } else {
                             telaErro(tr("Invalid email or password."), AuthScreen.this::telaLogin);
                         }
@@ -990,6 +992,8 @@ public class AuthScreen extends ScreenAdapter {
                         }
                     }
                     telaSelecaoPersonagem();
+                } else if (statusCode == 426) {
+                    telaErro(tr("Version outdated, please update your game"), AuthScreen.this::telaMenuPrincipal);
                 } else if (statusCode == 403 && body != null && body.has("banned")) {
                     // Conta banida (/ban do admin): tela com o motivo e quanto falta.
                     telaBanido(body.get("banned"));

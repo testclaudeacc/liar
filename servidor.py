@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.49"
+SERVER_VERSION = "v0.50"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -3276,6 +3276,14 @@ def enviar_codigo_reset(email, codigo):
 @app.route('/ping', methods=['GET'])
 def ping(): return jsonify({"status": "online"}), 200
 
+def versao_ok(dados):
+    """O client manda a versao em todo pedido que importa (login, personagens,
+    entrar no mundo): pular o /check_version nao deixa client velho entrar."""
+    return isinstance(dados, dict) and dados.get('version', '') == SERVER_VERSION
+
+def _resposta_versao():
+    return jsonify({"valid": False, "erro": "Version outdated, please update your game"}), 426
+
 @app.route('/check_version', methods=['POST'])
 def check_version():
     dados = _json_requisicao()
@@ -3460,6 +3468,7 @@ def login():
     dados = _json_requisicao()
     email = str(dados.get('email') or '').strip().lower()
     senha = str(dados.get('password') or '')
+    if not versao_ok(dados): return _resposta_versao()
     if not email or not senha: return jsonify({"erro": "Missing fields"}), 400
     # Forca bruta: por IP e por conta.
     if _limite_excedido(('login_ip', _ip()), 20, 300) or _limite_excedido(('login_email', email), 10, 300):
@@ -3597,6 +3606,7 @@ def create_character():
 def get_characters():
     dados = _json_requisicao()
     user_id = dados.get('user_id')
+    if not versao_ok(dados): return _resposta_versao()
     if not user_id: return jsonify({"erro": "Missing ID."}), 400
     conn = None
     try:
@@ -4051,6 +4061,9 @@ def handle_join_game(data):
         user_id = data.get('user_id')
         p_name = str(data.get('name', '')).strip()
         if not p_name or not user_id or user_id == -1: return
+        if not versao_ok(data):
+            emit('force_disconnect', {"reason": "Version outdated, please update your game"}, room=sid)
+            return
         # Save desse personagem ainda na fila (acabou de sair): espera gravar.
         # (Ainda online em outra sessao: o estado vem da memoria, sem esperar.)
         def _pendente():

@@ -34,6 +34,7 @@ public class ServerApi {
         String body = json(w -> {
             w.set("email", email);
             w.set("password", password);
+            w.set("version", ServerConfig.CLIENT_VERSION); // o servidor recusa versao velha
         });
         post("/login", body, callback);
     }
@@ -77,6 +78,7 @@ public class ServerApi {
         String body = json(w -> {
             w.set("user_id", userId);
             w.set("token", Sessao.tokenSalvo());
+            w.set("version", ServerConfig.CLIENT_VERSION);
         });
         post("/get_characters", body, callback);
     }
