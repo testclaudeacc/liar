@@ -588,6 +588,13 @@ public final class BookMenuUI {
         // Vanity: a coluna da esquerda cresceu com a traducao - a janela alarga o
         // mesmo tanto, e as grades da direita continuam com 5 pecas / 8 cores.
         if (vanityPage.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, extraVanity());
+        // Skills: numeros grandes (EXP/abates na casa dos milhoes) alargam a janela
+        // em vez de empurrar as barras/valores pra fora da borda.
+        if (skillsPage.getParent() == mainWindow) {
+            float disponivel = JANELA_LARGURA - mainWindow.getPadLeft() - mainWindow.getPadRight();
+            extraVisivel = Math.max(extraVisivel,
+                Math.min(limite, Math.max(0f, (float) Math.ceil(skillsPage.getPrefWidth()) + 2f - disponivel)));
+        }
         // Aba Spells (lista de magias): a janela alarga ate' a descricao caber numa linha.
         if (conteudoMagias != null && spellsPage.getParent() == mainWindow && conteudoMagias.getStage() != null) {
             float esquerda = TAM_SLOT_ATALHO * 3f + 6f * 3f + 22f + 6f;
@@ -1485,7 +1492,8 @@ public final class BookMenuUI {
 
         Table status = new Table();
         status.top().left();
-        status.add(statusEsquerda).top().left().expandX().fillX();
+        // Folga entre as colunas: valor grande (EXP > 1 milhao) nao encosta no nome da direita.
+        status.add(statusEsquerda).top().left().expandX().fillX().padRight(16);
         status.add(statusDireita).top().left().expandX().fillX();
 
         skillsPage.add(barras).growX().height(ALTURA_TOPO_SKILLS).top().left().padTop(4).row();
