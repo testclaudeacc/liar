@@ -32,7 +32,7 @@ Only target	Alvo	Objetivo
 Only enemies	Inimigos	Enemigos
 Health bar size	Tamanho da barra de vida	Tamaño de la barra de vida
 UI font size	Tamanho do texto	Tamaño del texto
-Smaller	Menor	Más pequeño
+Smaller	Extra pequeno	Extra pequeño
 Small	Pequeno	Pequeño
 Default	Padrão	Normal
 Big	Grande	Grande
@@ -53,7 +53,7 @@ Auto target	Alvo automático	Objetivo automático
 All	Todos	Todos
 Not others'	Exceto de outros	Excepto de otros
 Only mine	Meus	Míos
-Mine + party	Festa	Grupo
+Mine + party	Festa	Fiesta
 UI font size: the chat text and potion cooldown numbers update after re-entering the world.	Tamanho do texto: o chat e os números de cooldown das poções mudam ao entrar no mundo de novo.	Tamaño del texto: el chat y los números de enfriamiento de pociones cambian al volver a entrar al mundo.
 Language of menus, messages and descriptions. Item, creature and spell names stay in English for everyone.	Idioma dos menus, mensagens e descrições. Nomes de itens, criaturas e magias ficam em inglês para todos.	Idioma de menús, mensajes y descripciones. Los nombres de objetos, criaturas y hechizos quedan en inglés para todos.
 Map	Mapa	Mapa
@@ -325,7 +325,6 @@ Open Map	Abrir mapa	Abrir mapa
 Write	Escrever	Escribir
 Auto Target	Alvo automático	Objetivo automático
 Collect Bags	Pegar bolsas	Recoger bolsas
-PLAY	JOGAR	JUGAR
 Play	Jogar	Jugar
 Register	Cadastrar-se	Registrarse
 Connecting...	Conectando...	Conectando...

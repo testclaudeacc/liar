@@ -460,7 +460,7 @@ public class AuthScreen extends ScreenAdapter {
         definirRodape();
 
         Table painel = criarPainel();
-        TextButton playBtn = new TextButton(tr("PLAY"), skin, "verde");
+        TextButton playBtn = new TextButton(tr("Play"), skin, "verde");
         TextButton registerBtn = new TextButton(tr("Register"), skin, "laranja");
         TextButton exitBtn = new TextButton(tr("Exit"), skin, "vermelho");
 
