@@ -587,6 +587,13 @@ public final class BookMenuUI {
             }
             if (pagina.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, extra);
         }
+        // Loja: a janela alarga se a pagina nao couber (ex: linha de moedas comprida),
+        // em vez de vazar pra direita e sair do centro.
+        if (modoLoja && lojaPage.getParent() == mainWindow) {
+            float disponivel = JANELA_LARGURA - mainWindow.getPadLeft() - mainWindow.getPadRight();
+            extraVisivel = Math.max(extraVisivel,
+                Math.min(limite, Math.max(0f, (float) Math.ceil(lojaPage.getMinWidth()) + 2f - disponivel)));
+        }
         // Mercado: lista de itens + painel das ofertas lado a lado.
         if (modoMercado && mercadoPage.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, limite);
         // Vanity: a coluna da esquerda cresceu com a traducao - a janela alarga o
@@ -3731,7 +3738,9 @@ public final class BookMenuUI {
         });
         Table linhaMoedas = new Table();
         linhaMoedas.add(moedasLoja).left().expandX();
-        linhaMoedas.add(botaoAprenderRodape).height(40).minWidth(130).right();
+        // So' ocupa espaco na loja de magia (invisivel ainda reservava 130px e,
+        // com muitas moedas, a linha passava da janela).
+        celulaAprenderRodape = linhaMoedas.add(botaoAprenderRodape).height(40).minWidth(130).right();
         conteudoCompra.add(linhaMoedas).growX().padTop(2).row();
         conteudoCompra.add(new Stack(barraCapLoja, textoBarra)).growX().height(24).padTop(4);
 
@@ -6264,12 +6273,18 @@ public final class BookMenuUI {
     /** Magia com o Learn no "Are you sure?" (null = nenhuma). */
     private String magiaArmada;
     private TextButton botaoAprenderRodape;
+    private com.badlogic.gdx.scenes.scene2d.ui.Cell<?> celulaAprenderRodape;
 
     /** Botao Learn de baixo (loja de magia): segue a gaveta selecionada. */
     private void atualizarBotaoAprender() {
         if (botaoAprenderRodape == null) return;
         boolean magia = lojaDeMagia() && !abaLojaVenda;
         botaoAprenderRodape.setVisible(magia);
+        if (celulaAprenderRodape != null && (celulaAprenderRodape.getActor() != null) != magia) {
+            celulaAprenderRodape.setActor(magia ? botaoAprenderRodape : null);
+            celulaAprenderRodape.minWidth(magia ? 130f : 0f).height(magia ? 40f : 0f);
+            if (celulaAprenderRodape.getTable() != null) celulaAprenderRodape.getTable().invalidateHierarchy();
+        }
         if (!magia) return;
         ItemLoja it = lojaFoco == null ? null : itemLoja(lojaFoco);
         boolean ok = it != null && ehMagia(it.item) && !conheceMagia(it.item);

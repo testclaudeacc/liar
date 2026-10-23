@@ -263,7 +263,7 @@ final class IdiomaTextos {
             + "Block	Bloquear	Bloquear\n"
             + "Blocked	Bloqueado	Bloqueado\n"
             + "Search item...	Buscar item...	Buscar objeto...\n"
-            + "My offers	Minhas ofertas	Mis ofertas\n"
+            + "My offers	Ofertas	Ofertas\n"
             + "No items found.	Nenhum item encontrado.	No se encontraron objetos.\n"
             + "Lv {0}	Lv {0}	Nv {0}\n"
             + "Select an item on the left.	Selecione um item \u00e0 esquerda.	Selecciona un objeto a la izquierda.\n"
