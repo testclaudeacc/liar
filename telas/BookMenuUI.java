@@ -1148,7 +1148,10 @@ public final class BookMenuUI {
             linha.add(linhaStat(tr("Extra XP"), cor));
             bloco.add(linha).left().padTop(4).row();
         } else if (dados.conjuntoDesc != null && !dados.conjuntoDesc.isEmpty()) {
-            bloco.add(linhaStat(tr("Bonus: {0}", tr(dados.conjuntoDesc)), completo ? COR_SET : COR_SET_OFF)).left().padTop(4).row();
+            // Quebra a linha (texto comprido nao passa da coluna), igual a descricao do scroll.
+            Label bonus = linhaStat(tr("Bonus: {0}", tr(dados.conjuntoDesc)), completo ? COR_SET : COR_SET_OFF);
+            bonus.setWrap(true);
+            bloco.add(bonus).growX().left().padTop(4).row();
         }
     }
 
