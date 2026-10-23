@@ -8,6 +8,7 @@ Arquivos daqui vao pro projeto `LibgdxTeste` (substituindo os atuais):
 | `desktop/build.gradle` | `LibgdxTeste/desktop/build.gradle` |
 | `android/build.gradle` | `LibgdxTeste/android/build.gradle` |
 | `android/proguard-rules.pro` | `LibgdxTeste/android/proguard-rules.pro` |
+| `desktop/proguard-rules.pro` | `LibgdxTeste/desktop/proguard-rules.pro` |
 | `exportar.sh` | `LibgdxTeste/exportar.sh` |
 | `keystore.properties.exemplo` | `LibgdxTeste/` (copie como `keystore.properties` e preencha) |
 | `gitignore.adicionar` | cole o conteudo no `LibgdxTeste/.gitignore` |

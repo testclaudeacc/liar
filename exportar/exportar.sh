@@ -29,5 +29,9 @@ fi
 if [ "$ALVO" = "windows" ] || [ "$ALVO" = "tudo" ]; then
     ./gradlew desktop:packageWinX64
 fi
+# mapping do jogo de PC embaralhado (ProGuard): traduz crash log do .exe/Linux. Guarde, NUNCA publique.
+if [ -f desktop/build/proguard/mapping.txt ]; then
+    mkdir -p dist/mapping && cp desktop/build/proguard/mapping.txt "dist/mapping/mapping-pc-$VERSAO.txt"
+fi
 echo "Pronto. Arquivos em dist/:"
 ls -lh dist/

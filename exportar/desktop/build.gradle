@@ -1,5 +1,11 @@
 import io.github.fourlastor.construo.Target
 
+buildscript {
+    repositories { mavenCentral() }
+    // ProGuard: embaralha o codigo do jogo dentro do .jar/.exe/Linux (igual o R8 no APK).
+    dependencies { classpath 'com.guardsquare:proguard-gradle:7.10.0' }
+}
+
 plugins {
     // Construo: gera Linux e Windows com um Java enxuto (jlink) embutido -
     // o jogador nao precisa instalar Java. Tasks: packageLinuxX64, packageWinX64.
@@ -59,7 +65,7 @@ construo {
     humanName.set('Mitera Online')
     mainClass.set('com.teste.desktop.DesktopGameLauncher')
     outputDir.set(rootProject.file('dist'))
-    jarTask.set('jar')
+    jarTask.set('jarOfuscado')  // o jar ja' embaralhado pelo ProGuard (ver abaixo)
     jlink {
         // Java so' com os modulos que o jogo usa (bem menor que o JRE inteiro);
         // cripto incluida pra HTTPS/WSS funcionar com o dominio.
@@ -76,6 +82,56 @@ construo {
             jdkUrl.set('https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.13%2B11/OpenJDK17U-jdk_x64_windows_hotspot_17.0.13_11.zip')
             useGpuHint.set(false)
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EMBARALHAR (ProGuard): so' o codigo do jogo (com.teste.**) e' renomeado; libGDX,
+// LWJGL, WebSocket e os assets passam intactos. jar -> proguard -> jarOfuscado.
+// ---------------------------------------------------------------------------
+
+// Classes do proprio Java (pro ProGuard saber o que e' do Java e nao renomear,
+// ex: run() de Runnable). Tirado do JDK que esta' rodando o Gradle (jrt:/),
+// funciona com qualquer JDK 17+ (sem precisar da pasta jmods).
+tasks.register('classesDoJava') {
+    def saida = layout.buildDirectory.file('proguard/java-classes.jar')
+    outputs.file(saida)
+    doLast {
+        def fs = java.nio.file.FileSystems.getFileSystem(URI.create('jrt:/'))
+        def arquivo = saida.get().asFile
+        arquivo.parentFile.mkdirs()
+        new java.util.zip.ZipOutputStream(new FileOutputStream(arquivo)).withCloseable { zip ->
+            ['java.base', 'java.desktop', 'java.logging', 'java.xml', 'jdk.unsupported'].each { modulo ->
+                def raiz = fs.getPath('modules', modulo)
+                java.nio.file.Files.walk(raiz).withCloseable { arquivos ->
+                    arquivos.filter { it.toString().endsWith('.class') && it.fileName.toString() != 'module-info.class' }
+                        .forEach { c ->
+                            zip.putNextEntry(new java.util.zip.ZipEntry(raiz.relativize(c).toString()))
+                            zip.write(java.nio.file.Files.readAllBytes(c))
+                            zip.closeEntry()
+                        }
+                }
+            }
+        }
+    }
+}
+
+tasks.register('proguard', proguard.gradle.ProGuardTask) {
+    dependsOn jar, 'classesDoJava'
+    injars jar.archiveFile
+    outjars layout.buildDirectory.file('proguard/MiteraOnline-proguard.jar')
+    libraryjars layout.buildDirectory.file('proguard/java-classes.jar')
+    configuration file('proguard-rules.pro')
+}
+
+// Jar final (o que o Construo poe no .exe e no Linux), com o manifest certo.
+tasks.register('jarOfuscado', Jar) {
+    dependsOn 'proguard'
+    archiveBaseName.set('MiteraOnline')
+    archiveClassifier.set('ofuscado')
+    from { zipTree(layout.buildDirectory.file('proguard/MiteraOnline-proguard.jar')) }
+    manifest {
+        attributes 'Main-Class': 'com.teste.desktop.DesktopGameLauncher'
     }
 }
 
