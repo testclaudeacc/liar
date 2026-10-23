@@ -585,6 +585,9 @@ public final class BookMenuUI {
         }
         // Mercado: lista de itens + painel das ofertas lado a lado.
         if (modoMercado && mercadoPage.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, limite);
+        // Vanity: a coluna da esquerda cresceu com a traducao - a janela alarga o
+        // mesmo tanto, e as grades da direita continuam com 5 pecas / 8 cores.
+        if (vanityPage.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, extraVanity());
         // Aba Spells (lista de magias): a janela alarga ate' a descricao caber numa linha.
         if (conteudoMagias != null && spellsPage.getParent() == mainWindow && conteudoMagias.getStage() != null) {
             float esquerda = TAM_SLOT_ATALHO * 3f + 6f * 3f + 22f + 6f;
@@ -1692,10 +1695,18 @@ public final class BookMenuUI {
 
     /** Quantas celulas de "tamanho" cabem na coluna da direita do Vanity
      * (a esquerda cresce com a traducao; a grade se ajusta e rola pra baixo). */
-    private int colunasVanity(float tamanho, int maximo) {
-        float livre = JANELA_LARGURA - larguraColunaVanity - 20f - 14f; // pads + barra de rolagem
-        return Math.max(2, Math.min(maximo, (int) Math.floor(livre / tamanho)));
+    private float extraVanity() {
+        return Math.max(0f, Math.min(limiteExtraTela(), larguraColunaVanity - COLUNA_VANITY));
     }
+
+    private int colunasVanity(float tamanho, int maximo) {
+        // Com a janela alargada (extraVanity) fica igual o original (5 pecas /
+        // 8 cores); so' numa tela estreita demais pra alargar perde coluna.
+        float falta = (larguraColunaVanity - COLUNA_VANITY) - extraVanity();
+        if (falta <= 0.5f) return maximo;
+        return Math.max(2, maximo - (int) Math.ceil(falta / tamanho));
+    }
+
     private static final float ESCALA_PREVIEW = 3.5f;
     private final Map<String, List<String[]>> skinDb = new LinkedHashMap<>(); // cat -> {caminho, nome}
     private final Map<String, String[]> skinsEquipadas = new LinkedHashMap<>(); // cat -> {caminho, cor}
