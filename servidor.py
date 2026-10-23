@@ -587,8 +587,8 @@ CAP_POR_NIVEL = 10.0
 # "Class": item universal (sets) - vira o ADC da classe de quem veste (o
 # client mostra como Melee/Magic/Focus/Musicality). Magic no Bard aparece
 # como Musicality (o Bard usa os sets do Mage). No dano tudo vale igual 1:2.
-# ADC (fourth stat) estilo Tibia: 1 de ADC = +1 de dano E +1 de reducao de dano
-# (igual 1 nivel de skill). So' armas e offhands tem ADC; armadura da' HP/defesa.
+# ADC (fourth stat) estilo Tibia: 1 de ADC = +1 de dano (igual 1 nivel da skill
+# da classe; nao reduz dano). So' armas e offhands tem ADC; armadura da' HP/defesa.
 FOURTH_STAT_MULTIPLIERS = {"Magic": 1.0, "Focus": 1.0, "Musicality": 1.0, "Melee": 1.0, "Class": 1.0}
 # Joias "universal": True (Ruby Ring/Necklace) - sem ADC; o que dao depende da
 # classe de quem usa (mago mais mana que defesa, knight o contrario).
@@ -645,9 +645,9 @@ def obter_dados_item(item_path, classe=None):
     bonus_damage += adc
     return {
         "req_class": dados.get("req_class", "All"),
-        # Armour (armaduras) e ADC: 1 = 1 de dano a menos (1:1). Defense dos itens
-        # conta 1:2 em calc_player_stats, entao os dois entram dobrados aqui.
-        "bonus_damage": bonus_damage, "bonus_defense": dados.get("defense", 0) + 2 * dados.get("armour", 0) + 2 * adc,
+        # Armour (armaduras): 1 = 1 de dano a menos (1:1). Defense dos itens
+        # conta 1:2 em calc_player_stats, entao o armour entra dobrado aqui.
+        "bonus_damage": bonus_damage, "bonus_defense": dados.get("defense", 0) + 2 * dados.get("armour", 0),
         "bonus_hp": dados.get("stamina", 0), "bonus_mp": dados.get("mana", 0),
     }
 
@@ -912,9 +912,7 @@ def calc_player_stats(player_class, level, skills, bonus_dmg=0, bonus_def=0):
     # Defesa dos itens conta 1:2 (5 de defesa no escudo = 2.5 de reducao);
     # a skill defense conta 1:1 (mais abaixo).
     defense = 0.0 + bonus_def * 0.5
-    adc = skills.get("adc", 0)
-    dmg += adc
-    defense += adc
+    dmg += skills.get("adc", 0)
     
     # Skill base (a da classe + defense): 1 de dano e 1 de redução por nível,
     # igual pra todas as classes. ADC (acima) e itens continuam à parte.
@@ -8198,8 +8196,7 @@ def bonus_itens_skills(p):
             if tipo != "None" and (tipo == "Class" or tipo in ADC_DA_CLASSE.get(classe, (tipo,))):
                 adc_item = int(d.get("fourth_stat_value", 0) or 0)
             adc += adc_item
-            # ADC tambem reduz dano 1:1 (mesma conta de obter_dados_item).
-            defesa += float(d.get("defense", 0) or 0) * 0.5 + float(d.get("armour", 0) or 0) + adc_item
+            defesa += float(d.get("defense", 0) or 0) * 0.5 + float(d.get("armour", 0) or 0)
     return adc, defesa
 
 def regen_base_e_itens(p):
