@@ -1385,6 +1385,7 @@ def resumo_player_area(p):
         "is_typing": bool(p.get('is_typing', False)),
         "is_in_settings": bool(p.get('is_in_settings', False)),
         "is_in_skins": bool(p.get('is_in_skins', False)),
+        "is_away": bool(p.get('corpo_ausente', False)),  # saiu em battle: balao com X
         "ghost": admin_ghost(p),
         "morph": (p.get('morph') or {}).get('type_id', '') if isinstance(p.get('morph'), dict) else '',
     }
@@ -3776,6 +3777,12 @@ def handle_disconnect():
         # battle acabar - battle_loop tira ele depois (_remover_corpo_ausente).
         if player.get('em_batalha') and not player.get('is_dead'):
             player['corpo_ausente'] = True
+            # Quem esta' perto ve o balao com X em cima do corpo (saiu em battle);
+            # os outros baloes (chat/menu/settings) somem.
+            for chave in ('is_typing', 'is_in_settings', 'is_in_skins'): player[chave] = False
+            if room and p_name:
+                emit_area('player_status_updated', {"name": p_name, "is_away": True, "is_typing": False,
+                                                    "is_in_settings": False, "is_in_skins": False}, room)
             return
         _remover_da_visao(sid)
         if not invisivel(player): emit('player_left', {"name": p_name}, broadcast=True, include_self=False)

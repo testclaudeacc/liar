@@ -1004,6 +1004,15 @@ public class WorldScreen extends ScreenAdapter {
     // uma tela de verdade ainda (BookMenu nao foi portado), entao o proprio
     // clique no botao liga/desliga esse flag.
     private TextureRegion notifChat, notifConfig, notifMenu;
+    /** Balao com X: em cima do corpo de quem saiu do jogo em battle (servidor: is_away). */
+    private TextureRegion notifSaiu;
+    /** Baloes 16x16 desenhados pequenos (igual o de chat). */
+    private final java.util.Set<TextureRegion> baloesPequenos = new java.util.HashSet<>();
+
+    private TextureRegion regiaoOu(String nova, String antiga) {
+        TextureRegion r = atlas.findRegion(nova);
+        return r != null ? r : atlas.findRegion(antiga);
+    }
     private TextureRegion iconeLiderParty, iconeMembroParty; // ui/party/PT_Crown / PT_Shield
     private TextureRegion iconeConviteParty; // Pt_Invite: em cima de quem eu convidei (so' eu vejo)
     private final java.util.Set<String> convitesPartyEnviados = new java.util.HashSet<>();
@@ -1101,12 +1110,19 @@ public class WorldScreen extends ScreenAdapter {
         notifChat = atlas.findRegion("sheet/r83_c6");
         if (notifChat == null) notifChat = atlas.findRegion("sprites/notifications/Chat");
         iconeLiderParty = atlas.findRegion("ui/party/PT_Crown");
-        balaoTrade = atlas.findRegion("ui/items/Trade");
+        balaoTrade = regiaoOu("ui/baloes/BalaoTrade", "ui/items/Trade");
         iconeMembroParty = atlas.findRegion("ui/party/PT_Shield");
         iconeConviteParty = regiaoQualquer("ui/party/Pt_Invite", "ui/party/PT_Invite", "ui/Pt_Invite", "ui/PT_Invite",
             "ui/party/PtInvite", "ui/party/PT_invite");
-        notifConfig = atlas.findRegion("sprites/notifications/Settings");
-        notifMenu = atlas.findRegion("sprites/notifications/Menu");
+        // Baloes novos (ui/baloes/, mesmo contorno do de chat): pequenos a direita.
+        // Sem eles no atlas: os antigos, no tamanho original.
+        notifConfig = regiaoOu("ui/baloes/BalaoSettings", "sprites/notifications/Settings");
+        notifMenu = regiaoOu("ui/baloes/BalaoInventario", "sprites/notifications/Menu");
+        notifSaiu = atlas.findRegion("ui/baloes/BalaoLogout");
+        for (String n : new String[]{"ui/baloes/BalaoSettings", "ui/baloes/BalaoInventario", "ui/baloes/BalaoLogout", "ui/baloes/BalaoTrade"}) {
+            TextureRegion r = atlas.findRegion(n);
+            if (r != null) baloesPequenos.add(r);
+        }
 
         spawnSmokeTex = atlas.findRegion("sprites/spawn/Smoke");
         TextureRegion[] quadrosFumaca = new TextureRegion[7];
@@ -2774,6 +2790,8 @@ public class WorldScreen extends ScreenAdapter {
     // servidor.py::handle_update_status repassa essas chaves pra area.
     // is_in_skins = livro (BookMenu) aberto.
     private static final String[] CHAVES_BALAO = {"is_in_settings", "is_typing", "is_in_skins"};
+    /** O que chega dos outros: as de cima + is_away (saiu em battle, so' o corpo ficou). */
+    private static final String[] CHAVES_BALAO_REMOTO = {"is_in_settings", "is_typing", "is_in_skins", "is_away"};
     private final Map<String, java.util.Set<String>> baloesRemotos = new HashMap<>();
     private final boolean[] balaoEnviado = new boolean[CHAVES_BALAO.length];
 
@@ -2786,6 +2804,7 @@ public class WorldScreen extends ScreenAdapter {
     private TextureRegion balaoRemoto(String nome) {
         java.util.Set<String> estado = baloesRemotos.get(nome);
         if (estado == null || estado.isEmpty()) return null;
+        if (estado.contains("is_away") && notifSaiu != null) return notifSaiu;
         if (estado.contains("is_in_settings")) return notifConfig;
         if (estado.contains("is_typing")) return notifChat;
         if (estado.contains("is_in_skins")) return notifMenu;
@@ -4248,7 +4267,7 @@ public class WorldScreen extends ScreenAdapter {
             if (data.has("ghost")) definirFantasma(data.getString("name", ""), data.getBoolean("ghost", false));
             if (data.has("morph")) definirMorph(data.getString("name", ""), data.getString("morph", ""));
             // Balaozinho em cima da cabeca: abriu/fechou chat, menu ou settings.
-            for (String chave : CHAVES_BALAO) {
+            for (String chave : CHAVES_BALAO_REMOTO) {
                 if (data.has(chave)) definirBalaoRemoto(data.getString("name", ""), chave, data.getBoolean(chave, false));
             }
             // Outro player morreu / renasceu: troca pro quadro de morte (ou volta).
@@ -4836,7 +4855,7 @@ public class WorldScreen extends ScreenAdapter {
      * chat vai reduzido (TAM_ICONE_SANGRA) no espelho do icone de veneno/sangue
      * (que fica a esquerda); settings/menu/trade seguem no tamanho original. */
     private void desenharBalao(TextureRegion balao, float ancoraX, float ancoraY) {
-        if (balao == notifChat) {
+        if (balao == notifChat || baloesPequenos.contains(balao)) {
             batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, TAM_ICONE_SANGRA, TAM_ICONE_SANGRA);
         } else {
             batch.draw(balao, ancoraX + 2f, ancoraY + 9.5f, balao.getRegionWidth(), balao.getRegionHeight());
@@ -4881,7 +4900,7 @@ public class WorldScreen extends ScreenAdapter {
         }
         // Ja' entrou morto (morreu antes de eu chegar na area).
         if (p.getBoolean("is_dead", false)) remotosMortos.add(nome);
-        for (String chave : CHAVES_BALAO) {
+        for (String chave : CHAVES_BALAO_REMOTO) {
             if (p.getBoolean(chave, false)) definirBalaoRemoto(nome, chave, true);
         }
     }
