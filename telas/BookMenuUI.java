@@ -514,6 +514,30 @@ public final class BookMenuUI {
     private float extraJanela = 0f;
     /** Maior largura extra que a loja precisou desde que abriu (nao encolhe). */
     private float extraLojaAberta = 0f;
+    /** Loja: maior largura de detalhes entre os itens ja' medidos (so' cresce
+     * enquanto a loja esta' aberta). */
+    private float larguraLojaDetalhes = 0f;
+    private final Table medidorLoja = new Table();
+    private final java.util.Set<String> lojaMedidos = new java.util.HashSet<>();
+
+    private void medirLoja(String caminho, int qtd) {
+        if (caminho == null || !lojaMedidos.add(caminho + "#" + Math.min(qtd, 2))) return;
+        preencherBlocoStats(medidorLoja, caminho, null, qtd);
+        medidorLoja.invalidate();
+        larguraLojaDetalhes = Math.max(larguraLojaDetalhes, medidorLoja.getPrefWidth());
+        medidorLoja.clearChildren();
+    }
+
+    /** Mede tudo que pode aparecer nos detalhes da loja (itens a venda, a bag e
+     * o botao "Are you sure?"): a coluna ja' abre no tamanho final. */
+    private void medirItensLoja() {
+        for (ItemLoja it : itensLoja) medirLoja(it.item, 1);
+        for (InventoryItem it : inventoryItems) if (precoVenda(it.itemPath) > 0) medirLoja(it.itemPath, it.quantity);
+        if (lojaAcao != null && lojaMedidos.add("#botao")) {
+            float texto = new com.badlogic.gdx.graphics.g2d.GlyphLayout(lojaAcao.getLabel().getStyle().font, tr("Are you sure?")).width;
+            larguraLojaDetalhes = Math.max(larguraLojaDetalhes, texto + 30f - 2f);
+        }
+    }
     private static final float EXTRA_JANELA_MAX = 220f;
 
     /** Coluna de detalhes (Bag, trade, banco, loja) cresce ate' caber o texto
@@ -556,17 +580,14 @@ public final class BookMenuUI {
                     if (cc != null && cc.getMinWidth() > 0.5f) { cc.width(0f); pagina.invalidateHierarchy(); }
                     continue;
                 }
-                // Loja: coluna de largura fixa (o texto quebra). Alargar a cada item
-                // clicado fazia a GUI "sambar" e tudo trocava de lugar.
-                if (cc != null && Math.abs(cc.getMinWidth() - COLUNA_BAG) > 0.5f) { cc.width(COLUNA_BAG); pagina.invalidateHierarchy(); }
-                continue;
             }
             com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cDet = coluna.getCell(caixa), cCol = pagina.getCell(coluna);
             if (cDet == null || cCol == null) continue;
             float pad = cDet.getPadLeft() + cDet.getPadRight();
             float precisa = d.getPrefWidth() + pad + 2f;
-            // Loja: o botao de baixo ("Are you sure?" e' comprido) tambem tem que caber.
-            if (d == lojaDetalhes && lojaAcao != null) precisa = Math.max(precisa, lojaAcao.getPrefWidth() + 14f);
+            // Loja: largura do MAIOR item da loja/bag (medida ao abrir), nao do
+            // clicado - a coluna fica parada e nada troca de lugar ("samba").
+            if (d == lojaDetalhes) precisa = larguraLojaDetalhes + pad + 2f;
             // Trade: o botao Send Offer tambem (a coluna alarga pro texto dele).
             if (d == tradeDetalhes && botaoEnviarTrade != null) precisa = Math.max(precisa, botaoEnviarTrade.getPrefWidth() + 14f);
             float extra = Math.min(limite, Math.max(0f, precisa - base));
@@ -996,8 +1017,8 @@ public final class BookMenuUI {
         // caber numa linha; maior que isso quebra a linha.
         float larguraNome = Math.min(COLUNA_BAG - 16f + limiteExtraTela(),
             new com.badlogic.gdx.graphics.g2d.GlyphLayout(nome.getStyle().font, nome.getText()).width + 2f);
-        boolean colunaCresce = bloco == bagDetalhes || bloco == tradeDetalhes || bloco == bancoDetalhes
-            || bloco == equipDetalhesEsquerda;
+        boolean colunaCresce = bloco == bagDetalhes || bloco == tradeDetalhes || bloco == bancoDetalhes || bloco == lojaDetalhes
+            || bloco == equipDetalhesEsquerda || bloco == medidorLoja;
         bloco.add(nome).growX().minWidth(colunaCresce ? larguraNome : 0f).left().padBottom(1).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
         if (dados == null) return;
@@ -3820,6 +3841,7 @@ public final class BookMenuUI {
             itensLoja.add(new ItemLoja(e.getString("item", ""), e.getInt("price", 0), e.getInt("sell", 0)));
         }
         if (!modoLoja) secaoAntesDaLoja = secaoAtual;
+        if (!modoLoja || !lojaNpc.equals(npcMedido)) { lojaMedidos.clear(); larguraLojaDetalhes = 0f; npcMedido = lojaNpc; }
         modoLoja = true;
         vendaSelecao.clear();
         cancelarExclusao();
@@ -3832,6 +3854,8 @@ public final class BookMenuUI {
         trocarAbaLoja(false);
         root.setVisible(true);
     }
+
+    private String npcMedido = "";
 
     public String npcDaLoja() { return modoLoja ? lojaNpc : null; }
 
@@ -3894,6 +3918,7 @@ public final class BookMenuUI {
             if (it != null && e.getValue() > it.quantity) e.setValue(it.quantity);
         }
         if (abaLojaVenda) atualizarGradesVenda(); else atualizarGradeCompra();
+        medirItensLoja();
         atualizarDetalhesLoja();
         lojaInfo.setText(formatarPeso(capacityUsed) + "/" + formatarPeso(capacityMaximum));
         if (moedasLoja != null) moedasLoja.setActor(linhaMinhasMoedas());
