@@ -1006,7 +1006,7 @@ public class WorldScreen extends ScreenAdapter {
     private TextureRegion notifChat, notifConfig, notifMenu;
     /** Balao com X: em cima do corpo de quem saiu do jogo em battle (servidor: is_away). */
     private TextureRegion notifSaiu;
-    /** Baloes 16x16 desenhados pequenos (igual o de chat). */
+    /** Baloes no estilo do de chat (ui/baloes/), desenhados na metade do tamanho. */
     private final java.util.Set<TextureRegion> baloesPequenos = new java.util.HashSet<>();
 
     private TextureRegion regiaoOu(String nova, String antiga) {
@@ -4856,7 +4856,9 @@ public class WorldScreen extends ScreenAdapter {
      * (que fica a esquerda); settings/menu/trade seguem no tamanho original. */
     private void desenharBalao(TextureRegion balao, float ancoraX, float ancoraY) {
         if (balao == notifChat || baloesPequenos.contains(balao)) {
-            batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, TAM_ICONE_SANGRA, TAM_ICONE_SANGRA);
+            // Metade do tamanho do sprite (o de chat 16x16 vira 8x8; os de
+            // settings/inventario/trade/logout, 26x25, ficam 13x12.5).
+            batch.draw(balao, ancoraX + 1f, ancoraY + 9.5f, balao.getRegionWidth() / 2f, balao.getRegionHeight() / 2f);
         } else {
             batch.draw(balao, ancoraX + 2f, ancoraY + 9.5f, balao.getRegionWidth(), balao.getRegionHeight());
         }
