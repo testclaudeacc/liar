@@ -380,6 +380,10 @@ public class WorldScreen extends ScreenAdapter {
 
     /** Mobs com sombra desenhada pelo jogo (MOB_DB "shadow"): fica parada no chao. */
     private final java.util.Set<String> mobsComSombra = new java.util.HashSet<>();
+    /** Tipos boss (servidor manda 'mob_boss'): nome carmesim + caveira. */
+    private final java.util.Set<String> mobsBoss = new java.util.HashSet<>();
+    private static final Color COR_BOSS = Color.valueOf("DC143C");
+    private TextureRegion regiaoCaveiraBoss;
     private static final Color COR_SOMBRA_VOO = new Color(24 / 255f, 20 / 255f, 37 / 255f, 1f);
 
     /** Sombra oval (4/6/4 px) no chao, centrada no SQM - igual a que vinha desenhada na sheet. */
@@ -3500,6 +3504,9 @@ public class WorldScreen extends ScreenAdapter {
                 mobsComSombra.clear();
                 JsonValue sombras = data.get("mob_shadow");
                 if (sombras != null) for (JsonValue t = sombras.child; t != null; t = t.next) mobsComSombra.add(t.asString().toLowerCase());
+                mobsBoss.clear();
+                JsonValue bosses = data.get("mob_boss");
+                if (bosses != null) for (JsonValue t = bosses.child; t != null; t = t.next) mobsBoss.add(t.asString().toLowerCase());
                 bookMenu.atualizarInventario(data.get("inventory"));
                 if (data.has("hotbar")) bookMenu.definirHotbar(data.get("hotbar"));
                 bookMenu.atualizarMoedas(data.getLong("currency", 0L));
@@ -6913,10 +6920,22 @@ public class WorldScreen extends ScreenAdapter {
         // sprite, pra ficar por cima de arvores/telhados igual o nome.
         if (mostrarBarraMob(mob)) desenharBarraVida(ancoraX, ancoraY + altura + 1f, mob.hp / mob.maxHp);
         layout.setText(font, mob.nome);
-        float nomeX = Math.round((ancoraX - layout.width / 2f) / camera.zoom) * camera.zoom;
+        String tipoMob = tipoDe(mob);
+        boolean boss = tipoMob != null && mobsBoss.contains(tipoMob.toLowerCase());
+        if (boss && regiaoCaveiraBoss == null) regiaoCaveiraBoss = atlas.findRegion("ui/CritIcon");   // caveira 256,896
+        boolean comCaveira = boss && regiaoCaveiraBoss != null;
+        // Boss: "(caveira) Nome" centralizado como um bloco so'.
+        float tamCaveira = comCaveira ? Math.max(6f, font.getCapHeight() + 2f) : 0f;
+        float folgaCaveira = comCaveira ? 1f : 0f;
+        float larguraTotal = tamCaveira + folgaCaveira + layout.width;
+        float inicioX = Math.round((ancoraX - larguraTotal / 2f) / camera.zoom) * camera.zoom;
+        float nomeX = inicioX + tamCaveira + folgaCaveira;
         float nomeY = Math.round((ancoraY + altura + 10f + extraAlturaNome()) / camera.zoom) * camera.zoom;
+        if (comCaveira) {
+            batch.draw(regiaoCaveiraBoss, inicioX, nomeY - font.getCapHeight() / 2f - tamCaveira / 2f, tamCaveira, tamCaveira);
+        }
         Color anterior = new Color(font.getColor());
-        font.setColor(corDaVida(mob.hp / mob.maxHp));
+        font.setColor(boss ? COR_BOSS : corDaVida(mob.hp / mob.maxHp));
         font.draw(batch, mob.nome, nomeX, nomeY);
         font.setColor(anterior);
         // Bandeira enquanto volta pra casa (desistiu do alvo). Desenhada aqui

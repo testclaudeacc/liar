@@ -117,6 +117,14 @@ MOB_DB = {
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02}],
                        "currency": {"min": 35, "max": 50}},
+    # Boss: nome carmesim + caveira no client (lista 'mob_boss' do sync).
+    # respawn padrao 30 min (o respawn_time do Tiled ainda manda, se tiver).
+    "spidermother": {"name": "Spider Mother", "boss": True, "respawn": 1800, "speed_mult": 1.6, "hp": 6000, "xp": 1500,
+                       "attack": 90.0, "attack_min": 80, "attack_max": 100, "hit": "PoisonPhysATK",
+                       "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.5},
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25}],
+                       "currency": {"min": 400, "max": 700}},
     
 }
 
@@ -1603,6 +1611,8 @@ def obter_ou_criar_mob(mob_id, mob_type_id=None, room=None):
                     "cooldown": MOB_DB.get(tipo, {}).get("cooldown", MOB_COOLDOWN_PADRAO),
                     "hit_effect": "physical_hit", "mapa": None, "path": None, "alcance": {},
                     "tipos_sorteio": sorteio if len(sorteio) > 1 else None}
+        if MOB_DB.get(tipo, {}).get("respawn"):
+            mob_data['respawn_seg'] = float(MOB_DB[tipo]["respawn"])
         if spawn is not None:
             mob_data['pos_x'], mob_data['pos_y'] = centro_tile(spawn)
             mob_data['room'] = get_chunk(mob_data['pos_x'], mob_data['pos_y'], MOB_FLOOR)
@@ -4000,7 +4010,7 @@ def handle_join_game(data):
         emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(),
                                         'mob_names': {t: i.get('name', t.capitalize()) for t, i in MOB_DB.items()},
                                         'mob_flap': [t for t, i in MOB_DB.items() if i.get('flap')],
-                                        'mob_shadow': [t for t, i in MOB_DB.items() if i.get('shadow')], 'soul': eh_alma(data), 'admin': eh_admin(data),
+                                        'mob_shadow': [t for t, i in MOB_DB.items() if i.get('shadow')], 'mob_boss': [t for t, i in MOB_DB.items() if i.get('boss')], 'soul': eh_alma(data), 'admin': eh_admin(data),
                                    'ghost': admin_ghost(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
