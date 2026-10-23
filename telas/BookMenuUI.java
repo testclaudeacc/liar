@@ -512,6 +512,8 @@ public final class BookMenuUI {
 
     private com.badlogic.gdx.scenes.scene2d.ui.Cell<?> celulaJanela, celulaOrganizer;
     private float extraJanela = 0f;
+    /** Maior largura extra que a loja precisou desde que abriu (nao encolhe). */
+    private float extraLojaAberta = 0f;
     private static final float EXTRA_JANELA_MAX = 220f;
 
     /** Coluna de detalhes (Bag, trade, banco, loja) cresce ate' caber o texto
@@ -554,6 +556,10 @@ public final class BookMenuUI {
                     if (cc != null && cc.getMinWidth() > 0.5f) { cc.width(0f); pagina.invalidateHierarchy(); }
                     continue;
                 }
+                // Loja: coluna de largura fixa (o texto quebra). Alargar a cada item
+                // clicado fazia a GUI "sambar" e tudo trocava de lugar.
+                if (cc != null && Math.abs(cc.getMinWidth() - COLUNA_BAG) > 0.5f) { cc.width(COLUNA_BAG); pagina.invalidateHierarchy(); }
+                continue;
             }
             com.badlogic.gdx.scenes.scene2d.ui.Cell<?> cDet = coluna.getCell(caixa), cCol = pagina.getCell(coluna);
             if (cDet == null || cCol == null) continue;
@@ -591,8 +597,11 @@ public final class BookMenuUI {
         // em vez de vazar pra direita e sair do centro.
         if (modoLoja && lojaPage.getParent() == mainWindow) {
             float disponivel = JANELA_LARGURA - mainWindow.getPadLeft() - mainWindow.getPadRight();
-            extraVisivel = Math.max(extraVisivel,
+            extraLojaAberta = Math.max(extraLojaAberta,
                 Math.min(limite, Math.max(0f, (float) Math.ceil(lojaPage.getMinWidth()) + 2f - disponivel)));
+            extraVisivel = Math.max(extraVisivel, extraLojaAberta);
+        } else {
+            extraLojaAberta = 0f;
         }
         // Mercado: lista de itens + painel das ofertas lado a lado.
         if (modoMercado && mercadoPage.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, limite);
@@ -987,7 +996,7 @@ public final class BookMenuUI {
         // caber numa linha; maior que isso quebra a linha.
         float larguraNome = Math.min(COLUNA_BAG - 16f + limiteExtraTela(),
             new com.badlogic.gdx.graphics.g2d.GlyphLayout(nome.getStyle().font, nome.getText()).width + 2f);
-        boolean colunaCresce = bloco == bagDetalhes || bloco == tradeDetalhes || bloco == bancoDetalhes || bloco == lojaDetalhes
+        boolean colunaCresce = bloco == bagDetalhes || bloco == tradeDetalhes || bloco == bancoDetalhes
             || bloco == equipDetalhesEsquerda;
         bloco.add(nome).growX().minWidth(colunaCresce ? larguraNome : 0f).left().padBottom(1).row();
         EquipStats dados = ITEM_STATS.get(itemPath);
