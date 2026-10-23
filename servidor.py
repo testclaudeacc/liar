@@ -123,7 +123,7 @@ MOB_DB = {
                        {"item": "res://sprites/items/Bard/Weapons/WoodenRattle.tres", "chance": 0.025},
                        {"item": "res://sprites/items/Ranger/Weapons/IronBow.tres", "chance": 0.025}],
              "currency": {"min": 25, "max": 42}},
-    "spider": {"name": "Black Spider", "speed_mult": 2.4, "hp": 400, "xp": 92, "attack": 50.0, "attack_min": 48, "attack_max": 52, "hit": "PoisonPhysATK",
+    "spider": {"name": "Black Spider", "speed_mult": 2.4, "hp": 450, "xp": 92, "attack": 50.0, "attack_min": 48, "attack_max": 52, "hit": "PoisonPhysATK",
                        "drops": [{"one_of": ITENS_LV20_ARMADURA, "chance": 0.03},
                                  {"one_of": ITENS_LV20_ARMAS, "chance": 0.015},
                                  {"one_of": ITENS_LV20_JOIAS, "chance": 0.02}],
