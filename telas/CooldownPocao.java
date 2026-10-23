@@ -65,6 +65,29 @@ public final class CooldownPocao {
         return pixel;
     }
 
+    private static Texture circulo;
+
+    /** Circulo branco cheio (alta resolucao, borda suave) pro slot redondo do celular. */
+    private static Texture circulo() {
+        if (circulo == null) {
+            int n = 128;
+            Pixmap pm = new Pixmap(n, n, Pixmap.Format.RGBA8888);
+            pm.setBlending(Pixmap.Blending.None);
+            float c = (n - 1) / 2f, r = n / 2f;
+            for (int y = 0; y < n; y++) {
+                for (int x = 0; x < n; x++) {
+                    float d = (float) Math.hypot(x - c, y - c);
+                    float a = Math.max(0f, Math.min(1f, r - d)); // 1px de borda suave
+                    pm.drawPixel(x, y, Color.rgba8888(1f, 1f, 1f, a));
+                }
+            }
+            circulo = new Texture(pm);
+            circulo.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+            pm.dispose();
+        }
+        return circulo;
+    }
+
     /** Camada por cima do icone de uma pocao (ocupa o slot inteiro). */
     public static final class Sobreposicao extends Widget {
         // Bem escuro, mas ainda deixa ver a pocao por baixo.
@@ -73,6 +96,9 @@ public final class CooldownPocao {
         private final GlyphLayout layout = new GlyphLayout();
         private final boolean scroll;
         private final String magia; // != null: cooldown dessa magia
+        private boolean redondo; // slot redondo (hotbar do celular): escurece um circulo, nao um quadrado
+
+        public Sobreposicao redondo(boolean r) { this.redondo = r; return this; }
 
         public Sobreposicao(BitmapFont fonte) { this(fonte, false); }
 
@@ -97,7 +123,14 @@ public final class CooldownPocao {
             if (falta <= 0f) return;
             Color antes = new Color(batch.getColor());
             batch.setColor(FUNDO.r, FUNDO.g, FUNDO.b, FUNDO.a * parentAlpha);
-            batch.draw(pixel(), getX(), getY(), getWidth(), getHeight());
+            if (redondo) {
+                // Um pouco pra dentro: a borda do botao continua aparecendo.
+                float m = Math.min(getWidth(), getHeight()) * 0.04f;
+                float lado = Math.min(getWidth(), getHeight()) - m * 2f;
+                batch.draw(circulo(), getX() + (getWidth() - lado) / 2f, getY() + (getHeight() - lado) / 2f, lado, lado);
+            } else {
+                batch.draw(pixel(), getX(), getY(), getWidth(), getHeight());
+            }
             batch.setColor(antes);
             fonte.setColor(1f, 1f, 1f, parentAlpha);
             layout.setText(fonte, String.valueOf((int) Math.ceil(falta)));

@@ -411,7 +411,8 @@ public final class HotbarUI {
                     pilha.add(cantoMana);
                 }
                 // Pocao em cooldown: cinza escuro + segundos por cima.
-                if (livro.temCooldown(caminho)) pilha.add(livro.sobreposicaoCooldown(caminho));
+                // Celular: item no botao redondo = cooldown redondo; magia (slot quadrado), quadrado.
+                if (livro.temCooldown(caminho)) pilha.add(livro.sobreposicaoCooldown(caminho).redondo(MOBILE && !slotMagia[i]));
             }
             // PC: tecla do slot no canto; celular, no editor: numero do slot.
             if (!MOBILE || editando) {
