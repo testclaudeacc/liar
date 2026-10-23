@@ -47,12 +47,12 @@ Mitera Online está en desarrollo. El juego puede:
 Haremos lo posible para avisar los cambios importantes con anticipación.
 
 8. TUS DATOS
-Respetamos la Ley General de Protección de Datos de Brasil (LGPD, Ley n.º 13.709/2018).
+Cuidamos tus datos y usamos solo lo necesario para que el juego funcione.
 - Qué recopilamos: tu correo, tu contraseña (guardada cifrada, ni el equipo puede verla), la dirección IP de acceso y los datos del juego (personajes, objetos, progreso).
 - Para qué los usamos: crear y proteger tu cuenta, recuperar la contraseña, aplicar las reglas del juego y evitar fraudes y ataques.
 - Los mensajes del chat pueden ser revisados por el equipo para aplicar las reglas.
-- No vendemos tus datos ni los compartimos con terceros, salvo cuando la ley lo exija.
-- Puedes pedir ver, corregir o borrar tus datos a través del contacto de abajo. Al borrar la cuenta, tus datos se eliminan, salvo lo que la ley nos obligue a guardar.
+- No vendemos tus datos ni los compartimos con terceros, salvo cuando estemos obligados a hacerlo.
+- Puedes pedir ver, corregir o borrar tus datos a través del contacto de abajo. Al borrar la cuenta, tus datos se eliminan, salvo lo que necesitemos mantener por seguridad.
 
 9. LIMITACIÓN DE RESPONSABILIDAD
 El juego se ofrece "tal como está". No nos hacemos responsables de pérdidas causadas por contraseñas débiles o compartidas, estafas entre jugadores, problemas de tu internet o dispositivo, ni por negocios hechos fuera del juego.
@@ -60,8 +60,7 @@ El juego se ofrece "tal como está". No nos hacemos responsables de pérdidas ca
 10. CAMBIOS EN ESTOS TÉRMINOS
 Estos términos pueden actualizarse. Cuando eso pase, se te avisará y tendrás que aceptar la nueva versión para seguir jugando.
 
-11. CONTACTO Y JURISDICCIÓN
+11. CONTACTO
 Dudas, solicitudes sobre tus datos o apelaciones de sanciones: [CORREO DE CONTACTO].
-Estos términos se rigen por las leyes de Brasil.
 
 ¡Buen juego!

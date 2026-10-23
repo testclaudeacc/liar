@@ -47,12 +47,12 @@ Mitera Online is in development. The game may:
 We will do our best to announce important changes in advance.
 
 8. YOUR DATA
-We follow the Brazilian General Data Protection Law (LGPD, Law No. 13,709/2018).
+We take care of your data and only use what is needed for the game to work.
 - What we collect: your email, your password (stored encrypted, not even the staff can see it), the IP address you connect from and your game data (characters, items, progress).
 - What we use it for: creating and protecting your account, password recovery, enforcing the game rules and preventing fraud and attacks.
 - Chat messages may be reviewed by the staff to enforce the rules.
-- We do not sell your data and do not share it with third parties, except when required by law.
-- You can ask to see, correct or delete your data through the contact below. When your account is deleted, your data is removed, except what the law requires us to keep.
+- We do not sell your data and do not share it with third parties, except when we are required to.
+- You can ask to see, correct or delete your data through the contact below. When your account is deleted, your data is removed, except what we need to keep for security.
 
 9. LIMITATION OF LIABILITY
 The game is provided "as is". We are not responsible for losses caused by weak or shared passwords, scams between players, problems with your internet or device, or trades made outside the game.
@@ -60,8 +60,7 @@ The game is provided "as is". We are not responsible for losses caused by weak o
 10. CHANGES TO THESE TERMS
 These terms may be updated. When that happens, you will be notified and will need to accept the new version to keep playing.
 
-11. CONTACT AND JURISDICTION
+11. CONTACT
 Questions, data requests or punishment appeals: [CONTACT EMAIL].
-These terms are governed by the laws of Brazil.
 
 Have a good game!

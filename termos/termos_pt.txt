@@ -46,13 +46,13 @@ O Mitera Online está em desenvolvimento. O jogo pode:
 - Ser encerrado no futuro.
 Faremos o possível para avisar mudanças importantes com antecedência.
 
-8. SEUS DADOS (LGPD)
-Respeitamos a Lei Geral de Proteção de Dados (Lei nº 13.709/2018).
+8. SEUS DADOS
+Cuidamos dos seus dados e usamos apenas o necessário para o jogo funcionar.
 - O que coletamos: seu e-mail, sua senha (guardada de forma criptografada, nem a equipe consegue ver), o endereço IP de acesso e os dados do jogo (personagens, itens, progresso).
 - Para que usamos: criar e proteger sua conta, recuperar a senha, aplicar as regras do jogo e evitar fraudes e ataques.
 - Mensagens no chat podem ser analisadas pela equipe para aplicar as regras.
-- Não vendemos seus dados e não os compartilhamos com terceiros, exceto quando a lei exigir.
-- Você pode pedir para ver, corrigir ou apagar seus dados pelo contato abaixo. Ao apagar a conta, seus dados são removidos, exceto o que a lei nos obrigar a guardar.
+- Não vendemos seus dados e não os compartilhamos com terceiros, exceto quando formos obrigados a isso.
+- Você pode pedir para ver, corrigir ou apagar seus dados pelo contato abaixo. Ao apagar a conta, seus dados são removidos, exceto o que precisarmos manter por segurança.
 
 9. LIMITAÇÃO DE RESPONSABILIDADE
 O jogo é oferecido "como está". Não nos responsabilizamos por perdas causadas por senha fraca ou compartilhada, golpes entre jogadores, problemas na sua internet ou no seu dispositivo, nem por negociações feitas fora do jogo.
@@ -60,8 +60,7 @@ O jogo é oferecido "como está". Não nos responsabilizamos por perdas causadas
 10. MUDANÇAS NESTES TERMOS
 Estes termos podem ser atualizados. Quando isso acontecer, você será avisado e precisará aceitar a nova versão para continuar jogando.
 
-11. CONTATO E FORO
+11. CONTATO
 Dúvidas, pedidos sobre seus dados ou recursos de punição: [E-MAIL DE CONTATO].
-Estes termos seguem as leis brasileiras.
 
 Bom jogo!
