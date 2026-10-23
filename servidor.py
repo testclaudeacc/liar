@@ -125,6 +125,10 @@ MOB_DB = {
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25}],
                        "currency": {"min": 400, "max": 700}},
+    # walk_idle: anda idle, andar1, idle, andar2 por SQM (client: mob_walk_idle).
+    "mountaintroll": {"name": "Mountain Troll", "walk_idle": True, "speed_mult": 2.4, "hp": 800, "xp": 184,
+                       "attack": 100.0, "attack_min": 96, "attack_max": 104,
+                       "currency": {"min": 70, "max": 100}},
     "soullessbody": {"name": "Soulless Body", "boss": True, "respawn": 1800, "speed_mult": 2, "hp": 80000, "xp": 1000000,
                        "attack": 180.0, "attack_min": 160, "attack_max": 200,
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.5},
@@ -4036,7 +4040,7 @@ def handle_join_game(data):
         emit('sync_local_player', {**data, **extra_admin, 'item_db': montar_item_db_cliente(data.get('class_name')),
                                         'mob_names': {t: i.get('name', t.capitalize()) for t, i in MOB_DB.items()},
                                         'mob_flap': [t for t, i in MOB_DB.items() if i.get('flap')],
-                                        'mob_shadow': [t for t, i in MOB_DB.items() if i.get('shadow')], 'mob_boss': [t for t, i in MOB_DB.items() if i.get('boss')], 'soul': eh_alma(data), 'admin': eh_admin(data),
+                                        'mob_shadow': [t for t, i in MOB_DB.items() if i.get('shadow')], 'mob_boss': [t for t, i in MOB_DB.items() if i.get('boss')], 'mob_walk_idle': [t for t, i in MOB_DB.items() if i.get('walk_idle')], 'soul': eh_alma(data), 'admin': eh_admin(data),
                                    'ghost': admin_ghost(data),
                                    'max_hp': max_hp_join, 'max_mp': max_mp_join,
                                    'skin_db': montar_skin_db_cliente(data.get('class_name'))}, room=sid)
@@ -4301,6 +4305,7 @@ ADMIN_COMANDOS = [
     ("npcs", "/npcs", "NPCs lidos do mapa e se estao ativos"),
     ("mobs", "/mobs", "lista os mobs (nomes pro /summons)"),
     ("summons", "/summons <mob> [quantidade]", "cria mobs nos SQMs livres em volta (nao renascem)"),
+    ("level", "/level <1-1000>", "muda seu level (sobe ou desce; XP vai pro inicio do level)"),
     ("speed", "/speed <valor>|reset", "multiplica sua velocidade (fica salvo); reset volta ao normal"),
     ("dmg", "/dmg <valor>|reset", "multiplica seu dano (fica salvo); reset volta ao normal"),
     ("atkspd", "/atkspd <1-50>|reset", "multiplica sua velocidade de ataque (fica salvo)"),
@@ -4549,6 +4554,24 @@ def comando_admin(sid, p, texto, canal='local'):
         nome_mob = MOB_DB[tipo].get('name', tipo.capitalize())
         if feitos == 0: chat_sistema(sid, "No free tile near you.", 'red')
         else: chat_sistema(sid, f"Summoned {feitos}x {nome_mob}." + ("" if feitos == qtd else " (no more free tiles)"))
+        return
+    if cmd == 'level':
+        try: novo = int(partes[1]) if len(partes) > 1 else 0
+        except ValueError: novo = 0
+        if not 1 <= novo <= 1000:
+            chat_sistema(sid, f"Level: {p.get('level', 1)}. Usage: /level <1-1000>", 'red' if len(partes) > 1 else 'yellow')
+            return
+        p['level'] = novo
+        p['exp'] = get_exp_for_level(novo)
+        # HP/mana nao passam do maximo novo (descendo de level).
+        max_hp, max_mp = calcular_max_vitais(p)
+        p['current_hp'] = min(float(p.get('current_hp', max_hp) or 0), max_hp)
+        p['current_mp'] = min(float(p.get('current_mp', max_mp) or 0), max_mp)
+        _queue_save(p)
+        socketio.emit('sync_stats', _montar_payload_sync_stats(p), room=sid)
+        socketio.emit('sync_vitals', {'current_hp': p['current_hp'], 'current_mp': p['current_mp']}, room=sid)
+        broadcast_hp(sid, p)
+        chat_sistema(sid, f"Level set to {novo}.")
         return
     if cmd == 'speed':
         if len(partes) < 2:

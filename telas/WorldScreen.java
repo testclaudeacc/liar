@@ -373,8 +373,13 @@ public class WorldScreen extends ScreenAdapter {
     /** Quadro do mob agora: os que voam batem as asas sem parar (cada um num ritmo defasado). */
     private TextureRegion quadroDoMob(MobVisual mob) {
         if (!mob.morto && voa(mob)) return quadroAsas(mob.animacao, mob.direcao, mob.id.hashCode(), andandoVoo(mob));
-        return quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso);
+        return quadroAtual(mob.animacao, mob.andandoVisual(), mob.direcao, mob.progresso,
+            mobsPassoComIdle.contains(tipoDe(mob)));
     }
+
+    /** Tipos com MOB_DB "walk_idle" (ex: Mountain Troll): por SQM anda
+     * idle, andar1, idle, andar2 (movimento completo) em vez de andar1, andar2. */
+    private final java.util.Set<String> mobsPassoComIdle = new java.util.HashSet<>();
 
     private boolean voa(MobVisual mob) { return mobsBateAsas.contains(tipoDe(mob)); }
 
@@ -3504,6 +3509,9 @@ public class WorldScreen extends ScreenAdapter {
                 mobsComSombra.clear();
                 JsonValue sombras = data.get("mob_shadow");
                 if (sombras != null) for (JsonValue t = sombras.child; t != null; t = t.next) mobsComSombra.add(t.asString().toLowerCase());
+                mobsPassoComIdle.clear();
+                JsonValue passoIdle = data.get("mob_walk_idle");
+                if (passoIdle != null) for (JsonValue t = passoIdle.child; t != null; t = t.next) mobsPassoComIdle.add(t.asString().toLowerCase());
                 mobsBoss.clear();
                 JsonValue bosses = data.get("mob_boss");
                 if (bosses != null) for (JsonValue t = bosses.child; t != null; t = t.next) mobsBoss.add(t.asString().toLowerCase());
@@ -5703,6 +5711,24 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private TextureRegion quadroAtual(AnimacaoCorpo a, boolean movendo, String direcao, float progresso) {
+        return quadroAtual(a, movendo, direcao, progresso, false);
+    }
+
+    private TextureRegion quadroAtual(AnimacaoCorpo a, boolean movendo, String direcao, float progresso, boolean comIdle) {
+        if (movendo && comIdle) {
+            // idle, andar1, idle, andar2 dentro do mesmo SQM.
+            int fase = Math.min(3, (int) (progresso * 4f));
+            if (fase % 2 == 0) movendo = false;
+            else {
+                int i = fase / 2;
+                switch (direcao) {
+                    case "up": return a.andarCima[i];
+                    case "left": return a.andarEsquerda[i];
+                    case "right": return a.andarDireita[i];
+                    default: return a.andarBaixo[i];
+                }
+            }
+        }
         if (!movendo) {
             switch (direcao) {
                 case "up": return a.idleCima;
