@@ -3540,6 +3540,7 @@ def create_character():
             return jsonify({"erro": "Name taken."}), 409
         c.execute("SELECT 1 FROM characters WHERE LOWER(name) = LOWER(%s) LIMIT 1", (name,))
         if c.fetchone(): return jsonify({"erro": "Name taken."}), 409
+        if nome_reservado(c, name): return jsonify({"erro": "Name taken."}), 409
         inventory_inicial, equipped_inicial = montar_kit_inicial(class_name)
 
         # Personagem novo nasce como alma (ver eh_alma / despertar_alma).
@@ -4628,6 +4629,11 @@ def _achar_personagem(c, partes, i):
         c.execute("SELECT user_id, name FROM characters WHERE LOWER(name) = LOWER(%s) AND deleted_at IS NULL", (nome,))
         row = c.fetchone()
         if row: return row[0], row[1], i + n
+        # Ban permanente: o personagem esta' como "Nome#ban#xxxx" (ex: /unban dele).
+        c.execute("""SELECT user_id, name FROM characters WHERE deleted_at IS NOT NULL
+                     AND LOWER(name) LIKE LOWER(%s) ORDER BY deleted_at DESC LIMIT 1""", (nome + '#ban#%',))
+        row = c.fetchone()
+        if row: return row[0], row[1].split('#ban#')[0], i + n
     return None
 
 def _separar_tempo_e_motivo(resto):
@@ -4681,7 +4687,24 @@ def _comando_punicao(sid, cmd, partes):
             return
         fim = 0.0 if tirar else time.time() + (PUNICAO_PERMANENTE_SEG if segundos is None else segundos)
         c.execute(f"UPDATE users SET {tipo}_until = %s, {tipo}_reason = %s WHERE id = %s", (fim, motivo, user_id))
+        restaurar = []
+        if tipo == 'ban' and not tirar and segundos is None:
+            # Ban permanente: os personagens da conta ganham um nome placeholder
+            # ("Nome#ban#xxxx") e contam como apagados - o nome fica reservado
+            # NOME_BANIDO_RESERVA_DIAS e o personagem some de vez em APAGADO_DIAS.
+            c.execute("SELECT id, name FROM characters WHERE user_id = %s AND deleted_at IS NULL", (user_id,))
+            for char_id, nome_c in c.fetchall():
+                c.execute("UPDATE characters SET name = %s, deleted_at = %s WHERE id = %s",
+                          (f"{nome_c}#ban#{secrets.token_hex(4)}", time.time(), char_id))
+            _ranking_cache.clear()
+        elif tipo == 'ban' and tirar:
+            # Unban: os personagens do ban permanente (ainda nos 30 dias) voltam.
+            c.execute("SELECT id, name FROM characters WHERE user_id = %s AND deleted_at IS NOT NULL AND name LIKE %s",
+                      (user_id, '%#ban#%'))
+            restaurar = c.fetchall()
         conn.commit()
+        for char_id, nome_c in restaurar:
+            _restaurar_ou_perguntar(sid, c, conn, char_id, user_id, nome_c.split('#ban#')[0])
         c.close()
     except Exception:
         traceback.print_exc()
@@ -4719,7 +4742,7 @@ def _comando_restore(sid, partes):
         conn = db_pool.getconn()
         c = conn.cursor()
         if len(partes) < 2:
-            c.execute("SELECT name, deleted_at FROM characters WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 15")
+            c.execute("SELECT name, deleted_at FROM characters WHERE deleted_at IS NOT NULL AND name LIKE %s ORDER BY deleted_at DESC LIMIT 15", ('%#del#%',))
             linhas = c.fetchall()
             if not linhas: chat_sistema(sid, "No deleted characters.")
             for nome_del, quando in linhas:
@@ -4740,19 +4763,92 @@ def _comando_restore(sid, partes):
         if c.fetchone()[0] >= 4:
             chat_sistema(sid, f"Can't restore {original}: the account has no free character slot (4/4).", 'red')
             return
-        c.execute("SELECT 1 FROM characters WHERE LOWER(name) = LOWER(%s) AND deleted_at IS NULL", (original,))
-        if c.fetchone():
-            chat_sistema(sid, f"Can't restore {original}: another character is using this name. Rename it first.", 'red')
-            return
-        c.execute("UPDATE characters SET name = %s, deleted_at = NULL WHERE id = %s", (original, char_id))
-        conn.commit()
-        _ranking_cache.clear()
-        chat_sistema(sid, f"Restored {original} to its account.")
+        _restaurar_ou_perguntar(sid, c, conn, char_id, user_id, original)
     except Exception:
         traceback.print_exc()
         chat_sistema(sid, "Database error (see server log).", 'red')
     finally:
         if conn: db_pool.putconn(conn)
+
+# Ban permanente: o nome original fica reservado esse tempo (ninguem cria com ele).
+NOME_BANIDO_RESERVA_DIAS = 7
+
+def nome_reservado(c, nome):
+    """Nome de personagem de ban permanente recente (ainda reservado)?"""
+    c.execute("""SELECT 1 FROM characters WHERE deleted_at > %s AND LOWER(name) LIKE LOWER(%s) LIMIT 1""",
+              (time.time() - NOME_BANIDO_RESERVA_DIAS * 86400, nome + '#ban#%'))
+    return c.fetchone() is not None
+
+def _problema_nome(c, nome):
+    """Por que esse nome nao serve (texto pro admin) ou None."""
+    if not RE_NOME_PERSONAGEM.match(nome) or "  " in nome: return "invalid name (3-12 letters/numbers)"
+    if any(b in nome.lower() for b in BANNED_NAMES): return "inappropriate name"
+    if nome.lower() in ADMIN_NOMES: return "name taken"
+    c.execute("SELECT 1 FROM characters WHERE LOWER(name) = LOWER(%s) AND deleted_at IS NULL", (nome,))
+    if c.fetchone(): return "another character is using this name"
+    return None
+
+def _restaurar_ou_perguntar(sid, c, conn, char_id, user_id, nome):
+    """Volta o personagem (apagado ou de ban permanente) pra conta com esse nome;
+    se o nome esta' em uso, pergunta outro no chat do admin (_prompts_admin)."""
+    c.execute("SELECT COUNT(*) FROM characters WHERE user_id = %s AND deleted_at IS NULL", (user_id,))
+    if c.fetchone()[0] >= 4:
+        chat_sistema(sid, f"Can't restore {nome}: the account has no free character slot (4/4).", 'red')
+        return False
+    problema = _problema_nome(c, nome)
+    if problema:
+        _prompts_admin.setdefault(sid, []).append({'char_id': char_id, 'user_id': user_id, 'nome': nome,
+                                                   'expira': time.time() + 300})
+        if len(_prompts_admin[sid]) == 1: _perguntar_nome(sid)
+        return False
+    c.execute("UPDATE characters SET name = %s, deleted_at = NULL WHERE id = %s", (nome, char_id))
+    conn.commit()
+    _ranking_cache.clear()
+    chat_sistema(sid, f"Restored {nome} to its account.")
+    return True
+
+# sid do admin -> fila de personagens esperando um nome novo (respondido no chat).
+_prompts_admin = {}
+
+def _perguntar_nome(sid):
+    fila = _prompts_admin.get(sid)
+    if not fila: return
+    chat_sistema(sid, f"A player already has the name '{fila[0]['nome']}'. Type a new name for this character (or 'cancel'):", 'yellow')
+
+def responder_prompt_admin(sid, texto):
+    """Mensagem do admin com pergunta aberta: vira a resposta (nao vai pro chat).
+    True = consumiu a mensagem."""
+    fila = _prompts_admin.get(sid)
+    if not fila: return False
+    texto = str(texto).strip()
+    if texto.startswith('/'): return False  # comando continua funcionando
+    pedido = fila[0]
+    if time.time() > pedido['expira'] or texto.lower() in ('cancel', 'cancelar'):
+        fila.pop(0)
+        chat_sistema(sid, f"Restore of {pedido['nome']} cancelled." if texto.lower() in ('cancel', 'cancelar')
+                     else f"Restore of {pedido['nome']} expired.", 'red')
+        if not fila: _prompts_admin.pop(sid, None)
+        else: _perguntar_nome(sid)
+        return True
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        c = conn.cursor()
+        problema = _problema_nome(c, texto)
+        if problema:
+            chat_sistema(sid, f"'{texto}': {problema}. Type another name (or 'cancel'):", 'red')
+            return True
+        fila.pop(0)
+        if not fila: _prompts_admin.pop(sid, None)
+        pedido['nome'] = texto
+        _restaurar_ou_perguntar(sid, c, conn, pedido['char_id'], pedido['user_id'], texto)
+        if _prompts_admin.get(sid): _perguntar_nome(sid)
+    except Exception:
+        traceback.print_exc()
+        chat_sistema(sid, "Database error (see server log).", 'red')
+    finally:
+        if conn: db_pool.putconn(conn)
+    return True
 
 def purgar_apagados_loop():
     """De hora em hora: exclui de vez quem foi apagado ha' mais de APAGADO_DIAS."""
@@ -5248,6 +5344,7 @@ def handle_c(data):
         if not isinstance(data, list) or len(data) == 0: return
         # Comando de admin ("/..."): so' de personagem admin, nunca vai pro chat.
         # Pra quem nao e' admin, "/algo" e' so' uma mensagem normal.
+        if eh_admin(p) and responder_prompt_admin(sid, data[0]): return
         if eh_admin(p) and str(data[0]).strip().startswith('/'):
             comando_admin(sid, p, str(data[0]).strip()[:200])
             return
@@ -5304,6 +5401,7 @@ def handle_pc(data):
             chat_sistema(sid, "You are not in a party.")
             return
         p = online_players[sid]
+        if eh_admin(p) and responder_prompt_admin(sid, data.get('msg', '')): return
         if eh_admin(p) and str(data.get('msg', '')).strip().startswith('/'):
             comando_admin(sid, p, str(data.get('msg', '')).strip()[:200], canal='party')
             return
@@ -5325,6 +5423,7 @@ def handle_cc(data):
         canal = data.get('channel')
         if canal not in chat_channels or sid not in chat_channels[canal]: return
         p = online_players[sid]
+        if eh_admin(p) and responder_prompt_admin(sid, data.get('msg', '')): return
         if eh_admin(p) and str(data.get('msg', '')).strip().startswith('/'):
             comando_admin(sid, p, str(data.get('msg', '')).strip()[:200], canal=canal)
             return
