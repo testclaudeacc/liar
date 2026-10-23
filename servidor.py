@@ -999,17 +999,23 @@ def calc_level_bonuses(level, player_class):
 # +0.5 de dano por level ganho.
 DANO_POR_LEVEL = 0.5
 
+# Reducao de dano (subtrai do golpe do mob). Calibrado pra Black Spider (48-52)
+# com Defense 35: Knight full lv 20 (24 dos itens) toma ~5-10; Mage/Bard (8)
+# ~15-20; Ranger (12) ~13-17.
+REDUCAO_POR_DEFENSE = 0.8   # por nivel da skill Defense
+MULT_REDUCAO_ITENS = 0.6    # sobre o que os itens tiram (armour 1:1, defesa 1:2)
+
 def calc_player_stats(player_class, level, skills, bonus_dmg=0, bonus_def=0):
     dmg = ((level - 1) * DANO_POR_LEVEL) + bonus_dmg
-    # Defesa dos itens conta 1:2 (5 de defesa no escudo = 2.5 de reducao);
-    # a skill defense conta 1:1 (mais abaixo).
-    defense = 0.0 + bonus_def * 0.5
+    # Defesa dos itens conta 1:2 (5 de defesa no escudo = 2.5) e armour 1:1
+    # (bonus_def ja' vem com o armour dobrado), x MULT_REDUCAO_ITENS.
+    defense = 0.0 + bonus_def * 0.5 * MULT_REDUCAO_ITENS
     dmg += skills.get("adc", 0)
     
     # Skill base (a da classe + defense): 1 de dano e 1 de redução por nível,
     # igual pra todas as classes. ADC (acima) e itens continuam à parte.
     dmg += skills.get(SKILL_DA_CLASSE.get(player_class, 'melee'), 10) * 1.0
-    defense += skills.get("defense", 10) * 1.0
+    defense += skills.get("defense", 10) * REDUCAO_POR_DEFENSE
     return int(dmg), float(defense)
 
 def _slots_com_classe_invalida(p):
@@ -8337,7 +8343,8 @@ def bonus_itens_skills(p):
                 adc_item = int(d.get("fourth_stat_value", 0) or 0)
             adc += adc_item
             defesa += float(d.get("defense", 0) or 0) * 0.5 + float(d.get("armour", 0) or 0)
-    return adc, defesa
+    # Aba de skills: "Defense 35+X" mostra o que os itens tiram de verdade.
+    return adc, round(defesa * MULT_REDUCAO_ITENS, 1)
 
 def regen_base_e_itens(p):
     """([hp base, hp extra], [mp base, mp extra]): base = so' o HP/mana do
