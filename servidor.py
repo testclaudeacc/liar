@@ -119,14 +119,22 @@ MOB_DB = {
                        "currency": {"min": 35, "max": 50}},
     # Boss: nome carmesim + caveira no client (lista 'mob_boss' do sync).
     # respawn padrao 30 min (o respawn_time do Tiled ainda manda, se tiver).
-    "spidermother": {"name": "Spider Mother", "boss": True, "respawn": 1800, "speed_mult": 1.6, "hp": 6000, "xp": 1500,
+    "spidermother": {"name": "Spider Mother", "boss": True, "respawn": 1800, "speed_mult": 1.6, "hp": 20000, "xp": 10000,
                        "attack": 90.0, "attack_min": 80, "attack_max": 100, "hit": "PoisonPhysATK",
                        "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.5},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25}],
                        "currency": {"min": 400, "max": 700}},
-    
+    "soullessbody": {"name": "Soulless Body", "boss": True, "respawn": 1800, "speed_mult": 2, "hp": 80000, "xp": 1000000,
+                       "attack": 180.0, "attack_min": 160, "attack_max": 200,
+                       "drops": [{"item": "res://sprites/items/Food/RedMushroom.tres", "chance": 0.5},
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
+                                 {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25}],
+                       "currency": {"min": 4000, "max": 7000}},
 }
+# O servidor procura o tipo sempre em minusculo ("SoullessBody" -> "soullessbody");
+# chave com maiuscula caia nos valores padrao (40 HP, 1 de dano).
+MOB_DB = {k.lower(): v for k, v in MOB_DB.items()}
 
 # ---------------------------------------------------------------------------
 # BESTIARY. Cada tipo do MOB_DB vira uma entrada (numero = ordem no MOB_DB).
