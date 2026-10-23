@@ -30,6 +30,15 @@ os jogadores precisam desinstalar e instalar de novo pra atualizar.
 
 ## 3. Exportar
 
+Atalhos de duplo clique (abrem uma janela de terminal com o progresso):
+
+- `exportar_tudo.sh`: APK assinado + Linux + Windows em `dist/`
+- `exportar_linux.sh`: so' o Linux
+- `depurar_celular.sh`: versao de teste instalada no celular pelo USB (igual o antigo
+  build_apk.sh). Entra como app separado (".debug"), convive com o APK oficial.
+
+Ou pelo terminal:
+
     ./exportar.sh          # tudo
     ./exportar.sh apk      # so' o APK
     ./exportar.sh linux    # so' Linux

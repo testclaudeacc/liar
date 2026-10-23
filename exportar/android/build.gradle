@@ -65,6 +65,10 @@ android {
     buildTypes {
         debug {
             minifyEnabled false
+            // Debug vira um app separado (".debug"): instala pelo USB sem brigar
+            // com o APK oficial assinado (assinaturas diferentes nao instalam por cima).
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
         }
         release {
             // R8: encolhe e embaralha o codigo (dificulta engenharia reversa).
