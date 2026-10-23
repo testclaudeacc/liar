@@ -78,6 +78,7 @@ ITENS_LV20_ARMAS = ["res://sprites/items/%s.tres" % c for c in (
     "Knight/Weapons/BronzeAxe", "Knight/Weapons/BronzeDagger", "Mage/Weapons/VenomStaff",
     "Bard/Weapons/WoodenHarp", "Ranger/Weapons/BronzeBow",
     "Mage/SecondHand/ObsidianTome", "Bard/SecondHand/ObsidianScore")]
+ITENS_LV20_JOIAS = ["res://sprites/items/Jewelry/BronzeRing.tres", "res://sprites/items/Jewelry/BronzeNecklace.tres"]
 
 MOB_DB = {
     # attack_min/attack_max: faixa do golpe (sem elas: attack -15%..+15%, igual o
@@ -127,7 +128,8 @@ MOB_DB = {
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.02},
                                  {"one_of": ITENS_LV20_ARMADURA, "chance": 0.03},
-                                 {"one_of": ITENS_LV20_ARMAS, "chance": 0.015}],
+                                 {"one_of": ITENS_LV20_ARMAS, "chance": 0.015},
+                                 {"one_of": ITENS_LV20_JOIAS, "chance": 0.02}],
                        "currency": {"min": 35, "max": 50}},
     # Boss: nome carmesim + caveira no client (lista 'mob_boss' do sync).
     # respawn padrao 30 min (o respawn_time do Tiled ainda manda, se tiver).
@@ -137,7 +139,8 @@ MOB_DB = {
                                  {"one_of": ["res://sprites/items/Jewelry/RubyRing%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
                                  {"one_of": ["res://sprites/items/Jewelry/RubyNecklace%s.tres" % a for a in ("Melee", "Magic", "Focus", "Musicality")], "chance": 0.25},
                                  {"one_of": ITENS_LV20_ARMADURA, "chance": 0.5},
-                                 {"one_of": ITENS_LV20_ARMAS, "chance": 0.3}],
+                                 {"one_of": ITENS_LV20_ARMAS, "chance": 0.3},
+                                 {"one_of": ITENS_LV20_JOIAS, "chance": 0.25}],
                        "currency": {"min": 400, "max": 700}},
     # walk_idle: anda idle, andar1, idle, andar2 por SQM (client: mob_walk_idle).
     "mountaintroll": {"name": "Mountain Troll", "walk_idle": True, "speed_mult": 2.4, "hp": 800, "xp": 184,
@@ -250,6 +253,9 @@ NPC_DB = {
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Ranger/SecondHand/StarterArrow.tres", "res://sprites/items/Ranger/SecondHand/FlintArrow.tres",
         "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres",
+    # Joias lv 20: sem ADC, universais (mana/defesa pela classe, 2x a Ruby).
+    "res://sprites/items/Jewelry/BronzeRing.tres": {"name": "Bronze Ring", "type": "Ring", "slot": "Ring", "req_level": 20, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "universal": True, "universal_mult": 2, "price": 2000, "icon": "sheet/r64_c10", "cap": 0.5},
+    "res://sprites/items/Jewelry/BronzeNecklace.tres": {"name": "Bronze Necklace", "type": "Necklace", "slot": "Necklace", "req_level": 20, "req_class": "All", "bonus_damage": 0, "defense": 0, "stamina": 20, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "universal": True, "universal_mult": 2, "price": 2000, "icon": "sheet/r1_c5", "cap": 0.5},
         "res://sprites/items/Mage/Weapons/DisabledRod.tres", "res://sprites/items/Knight/Weapons/RawSword.tres",
         "res://sprites/items/Bard/Weapons/RawFlute.tres", "res://sprites/items/Ranger/Weapons/RawBow.tres",
         "res://sprites/items/Outlander/OutlanderHelm.tres", "res://sprites/items/Outlander/OutlanderCape.tres",
@@ -670,8 +676,10 @@ def stats_item(item_path, classe=None):
     dados = ITEM_DB.get(item_path, {})
     if not dados.get("universal") or classe not in JOIA_POR_CLASSE: return dados
     dados = dict(dados)
+    # "universal_mult": joia de level maior da' mais (Bronze lv 20 = 2x a Ruby).
+    mult = dados.get("universal_mult", 1)
     for campo, valor in JOIA_POR_CLASSE[classe].items():
-        dados[campo] = dados.get(campo, 0) + valor
+        dados[campo] = dados.get(campo, 0) + valor * mult
     return dados
 
 STARTING_EQUIPMENT = {
