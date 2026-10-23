@@ -1110,8 +1110,9 @@ public class WorldScreen extends ScreenAdapter {
 
         // Balao de chat 16x16 (96,832 no atlas), desenhado pequeno igual o icone
         // de veneno/sangue, mas do lado DIREITO do player. Sem ele: o antigo.
-        // Chat animado (ui/baloes/BalaoChat: tira de 3 quadros, bolinhas pulando).
-        // Sem ele: o balao 16x16 de 96,832, e por ultimo o antigo.
+        // Chat animado (ui/baloes/BalaoChat: tira de 3 quadros, bolinhas pulando),
+        // tambem no NPC com quem da' pra conversar. Sem ele: o balao 16x16 de 96,832.
+        // (sprites/notifications/ saiu do atlas: os baloes todos sao os de ui/baloes/.)
         TextureRegion tiraChat = atlas.findRegion("ui/baloes/BalaoChat");
         if (tiraChat != null) {
             int l = tiraChat.getRegionWidth() / 3;
@@ -1120,7 +1121,6 @@ public class WorldScreen extends ScreenAdapter {
             notifChat = quadrosChat[0];
         } else {
             notifChat = atlas.findRegion("sheet/r83_c6");
-            if (notifChat == null) notifChat = atlas.findRegion("sprites/notifications/Chat");
         }
         iconeLiderParty = atlas.findRegion("ui/party/PT_Crown");
         balaoTrade = regiaoOu("ui/baloes/BalaoTrade", "ui/items/Trade");
@@ -1129,8 +1129,8 @@ public class WorldScreen extends ScreenAdapter {
             "ui/party/PtInvite", "ui/party/PT_invite");
         // Baloes novos (ui/baloes/, mesmo contorno do de chat): pequenos a direita.
         // Sem eles no atlas: os antigos, no tamanho original.
-        notifConfig = regiaoOu("ui/baloes/BalaoSettings", "sprites/notifications/Settings");
-        notifMenu = regiaoOu("ui/baloes/BalaoInventario", "sprites/notifications/Menu");
+        notifConfig = atlas.findRegion("ui/baloes/BalaoSettings");
+        notifMenu = atlas.findRegion("ui/baloes/BalaoInventario");
         notifSaiu = atlas.findRegion("ui/baloes/BalaoLogout");
         for (String n : new String[]{"ui/baloes/BalaoSettings", "ui/baloes/BalaoInventario", "ui/baloes/BalaoLogout", "ui/baloes/BalaoTrade"}) {
             TextureRegion r = atlas.findRegion(n);
