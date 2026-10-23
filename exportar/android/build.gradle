@@ -1,0 +1,127 @@
+apply plugin: 'com.android.application'
+
+// Versao do jogo = CLIENT_VERSION do ServerConfig.java: "v0.50" -> versionName
+// "0.50", versionCode 50 ("v1.2" -> 1002). Sobe sozinho a cada versao nova
+// (o Android so' instala por cima com versionCode maior).
+def textoConfig = file("../core/src/main/java/com/teste/game/rede/ServerConfig.java").text
+def versao = (textoConfig =~ /CLIENT_VERSION\s*=\s*"v?(\d+)\.(\d+)"/)[0]
+def versaoNome = "${versao[1]}.${versao[2]}"
+def versaoCodigo = versao[1].toInteger() * 1000 + versao[2].toInteger()
+
+// Assinatura: keystore.properties na RAIZ do projeto (fora do Git!) com
+// storeFile, storePassword, keyAlias, keyPassword. Sem ele, o release sai sem assinar.
+def arquivoKeystore = rootProject.file('keystore.properties')
+def keystore = new Properties()
+if (arquivoKeystore.exists()) arquivoKeystore.withInputStream { keystore.load(it) }
+
+android {
+    // ID do app (tipo o "CPF" dele no Android). Defina em gradle.properties
+    // (appId=...). Depois do 1o APK publico NUNCA mude: o celular trataria
+    // como outro app e o jogador nao conseguiria atualizar por cima.
+    namespace 'com.teste.android'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId project.findProperty('appId') ?: 'com.teste.android'
+        minSdk 21
+        targetSdk 36
+        versionCode versaoCodigo
+        versionName versaoNome
+    }
+
+    signingConfigs {
+        release {
+            if (arquivoKeystore.exists()) {
+                storeFile rootProject.file(keystore['storeFile'])
+                storePassword keystore['storePassword']
+                keyAlias keystore['keyAlias']
+                keyPassword keystore['keyPassword']
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+            }
+        }
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+            java.srcDirs = ['src/main/java']
+            res.srcDirs = ['res']
+            assets.srcDirs = ['assets', '../core/assets']
+            jniLibs.srcDirs = ['libs']
+        }
+    }
+
+    packagingOptions {
+        exclude 'META-INF/robovm/ios/robovm.xml'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+        release {
+            // R8: encolhe e embaralha o codigo (dificulta engenharia reversa).
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (arquivoKeystore.exists()) signingConfig signingConfigs.release
+        }
+    }
+}
+
+if (!arquivoKeystore.exists()) {
+    logger.warn('AVISO: keystore.properties nao encontrado - o APK de release vai sair SEM assinatura.')
+}
+
+// Copia as .so nativas do libGDX pra dentro do APK (mesmo esquema dos projetos
+// gerados pelo setup oficial do libGDX).
+configurations { natives }
+
+dependencies {
+    implementation project(':core')
+    implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86_64"
+    // FreeType tambem precisa da .so (UiSkin/AuthScreen geram fontes com ele;
+    // sem isso o jogo fechava sozinho ao abrir no celular).
+    natives "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-armeabi-v7a"
+    natives "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-arm64-v8a"
+    natives "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-x86"
+    natives "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-x86_64"
+}
+
+task copyAndroidNatives {
+    doFirst {
+        file("libs/armeabi-v7a/").mkdirs()
+        file("libs/arm64-v8a/").mkdirs()
+        file("libs/x86/").mkdirs()
+        file("libs/x86_64/").mkdirs()
+        configurations.natives.files.each { jar ->
+            def outputDir = null
+            if (jar.name.endsWith("natives-armeabi-v7a.jar")) outputDir = file("libs/armeabi-v7a")
+            if (jar.name.endsWith("natives-arm64-v8a.jar")) outputDir = file("libs/arm64-v8a")
+            if (jar.name.endsWith("natives-x86.jar")) outputDir = file("libs/x86")
+            if (jar.name.endsWith("natives-x86_64.jar")) outputDir = file("libs/x86_64")
+            if (outputDir != null) {
+                copy {
+                    from zipTree(jar)
+                    into outputDir
+                    include "*.so"
+                }
+            }
+        }
+    }
+}
+
+tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
+    dependsOn copyAndroidNatives
+}

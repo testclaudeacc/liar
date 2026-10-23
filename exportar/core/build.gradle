@@ -1,0 +1,15 @@
+apply plugin: 'java-library'
+
+sourceCompatibility = 17
+targetCompatibility = 17
+
+dependencies {
+    api "com.badlogicgames.gdx:gdx:$gdxVersion"
+    // Cliente WebSocket puro-Java (funciona igual em desktop/Android) - o
+    // servidor fala Engine.IO v4/Socket.IO v4 direto sobre um WebSocket cru.
+    api "org.java-websocket:Java-WebSocket:1.5.6"
+    // Fontes de verdade (FreeType) em vez do BitmapFont default do libGDX.
+    api "com.badlogicgames.gdx:gdx-freetype:$gdxVersion"
+    // (gdx-lml saiu: nenhum arquivo do jogo usa - so' deixava o APK/exe maior
+    // e, com reflexao, ainda precisaria de regras extras no R8.)
+}

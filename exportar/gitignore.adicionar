@@ -1,0 +1,6 @@
+# Assinatura do APK e saidas do export (cole no .gitignore do projeto)
+keystore.properties
+*.jks
+*.keystore
+dist/
+android/build/outputs/mapping/
