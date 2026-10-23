@@ -524,6 +524,18 @@ public class UiSkin {
     /** Largura de um grupo de botoes: o minimo, ou mais se o texto de algum
      * nao couber (traducao mais comprida). Todos do grupo usam a mesma, entao
      * crescem juntos e o fundo acompanha. folga = margem dos dois lados. */
+    /** Igual larguraBotoes, mas pela largura do botao INTEIRO (icone + texto +
+     * margens do fundo): pra botao com icone, a traducao comprida nunca encosta na borda. */
+    public static float larguraBotoesComIcone(float minimo, float folga, com.badlogic.gdx.scenes.scene2d.ui.Button... botoes) {
+        float l = minimo;
+        for (com.badlogic.gdx.scenes.scene2d.ui.Button b : botoes) {
+            if (b == null) continue;
+            b.invalidate();
+            l = Math.max(l, b.getPrefWidth() + folga);
+        }
+        return (float) Math.ceil(l);
+    }
+
     public static float larguraBotoes(float minimo, float folga, TextButton... botoes) {
         float l = minimo;
         for (TextButton b : botoes) {

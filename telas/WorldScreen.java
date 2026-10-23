@@ -1114,16 +1114,17 @@ public class WorldScreen extends ScreenAdapter {
         spriteBase = atlas.findRegion("sprites/base/BaseSoul");
         animacaoBase = criarAnimacao(spriteBase);
 
-        // Balao de chat 16x16 (96,832 no atlas), desenhado pequeno igual o icone
-        // de veneno/sangue, mas do lado DIREITO do player. Sem ele: o antigo.
-        // Chat animado (ui/baloes/BalaoChat: tira de 3 quadros, bolinhas pulando),
-        // tambem no NPC com quem da' pra conversar. Sem ele: o balao 16x16 de 96,832.
-        // (sprites/notifications/ saiu do atlas: os baloes todos sao os de ui/baloes/.)
+        // Chat animado (ui/baloes/BalaoChat: tira de quadros lado a lado, o 1o e' o
+        // "parado"). Quadro com a largura dos outros baloes (26). Sem ele: o
+        // balao 16x16 de 96,832. (sprites/notifications/ saiu do atlas.)
         TextureRegion tiraChat = atlas.findRegion("ui/baloes/BalaoChat");
+        TextureRegion modeloBalao = atlas.findRegion("ui/baloes/BalaoSettings");
         if (tiraChat != null) {
-            int l = tiraChat.getRegionWidth() / 3;
-            quadrosChat = new TextureRegion[3];
-            for (int i = 0; i < 3; i++) quadrosChat[i] = new TextureRegion(tiraChat, i * l, 0, l, tiraChat.getRegionHeight());
+            int l = modeloBalao != null ? modeloBalao.getRegionWidth() : 26;
+            int n = Math.max(1, Math.round(tiraChat.getRegionWidth() / (float) l));
+            l = tiraChat.getRegionWidth() / n;
+            quadrosChat = new TextureRegion[n];
+            for (int i = 0; i < n; i++) quadrosChat[i] = new TextureRegion(tiraChat, i * l, 0, l, tiraChat.getRegionHeight());
             notifChat = quadrosChat[0];
         } else {
             notifChat = atlas.findRegion("sheet/r83_c6");
@@ -2831,10 +2832,22 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     // ---- Coroa/escudo da party: na altura do balao, mas a ESQUERDA do player ----
-    private static final float TAM_ICONE_PARTY = 20f;
     private TextureRegion regiaoBleed, regiaoVeneno;
     private static final float TAM_ICONE_SANGRA = 8f;
-    private static final float RECUO_ICONE_SANGRA = 4f; // mais pra esquerda que a coroa
+
+    /** Coluna de icones a ESQUERDA do personagem (espelho do balao): o 1o fica no
+     * alto (na altura do balao) e os seguintes vao empilhando pra baixo - ex:
+     * icone da party em cima e, abaixo, o debuff (veneno/sangue). Nulos sao pulados. */
+    private void desenharPilhaEsquerda(float ancoraX, float ancoraY, TextureRegion... icones) {
+        int n = 0;
+        for (TextureRegion icone : icones) {
+            if (icone == null) continue;
+            float x = ancoraX - LADO_BALAO - TAM_ICONE_SANGRA;
+            float y = ancoraY + ALTURA_BALAO - n * (TAM_ICONE_SANGRA + 1f);
+            batch.draw(icone, x, y, TAM_ICONE_SANGRA, TAM_ICONE_SANGRA);
+            n++;
+        }
+    }
 
     private void desenharIconeParty(Jogador j) {
         if (j == local ? localMorto : estaMorto(j)) return;
@@ -2845,12 +2858,9 @@ public class WorldScreen extends ScreenAdapter {
             icone = iconeConviteParty; // eu convidei ele, ou ele me convidou
         }
         if (icone == null) return;
-        // Balao: x+2 a direita do centro; aqui o espelho dele.
-        // Centro vertical igual o do balao (y+9.5, ~8 de altura).
-        // Encostado no lado esquerdo do corpo (o desenho tem sobra transparente).
-        float ix = Math.round(j.x / camera.zoom) * camera.zoom + 9f - TAM_ICONE_PARTY;
-        float iy = Math.round(j.y / camera.zoom) * camera.zoom + 13.5f - TAM_ICONE_PARTY / 2f;
-        batch.draw(icone, ix, iy, TAM_ICONE_PARTY, TAM_ICONE_PARTY);
+        // Icones da party agora 16x16: reduzidos e no topo da coluna da esquerda
+        // (debuffs, quando players tiverem, entram como proximos argumentos).
+        desenharPilhaEsquerda(Math.round(j.x / camera.zoom) * camera.zoom, Math.round(j.y / camera.zoom) * camera.zoom, icone);
     }
 
     /** Chamado todo frame: avisa o servidor so' quando algo abriu/fechou. */
@@ -4864,10 +4874,19 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     private void desenharBalaoInteracaoNPC(NPCVisual npc) {
-        if (npc == null || notifChat == null) return;
+        if (npc == null) return;
         float ancoraX = Math.round(npc.movimento.x / camera.zoom) * camera.zoom;
         float ancoraY = Math.round(npc.movimento.y / camera.zoom) * camera.zoom;
-        desenharBalao(notifChat, ancoraX, ancoraY);
+        // Kharon (conversa): balao de chat parado (1o quadro). Os outros (loja,
+        // banco, mercado...): balao de trade.
+        boolean kharon = "kharon".equalsIgnoreCase(npc.tipo) || npc.id.toLowerCase().contains("kharon");
+        TextureRegion balao = kharon ? (quadrosChat != null ? quadrosChat[0] : notifChat) : balaoTrade;
+        if (balao == null) return;
+        if (baloesPequenos.contains(balao) || (quadrosChat != null && balao == quadrosChat[0])) {
+            batch.draw(balao, ancoraX + LADO_BALAO, ancoraY + ALTURA_BALAO, balao.getRegionWidth() * ESCALA_BALAO, balao.getRegionHeight() * ESCALA_BALAO);
+        } else {
+            desenharBalao(balao, ancoraX, ancoraY);
+        }
     }
 
     /** Balaozinho ao lado da cabeca (ancora = pes, ja' no grid da camera). O de
@@ -4875,8 +4894,10 @@ public class WorldScreen extends ScreenAdapter {
      * (que fica a esquerda); settings/menu/trade seguem no tamanho original. */
     private void desenharBalao(TextureRegion balao, float ancoraX, float ancoraY) {
         if (balao == notifChat && quadrosChat != null) {
+            // 1o quadro (parado) dura o dobro: ciclo de n+1 tempos (0,0,1,2,3...).
             // Resto da divisao ainda em long (o (int) antes estourava pra negativo -> indice -1).
-            balao = quadrosChat[(int) ((com.badlogic.gdx.utils.TimeUtils.millis() / (long) (QUADRO_CHAT_SEG * 1000f)) % quadrosChat.length)];
+            int t = (int) ((com.badlogic.gdx.utils.TimeUtils.millis() / (long) (QUADRO_CHAT_SEG * 1000f)) % (quadrosChat.length + 1));
+            balao = quadrosChat[Math.max(0, t - 1)];
             batch.draw(balao, ancoraX + LADO_BALAO, ancoraY + ALTURA_BALAO, balao.getRegionWidth() * ESCALA_BALAO, balao.getRegionHeight() * ESCALA_BALAO);
         } else if (baloesPequenos.contains(balao)) {
             batch.draw(balao, ancoraX + LADO_BALAO, ancoraY + ALTURA_BALAO, balao.getRegionWidth() * ESCALA_BALAO, balao.getRegionHeight() * ESCALA_BALAO);
@@ -7029,27 +7050,13 @@ public class WorldScreen extends ScreenAdapter {
         if (mob.voltando && regiaoFlag != null) {
             batch.draw(regiaoFlag, ancoraX + 2f, ancoraY + altura - 10f, 12f, 12f);
         }
-        // Envenenado (Small Vines): mesmo lugar; se tambem sangra, vai 1 icone pra esquerda.
-        if (System.currentTimeMillis() < mob.venenoAteMs) {
-            if (regiaoVeneno == null) regiaoVeneno = atlas.findRegion("sheet/r75_c6");   // 640,736
-            if (regiaoVeneno != null) {
-                float desvio = System.currentTimeMillis() < mob.sangraAteMs ? TAM_ICONE_SANGRA + 1f : 0f;
-                float caixaX = ancoraX + 9f - TAM_ICONE_PARTY - RECUO_ICONE_SANGRA - desvio, caixaY = ancoraY + 13.5f - TAM_ICONE_PARTY / 2f;
-                batch.draw(regiaoVeneno, caixaX + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f,
-                    caixaY + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f, TAM_ICONE_SANGRA, TAM_ICONE_SANGRA);
-            }
-        }
-        // Sangrando (Heavy Cut): icone Bleed no lugar do icone de party do player.
-        if (System.currentTimeMillis() < mob.sangraAteMs) {
-            // Gota de sangue (752,736 no atlas, 16x16) bem reduzida, centrada no
-            // mesmo quadrado da coroa da party (TAM_ICONE_PARTY, mesma posicao).
-            if (regiaoBleed == null) regiaoBleed = atlas.findRegion("sheet/r76_c11");
-            if (regiaoBleed != null) {
-                float caixaX = ancoraX + 9f - TAM_ICONE_PARTY - RECUO_ICONE_SANGRA, caixaY = ancoraY + 13.5f - TAM_ICONE_PARTY / 2f;
-                batch.draw(regiaoBleed, caixaX + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f,
-                    caixaY + (TAM_ICONE_PARTY - TAM_ICONE_SANGRA) / 2f, TAM_ICONE_SANGRA, TAM_ICONE_SANGRA);
-            }
-        }
+        // Debuffs (veneno: Small Vines, sangue: Heavy Cut) empilhados na coluna da esquerda.
+        long agoraMs = System.currentTimeMillis();
+        if (agoraMs < mob.venenoAteMs && regiaoVeneno == null) regiaoVeneno = atlas.findRegion("sheet/r75_c6");   // 640,736
+        if (agoraMs < mob.sangraAteMs && regiaoBleed == null) regiaoBleed = atlas.findRegion("sheet/r76_c11");   // 752,736
+        desenharPilhaEsquerda(ancoraX, ancoraY,
+            agoraMs < mob.sangraAteMs ? regiaoBleed : null,
+            agoraMs < mob.venenoAteMs ? regiaoVeneno : null);
     }
 
     /** Cor do nome/barra pela vida: verde cheio, verde claro, amarelo,

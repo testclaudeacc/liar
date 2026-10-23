@@ -3745,8 +3745,11 @@ public final class BookMenuUI {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { setVisible(false); }
         });
         Table abas = new Table();
-        abas.add(abaBuy).width(112).height(42).padRight(4);
-        abas.add(abaSell).width(112).height(42);
+        // Largura pelo maior dos dois (icone + texto traduzido + folga): "Vender",
+        // "Comprar", "Aprender"... nunca encostam na borda.
+        float larguraAba = UiSkin.larguraBotoesComIcone(112, 20, abaBuy, abaSell);
+        celulaAbaBuy = abas.add(abaBuy).width(larguraAba).height(42).padRight(4);
+        celulaAbaSell = abas.add(abaSell).width(larguraAba).height(42);
         abas.add().expandX();
         abas.add(fechar).size(42);
 
@@ -3828,6 +3831,17 @@ public final class BookMenuUI {
     public void abrirLoja(JsonValue dados) { abrirLoja(dados, ""); }
 
     /** papel: funcao do NPC (food, pot...) - muda a cor/icone da aba Buy. */
+    private com.badlogic.gdx.scenes.scene2d.ui.Cell<?> celulaAbaBuy, celulaAbaSell;
+
+    /** As abas Buy/Sell mudam de texto (loja de magia: "Learn"): largura de novo. */
+    private void ajustarLarguraAbasLoja() {
+        if (celulaAbaBuy == null) return;
+        float l = UiSkin.larguraBotoesComIcone(112, 20, abaBuy, abaSell);
+        celulaAbaBuy.width(l);
+        celulaAbaSell.width(l);
+        if (celulaAbaBuy.getTable() != null) celulaAbaBuy.getTable().invalidateHierarchy();
+    }
+
     public void abrirLoja(JsonValue dados, String papel) {
         if (modoTrade || dados == null) return;
         lojaPapel = papel == null ? "" : papel;
@@ -3837,6 +3851,7 @@ public final class BookMenuUI {
         }
         // Loja de magia: "Learn" em cima e embaixo, com icones proprios.
         abaBuy.setText(textoComprar());
+        ajustarLarguraAbasLoja();
         if (lojaAcao.getChildren().size > 0 && lojaAcao.getChildren().first() instanceof Image) {
             TextureAtlas.AtlasRegion r = atlas.findRegion(lojaDeMagia() ? ICONE_APRENDER : ICONE_COMPRAR);
             if (r != null) ((Image) lojaAcao.getChildren().first()).setDrawable(new TextureRegionDrawable(r));
