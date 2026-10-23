@@ -5655,7 +5655,9 @@ public class WorldScreen extends ScreenAdapter {
             a.andarDireita = regioes(tex, new int[] {10, 11});
             a.morte = regiao(tex, 12);
             // Muitas patas (aranha): pernas mexem o dobro por SQM, nao igual bipede.
-            a.ciclosPorPasso = 2;
+            boolean aranha = !(tex instanceof TextureAtlas.AtlasRegion)
+                || ((TextureAtlas.AtlasRegion) tex).name.toLowerCase().contains("spider");
+            if (aranha) a.ciclosPorPasso = 2;
         }
         return a;
     }
@@ -5994,6 +5996,10 @@ public class WorldScreen extends ScreenAdapter {
         if (!mob.morto && mob.id.equals(alvoMob) && regiaoAlvo != null) {
             batch.draw(regiaoAlvo, ancoraX - regiaoAlvo.getRegionWidth() / 2f, ancoraY - 1f);
         }
+        // Quadrado preto do golpe: tambem por baixo do sprite (mob 32x32 cobria o SQM inteiro).
+        if (!mob.morto && mob.tempoTargetHit > 0f && regiaoTargetHit != null) {
+            batch.draw(regiaoTargetHit, ancoraX - regiaoTargetHit.getRegionWidth() / 2f, ancoraY);
+        }
         float dyVoo = dyDoMob(mob); // mob que voa: corpo parado/abaixado enquanto as asas batem
         if (!mob.morto && mobsComSombra.contains(tipoDe(mob))) desenharSombraVoo(ancoraX, ancoraY);
         if (mob.morto) {
@@ -6004,9 +6010,6 @@ public class WorldScreen extends ScreenAdapter {
             batch.setColor(Color.WHITE);
         } else {
             batch.draw(quadro, x, ancoraY + dyVoo, largura, altura);
-        }
-        if (!mob.morto && mob.tempoTargetHit > 0f && regiaoTargetHit != null) {
-            batch.draw(regiaoTargetHit, ancoraX - regiaoTargetHit.getRegionWidth() / 2f, ancoraY);
         }
         // Barra de vida: desenhada junto do nome (desenharNomeMob), por cima dos tiles.
     }
