@@ -1688,6 +1688,14 @@ public final class BookMenuUI {
     // vale de verdade e' confirmado pelo servidor em skins_synced.
     private static final String[] CATEGORIAS_VANITY = {"base", "helm", "body", "acc"};
     private static final float COLUNA_VANITY = 200f;
+    private float larguraColunaVanity = COLUNA_VANITY;
+
+    /** Quantas celulas de "tamanho" cabem na coluna da direita do Vanity
+     * (a esquerda cresce com a traducao; a grade se ajusta e rola pra baixo). */
+    private int colunasVanity(float tamanho, int maximo) {
+        float livre = JANELA_LARGURA - larguraColunaVanity - 20f - 14f; // pads + barra de rolagem
+        return Math.max(2, Math.min(maximo, (int) Math.floor(livre / tamanho)));
+    }
     private static final float ESCALA_PREVIEW = 3.5f;
     private final Map<String, List<String[]>> skinDb = new LinkedHashMap<>(); // cat -> {caminho, nome}
     private final Map<String, String[]> skinsEquipadas = new LinkedHashMap<>(); // cat -> {caminho, cor}
@@ -1805,7 +1813,8 @@ public final class BookMenuUI {
         }
         float larguraBotao = UiSkin.larguraBotoes(0f, 20f, equipar, resetar);
         larguraVanity = Math.max(larguraVanity, larguraBotao * 2f + 6f + 16f);
-        vanityPage.add(colunaEsquerda).width((float) Math.ceil(larguraVanity)).growY();
+        larguraColunaVanity = (float) Math.ceil(larguraVanity);
+        vanityPage.add(colunaEsquerda).width(larguraColunaVanity).growY();
         vanityPage.add(colunaDireita).grow();
         atualizarVanity();
     }
@@ -1957,7 +1966,7 @@ public final class BookMenuUI {
                 }
             });
             vanityOpcoes.add(botao).size(SLOT_EQUIP).pad(1.5f);
-            if (++coluna % 5 == 0) vanityOpcoes.row();
+            if (++coluna % colunasVanity(SLOT_EQUIP + 3f, 5) == 0) vanityOpcoes.row();
         }
     }
 
@@ -1986,7 +1995,7 @@ public final class BookMenuUI {
                 }
             });
             vanityCores.add(celula).size(34).pad(1.5f);
-            if (++coluna % 8 == 0) vanityCores.row();
+            if (++coluna % colunasVanity(37f, 8) == 0) vanityCores.row();
         }
     }
 

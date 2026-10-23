@@ -128,7 +128,7 @@ public class PainelJogadorUI {
             }
         });
         // Nome sem contorno e um pouco menor que o titulo.
-        nomeLabel = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 1.35f), Color.WHITE));
+        nomeLabel = new Label("", new Label.LabelStyle(UiSkin.fonteDescricao(skin, 21), Color.WHITE));
         nomeLabel.setAlignment(Align.center);
         Button fechar = botaoIcone("ui/buttons/CloseBtn", null, 30f);
         fechar.addListener(new ChangeListener() {
@@ -234,9 +234,10 @@ public class PainelJogadorUI {
         });
 
         // Status no canto de cima da foto: online/offline e "Last seen".
-        Label.LabelStyle estiloStatus = new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.95f), Color.WHITE);
+        // Mesma fonte com contorno preto das outras GUIs (UiSkin.fonteDescricao).
+        Label.LabelStyle estiloStatus = new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE);
         textoStatus = new Label("", estiloStatus);
-        textoVisto = new Label("", new Label.LabelStyle(UiSkin.fonteHudEm(skin, 0.75f), Color.WHITE));
+        textoVisto = new Label("", new Label.LabelStyle(UiSkin.fonteDescricao(skin, 12), Color.WHITE));
         textoVisto.setColor(new Color(0.65f, 0.65f, 0.65f, 1f));
         iconeStatus.setScaling(Scaling.fit);
         Table linhaStatus = new Table();
@@ -276,7 +277,7 @@ public class PainelJogadorUI {
         Label.LabelStyle estiloNome = nomeExibido.indexOf('?') >= 0
             ? new Label.LabelStyle(skin.getFont("simbolo-font"), Color.WHITE)
             : skin.get("subtitulo", Label.LabelStyle.class);
-        estiloNome = new Label.LabelStyle(UiSkin.fonteHudEm(skin, 1.35f), Color.WHITE); // tem "?" e sem contorno
+        estiloNome = new Label.LabelStyle(UiSkin.fonteDescricao(skin, 21), Color.WHITE); // tem "?" e contorno preto
         nomeLabel.setStyle(estiloNome);
         nomeLabel.setText(nomeExibido);
         // Nome escondido ("???"): sem cor, senao entregava a classe.
