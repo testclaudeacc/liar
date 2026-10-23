@@ -3034,31 +3034,71 @@ public class WorldScreen extends ScreenAdapter {
         if (dicaEn == null) return;
         String texto = tr(dicaEn);
         alvo.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.enabled);
-        alvo.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
-            @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, com.badlogic.gdx.scenes.scene2d.Actor de) {
-                if (pointer == -1) mostrarDica(alvo, texto); // mouse
-            }
-            @Override public void exit(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, com.badlogic.gdx.scenes.scene2d.Actor para) {
-                if (pointer == -1 && (para == null || !para.isDescendantOf(alvo))) esconderDica(alvo, 0f);
-            }
+        if (!mobile) {
+            // PC: mouse em cima mostra, saiu esconde.
+            alvo.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+                @Override public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, com.badlogic.gdx.scenes.scene2d.Actor de) {
+                    if (pointer == -1) mostrarDica(alvo, texto);
+                }
+                @Override public void exit(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, com.badlogic.gdx.scenes.scene2d.Actor para) {
+                    if (pointer == -1 && (para == null || !para.isDescendantOf(alvo))) esconderDica(alvo, 0f);
+                }
+            });
+            return;
+        }
+        // Celular: toque rapido abre a lista; SEGURAR mostra so' a dica (sem
+        // abrir a lista), que some ~1.5s depois de soltar. Arrastar (rolar a
+        // tela) nao faz nada.
+        SelectBox<?> caixa = acharSelect(alvo);
+        alvo.addCaptureListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            private com.badlogic.gdx.utils.Timer.Task tarefa;
+            private boolean mostrou, arrastou;
+            private float x0, y0;
             @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, int botao) {
-                if (mobile) mostrarDica(alvo, texto);
-                return false; // nao rouba o toque do dropdown
+                if (pointer != 0) return false;
+                if (caixa != null && caixa.getScrollPane().hasParent()) return false; // lista aberta: toque normal
+                e.stop();
+                mostrou = false; arrastou = false; x0 = x; y0 = y;
+                if (tarefa != null) tarefa.cancel();
+                tarefa = com.badlogic.gdx.utils.Timer.schedule(new com.badlogic.gdx.utils.Timer.Task() {
+                    @Override public void run() { mostrou = true; mostrarDica(alvo, texto); }
+                }, 0.4f);
+                return true;
+            }
+            @Override public void touchDragged(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer) {
+                if (!arrastou && Math.abs(x - x0) + Math.abs(y - y0) > 12f) {
+                    arrastou = true;
+                    if (tarefa != null) tarefa.cancel();
+                }
+            }
+            @Override public void touchUp(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int pointer, int botao) {
+                if (tarefa != null) tarefa.cancel();
+                if (mostrou) esconderDica(alvo, 1.5f);
+                else if (!arrastou && caixa != null) caixa.showList();
             }
         });
-        // Soltou o dedo (o touchUp vai pro dropdown, entao escuta no stage): some depois de um tempinho.
-        if (mobile && !dicaEscutandoStage) {
+        // Tocou fora da dica aberta: some na hora.
+        if (!dicaEscutandoStage) {
             dicaEscutandoStage = true;
-            uiStage.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            uiStage.addCaptureListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
                 @Override public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p, int b) {
                     if (alvoDica != null && (e.getTarget() == null || !e.getTarget().isDescendantOf(alvoDica))) esconderDica(alvoDica, 0f);
-                    return true;
-                }
-                @Override public void touchUp(com.badlogic.gdx.scenes.scene2d.InputEvent e, float x, float y, int p, int b) {
-                    if (alvoDica != null) esconderDica(alvoDica, 2f);
+                    return false;
                 }
             });
         }
+    }
+
+    /** O dropdown da linha (ou o proprio ator, se ja for um). */
+    private static SelectBox<?> acharSelect(com.badlogic.gdx.scenes.scene2d.Actor a) {
+        if (a instanceof SelectBox) return (SelectBox<?>) a;
+        if (a instanceof com.badlogic.gdx.scenes.scene2d.Group) {
+            for (com.badlogic.gdx.scenes.scene2d.Actor f : ((com.badlogic.gdx.scenes.scene2d.Group) a).getChildren()) {
+                SelectBox<?> s = acharSelect(f);
+                if (s != null) return s;
+            }
+        }
+        return null;
     }
     private boolean dicaEscutandoStage = false;
 
@@ -3094,6 +3134,12 @@ public class WorldScreen extends ScreenAdapter {
     private void esconderDica(com.badlogic.gdx.scenes.scene2d.Actor alvo, float depois) {
         if (popupDica == null || alvoDica != alvo) return;
         popupDica.clearActions();
+        if (depois <= 0f) { // na hora (sem fade que um toque seguinte interrompia pela metade)
+            popupDica.getColor().a = 1f;
+            popupDica.remove();
+            alvoDica = null;
+            return;
+        }
         popupDica.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.sequence(
             com.badlogic.gdx.scenes.scene2d.actions.Actions.delay(depois),
             com.badlogic.gdx.scenes.scene2d.actions.Actions.fadeOut(0.15f),
