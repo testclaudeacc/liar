@@ -4000,9 +4000,11 @@ public class WorldScreen extends ScreenAdapter {
             mob.hp = Math.max(0f, data.getFloat("new_hp", mob.hp));
             if (data.has("training_lock")) travarMobTreino(mob, data.getString("training_lock", ""), data.getFloat("lock_secs", 5f));
             // Sangramento (Heavy Cut): icone Bleed enquanto durar; tick = so' o numero vermelho.
-            if (data.has("bleed_secs")) mob.sangraAteMs = System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L;
-            if (data.has("poison_secs")) mob.venenoAteMs = System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L;
-            if (data.has("burn_secs")) mob.queimaAteMs = System.currentTimeMillis() + (long) (data.getFloat("burn_secs", 0f) * 1000f) + 300L;
+            // Max: dois DoTs do mesmo tipo (Small Vines + Venom Chorus) - o icone
+            // fica ate' o que acabar por ultimo, nao o ultimo tick que chegou.
+            if (data.has("bleed_secs")) mob.sangraAteMs = Math.max(mob.sangraAteMs, System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L);
+            if (data.has("poison_secs")) mob.venenoAteMs = Math.max(mob.venenoAteMs, System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L);
+            if (data.has("burn_secs")) mob.queimaAteMs = Math.max(mob.queimaAteMs, System.currentTimeMillis() + (long) (data.getFloat("burn_secs", 0f) * 1000f) + 300L);
             // Tick de queimadura (Flame Burst): numero + uma chaminha no mob.
             if (data.getBoolean("is_burn", false)) {
                 boolean tickCrit = data.getBoolean("is_crit", false);
@@ -4149,8 +4151,8 @@ public class WorldScreen extends ScreenAdapter {
             if (data == null) return;
             MobVisual mob = mobs.get(data.getString("mob_id", ""));
             if (mob == null) return;
-            if (data.has("poison_secs")) mob.venenoAteMs = System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L;
-            if (data.has("bleed_secs")) mob.sangraAteMs = System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L;
+            if (data.has("poison_secs")) mob.venenoAteMs = Math.max(mob.venenoAteMs, System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L);
+            if (data.has("bleed_secs")) mob.sangraAteMs = Math.max(mob.sangraAteMs, System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L);
             String efeito = data.getString("effect", "");
             if ("Vines".equals(efeito)) {
                 float segurar = data.getFloat("hold", 2f);

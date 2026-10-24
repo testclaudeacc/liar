@@ -5981,12 +5981,13 @@ def _lancar_magia(sid, p, caminho, mob_id, aliado=''):
     if ticks > 0 and mob_data.get('hp', 0) > 0:
         # Sangramento: substitui um anterior (o token muda e a tarefa velha para).
         token = uuid.uuid4().hex
-        mob_data[chave_dot(dot)] = token
+        chave = chave_dot(dot, dados.get('spell'))
+        mob_data[chave] = token
         dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_bleed_pct', 0) or 0) / 100.0)))
         # A magia critou (mesmo a sem golpe, ex: Small Vines): todos os ticks vem critados.
         if critico: dano_tick *= 2
         socketio.start_background_task(_sangrar, sid, mob_id, mob_data, token, ticks, cada, dano_tick,
-                                       dados.get('spell_bleed_skill'), mob_type_id, dot, critico)
+                                       dados.get('spell_bleed_skill'), mob_type_id, dot, critico, chave)
 
 def _lancar_magia_cura(sid, p, caminho, dados, now, aliado):
     """Cura (Bard): spell_heal x o dano base de quem lanca. Alvo = o player
@@ -6138,11 +6139,12 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
             _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, now, extra)
         if pega and ticks_q > 0 and m.get('hp', 0) > 0:
             token = uuid.uuid4().hex
-            m[chave_dot(dot)] = token
+            chave = chave_dot(dot, dados.get('spell'))
+            m[chave] = token
             dano_tick = max(1, int(round(base_dmg * pct_q / 100.0)))
             if critico: dano_tick *= 2
             socketio.start_background_task(_sangrar, sid, mob_id, m, token, ticks_q, cada_q, dano_tick,
-                                           None, mob_type_id, dot, critico)
+                                           None, mob_type_id, dot, critico, chave)
     # Skill: golpes fixos por lancamento (nao por mob atingido), ex: 3 de Focus.
     skill_magia = dados.get('spell_skill')
     if skill_magia: _dar_hits_skill(sid, p, skill_magia, int(dados.get('spell_skill_hits', 0) or 0))
@@ -6163,15 +6165,17 @@ def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, 
             if skill: _dar_hits_skill(sid, p, skill, 1)
     except Exception: traceback.print_exc()
 
-def chave_dot(dot):
-    return {'burn': 'queima', 'poison': 'veneno'}.get(dot, 'sangria')
+def chave_dot(dot, magia=None):
+    """Token do DoT no mob: um por tipo E por magia. Bleed, veneno e queimadura
+    rodam juntos, e o veneno da Small Vines soma com o do Venom Chorus; so' a
+    MESMA magia de novo substitui a anterior (nao empilha consigo mesma)."""
+    base = {'burn': 'queima', 'poison': 'veneno'}.get(dot, 'sangria')
+    return base + ':' + magia if magia else base
 
-def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id, dot='bleed', critico=False):
+def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id, dot='bleed', critico=False, chave=None):
     """Ticks do sangramento (Heavy Cut). Para se o mob morrer/renascer, se
     outro sangramento substituir esse ou se quem lancou sair do jogo."""
-    # Cada tipo de DoT tem o proprio token: bleed, veneno e queimadura rodam
-    # juntos no mesmo mob (o mesmo tipo de novo substitui o anterior).
-    chave = chave_dot(dot)
+    if chave is None: chave = chave_dot(dot)
     try:
         for i in range(ticks):
             socketio.sleep(cada)
