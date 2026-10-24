@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.51"
+SERVER_VERSION = "v0.52"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -257,7 +257,8 @@ NPC_DB = {
         "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres",
         "res://sprites/spells/ArrowBarrage.tres", "res://sprites/spells/SmallVines.tres",
         "res://sprites/spells/RadiantBurst.tres", "res://sprites/spells/FlameBurst.tres",
-        "res://sprites/spells/WhirlwindSlash.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
+        "res://sprites/spells/WhirlwindSlash.tres", "res://sprites/spells/VenomChorus.tres",
+        "res://sprites/spells/HealingSong.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Ranger/SecondHand/StarterArrow.tres", "res://sprites/items/Ranger/SecondHand/FlintArrow.tres",
         "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres",
@@ -504,6 +505,10 @@ ITEM_DB = {
     # fechadas): veneno de spell_bleed_ticks ticks (spell_dot "poison") e o mob
     # fica lento (spell_slow s). Sem golpe inicial (spell_dmg 0).
     "res://sprites/spells/SmallVines.tres": {"name": "Small Vines", "type": "Spell", "spell": "small_vines", "spell_words": "Vineolae", "spell_desc": "Vines burst from the ground, slowing and poisoning the target.", "req_level": 7, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 0, "spell_area": False, "spell_dot": "poison", "spell_bleed_ticks": 3, "spell_bleed_pct": 20, "spell_bleed_every": 0.67, "spell_bleed_skill": "musicality", "spell_slow": 2.0, "spell_effect": "Vines", "spell_hit": "", "spell_proj": "res://ui/ThornSeed.png", "spell_color": "8cd612", "spell_slot": "376d03", "price": 1000, "icon": "sheet/r75_c8", "cap": 0.0},
+    # Bard lv20: AOE so' de veneno (4 ticks, 110% no total - o Bard e' suporte)
+    # e cura (2x o dano base, em si ou no amigo marcado). Mais baratas: sao duas.
+    "res://sprites/spells/VenomChorus.tres": {"name": "Venom Chorus", "type": "Spell", "spell": "venom_chorus", "spell_words": "Chorus Venenatus", "spell_desc": "A haunting chorus poisons the ground around you, poisoning every enemy in a medium-range area.", "req_level": 20, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 25, "spell_cd": 15, "spell_dmg": 0, "spell_skill": "musicality", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "PoisonCloud", "spell_dot": "poison", "spell_bleed_ticks": 4, "spell_bleed_pct": 27.5, "spell_bleed_every": 1, "spell_color": "8cd612", "spell_slot": "2f4d06", "price": 5000, "icon": "sheet/r75_c3", "cap": 0.0},
+    "res://sprites/spells/HealingSong.tres": {"name": "Healing Song", "type": "Spell", "spell": "healing_song", "spell_words": "Cantus Sanans", "spell_desc": "A soothing song that heals your marked ally, or yourself if no ally is marked.", "req_level": 20, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 0, "spell_heal": 2, "spell_skill": "musicality", "spell_skill_hits": 3, "spell_area": False, "spell_hit": "", "spell_proj": "", "spell_color": "8cd612", "spell_slot": "376d03", "price": 5000, "icon": "sheet/r75_c7", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
@@ -631,7 +636,7 @@ CAMPOS_ITEM_CLIENTE = ("name", "type", "req_level", "req_class", "bonus_damage",
                        "regen_hp", "regen_mp", "regen_seg", "price", "sell_price", "set", "set_xp", "set_desc", "two_handed", "training", "ammo_save",
                        "spell", "spell_mana", "spell_cd", "spell_dmg", "spell_desc", "spell_area",
                        "spell_bleed_ticks", "spell_bleed_pct", "spell_bleed_every", "spell_slot",
-                       "spell_hits", "spell_hit_every", "spell_dot", "spell_slow",
+                       "spell_hits", "spell_hit_every", "spell_dot", "spell_slow", "spell_heal",
                        "atk_speed", "atk_hit", "atk_proj")
 
 def montar_item_db_cliente(classe=None):
@@ -5875,7 +5880,7 @@ def _recompensar_morte_mob(mob_id, mob_type_id, mob_data, room, now):
     mob_data['returning'] = False
     mob_data['path'] = None
 
-def _lancar_magia(sid, p, caminho, mob_id):
+def _lancar_magia(sid, p, caminho, mob_id, aliado=''):
     """Magia de dano num mob (ex: Igniculus): valida tudo, gasta mana, poe o
     cooldown e usa _aplicar_dano_mob (XP/loot iguais ao golpe normal)."""
     dados = ITEM_DB.get(caminho, {})
@@ -5893,6 +5898,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
     cds = p.setdefault('_spell_cd', {})
     if cds.get(caminho, 0) > now: return falha('cooldown')
     if dados.get('spell_area'): return _lancar_magia_area(sid, p, caminho, dados, now)
+    if dados.get('spell_heal'): return _lancar_magia_cura(sid, p, caminho, dados, now, aliado)
     mob_data = active_mobs.get(mob_id) if mob_id else None
     if mob_data is None or mob_data.get('hp', 1) <= 0 or 'pos_x' not in mob_data or na_pz(mob_data): return falha('no_target')
     if int(p.get('floor', 1) or 1) != MOB_FLOOR: return falha('no_target')
@@ -5975,12 +5981,67 @@ def _lancar_magia(sid, p, caminho, mob_id):
     if ticks > 0 and mob_data.get('hp', 0) > 0:
         # Sangramento: substitui um anterior (o token muda e a tarefa velha para).
         token = uuid.uuid4().hex
-        mob_data['sangria'] = token
+        mob_data[chave_dot(dot)] = token
         dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_bleed_pct', 0) or 0) / 100.0)))
         # A magia critou (mesmo a sem golpe, ex: Small Vines): todos os ticks vem critados.
         if critico: dano_tick *= 2
         socketio.start_background_task(_sangrar, sid, mob_id, mob_data, token, ticks, cada, dano_tick,
                                        dados.get('spell_bleed_skill'), mob_type_id, dot, critico)
+
+def _lancar_magia_cura(sid, p, caminho, dados, now, aliado):
+    """Cura (Bard): spell_heal x o dano base de quem lanca. Alvo = o player
+    marcado (amigo) se estiver perto e visivel; senao (sem ninguem marcado,
+    ou mirando um mob) cura a si mesmo. Curar outro nao da' battle."""
+    def falha(motivo):
+        emit('spell_result', {'item': caminho, 'reason': motivo}, room=sid)
+    alvo_sid, alvo = sid, p
+    if aliado and aliado != p.get('name'):
+        achado = next(((s2, o) for s2, o in online_players.items() if o.get('name') == aliado), None)
+        if achado is None: return falha('range')
+        s2, o = achado
+        if o.get('is_dead') or o.get('mapa') != p.get('mapa') or int(o.get('floor', 1) or 1) != int(p.get('floor', 1) or 1):
+            return falha('range')
+        if _dist_px(o, p) > (ALCANCE_RANGED_SQM + 1) * TILE: return falha('range')
+        if int(p.get('floor', 1) or 1) == 1 and not linha_de_visao(
+                mapas_colisao.get(p.get('mapa')), tile_de(p.get('pos_x', 0), p.get('pos_y', 0)), tile_de(o.get('pos_x', 0), o.get('pos_y', 0))):
+            return falha('range')
+        alvo_sid, alvo = s2, o
+    max_hp_a, max_mp_a = calcular_max_vitais(alvo)
+    try: hp_atual = float(alvo.get('current_hp', -1))
+    except (TypeError, ValueError): hp_atual = -1.0
+    if hp_atual < 0: hp_atual = max_hp_a
+    custo = int(dados.get('spell_mana', 0) or 0)
+    max_hp_m, max_mp_m = calcular_max_vitais(p)
+    try: mp_atual = float(p.get('current_mp', -1))
+    except (TypeError, ValueError): mp_atual = -1.0
+    if mp_atual < 0: mp_atual = max_mp_m
+    if mp_atual < custo:
+        emit('sync_vitals', {'current_mp': mp_atual, 'max_mp': max_mp_m, 'no_mana': True}, room=sid)
+        return
+    p['current_mp'] = mp_atual - custo
+    emit('sync_vitals', {'current_mp': p['current_mp'], 'max_mp': max_mp_m}, room=sid)
+    cd = float(dados.get('spell_cd', 0) or 0)
+    p.setdefault('_spell_cd', {})[caminho] = now + cd
+    emit('spell_used', {'item': caminho, 'cooldown': cd}, room=sid)
+    texto_de_acao(p, dados.get('spell_words') or dados.get('name', 'Spell'), dados.get('spell_color', 'ff7500'))
+    if len(_slots_com_classe_invalida(p)) > 0:
+        base_dmg = PUNICAO_CLASSE_DANO
+    else:
+        bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}), p.get('class_name'))
+        base_dmg, _ = calc_player_stats(p.get('class_name', 'Knight'), p.get('level', 1), p.get('skills', {}), bonus_dmg=bonus_itens['bonus_damage'])
+    if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
+    base = base_dmg * float(dados.get('spell_heal', 2) or 2)
+    cura = max(1, int(round(random.uniform(base * DANO_VAR_MIN, base * DANO_VAR_MAX))))
+    cura = int(min(cura, max(0.0, max_hp_a - hp_atual)))  # mostra o que curou de verdade
+    alvo['current_hp'] = hp_atual + cura
+    emit('sync_vitals', {'current_hp': alvo['current_hp'], 'max_hp': max_hp_a, 'max_mp': max_mp_a}, room=alvo_sid)
+    emit_tela('spell_heal', {'name': alvo.get('name', ''), 'caster': p.get('name', ''), 'amount': cura},
+              alvo.get('pos_x', 0), alvo.get('pos_y', 0), incluir=sid)
+    emit_area('player_status_updated', {'name': alvo.get('name', ''), 'current_hp': alvo['current_hp'], 'max_hp': max_hp_a},
+              alvo.get('room'), skip_sid=alvo_sid)
+    _queue_save(alvo)
+    skill_magia = dados.get('spell_skill')
+    if skill_magia: _dar_hits_skill(sid, p, skill_magia, int(dados.get('spell_skill_hits', 0) or 0))
 
 def _tiles_area_magia(centro, raio, forma=''):
     """SQMs da magia em area, sem o SQM do player: "circulo" (losango) de raio
@@ -6012,8 +6073,10 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
     tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
     cx, cy = centro_tile(tp)
     forma = dados.get('spell_forma', '')
+    # hold: efeito que fica no chao enquanto o DoT roda (Venom Chorus).
+    segurar = int(dados.get('spell_bleed_ticks', 0) or 0) * float(dados.get('spell_bleed_every', 1) or 1)
     emit_tela('spell_area', {'attacker_id': p.get('name', ''), 'pos_x': cx, 'pos_y': cy, 'raio': raio,
-                             'shape': forma, 'effect': dados.get('spell_effect', '')}, cx, cy, incluir=sid)
+                             'shape': forma, 'effect': dados.get('spell_effect', ''), 'hold': segurar}, cx, cy, incluir=sid)
     if int(p.get('floor', 1) or 1) != MOB_FLOOR: return
     tiles = _tiles_area_magia(tp, raio, forma)
     grade = mapas_colisao.get(p.get('mapa'))
@@ -6037,6 +6100,7 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
         base_dmg, _ = calc_player_stats(p.get('class_name', 'Knight'), p.get('level', 1), p.get('skills', {}), bonus_dmg=bonus_itens['bonus_damage'])
     if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
     base = base_dmg * float(dados.get('spell_dmg', 100) or 100) / 100.0
+    sem_golpe = float(dados.get('spell_dmg', 0) or 0) <= 0  # Venom Chorus: so' veneno
     for mob_id, m in alvos:
         m['last_activity'] = now
         m.setdefault('hits_recentes', {})[sid] = now
@@ -6047,18 +6111,32 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
         mob_type_id = m.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
         extra = {'hit_type': dados.get('spell_hit', 'none'), 'is_crit': critico, 'reduced': False,
                  'is_miss': False, 'w_type': 'Melee', 'proj': ''}
-        # Chance de DoT em cada mob atingido (Flame Burst: burn; Whirlwind Slash:
-        # bleed). Ticks de % do dano base; critou no golpe = ticks critados.
+        # DoT nos mobs atingidos: spell_dot_* = por chance; spell_bleed_* = em
+        # todos (Venom Chorus). Ticks de % do dano base; critou = ticks critados.
         dot = dados.get('spell_dot', 'burn')
-        pega = random.random() * 100 < float(dados.get('spell_dot_chance', 0) or 0)
-        ticks_q = int(dados.get('spell_dot_ticks', 0) or 0)
-        cada_q = float(dados.get('spell_dot_every', 1) or 1)
+        garantido = int(dados.get('spell_bleed_ticks', 0) or 0) > 0
+        if garantido:
+            pega = True
+            ticks_q = int(dados.get('spell_bleed_ticks', 0) or 0)
+            cada_q = float(dados.get('spell_bleed_every', 1) or 1)
+            pct_q = float(dados.get('spell_bleed_pct', 0) or 0)
+        else:
+            pega = random.random() * 100 < float(dados.get('spell_dot_chance', 0) or 0)
+            ticks_q = int(dados.get('spell_dot_ticks', 0) or 0)
+            cada_q = float(dados.get('spell_dot_every', 1) or 1)
+            pct_q = float(dados.get('spell_dot_pct', 0) or 0)
         if pega and ticks_q > 0: extra[dot + '_secs'] = ticks_q * cada_q
-        _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, now, extra)
+        if sem_golpe:
+            # So' o DoT (o dano vem nos ticks): liga o icone no mob.
+            if pega and ticks_q > 0:
+                emit_tela('spell_effect', {'mob_id': mob_id, 'effect': '', 'attacker_id': p.get('name', ''),
+                                           dot + '_secs': ticks_q * cada_q}, m.get('pos_x', 0), m.get('pos_y', 0), incluir=sid)
+        else:
+            _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, now, extra)
         if pega and ticks_q > 0 and m.get('hp', 0) > 0:
             token = uuid.uuid4().hex
-            m['queima' if dot == 'burn' else 'sangria'] = token
-            dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_dot_pct', 0) or 0) / 100.0)))
+            m[chave_dot(dot)] = token
+            dano_tick = max(1, int(round(base_dmg * pct_q / 100.0)))
             if critico: dano_tick *= 2
             socketio.start_background_task(_sangrar, sid, mob_id, m, token, ticks_q, cada_q, dano_tick,
                                            None, mob_type_id, dot, critico)
@@ -6082,11 +6160,15 @@ def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, 
             if skill: _dar_hits_skill(sid, p, skill, 1)
     except Exception: traceback.print_exc()
 
+def chave_dot(dot):
+    return {'burn': 'queima', 'poison': 'veneno'}.get(dot, 'sangria')
+
 def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id, dot='bleed', critico=False):
     """Ticks do sangramento (Heavy Cut). Para se o mob morrer/renascer, se
     outro sangramento substituir esse ou se quem lancou sair do jogo."""
-    # Queimadura tem token proprio: nao corta o bleed/veneno que ja' estiver rodando.
-    chave = 'queima' if dot == 'burn' else 'sangria'
+    # Cada tipo de DoT tem o proprio token: bleed, veneno e queimadura rodam
+    # juntos no mesmo mob (o mesmo tipo de novo substitui o anterior).
+    chave = chave_dot(dot)
     try:
         for i in range(ticks):
             socketio.sleep(cada)
@@ -9100,7 +9182,7 @@ def handle_use_hotbar(data):
         caminho = normalizar_hotbar(p.get('hotbar'))['slots'][i]
         if not caminho: return
         if eh_magia(caminho):
-            _lancar_magia(sid, p, caminho, str(data.get('target', '') or ''))
+            _lancar_magia(sid, p, caminho, str(data.get('target', '') or ''), str(data.get('ally', '') or '')[:40])
             return
         inst = next((it for it in p.get('inventory', []) if it.get('item') == caminho), None)
         if inst is None:

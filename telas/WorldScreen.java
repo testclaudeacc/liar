@@ -531,6 +531,12 @@ public class WorldScreen extends ScreenAdapter {
         // Hits usam DURACAO_QUADRO_HIT (mais lento); fumaca de spawn segue no ritmo antigo.
         float duracaoQuadro = DURACAO_QUADRO_EFEITO;
         boolean porCima; // acima de todos os tiles (desenhado depois dos telhados)
+        float duracaoTotal; // > 0: repete os quadros ate' esse tempo (nuvem do Venom Chorus)
+        float fim() { return duracaoTotal > 0f ? duracaoTotal : quadros.length * duracaoQuadro; }
+        int quadroAtual() {
+            int q = (int) (tempo / duracaoQuadro);
+            return duracaoTotal > 0f ? q % quadros.length : Math.min(quadros.length - 1, q);
+        }
         Efeito(TextureRegion[] quadros, float x, float y) { this.quadros = quadros; this.x = x; this.y = y; }
         float posX() { return mobAlvo != null ? mobAlvo.x : jogadorAlvo != null ? jogadorAlvo.x : x; }
         float posY() { return mobAlvo != null ? mobAlvo.y : jogadorAlvo != null ? jogadorAlvo.y : y; }
@@ -1548,15 +1554,19 @@ public class WorldScreen extends ScreenAdapter {
                 if (CooldownPocao.restanteMagia(caminho) > 0f) return;
                 // Magia em area (Radiant Burst): sai em volta do player, sem alvo.
                 MobVisual alvo = alvoMob == null ? null : mobs.get(alvoMob);
-                if (!bookMenu.ehMagiaArea(caminho) && (alvo == null || alvo.morto || !alvo.visivel)) {
+                // Cura: no amigo marcado ou em si mesmo - tambem sem mob.
+                boolean semAlvo = bookMenu.ehMagiaArea(caminho) || bookMenu.ehMagiaCura(caminho);
+                if (!semAlvo && (alvo == null || alvo.morto || !alvo.visivel)) {
                     hud.notificar(tr("Select a target first."), COR_NOTIF_AVISO, null);
                     return;
                 }
             }
             final String alvoId = alvoMob == null ? "" : alvoMob;
+            final String aliado = amigoMarcado == null ? "" : amigoMarcado; // Healing Song
             socket.emitRaw("use_hotbar", GameSocket.obj(jw -> {
                 jw.set("index", indice);
                 jw.set("target", alvoId);
+                jw.set("ally", aliado);
             }));
         });
         bookMenu.definirAoMudarAtalhos(hotbar::atualizar);
@@ -4164,6 +4174,8 @@ public class WorldScreen extends ScreenAdapter {
             float duracaoQuadro = "Fire".equals(efeitoArea) ? DURACAO_QUADRO_HIT_FOGO
                 : "Sword".equals(efeitoArea) || "CutATK".equals(efeitoArea) ? DURACAO_QUADRO_HIT_ESPADA : DURACAO_QUADRO_LUZ;
             boolean caixa = "box".equals(data.getString("shape", "")); // quadrado (Knight) em vez de losango
+            if ("PoisonCloud".equals(efeitoArea)) duracaoQuadro = DURACAO_QUADRO_HIT;
+            float segurar = data.getFloat("hold", 0f); // Venom Chorus: a nuvem fica enquanto o veneno roda
             // Uma luz so', do tamanho da area, enquanto a animacao dura
             // (amarela na Radiant Burst, laranja na Flame Burst).
             Color corArea = "LightAtk".equals(efeitoArea) ? COR_LUZ_RADIANTE : corLuzDoEfeito(efeitoArea);
@@ -4183,6 +4195,7 @@ public class WorldScreen extends ScreenAdapter {
                     Efeito e = new Efeito(quadros, cx + dx * Jogador.TILE, cy + dy * Jogador.TILE);
                     e.duracaoQuadro = duracaoQuadro;
                     e.porCima = true;
+                    if (segurar > 0f) e.duracaoTotal = segurar;
                     efeitos.add(e);
                 }
             }
@@ -4479,6 +4492,22 @@ public class WorldScreen extends ScreenAdapter {
             // Mesmo numero do dano (mesma posicao, subida e sumico), so' na cor da cura.
             NumeroDano n = new NumeroDano(j.x, j.y + 4f, String.valueOf(data.getInt("amount", 0)), false);
             n.cor = mana ? COR_CURA_MP : COR_CURA_HP;
+            numerosDano.add(n);
+        });
+        // Healing Song: efeito de cura e o numero verde em quem foi curado.
+        socket.on("spell_heal", (nomeEvt, data) -> {
+            if (data == null) return;
+            Jogador j = jogadorPorNome(data.getString("name", ""));
+            if (j == null) return;
+            TextureRegion[] quadros = quadrosCura("heal");
+            if (quadros != null) {
+                Efeito e = new Efeito(quadros, j.x, j.y);
+                e.jogadorAlvo = j;
+                e.duracaoQuadro = DURACAO_QUADRO_HIT;
+                efeitos.add(e);
+            }
+            NumeroDano n = new NumeroDano(j.x, j.y + 4f, String.valueOf(data.getInt("amount", 0)), false);
+            n.cor = COR_CURA_HP;
             numerosDano.add(n);
         });
         socket.on("food_result", (nomeEvt, data) -> {
@@ -6783,7 +6812,7 @@ public class WorldScreen extends ScreenAdapter {
         for (int i = efeitos.size() - 1; i >= 0; i--) {
             Efeito e = efeitos.get(i);
             e.tempo += delta;
-            if (e.tempo >= e.quadros.length * e.duracaoQuadro) efeitos.remove(i);
+            if (e.tempo >= e.fim()) efeitos.remove(i);
         }
         for (int i = projeteis.size() - 1; i >= 0; i--) {
             Projetil pr = projeteis.get(i);
@@ -7055,7 +7084,7 @@ public class WorldScreen extends ScreenAdapter {
     private void desenharListaEfeitos(boolean porCima) {
         for (Efeito e : efeitos) {
             if (e.porCima != porCima) continue;
-            int quadro = Math.min(e.quadros.length - 1, (int) (e.tempo / e.duracaoQuadro));
+            int quadro = e.quadroAtual();
             TextureRegion r = e.quadros[quadro];
             float ancoraX = Math.round(e.posX() / camera.zoom) * camera.zoom;
             float ancoraY = Math.round(e.posY() / camera.zoom) * camera.zoom;

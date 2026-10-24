@@ -427,6 +427,7 @@ public final class BookMenuUI {
         final float sangraPct, sangraCada;   // % por tick e segundos entre eles
         final String magiaDot;               // "bleed" ou "poison"
         final float magiaLento;              // segundos de lentidao no mob
+        final float magiaCura;               // Healing Song: cura = isso x o dano base (0 = nao cura)
         final String magiaSlot; // cor do slot: "orange" (padrao) ou "red"
         final String magiaExpSkill; // skill que a magia treina (magic/melee/distance/musicality)
         final int magiaExp;         // golpes na skill por uso
@@ -453,6 +454,7 @@ public final class BookMenuUI {
             this.sangraCada = d.getFloat("spell_bleed_every", 0f);
             this.magiaDot = d.getString("spell_dot", "bleed");
             this.magiaLento = d.getFloat("spell_slow", 0f);
+            this.magiaCura = d.getFloat("spell_heal", 0f);
             this.magiaSlot = d.getString("spell_slot", "orange");
             this.magiaExpSkill = d.getString("spell_exp_skill", null);
             this.magiaExp = d.getInt("spell_exp", 0);
@@ -1049,11 +1051,12 @@ public final class BookMenuUI {
             bloco.add(linhaStat(tr("Spell"), Color.LIGHT_GRAY)).left().row();
             bloco.add(linhaStat(tr("{0} Mana", dados.magiaMana), COR_MANA)).left().row();
             bloco.add(linhaStat(tr("{0}s Cooldown", dados.magiaCd), Color.LIGHT_GRAY)).left().row();
-            bloco.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET)).left().padTop(6).row();
+            if (dados.magiaCura > 0) bloco.add(linhaStat(textoCura(dados), COR_CURA)).left().padTop(6).row();
+            else bloco.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET)).left().padTop(6).row();
             if (dados.sangraTicks > 0) bloco.add(linhaStat(textoSangramento(dados), corDoDot(dados))).left().row();
             if (dados.magiaLento > 0) bloco.add(linhaStat(tr("Slows for {0}s", porcento(dados.magiaLento)), Color.LIGHT_GRAY)).left().row();
             if (dados.magiaGolpes > 1) bloco.add(linhaStat(textoGolpes(dados), Color.LIGHT_GRAY)).left().row();
-            bloco.add(linhaStat(dados.magiaArea ? tr("Area Damage") : tr("Single Target"), COR_ALVO_MAGIA)).left().row();
+            bloco.add(linhaStat(textoAlvoMagia(dados), COR_ALVO_MAGIA)).left().row();
             return;
         }
         if (dados.usavel) {
@@ -4924,6 +4927,12 @@ public final class BookMenuUI {
         return dados != null && dados.magia != null && !dados.magia.isEmpty();
     }
 
+    /** Magia de cura (spell_heal): lanca sem mob mirado (amigo marcado ou si mesmo). */
+    public boolean ehMagiaCura(String caminho) {
+        EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        return dados != null && dados.magiaCura > 0;
+    }
+
     /** Magia em area (spell_area): lanca sem mob mirado. */
     public boolean ehMagiaArea(String caminho) {
         EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
@@ -6356,6 +6365,16 @@ public final class BookMenuUI {
     /** "3 hits of 21.5%" (so' magia com mais de um golpe). */
     private static String textoGolpes(EquipStats d) { return tr("{0} hits of {1}%", d.magiaGolpes, porcento(d.magiaDano)); }
 
+    private static final Color COR_CURA = Color.valueOf("8cd612");
+
+    /** Healing Song: "Heals 200% of your damage". */
+    private static String textoCura(EquipStats d) { return tr("Heals {0}% of your damage", porcento(d.magiaCura * 100f)); }
+
+    private static String textoAlvoMagia(EquipStats d) {
+        if (d.magiaCura > 0) return tr("Ally or Self");
+        return d.magiaArea ? tr("Area Damage") : tr("Single Target");
+    }
+
     private static String textoSangramento(EquipStats d) {
         String tipo = "poison".equals(d.magiaDot) ? "Poison" : "Bleed";
         return tipo + ": " + d.sangraTicks + "x " + porcento(d.sangraPct) + "% (every " + porcento(d.sangraCada) + "s)";
@@ -6465,8 +6484,9 @@ public final class BookMenuUI {
                 else texto.add(desc).left().row();
             }
             Table linhaDano = new Table();
-            linhaDano.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET));
-            linhaDano.add(linhaStat(dados.magiaArea ? tr("Area Damage") : tr("Single Target"), COR_ALVO_MAGIA)).padLeft(10);
+            if (dados.magiaCura > 0) linhaDano.add(linhaStat(textoCura(dados), COR_CURA));
+            else linhaDano.add(linhaStat(danoTotalMagia(dados) + "% Damage", COR_SET));
+            linhaDano.add(linhaStat(textoAlvoMagia(dados), COR_ALVO_MAGIA)).padLeft(10);
             texto.add(linhaDano).left().row();
             if (dados.sangraTicks > 0) texto.add(linhaStat(textoSangramento(dados), corDoDot(dados))).left().row();
             if (dados.magiaLento > 0) texto.add(linhaStat(tr("Slows for {0}s", porcento(dados.magiaLento)), Color.LIGHT_GRAY)).left().row();
