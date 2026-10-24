@@ -14,7 +14,7 @@
   AOE do lv 20) sao a margem de lucro: com elas o mob morre ~25% mais rapido.
 - Conta: HP do mob ~= golpes x dano medio por golpe do player da fase
   (level x0.5 + arma + offhand ADC + skill da classe).
-- Referencias calibradas: Wolf 300 HP (lv ~12, gear lv 10), Black Spider 500 HP (lv ~22, gear lv 20).
+- Referencias calibradas: Wolf 300 HP (lv ~12, gear lv 10), Black Spider 450 HP (lv ~22, gear lv 20; com o gear lv20 novo morre um pouco mais rapido - mantido assim de proposito).
 - Gear novo (main hand + offhand) deve dar ~+15 de dano por tier em relacao ao anterior
   (ex: Mage lv10 staff 8 + book 9 = 17 -> lv20 staff 18 + book 14 = 32), pra troca ser sentida.
 - Economia: profit do player deve ir 70-80% pro refill (pots, comida, flechas, runas). NPC paga
