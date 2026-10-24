@@ -4017,6 +4017,9 @@ public class WorldScreen extends ScreenAdapter {
                 boolean tickCrit = data.getBoolean("is_crit", false); // a magia critou: os ticks tambem
                 NumeroDano n = new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (tickCrit ? "!" : ""), tickCrit);
                 numerosDano.add(n);
+                // Veneno em area (Venom Chorus) manda o efeito do tick (PoisonPhysATK).
+                String efeitoTick = data.getString("hit_type", "");
+                if (!efeitoTick.isEmpty()) tocarEfeitoNoMob(efeitoTick, mob);
                 return;
             }
             if (data.getBoolean("is_bleed", false)) {

@@ -6143,8 +6143,10 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
             m[chave] = token
             dano_tick = max(1, int(round(base_dmg * pct_q / 100.0)))
             if critico: dano_tick *= 2
+            # Tick do veneno em area (Venom Chorus): toca o PoisonPhysATK no mob.
+            efeito_tick = 'PoisonPhysATK' if dot == 'poison' else ''
             socketio.start_background_task(_sangrar, sid, mob_id, m, token, ticks_q, cada_q, dano_tick,
-                                           None, mob_type_id, dot, critico, chave)
+                                           None, mob_type_id, dot, critico, chave, efeito_tick)
     # Skill: golpes fixos por lancamento (nao por mob atingido), ex: 3 de Focus.
     skill_magia = dados.get('spell_skill')
     if skill_magia: _dar_hits_skill(sid, p, skill_magia, int(dados.get('spell_skill_hits', 0) or 0))
@@ -6172,7 +6174,7 @@ def chave_dot(dot, magia=None):
     base = {'burn': 'queima', 'poison': 'veneno'}.get(dot, 'sangria')
     return base + ':' + magia if magia else base
 
-def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id, dot='bleed', critico=False, chave=None):
+def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id, dot='bleed', critico=False, chave=None, efeito=''):
     """Ticks do sangramento (Heavy Cut). Para se o mob morrer/renascer, se
     outro sangramento substituir esse ou se quem lancou sair do jogo."""
     if chave is None: chave = chave_dot(dot)
@@ -6184,7 +6186,7 @@ def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_typ
             if m is not mob_ref or m.get(chave) != token or m.get('hp', 0) <= 0 or p is None: return
             restante = (ticks - i - 1) * cada
             _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano_tick, time.time(),
-                              {'hit_type': '', 'is_crit': critico, 'reduced': False, 'is_miss': False,
+                              {'hit_type': efeito, 'is_crit': critico, 'reduced': False, 'is_miss': False,
                                'w_type': 'Melee', 'proj': '', 'is_' + dot: True, dot + '_secs': restante})
             if skill: _dar_hits_skill(sid, p, skill, 1)
             if m.get('hp', 0) <= 0: return
