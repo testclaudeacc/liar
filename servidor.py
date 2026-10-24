@@ -507,8 +507,8 @@ ITEM_DB = {
     "res://sprites/spells/SmallVines.tres": {"name": "Small Vines", "type": "Spell", "spell": "small_vines", "spell_words": "Vineolae", "spell_desc": "Vines burst from the ground, slowing and poisoning the target.", "req_level": 7, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 0, "spell_area": False, "spell_dot": "poison", "spell_bleed_ticks": 3, "spell_bleed_pct": 20, "spell_bleed_every": 0.67, "spell_bleed_skill": "musicality", "spell_slow": 2.0, "spell_effect": "Vines", "spell_hit": "", "spell_proj": "res://ui/ThornSeed.png", "spell_color": "8cd612", "spell_slot": "376d03", "price": 1000, "icon": "sheet/r75_c8", "cap": 0.0},
     # Bard lv20: AOE so' de veneno (4 ticks, 110% no total - o Bard e' suporte)
     # e cura (2x o dano base, em si ou no amigo marcado). Mais baratas: sao duas.
-    "res://sprites/spells/VenomChorus.tres": {"name": "Venom Chorus", "type": "Spell", "spell": "venom_chorus", "spell_words": "Chorus Venenatus", "spell_desc": "A haunting chorus poisons the ground around you, poisoning every enemy in a medium-range area.", "req_level": 20, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 25, "spell_cd": 15, "spell_dmg": 0, "spell_skill": "musicality", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "PoisonCloud", "spell_dot": "poison", "spell_bleed_ticks": 4, "spell_bleed_pct": 27.5, "spell_bleed_every": 1, "spell_color": "8cd612", "spell_slot": "2f4d06", "price": 5000, "icon": "sheet/r75_c3", "cap": 0.0},
-    "res://sprites/spells/HealingSong.tres": {"name": "Healing Song", "type": "Spell", "spell": "healing_song", "spell_words": "Cantus Sanans", "spell_desc": "A soothing song that heals your marked ally, or yourself if no ally is marked.", "req_level": 20, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 0, "spell_heal": 2, "spell_skill": "musicality", "spell_skill_hits": 3, "spell_area": False, "spell_hit": "", "spell_proj": "", "spell_color": "8cd612", "spell_slot": "376d03", "price": 5000, "icon": "sheet/r75_c7", "cap": 0.0},
+    "res://sprites/spells/VenomChorus.tres": {"name": "Venom Chorus", "type": "Spell", "spell": "venom_chorus", "spell_words": "Chorus Venenatus", "spell_desc": "A haunting chorus poisons the ground around you, poisoning every enemy in a medium-range area.", "req_level": 20, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 25, "spell_cd": 15, "spell_dmg": 0, "spell_skill": "musicality", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "PoisonCloud", "spell_dot": "poison", "spell_bleed_ticks": 4, "spell_bleed_pct": 27.5, "spell_bleed_every": 1, "spell_color": "8cd612", "spell_slot": "4a5a08", "price": 5000, "icon": "sheet/r75_c3", "cap": 0.0},
+    "res://sprites/spells/HealingSong.tres": {"name": "Healing Song", "type": "Spell", "spell": "healing_song", "spell_words": "Cantus Sanans", "spell_desc": "A soothing song that heals your marked ally, or yourself if no ally is marked.", "req_level": 20, "req_class": "Bard", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 0, "spell_heal": 2, "spell_skill": "musicality", "spell_skill_hits": 3, "spell_area": False, "spell_hit": "", "spell_proj": "", "spell_color": "5ee8a0", "spell_slot": "0c6b4c", "price": 5000, "icon": "sheet/r75_c7", "cap": 0.0},
     # Armas de treino (loja do Luke): "training" troca o dano por 1% do HP
     # maximo do alvo (mob: no maximo TREINO_DANO_MAX_MOB), ignorando defesa,
     # e trava o mob pra outros players por TREINO_TRAVA_SEG (anti-KS).
@@ -6010,6 +6010,11 @@ def _lancar_magia_cura(sid, p, caminho, dados, now, aliado):
     try: hp_atual = float(alvo.get('current_hp', -1))
     except (TypeError, ValueError): hp_atual = -1.0
     if hp_atual < 0: hp_atual = max_hp_a
+    # Vida cheia: nao gasta mana nem cooldown, so' avisa.
+    if hp_atual >= max_hp_a:
+        emit('spell_result', {'item': caminho, 'reason': 'full_hp' if alvo is p else 'ally_full_hp',
+                              'ally': alvo.get('name', '')}, room=sid)
+        return
     custo = int(dados.get('spell_mana', 0) or 0)
     max_hp_m, max_mp_m = calcular_max_vitais(p)
     try: mp_atual = float(p.get('current_mp', -1))
@@ -6073,10 +6078,8 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
     tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
     cx, cy = centro_tile(tp)
     forma = dados.get('spell_forma', '')
-    # hold: efeito que fica no chao enquanto o DoT roda (Venom Chorus).
-    segurar = int(dados.get('spell_bleed_ticks', 0) or 0) * float(dados.get('spell_bleed_every', 1) or 1)
     emit_tela('spell_area', {'attacker_id': p.get('name', ''), 'pos_x': cx, 'pos_y': cy, 'raio': raio,
-                             'shape': forma, 'effect': dados.get('spell_effect', ''), 'hold': segurar}, cx, cy, incluir=sid)
+                             'shape': forma, 'effect': dados.get('spell_effect', '')}, cx, cy, incluir=sid)
     if int(p.get('floor', 1) or 1) != MOB_FLOOR: return
     tiles = _tiles_area_magia(tp, raio, forma)
     grade = mapas_colisao.get(p.get('mapa'))

@@ -4175,7 +4175,6 @@ public class WorldScreen extends ScreenAdapter {
                 : "Sword".equals(efeitoArea) || "CutATK".equals(efeitoArea) ? DURACAO_QUADRO_HIT_ESPADA : DURACAO_QUADRO_LUZ;
             boolean caixa = "box".equals(data.getString("shape", "")); // quadrado (Knight) em vez de losango
             if ("PoisonCloud".equals(efeitoArea)) duracaoQuadro = DURACAO_QUADRO_HIT;
-            float segurar = data.getFloat("hold", 0f); // Venom Chorus: a nuvem fica enquanto o veneno roda
             // Uma luz so', do tamanho da area, enquanto a animacao dura
             // (amarela na Radiant Burst, laranja na Flame Burst).
             Color corArea = "LightAtk".equals(efeitoArea) ? COR_LUZ_RADIANTE : corLuzDoEfeito(efeitoArea);
@@ -4195,7 +4194,6 @@ public class WorldScreen extends ScreenAdapter {
                     Efeito e = new Efeito(quadros, cx + dx * Jogador.TILE, cy + dy * Jogador.TILE);
                     e.duracaoQuadro = duracaoQuadro;
                     e.porCima = true;
-                    if (segurar > 0f) e.duracaoTotal = segurar;
                     efeitos.add(e);
                 }
             }
@@ -4255,6 +4253,8 @@ public class WorldScreen extends ScreenAdapter {
                 case "unknown": msg = tr("You don't know this spell."); break;
                 case "class": msg = tr("Your class can't use {0}.", nome); break;
                 case "training": msg = tr("You can't use spells with a training weapon."); break;
+                case "full_hp": msg = tr("Your health is already full."); break;
+                case "ally_full_hp": msg = tr("{0}'s health is already full.", nomeVisivel(data.getString("ally", ""))); break;
                 default: return;
             }
             hud.notificar(msg, COR_NOTIF_AVISO, null);

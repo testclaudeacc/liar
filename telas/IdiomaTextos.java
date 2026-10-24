@@ -426,6 +426,7 @@ final class IdiomaTextos {
             + "A soothing song that heals your marked ally, or yourself if no ally is marked.\tUma can\u00e7\u00e3o suave que cura o aliado marcado, ou voc\u00ea mesmo se nenhum aliado estiver marcado.\tUna canci\u00f3n suave que cura a tu aliado marcado, o a ti mismo si no hay ning\u00fan aliado marcado.\n"
             + "Heals {0}% of your damage\tCura {0}% do seu dano\tCura {0}% de tu da\u00f1o\n"
             + "Ally or Self\tAliado ou si mesmo\tAliado o uno mismo\n"
+            + "{0}'s health is already full.\tA vida de {0} j\u00e1 est\u00e1 cheia.\tLa vida de {0} ya est\u00e1 llena.\n"
             + "Vines burst from the ground, slowing and poisoning the target.	Vinhas brotam do ch\u00e3o, deixando o alvo lento e envenenado.	Enredaderas brotan del suelo, ralentizando y envenenando al objetivo.\n"
             + "Hungry, traveler? Fresh food, right here.	Com fome, viajante? Comida fresca, bem aqui.	\u00bfHambre, viajero? Comida fresca, aqu\u00ed mismo.\n"
             + "Seeking arcane power? My spells are not for the faint of heart.	Procurando poder arcano? Minhas magias n\u00e3o s\u00e3o para os fracos de cora\u00e7\u00e3o.	\u00bfBuscas poder arcano? Mis hechizos no son para los d\u00e9biles de coraz\u00f3n.\n"
