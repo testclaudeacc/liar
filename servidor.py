@@ -5975,10 +5975,10 @@ def _lancar_magia(sid, p, caminho, mob_id):
 
 def _tiles_area_magia(centro, raio):
     """SQMs da magia em area: "circulo" (losango) de raio SQMs em volta do
-    player, sem o SQM dele (raio 3 = 24 SQMs)."""
+    player, sem o SQM dele e sem as 4 pontas (raio 3 = 20 SQMs)."""
     cx, cy = centro
     return {(cx + dx, cy + dy) for dx in range(-raio, raio + 1) for dy in range(-raio, raio + 1)
-            if 0 < abs(dx) + abs(dy) <= raio}
+            if 0 < abs(dx) + abs(dy) <= raio and not (raio > 1 and max(abs(dx), abs(dy)) == raio)}
 
 def _lancar_magia_area(sid, p, caminho, dados, now):
     """Magia em area (Radiant Burst): nao precisa de alvo, acerta todo mob
