@@ -541,6 +541,7 @@ public class WorldScreen extends ScreenAdapter {
     private static final float DURACAO_QUADRO_HIT_FLECHA = 0.05f;
     private static final float DURACAO_QUADRO_HIT_ESPADA = 0.06f; // corte do Knight (e o Heavy Cut)
     private static final float DURACAO_QUADRO_HIT_FOGO = 0.08f; // ui/FireAnimation (Igniculus)
+    private static final float DURACAO_QUADRO_LUZ = 0.07f; // sprites/spawn/LightAtk (Radiant Burst, 10 quadros)
     private static final float DURACAO_QUADRO_HIT_MORDIDA = 0.13f; // sprites/spawn/BiteAtk (Wolf) - mais lenta, pesada
     private final List<Efeito> efeitos = new ArrayList<>();
     private final Map<String, TextureRegion[]> cacheEfeitos = new HashMap<>();
@@ -1502,8 +1503,9 @@ public class WorldScreen extends ScreenAdapter {
             if (bookMenu.ehMagia(caminho)) {
                 // Em cooldown: o proprio slot ja' mostra o tempo, sem notificacao.
                 if (CooldownPocao.restanteMagia(caminho) > 0f) return;
+                // Magia em area (Radiant Burst): sai em volta do player, sem alvo.
                 MobVisual alvo = alvoMob == null ? null : mobs.get(alvoMob);
-                if (alvo == null || alvo.morto || !alvo.visivel) {
+                if (!bookMenu.ehMagiaArea(caminho) && (alvo == null || alvo.morto || !alvo.visivel)) {
                     hud.notificar(tr("Select a target first."), COR_NOTIF_AVISO, null);
                     return;
                 }
@@ -3976,7 +3978,8 @@ public class WorldScreen extends ScreenAdapter {
                 numero.sangra = !errou && data.getInt("damage", 0) > 0;
                 projeteis.add(pr);
             } else {
-                tocarEfeitoNoMob(efeito, mob);
+                // "none": a magia ja' desenhou o proprio efeito (ex: Radiant Burst).
+                if (!"none".equals(efeito)) tocarEfeitoNoMob(efeito, mob);
                 numerosDano.add(numero);
                 if (!errou && data.getInt("damage", 0) > 0) sangrar(mob.x, mob.y);
             }
@@ -4092,6 +4095,25 @@ public class WorldScreen extends ScreenAdapter {
                     projeteis.add(pr);
                 } else {
                     tocarVinhas(mob, segurar);
+                }
+            }
+        });
+        // Magia em area (Radiant Burst): o efeito em cada SQM do losango em
+        // volta de quem lancou (o dano chega no "mob damage" de cada mob).
+        socket.on("spell_area", (nomeEvt, data) -> {
+            if (data == null) return;
+            TextureRegion[] quadros = quadrosEfeito(data.getString("effect", ""));
+            if (quadros == null) return;
+            float cx = conversor.rawParaMundoX(data.getFloat("pos_x", 0f));
+            float cy = conversor.rawParaMundoY(data.getFloat("pos_y", 0f));
+            int raio = data.getInt("raio", 3);
+            for (int dx = -raio; dx <= raio; dx++) {
+                for (int dy = -raio; dy <= raio; dy++) {
+                    int d = Math.abs(dx) + Math.abs(dy);
+                    if (d == 0 || d > raio) continue;
+                    Efeito e = new Efeito(quadros, cx + dx * Jogador.TILE, cy + dy * Jogador.TILE);
+                    e.duracaoQuadro = DURACAO_QUADRO_LUZ;
+                    efeitos.add(e);
                 }
             }
         });
@@ -6178,6 +6200,7 @@ public class WorldScreen extends ScreenAdapter {
             case "PoisonCloud": tira = atlas.findRegion("sprites/spawn/PoisonCloud"); break;     // Venom Wasp (cuspe)
             case "PoisonPhysATK": tira = atlas.findRegion("sprites/spawn/PoisonPhysATK"); break; // Razor Hornet (ferrao)
             case "BiteAtk": tira = atlas.findRegion("sprites/spawn/BiteAtk"); break;             // Wolf (mordida)
+            case "LightAtk": tira = atlas.findRegion("sprites/spawn/LightAtk"); break;           // Radiant Burst (16x32, base no SQM)
             case "RattleHit": tira = regiaoDoCaminho("ui/items/RattleHit"); break; // Wooden Rattle (Bard)
             default: tira = atlas.findRegion("ui/items/Physical"); break;
         }

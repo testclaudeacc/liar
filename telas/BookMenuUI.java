@@ -4918,6 +4918,12 @@ public final class BookMenuUI {
         return dados != null && dados.magia != null && !dados.magia.isEmpty();
     }
 
+    /** Magia em area (spell_area): lanca sem mob mirado. */
+    public boolean ehMagiaArea(String caminho) {
+        EquipStats dados = caminho == null ? null : ITEM_STATS.get(caminho);
+        return dados != null && dados.magiaArea;
+    }
+
     public boolean conheceMagia(String caminho) { return magiasConhecidas.contains(caminho); }
 
     /** Magias da classe (ou "All") que passam a poder ser aprendidas ao ir de

@@ -50,7 +50,7 @@ GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 # Versao exigida do client (rede/ServerConfig.java::CLIENT_VERSION). Subir as
 # DUAS juntas a cada mudanca grande: APK antigo passa a ver "Version outdated".
-SERVER_VERSION = "v0.50"
+SERVER_VERSION = "v0.51"
 CHUNK_SIZE = 800
 DIR_MAP = {0: 'down', 1: 'up', 2: 'left', 3: 'right'}
 
@@ -248,7 +248,8 @@ NPC_DB = {
         "res://sprites/items/Food/Pepper.tres", "res://sprites/items/Food/Beetroot.tres"], "falas": ["Hungry, traveler? Fresh food, right here."]},
     "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "shop": [
         "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres",
-        "res://sprites/spells/ArrowBarrage.tres", "res://sprites/spells/SmallVines.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
+        "res://sprites/spells/ArrowBarrage.tres", "res://sprites/spells/SmallVines.tres",
+        "res://sprites/spells/RadiantBurst.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Ranger/SecondHand/StarterArrow.tres", "res://sprites/items/Ranger/SecondHand/FlintArrow.tres",
         "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres",
@@ -488,6 +489,7 @@ ITEM_DB = {
     # entre elas), cada uma com spell_dmg% (3 x 23.333 = 70%); cada flecha da'
     # 1 golpe na skill spell_hit_skill. spell_slot aceita cor hex.
     "res://sprites/spells/ArrowBarrage.tres": {"name": "Arrow Barrage", "type": "Spell", "spell": "arrow_barrage", "spell_words": "Sequentia Iaculorum", "spell_desc": "Fires three arrows in quick succession.", "req_level": 7, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 23.333, "spell_hits": 3, "spell_hit_every": 0.3, "spell_hit_skill": "distance", "spell_area": False, "spell_hit": "Arrow", "spell_proj": "res://ui/items/Arrow1.png", "spell_color": "4fd1a5", "spell_slot": "00604b", "price": 1000, "icon": "sheet/r77_c12", "cap": 0.0},
+    "res://sprites/spells/RadiantBurst.tres": {"name": "Radiant Burst", "type": "Spell", "spell": "radiant_burst", "spell_words": "Lux Erumpens", "spell_desc": "Releases a burst of light around you, striking every enemy within 3 squares.", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 40, "spell_cd": 10, "spell_dmg": 130, "spell_hit_skill": "distance", "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "LightAtk", "spell_color": "ffe066", "spell_slot": "00604b", "price": 10000, "icon": "sheet/r76_c4", "cap": 0.0},
     # Small Vines (Bard): vinhas prendem o mob (efeito "Vines" no client, ~2s
     # fechadas): veneno de spell_bleed_ticks ticks (spell_dot "poison") e o mob
     # fica lento (spell_slow s). Sem golpe inicial (spell_dmg 0).
@@ -5877,6 +5879,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
     now = time.time()
     cds = p.setdefault('_spell_cd', {})
     if cds.get(caminho, 0) > now: return falha('cooldown')
+    if dados.get('spell_area'): return _lancar_magia_area(sid, p, caminho, dados, now)
     mob_data = active_mobs.get(mob_id) if mob_id else None
     if mob_data is None or mob_data.get('hp', 1) <= 0 or 'pos_x' not in mob_data or na_pz(mob_data): return falha('no_target')
     if int(p.get('floor', 1) or 1) != MOB_FLOOR: return falha('no_target')
@@ -5965,6 +5968,74 @@ def _lancar_magia(sid, p, caminho, mob_id):
         if critico: dano_tick *= 2
         socketio.start_background_task(_sangrar, sid, mob_id, mob_data, token, ticks, cada, dano_tick,
                                        dados.get('spell_bleed_skill'), mob_type_id, dot, critico)
+
+def _tiles_area_magia(centro, raio):
+    """SQMs da magia em area: "circulo" (losango) de raio SQMs em volta do
+    player, sem o SQM dele (raio 3 = 24 SQMs)."""
+    cx, cy = centro
+    return {(cx + dx, cy + dy) for dx in range(-raio, raio + 1) for dy in range(-raio, raio + 1)
+            if 0 < abs(dx) + abs(dy) <= raio}
+
+def _lancar_magia_area(sid, p, caminho, dados, now):
+    """Magia em area (Radiant Burst): nao precisa de alvo, acerta todo mob
+    nos SQMs em volta do player (cada um sorteia o proprio dano/crit)."""
+    nome = dados.get('name', 'Spell')
+    custo = int(dados.get('spell_mana', 0) or 0)
+    max_hp_m, max_mp_m = calcular_max_vitais(p)
+    try: mp_atual = float(p.get('current_mp', -1))
+    except (TypeError, ValueError): mp_atual = -1.0
+    if mp_atual < 0: mp_atual = max_mp_m
+    if mp_atual < custo:
+        emit('sync_vitals', {'current_mp': mp_atual, 'max_mp': max_mp_m, 'no_mana': True}, room=sid)
+        return
+    p['current_mp'] = mp_atual - custo
+    emit('sync_vitals', {'current_mp': p['current_mp'], 'max_mp': max_mp_m}, room=sid)
+    cd = float(dados.get('spell_cd', 0) or 0)
+    p.setdefault('_spell_cd', {})[caminho] = now + cd
+    emit('spell_used', {'item': caminho, 'cooldown': cd}, room=sid)
+    texto_de_acao(p, dados.get('spell_words') or nome, dados.get('spell_color', 'ff7500'))
+    raio = int(dados.get('spell_raio', 3) or 3)
+    tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
+    cx, cy = centro_tile(tp)
+    emit_tela('spell_area', {'attacker_id': p.get('name', ''), 'pos_x': cx, 'pos_y': cy, 'raio': raio,
+                             'effect': dados.get('spell_effect', '')}, cx, cy, incluir=sid)
+    if int(p.get('floor', 1) or 1) != MOB_FLOOR: return
+    tiles = _tiles_area_magia(tp, raio)
+    grade = mapas_colisao.get(p.get('mapa'))
+    alvos = []
+    for mob_id, m in list(active_mobs.items()):
+        if m.get('hp', 1) <= 0 or 'pos_x' not in m: continue
+        if m.get('mapa') and p.get('mapa') and m.get('mapa') != p.get('mapa'): continue
+        tm = tile_do_mob(m)
+        if tm not in tiles or na_pz(m): continue
+        trava = m.get('treino_trava')
+        if trava and trava.get('sid') != sid and trava.get('ate', 0) > now and trava.get('sid') in online_players: continue
+        # Parede no meio: a luz nao atravessa.
+        if grade is not None and not linha_de_visao(grade, tp, tm): continue
+        alvos.append((mob_id, m))
+    if not alvos: return
+    marcar_batalha(sid, p, now)
+    if len(_slots_com_classe_invalida(p)) > 0:
+        base_dmg = PUNICAO_CLASSE_DANO
+    else:
+        bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}), p.get('class_name'))
+        base_dmg, _ = calc_player_stats(p.get('class_name', 'Knight'), p.get('level', 1), p.get('skills', {}), bonus_dmg=bonus_itens['bonus_damage'])
+    if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
+    base = base_dmg * float(dados.get('spell_dmg', 100) or 100) / 100.0
+    for mob_id, m in alvos:
+        m['last_activity'] = now
+        m.setdefault('hits_recentes', {})[sid] = now
+        mob_focar_agressor(mob_id, m, sid)
+        dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
+        critico = random.random() < chance_critico(p)
+        if critico: dano *= 2
+        mob_type_id = m.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
+        _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, now,
+                          {'hit_type': dados.get('spell_hit', 'none'), 'is_crit': critico, 'reduced': False,
+                           'is_miss': False, 'w_type': 'Melee', 'proj': ''})
+    # Skill: 1 golpe por lancamento (nao por mob atingido).
+    skill_golpe = dados.get('spell_hit_skill')
+    if skill_golpe: _dar_hits_skill(sid, p, skill_golpe, 1)
 
 def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, mob_type_id):
     """Flechas seguintes da Arrow Barrage. Param se o mob morrer ou o player sair."""
