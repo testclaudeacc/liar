@@ -8268,26 +8268,30 @@ def handle_shop_sell(data):
     p, npc_id, loja = _loja_do_evento(sid, data)
     if not p: return
     entradas = data.get('items')
-    if not isinstance(entradas, list) or not entradas or len(entradas) > 60: return
     inventario = p.setdefault('inventory', [])
-    # Valida tudo antes de mexer em qualquer coisa.
+    # Limite = o que cabe na bag (antes era 60 fixo: Select All com a bag cheia
+    # passava disso e a venda inteira era ignorada sem aviso).
+    if not isinstance(entradas, list) or not entradas or len(entradas) > max(60, len(inventario)): return
+    # Valida antes de mexer em qualquer coisa; entrada invalida (ex: item que
+    # saiu da bag) e' so' pulada, o resto vende.
     plano, vistos, total = [], set(), 0
     for e in entradas:
-        if not isinstance(e, dict): return
+        if not isinstance(e, dict): continue
         iid = str(e.get('instance_id', ''))
-        if not iid or iid in vistos: return
+        if not iid or iid in vistos: continue
         inst = encontrar_instancia(inventario, iid)
         # Qualquer NPC de loja compra qualquer item da bag que tenha preco
         # (nao precisa andar ate' o vendedor certo); sem preco nao vende.
         dados_v = ITEM_DB.get(inst.get('item'), {}) if inst is not None else {}
-        if inst is None or (int(dados_v.get('price', 0) or 0) <= 0 and int(dados_v.get('sell_price', 0) or 0) <= 0): return
+        if inst is None or (int(dados_v.get('price', 0) or 0) <= 0 and int(dados_v.get('sell_price', 0) or 0) <= 0): continue
         maximo = int(inst.get('qty', 1)) if eh_empilhavel(inst.get('item')) else 1
         try: qtd = int(e.get('qty', 1))
-        except (TypeError, ValueError): return
-        if qtd < 1 or qtd > maximo: return
+        except (TypeError, ValueError): continue
+        if qtd < 1 or qtd > maximo: continue
         vistos.add(iid)
         plano.append((inst, qtd))
         total += preco_venda_npc(inst.get('item')) * qtd
+    if not plano: return _depois_da_loja(sid, p, '')  # nada valido: so' ressincroniza a bag
     for inst, qtd in plano:
         if eh_empilhavel(inst.get('item')) and qtd < int(inst.get('qty', 1)): inst['qty'] = int(inst.get('qty', 1)) - qtd
         else: inventario.remove(inst)

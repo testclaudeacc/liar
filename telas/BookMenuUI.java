@@ -3804,9 +3804,13 @@ public final class BookMenuUI {
         selecionarTudo.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { selecionarTudoVenda(); }
         });
-        rodapeVenda.add(totalLoja).left().expandX();
-        rodapeVenda.add(selecionarTudo).height(40).minWidth(120).padRight(6);
-        rodapeVenda.add(botaoVender).width(150).height(40);
+        // Total numa linha propria: com moedas de varios tipos + os dois botoes,
+        // a linha nao cabia e cortava o numero.
+        rodapeVenda.add(totalLoja).left().colspan(3).padBottom(4).row();
+        rodapeVenda.add().expandX();
+        // Largura pelo texto (PT "Selecionar tudo" vazava dos 120px fixos).
+        rodapeVenda.add(selecionarTudo).height(40).width(UiSkin.larguraBotoes(120f, 24f, selecionarTudo)).padRight(6);
+        rodapeVenda.add(botaoVender).width(Math.max(150f, UiSkin.larguraBotoesComIcone(0f, 16f, botaoVender))).height(40);
         conteudoVenda = new Table();
         conteudoVenda.top();
         conteudoVenda.add(tituloVendendo).left().row();
