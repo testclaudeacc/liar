@@ -7,7 +7,7 @@ VERM = (210, 28, 28); VERM_CLARO = (255, 110, 100)
 # barriga pra cima-direita (lua crescente).
 # Meia lua: comeca no canto de cima-esquerda, faz a barriga pra cima-direita
 # e termina embaixo-direita (diagonal, nao aponta pra um lado so').
-CX, CY, R = 8.0, 8.0, 6.6
+CX, CY, R = 6.8, 9.2, 6.1  # centro puxado pra baixo-esquerda: o arco fica no meio do SQM
 ANG0, ANG1 = math.radians(135), math.radians(-45)
 def ponto(u):
     a = ANG0 + (ANG1 - ANG0) * u
