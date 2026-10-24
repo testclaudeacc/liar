@@ -566,11 +566,20 @@ public class WorldScreen extends ScreenAdapter {
         float escala = 1f;      // tamanho na tela (a pixel art continua a mesma)
         boolean gira = true;    // false: sempre de pe' (nota musical nao vira de ponta-cabeca)
         float tempo = 0f;
+        TextureRegion[] quadros; // tira de quadros quadrados (ex: PowerShootProjectile 3x16): anima no voo
         // Tempo fixo (a velocidade cresce com a distancia): sempre chega logo,
         // e so' entao aparecem o hit e o numero de dano.
         final float duracao = DURACAO_PROJETIL;
         Projetil(TextureRegion regiao, float x0, float y0, MobVisual alvo, String efeitoHit) {
             this.regiao = regiao; this.x0 = x0; this.y0 = y0; this.alvo = alvo; this.efeitoHit = efeitoHit;
+            int h = regiao.getRegionHeight(), w = regiao.getRegionWidth();
+            if (h >= 8 && w >= h * 2 && w % h == 0) {
+                quadros = new TextureRegion[w / h];
+                for (int i = 0; i < quadros.length; i++) quadros[i] = new TextureRegion(regiao, i * h, 0, h, h);
+            }
+        }
+        TextureRegion quadro() {
+            return quadros == null ? regiao : quadros[Math.min(quadros.length - 1, (int) (tempo / duracao * quadros.length))];
         }
         float x1() { return alvoJogador != null ? alvoJogador.x : alvo.x; }
         float y1() { return (alvoJogador != null ? alvoJogador.y : alvo.y) + 8f; }
@@ -6359,7 +6368,8 @@ public class WorldScreen extends ScreenAdapter {
             case "PoisonCloud": tira = atlas.findRegion("sprites/spawn/PoisonCloud"); break;     // Venom Wasp (cuspe)
             case "PoisonPhysATK": tira = atlas.findRegion("sprites/spawn/PoisonPhysATK"); break; // Razor Hornet (ferrao)
             case "BiteAtk": tira = atlas.findRegion("sprites/spawn/BiteAtk"); break;             // Wolf (mordida)
-            case "CutATK": tira = atlas.findRegion("sprites/spawn/CutATK"); break;               // Whirlwind Slash (arco prateado)
+            case "CutATK": tira = atlas.findRegion("sprites/spawn/CutATK"); break;
+            case "PowerShotATK": tira = atlas.findRegion("sprites/spawn/PowerShotATK"); break;   // Power Shot (Ranger)               // Whirlwind Slash (arco prateado)
             case "LightAtk": tira = atlas.findRegion("sprites/spawn/LightAtk"); break;           // Radiant Burst (16x32, base no SQM)
             case "RattleHit": tira = regiaoDoCaminho("ui/items/RattleHit"); break; // Wooden Rattle (Bard)
             default: tira = atlas.findRegion("ui/items/Physical"); break;
@@ -7088,14 +7098,15 @@ public class WorldScreen extends ScreenAdapter {
             float x = pr.x0 + (pr.x1() - pr.x0) * t;
             float y = pr.y0 + (pr.y1() - pr.y0) * t;
             float angulo = pr.gira ? (float) Math.toDegrees(Math.atan2(pr.y1() - pr.y0, pr.x1() - pr.x0)) : 0f;
-            float w = pr.regiao.getRegionWidth(), h = pr.regiao.getRegionHeight();
+            TextureRegion rq = pr.quadro();
+            float w = rq.getRegionWidth(), h = rq.getRegionHeight();
             // A "cabeca" do projetil (fogo/mana) fica na frente do sprite: quem
             // segue o caminho e chega no centro do mob e' ela, nao o meio do
             // sprite (senao some com a cabeca ja' passada do mob).
             float recuo = pr.gira ? w * pr.escala * 0.22f : 0f, rad = angulo * com.badlogic.gdx.math.MathUtils.degreesToRadians;
             x -= com.badlogic.gdx.math.MathUtils.cos(rad) * recuo;
             y -= com.badlogic.gdx.math.MathUtils.sin(rad) * recuo;
-            batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, pr.escala, pr.escala, angulo);
+            batch.draw(rq, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, pr.escala, pr.escala, angulo);
         }
         desenharListaEfeitos(false);
     }

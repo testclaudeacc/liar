@@ -419,6 +419,7 @@ final class IdiomaTextos {
             + "Hurls a small ball of fire at your target.	Lan\u00e7a uma pequena bola de fogo no seu alvo.	Lanza una peque\u00f1a bola de fuego a tu objetivo.\n"
             + "A brutal cut that leaves the target bleeding.	Um corte brutal que deixa o alvo sangrando.	Un corte brutal que deja al objetivo sangrando.\n"
             + "Fires three arrows in quick succession.	Dispara tr\u00eas flechas em sequ\u00eancia r\u00e1pida.	Dispara tres flechas en r\u00e1pida sucesi\u00f3n.\n"
+            + "Fires a single powerful arrow at your target.\tDispara uma \u00fanica flecha poderosa no seu alvo.\tDispara una \u00fanica flecha poderosa a tu objetivo.\n"
             + "Releases a burst of light around you, striking every enemy in a medium-range area.\tLibera uma explos\u00e3o de luz ao seu redor, atingindo todos os inimigos em uma \u00e1rea de alcance m\u00e9dio.\tLibera una explosi\u00f3n de luz a tu alrededor, golpeando a todos los enemigos en un \u00e1rea de alcance medio.\n"
             + "Unleashes a wave of fire around you, burning every enemy in a medium-range area.\tLibera uma onda de fogo ao seu redor, queimando todos os inimigos em uma \u00e1rea de alcance m\u00e9dio.\tDesata una ola de fuego a tu alrededor, quemando a todos los enemigos en un \u00e1rea de alcance medio.\n"
             + "Spins your weapon in a wide arc, cutting every enemy right next to you.\tGira sua arma num arco amplo, cortando todos os inimigos ao seu lado.\tGira tu arma en un amplio arco, cortando a todos los enemigos a tu lado.\n"
