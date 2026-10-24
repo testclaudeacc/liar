@@ -542,7 +542,7 @@ public class WorldScreen extends ScreenAdapter {
     private static final float DURACAO_QUADRO_HIT_RAPIDO = 0.07f;
     private static final float DURACAO_QUADRO_HIT_FLECHA = 0.05f;
     private static final float DURACAO_QUADRO_HIT_ESPADA = 0.06f; // corte do Knight (e o Heavy Cut)
-    private static final float DURACAO_QUADRO_HIT_FOGO = 0.08f; // ui/FireAnimation (Igniculus)
+    private static final float DURACAO_QUADRO_HIT_FOGO = 0.095f; // ui/FireAnimation (Igniculus)
     private static final float DURACAO_QUADRO_LUZ = 0.09f; // sprites/spawn/LightAtk (Radiant Burst, 10 quadros)
     private static final float DURACAO_QUADRO_HIT_MORDIDA = 0.13f; // sprites/spawn/BiteAtk (Wolf) - mais lenta, pesada
     private final List<Efeito> efeitos = new ArrayList<>();
