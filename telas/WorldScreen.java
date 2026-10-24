@@ -529,6 +529,7 @@ public class WorldScreen extends ScreenAdapter {
         float tempo = 0f;
         // Hits usam DURACAO_QUADRO_HIT (mais lento); fumaca de spawn segue no ritmo antigo.
         float duracaoQuadro = DURACAO_QUADRO_EFEITO;
+        boolean porCima; // acima de todos os tiles (desenhado depois dos telhados)
         Efeito(TextureRegion[] quadros, float x, float y) { this.quadros = quadros; this.x = x; this.y = y; }
         float posX() { return mobAlvo != null ? mobAlvo.x : jogadorAlvo != null ? jogadorAlvo.x : x; }
         float posY() { return mobAlvo != null ? mobAlvo.y : jogadorAlvo != null ? jogadorAlvo.y : y; }
@@ -4164,6 +4165,7 @@ public class WorldScreen extends ScreenAdapter {
                     if (d == 0 || d > raio) continue;
                     Efeito e = new Efeito(quadros, cx + dx * Jogador.TILE, cy + dy * Jogador.TILE);
                     e.duracaoQuadro = DURACAO_QUADRO_LUZ;
+                    e.porCima = true;
                     efeitos.add(e);
                 }
             }
@@ -5327,6 +5329,7 @@ public class WorldScreen extends ScreenAdapter {
 
         // Nomes e baloes dos jogadores e NPCs recebem a mesma iluminacao.
         batch.begin();
+        desenharListaEfeitos(true); // AOE: sempre por cima dos tiles
         desenharNome(local);
         for (Jogador j : remotos.values()) if (naTela(j.x, j.y)) desenharNome(j);
         for (NPCVisual npc : npcs.values()) if (naTela(npc.movimento.x, npc.movimento.y)) desenharNomeNPC(npc);
@@ -7025,7 +7028,14 @@ public class WorldScreen extends ScreenAdapter {
             y -= com.badlogic.gdx.math.MathUtils.sin(rad) * recuo;
             batch.draw(pr.regiao, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h, pr.escala, pr.escala, angulo);
         }
+        desenharListaEfeitos(false);
+    }
+
+    /** porCima=true: so' os efeitos que vao acima de qualquer tile (telhado,
+     * pilar, overlay) - ex: a luz da Radiant Burst. */
+    private void desenharListaEfeitos(boolean porCima) {
         for (Efeito e : efeitos) {
+            if (e.porCima != porCima) continue;
             int quadro = Math.min(e.quadros.length - 1, (int) (e.tempo / e.duracaoQuadro));
             TextureRegion r = e.quadros[quadro];
             float ancoraX = Math.round(e.posX() / camera.zoom) * camera.zoom;
