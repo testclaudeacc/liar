@@ -5,10 +5,10 @@ BRANCO = (255, 255, 255); CLARO = (210, 218, 232); MEIO = (148, 154, 172); ESCUR
 VERM = (210, 28, 28); VERM_CLARO = (255, 110, 100)
 # Curva do corte (bezier quadratica): de cima-esquerda ate' baixo-direita,
 # barriga pra cima-direita (lua crescente).
-# Meia lua: arco de circulo de ~200 graus, da esquerda-baixo, por cima, ate'
-# a direita-baixo (y da imagem cresce pra baixo).
-CX, CY, R = 8.0, 9.5, 5.6
-ANG0, ANG1 = math.radians(200), math.radians(-20)
+# Meia lua: comeca no canto de cima-esquerda, faz a barriga pra cima-direita
+# e termina embaixo-direita (diagonal, nao aponta pra um lado so').
+CX, CY, R = 8.0, 8.0, 6.6
+ANG0, ANG1 = math.radians(135), math.radians(-45)
 def ponto(u):
     a = ANG0 + (ANG1 - ANG0) * u
     return (CX + R * math.cos(a), CY - R * math.sin(a))
@@ -37,18 +37,6 @@ for k in range(N):
             if k >= 6: cor = {BRANCO: CLARO, CLARO: MEIO, MEIO: ESCURO}.get(cor, cor)
             if k >= 8: cor = ESCURO
             img.putpixel((k * T + x, y), cor + (255,))
-    # Toque vermelho: rastro de sangue colado no lado de dentro do corte.
-    if 3 <= k <= 6:
-        ini, fim = (0.38, 0.66) if k <= 5 else (0.5, 0.62)
-        for i in range(12):
-            u = ini + (fim - ini) * i / 11
-            if u < cauda[k]: continue
-            qx, qy = ponto(u); tx, ty = ponto(u + 0.01)[0] - qx, ponto(u + 0.01)[1] - qy
-            n = math.hypot(CX - qx, CY - qy); nx, ny = (CX - qx) / n, (CY - qy) / n   # pro centro (lado de dentro)
-            w = largura[k] * math.sin(math.pi * u) ** 0.7 / 2 + 0.3
-            x, y = int(qx + nx * (w + 0.4)), int(qy + ny * (w + 0.4))
-            if 0 <= x < T and 0 <= y < T and img.getpixel((k * T + x, y))[3] == 0:
-                img.putpixel((k * T + x, y), (VERM if i % 3 else VERM_CLARO) + (255,))
 out = sys.argv[1]
 img.save(out)
 bg = Image.new('RGBA', img.size, (60, 90, 50, 255)); bg.alpha_composite(img)
