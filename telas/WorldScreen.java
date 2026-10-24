@@ -957,12 +957,12 @@ public class WorldScreen extends ScreenAdapter {
     }
     private static final Color COR_LUZ_RADIANTE = new Color(1f, 0.85f, 0.35f, 1f);
     private static final float BRILHO_LUZ_MAGIA = 0.45f; // forca do brilho aditivo no pico
-    private static final float FORCA_LUZ_RADIANTE = 0.65f, BRILHO_LUZ_RADIANTE = 0.25f; // Radiant Burst
+    private static final float FORCA_LUZ_AREA = 0.5f, BRILHO_LUZ_AREA = 0.06f; // AOEs: suave, pra iluminar no escuro (de dia quase nada)
     // Fogo (laranja) e mana (azul): luz leve no projetil e no hit. Veneno nao brilha.
     private static final Color COR_LUZ_FOGO = new Color(1f, 0.55f, 0.15f, 1f);
     private static final Color COR_LUZ_MANA = new Color(0.3f, 0.55f, 1f, 1f);
     private static final float RAIO_LUZ_PROJETIL = 20f, RAIO_LUZ_HIT = 28f;
-    private static final float BRILHO_LUZ_PEQUENA = 0.3f;
+    private static final float BRILHO_LUZ_PEQUENA = 0.05f;
     private final List<MapaPropriedades.Luz[]> luzesProjeteis = new ArrayList<>(); // pool (luz, brilho)
 
     private static Color corLuzDoEfeito(String efeito) {
@@ -4149,14 +4149,19 @@ public class WorldScreen extends ScreenAdapter {
             float cx = conversor.rawParaMundoX(data.getFloat("pos_x", 0f));
             float cy = conversor.rawParaMundoY(data.getFloat("pos_y", 0f));
             int raio = data.getInt("raio", 3);
-            // Uma luz amarela so', do tamanho da area, enquanto a animacao dura.
-            if ("LightAtk".equals(data.getString("effect", ""))) {
-                // Centro 1 SQM acima do pe' (a luz do sprite sobe 2 SQMs) e raio
-                // folgado: o glow e' radial e apaga antes da borda da textura.
+            String efeitoArea = data.getString("effect", "");
+            // Radiant Burst (LightAtk) num ritmo proprio; Flame Burst no do fogo.
+            float duracaoQuadro = "Fire".equals(efeitoArea) ? DURACAO_QUADRO_HIT_FOGO : DURACAO_QUADRO_LUZ;
+            // Uma luz so', do tamanho da area, enquanto a animacao dura
+            // (amarela na Radiant Burst, laranja na Flame Burst).
+            Color corArea = "LightAtk".equals(efeitoArea) ? COR_LUZ_RADIANTE : corLuzDoEfeito(efeitoArea);
+            if (corArea != null) {
+                // Centro 1 SQM acima do pe' (o sprite sobe) e raio folgado: o glow
+                // e' radial e apaga antes da borda da textura.
                 LuzMagia lm = new LuzMagia(cx, cy + Jogador.TILE, (raio + 2.5f) * Jogador.TILE,
-                    COR_LUZ_RADIANTE, quadros.length * DURACAO_QUADRO_LUZ + 0.2f);
-                lm.forcaLuz = FORCA_LUZ_RADIANTE;
-                lm.forcaBrilho = BRILHO_LUZ_RADIANTE;
+                    corArea, quadros.length * duracaoQuadro + 0.2f);
+                lm.forcaLuz = FORCA_LUZ_AREA;
+                lm.forcaBrilho = BRILHO_LUZ_AREA;
                 luzesMagia.add(lm);
             }
             for (int dx = -raio; dx <= raio; dx++) {
@@ -4164,7 +4169,7 @@ public class WorldScreen extends ScreenAdapter {
                     int d = Math.abs(dx) + Math.abs(dy);
                     if (d == 0 || d > raio) continue;
                     Efeito e = new Efeito(quadros, cx + dx * Jogador.TILE, cy + dy * Jogador.TILE);
-                    e.duracaoQuadro = DURACAO_QUADRO_LUZ;
+                    e.duracaoQuadro = duracaoQuadro;
                     e.porCima = true;
                     efeitos.add(e);
                 }

@@ -249,7 +249,7 @@ NPC_DB = {
     "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "shop": [
         "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres",
         "res://sprites/spells/ArrowBarrage.tres", "res://sprites/spells/SmallVines.tres",
-        "res://sprites/spells/RadiantBurst.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
+        "res://sprites/spells/RadiantBurst.tres", "res://sprites/spells/FlameBurst.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Ranger/SecondHand/StarterArrow.tres", "res://sprites/items/Ranger/SecondHand/FlintArrow.tres",
         "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres",
@@ -480,6 +480,7 @@ ITEM_DB = {
     # vez por cooldown da magia - nao da' pra abusar com atk speed).
     # A Nyla so' mostra a magia pra quem tem o level e a classe dela.
     "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 7, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 75, "spell_area": False, "spell_skill": "magic", "spell_skill_hits": 3, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 1000, "icon": "sheet/r73_c11", "cap": 0.0},
+    "res://sprites/spells/FlameBurst.tres": {"name": "Flame Burst", "type": "Spell", "spell": "flame_burst", "spell_words": "Ignis Erumpens", "spell_desc": "Unleashes a wave of fire around you, burning every enemy in a medium-range area.", "req_level": 20, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 140, "spell_skill": "magic", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "Fire", "spell_color": "ff7500", "spell_slot": "6e2a00", "price": 10000, "icon": "sheet/r73_c11", "cap": 0.0},
     # Heavy Cut (Knight): corte (20%) + sangramento: spell_bleed_ticks ticks de
     # spell_bleed_pct% a cada spell_bleed_every s; cada tick da' 1 golpe na
     # skill spell_bleed_skill. spell_range "melee": so' colado no mob.
