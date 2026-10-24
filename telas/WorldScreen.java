@@ -4162,7 +4162,7 @@ public class WorldScreen extends ScreenAdapter {
             // Radiant Burst (LightAtk) num ritmo proprio; Flame Burst no do fogo;
             // Whirlwind Slash no do corte do Knight.
             float duracaoQuadro = "Fire".equals(efeitoArea) ? DURACAO_QUADRO_HIT_FOGO
-                : "Sword".equals(efeitoArea) ? DURACAO_QUADRO_HIT_ESPADA : DURACAO_QUADRO_LUZ;
+                : "Sword".equals(efeitoArea) || "CutATK".equals(efeitoArea) ? DURACAO_QUADRO_HIT_ESPADA : DURACAO_QUADRO_LUZ;
             boolean caixa = "box".equals(data.getString("shape", "")); // quadrado (Knight) em vez de losango
             // Uma luz so', do tamanho da area, enquanto a animacao dura
             // (amarela na Radiant Burst, laranja na Flame Burst).
@@ -6308,6 +6308,7 @@ public class WorldScreen extends ScreenAdapter {
             case "PoisonCloud": tira = atlas.findRegion("sprites/spawn/PoisonCloud"); break;     // Venom Wasp (cuspe)
             case "PoisonPhysATK": tira = atlas.findRegion("sprites/spawn/PoisonPhysATK"); break; // Razor Hornet (ferrao)
             case "BiteAtk": tira = atlas.findRegion("sprites/spawn/BiteAtk"); break;             // Wolf (mordida)
+            case "CutATK": tira = atlas.findRegion("sprites/spawn/CutATK"); break;               // Whirlwind Slash (arco prateado)
             case "LightAtk": tira = atlas.findRegion("sprites/spawn/LightAtk"); break;           // Radiant Burst (16x32, base no SQM)
             case "RattleHit": tira = regiaoDoCaminho("ui/items/RattleHit"); break; // Wooden Rattle (Bard)
             default: tira = atlas.findRegion("ui/items/Physical"); break;
