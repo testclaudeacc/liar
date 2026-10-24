@@ -4177,7 +4177,6 @@ public class WorldScreen extends ScreenAdapter {
                 for (int dy = -raio; dy <= raio; dy++) {
                     int d = Math.abs(dx) + Math.abs(dy);
                     if (d == 0 || d > raio) continue;
-                    if (raio > 1 && Math.max(Math.abs(dx), Math.abs(dy)) == raio) continue; // sem as 4 pontas (igual o servidor)
                     Efeito e = new Efeito(quadros, cx + dx * Jogador.TILE, cy + dy * Jogador.TILE);
                     e.duracaoQuadro = duracaoQuadro;
                     e.porCima = true;
