@@ -136,6 +136,7 @@ public class WorldScreen extends ScreenAdapter {
         float tempoTargetHit = 0f;    // quadradinho de "atacou" (mob.gd::_exibir_target_hit)
         long sangraAteMs = 0L;        // Heavy Cut: icone Bleed em cima ate' esse momento
         long venenoAteMs = 0L;        // Small Vines: icone de veneno ate' esse momento
+        long queimaAteMs = 0L;        // Flame Burst: icone de burn ate' esse momento
         String treinoDono = null;     // player treinando nele (arma de treino) - outros nao batem
         long treinoAteMs = 0L;
 
@@ -2876,7 +2877,7 @@ public class WorldScreen extends ScreenAdapter {
     }
 
     // ---- Coroa/escudo da party: na altura do balao, mas a ESQUERDA do player ----
-    private TextureRegion regiaoBleed, regiaoVeneno;
+    private TextureRegion regiaoBleed, regiaoVeneno, regiaoQueima;
     private static final float TAM_ICONE_SANGRA = 8f;
 
     /** Coluna de icones a ESQUERDA do personagem (espelho do balao): o 1o fica no
@@ -3975,6 +3976,14 @@ public class WorldScreen extends ScreenAdapter {
             // Sangramento (Heavy Cut): icone Bleed enquanto durar; tick = so' o numero vermelho.
             if (data.has("bleed_secs")) mob.sangraAteMs = System.currentTimeMillis() + (long) (data.getFloat("bleed_secs", 0f) * 1000f) + 300L;
             if (data.has("poison_secs")) mob.venenoAteMs = System.currentTimeMillis() + (long) (data.getFloat("poison_secs", 0f) * 1000f) + 300L;
+            if (data.has("burn_secs")) mob.queimaAteMs = System.currentTimeMillis() + (long) (data.getFloat("burn_secs", 0f) * 1000f) + 300L;
+            // Tick de queimadura (Flame Burst): numero + uma chaminha no mob.
+            if (data.getBoolean("is_burn", false)) {
+                boolean tickCrit = data.getBoolean("is_crit", false);
+                numerosDano.add(new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (tickCrit ? "!" : ""), tickCrit));
+                tocarEfeitoNoMob("Fire", mob);
+                return;
+            }
             // Tick de veneno (Small Vines): so' o numero (as vinhas ja' estao no mob).
             if (data.getBoolean("is_poison", false)) {
                 boolean tickCrit = data.getBoolean("is_crit", false); // a magia critou: os ticks tambem
@@ -7188,9 +7197,11 @@ public class WorldScreen extends ScreenAdapter {
         long agoraMs = System.currentTimeMillis();
         if (agoraMs < mob.venenoAteMs && regiaoVeneno == null) regiaoVeneno = atlas.findRegion("sheet/r75_c6");   // 640,736
         if (agoraMs < mob.sangraAteMs && regiaoBleed == null) regiaoBleed = atlas.findRegion("sheet/r76_c11");   // 752,736
+        if (agoraMs < mob.queimaAteMs && regiaoQueima == null) regiaoQueima = atlas.findRegion("sheet/r78_c7");  // 704,800
         desenharPilhaEsquerda(ancoraX, ancoraY,
             agoraMs < mob.sangraAteMs ? regiaoBleed : null,
-            agoraMs < mob.venenoAteMs ? regiaoVeneno : null);
+            agoraMs < mob.venenoAteMs ? regiaoVeneno : null,
+            agoraMs < mob.queimaAteMs ? regiaoQueima : null);
     }
 
     /** Cor do nome/barra pela vida: verde cheio, verde claro, amarelo,

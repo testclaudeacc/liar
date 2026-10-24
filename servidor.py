@@ -480,7 +480,7 @@ ITEM_DB = {
     # vez por cooldown da magia - nao da' pra abusar com atk speed).
     # A Nyla so' mostra a magia pra quem tem o level e a classe dela.
     "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 7, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 75, "spell_area": False, "spell_skill": "magic", "spell_skill_hits": 3, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 1000, "icon": "sheet/r73_c11", "cap": 0.0},
-    "res://sprites/spells/FlameBurst.tres": {"name": "Flame Burst", "type": "Spell", "spell": "flame_burst", "spell_words": "Ignis Erumpens", "spell_desc": "Unleashes a wave of fire around you, burning every enemy in a medium-range area.", "req_level": 20, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 140, "spell_skill": "magic", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "Fire", "spell_color": "ff7500", "spell_slot": "6e2a00", "price": 10000, "icon": "sheet/r73_c11", "cap": 0.0},
+    "res://sprites/spells/FlameBurst.tres": {"name": "Flame Burst", "type": "Spell", "spell": "flame_burst", "spell_words": "Ignis Erumpens", "spell_desc": "Unleashes a wave of fire around you, striking every enemy in a medium-range area, with a small chance to set them ablaze.", "req_level": 20, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 140, "spell_skill": "magic", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "Fire", "spell_burn_chance": 5, "spell_burn_ticks": 3, "spell_burn_pct": 10, "spell_burn_every": 1, "spell_color": "ff7500", "spell_slot": "6e2a00", "price": 10000, "icon": "sheet/r73_c13", "cap": 0.0},
     # Heavy Cut (Knight): corte (20%) + sangramento: spell_bleed_ticks ticks de
     # spell_bleed_pct% a cada spell_bleed_every s; cada tick da' 1 golpe na
     # skill spell_bleed_skill. spell_range "melee": so' colado no mob.
@@ -6031,9 +6031,22 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
         critico = random.random() < chance_critico(p)
         if critico: dano *= 2
         mob_type_id = m.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
-        _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, now,
-                          {'hit_type': dados.get('spell_hit', 'none'), 'is_crit': critico, 'reduced': False,
-                           'is_miss': False, 'w_type': 'Melee', 'proj': ''})
+        extra = {'hit_type': dados.get('spell_hit', 'none'), 'is_crit': critico, 'reduced': False,
+                 'is_miss': False, 'w_type': 'Melee', 'proj': ''}
+        # Flame Burst: cada mob atingido tem spell_burn_chance% de pegar fogo
+        # (ticks de % do dano base; critou no golpe = ticks critados).
+        queima = random.random() * 100 < float(dados.get('spell_burn_chance', 0) or 0)
+        ticks_q = int(dados.get('spell_burn_ticks', 0) or 0)
+        cada_q = float(dados.get('spell_burn_every', 1) or 1)
+        if queima and ticks_q > 0: extra['burn_secs'] = ticks_q * cada_q
+        _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, now, extra)
+        if queima and ticks_q > 0 and m.get('hp', 0) > 0:
+            token = uuid.uuid4().hex
+            m['queima'] = token
+            dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_burn_pct', 0) or 0) / 100.0)))
+            if critico: dano_tick *= 2
+            socketio.start_background_task(_sangrar, sid, mob_id, m, token, ticks_q, cada_q, dano_tick,
+                                           None, mob_type_id, 'burn', critico)
     # Skill: golpes fixos por lancamento (nao por mob atingido), ex: 3 de Focus.
     skill_magia = dados.get('spell_skill')
     if skill_magia: _dar_hits_skill(sid, p, skill_magia, int(dados.get('spell_skill_hits', 0) or 0))
@@ -6057,19 +6070,21 @@ def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, 
 def _sangrar(sid, mob_id, mob_ref, token, ticks, cada, dano_tick, skill, mob_type_id, dot='bleed', critico=False):
     """Ticks do sangramento (Heavy Cut). Para se o mob morrer/renascer, se
     outro sangramento substituir esse ou se quem lancou sair do jogo."""
+    # Queimadura tem token proprio: nao corta o bleed/veneno que ja' estiver rodando.
+    chave = 'queima' if dot == 'burn' else 'sangria'
     try:
         for i in range(ticks):
             socketio.sleep(cada)
             m = active_mobs.get(mob_id)
             p = online_players.get(sid)
-            if m is not mob_ref or m.get('sangria') != token or m.get('hp', 0) <= 0 or p is None: return
+            if m is not mob_ref or m.get(chave) != token or m.get('hp', 0) <= 0 or p is None: return
             restante = (ticks - i - 1) * cada
             _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano_tick, time.time(),
                               {'hit_type': '', 'is_crit': critico, 'reduced': False, 'is_miss': False,
                                'w_type': 'Melee', 'proj': '', 'is_' + dot: True, dot + '_secs': restante})
             if skill: _dar_hits_skill(sid, p, skill, 1)
             if m.get('hp', 0) <= 0: return
-        if mob_ref.get('sangria') == token: mob_ref.pop('sangria', None)
+        if mob_ref.get(chave) == token: mob_ref.pop(chave, None)
     except Exception: traceback.print_exc()
 
 @socketio.on('hit_mob')
