@@ -1005,6 +1005,9 @@ def calc_level_bonuses(level, player_class):
     return bonus_hp, bonus_mp, speed_multiplier
 
 # +0.5 de dano por level ganho.
+# Variacao do dano do player (golpe e magia): +-7% do dano base (era +-15%,
+# 72 de base saia de 61 a 82 - longe demais). A media continua a mesma.
+DANO_VAR_MIN, DANO_VAR_MAX = 0.93, 1.07
 DANO_POR_LEVEL = 0.5
 
 # Reducao de dano (subtrai do golpe do mob). Calibrado pra Black Spider (48-52)
@@ -2658,8 +2661,8 @@ def handle_hit_morph(data):
             bonus_itens = somar_bonus_combate_equipados(p.get('equipped_items', {}), p.get('class_name'))
             base_dmg, _ = calc_player_stats(p.get('class_name', 'Knight'), p.get('level', 1), p.get('skills', {}), bonus_dmg=bonus_itens['bonus_damage'])
         if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
-        min_dano = max(1, int(base_dmg * 0.85))
-        max_dano = max(min_dano, int(base_dmg * 1.15))
+        min_dano = max(1, int(round(base_dmg * DANO_VAR_MIN)))
+        max_dano = max(min_dano, int(round(base_dmg * DANO_VAR_MAX)))
         dano = random.randint(min_dano, max_dano) if max_dano > min_dano else base_dmg
         critico = random.random() < chance_critico(p)
         if critico: dano *= 2
@@ -5925,7 +5928,7 @@ def _lancar_magia(sid, p, caminho, mob_id):
         base_dmg, _ = calc_player_stats(p.get('class_name', 'Knight'), p.get('level', 1), p.get('skills', {}), bonus_dmg=bonus_itens['bonus_damage'])
     if esta_com_fome(p): base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
     base = base_dmg * float(dados.get('spell_dmg', 100) or 100) / 100.0
-    dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
+    dano = max(1, int(round(random.uniform(base * DANO_VAR_MIN, base * DANO_VAR_MAX))))
     critico = random.random() < chance_critico(p)
     if critico: dano *= 2
     # Skill da magia (ex: +5 golpes de Magic): no maximo 1 vez por cooldown dela.
@@ -6027,7 +6030,7 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
         m['last_activity'] = now
         m.setdefault('hits_recentes', {})[sid] = now
         mob_focar_agressor(mob_id, m, sid)
-        dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
+        dano = max(1, int(round(random.uniform(base * DANO_VAR_MIN, base * DANO_VAR_MAX))))
         critico = random.random() < chance_critico(p)
         if critico: dano *= 2
         mob_type_id = m.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
@@ -6060,7 +6063,7 @@ def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, 
             p = online_players.get(sid)
             if m is not mob_ref or m.get('hp', 0) <= 0 or p is None or p.get('is_dead'): return
             base = base_dmg * pct / 100.0
-            dano = max(1, int(round(random.uniform(base * 0.85, base * 1.15))))
+            dano = max(1, int(round(random.uniform(base * DANO_VAR_MIN, base * DANO_VAR_MAX))))
             critico = random.random() < chance_critico(p)  # cada flecha sorteia o proprio crit
             if critico: dano *= 2
             _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, time.time(), {**extra, 'is_crit': critico})
@@ -6206,8 +6209,8 @@ def handle_hit_mob(data):
             base_dmg, _ = calc_player_stats(p_class, p.get('level', 1), skills, bonus_dmg=bonus_itens['bonus_damage'])
         if esta_com_fome(p) and not morph: base_dmg = max(1, int(base_dmg * FOME_MULT_DANO))
         
-        min_dano = max(1, int(base_dmg * 0.85))
-        max_dano = max(min_dano, int(base_dmg * 1.15))
+        min_dano = max(1, int(round(base_dmg * DANO_VAR_MIN)))
+        max_dano = max(min_dano, int(round(base_dmg * DANO_VAR_MAX)))
         dano_final = random.randint(min_dano, max_dano) if max_dano > min_dano else base_dmg
         
         is_crit = random.random() < chance_critico(p)
