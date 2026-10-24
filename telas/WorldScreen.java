@@ -939,6 +939,8 @@ public class WorldScreen extends ScreenAdapter {
         final Color base;
         final float duracao;
         float tempo = 0f;
+        float forcaBrilho = BRILHO_LUZ_MAGIA;
+        Efeito seguir; // hit num mob andando: a luz vai junto
         LuzMagia(float x, float y, float raio, Color cor, float duracao) {
             this.base = cor; this.duracao = duracao;
             this.luz = new MapaPropriedades.Luz(x, y, new Color(cor), raio);
@@ -953,6 +955,18 @@ public class WorldScreen extends ScreenAdapter {
     }
     private static final Color COR_LUZ_RADIANTE = new Color(1f, 0.85f, 0.35f, 1f);
     private static final float BRILHO_LUZ_MAGIA = 0.45f; // forca do brilho aditivo no pico
+    // Fogo (laranja) e mana (azul): luz leve no projetil e no hit. Veneno nao brilha.
+    private static final Color COR_LUZ_FOGO = new Color(1f, 0.55f, 0.15f, 1f);
+    private static final Color COR_LUZ_MANA = new Color(0.3f, 0.55f, 1f, 1f);
+    private static final float RAIO_LUZ_PROJETIL = 20f, RAIO_LUZ_HIT = 28f;
+    private static final float BRILHO_LUZ_PEQUENA = 0.3f;
+    private final List<MapaPropriedades.Luz[]> luzesProjeteis = new ArrayList<>(); // pool (luz, brilho)
+
+    private static Color corLuzDoEfeito(String efeito) {
+        if ("Fire".equals(efeito)) return COR_LUZ_FOGO;
+        if ("Mana".equals(efeito)) return COR_LUZ_MANA;
+        return null;
+    }
     private final List<LuzMagia> luzesMagia = new ArrayList<>();
     private final List<MapaPropriedades.Luz> brilhosDoFrame = new ArrayList<>();
     private TextureRegion[] quadrosAvisoSpawn;
@@ -5210,11 +5224,35 @@ public class WorldScreen extends ScreenAdapter {
             LuzMagia lm = luzesMagia.get(i);
             lm.tempo += delta;
             if (lm.tempo >= lm.duracao) { luzesMagia.remove(i); continue; }
+            if (lm.seguir != null) {
+                lm.luz.x = lm.brilho.x = lm.seguir.posX();
+                lm.luz.y = lm.brilho.y = lm.seguir.posY() + 8f;
+            }
             float f = lm.intensidade();
             lm.luz.cor.set(lm.base.r, lm.base.g, lm.base.b, f);
-            lm.brilho.cor.set(lm.base.r, lm.base.g, lm.base.b, f * BRILHO_LUZ_MAGIA);
+            lm.brilho.cor.set(lm.base.r, lm.base.g, lm.base.b, f * lm.forcaBrilho);
             luzesDoFrame.add(lm.luz);
             brilhosDoFrame.add(lm.brilho);
+        }
+        // Projetil de fogo/mana voando: luz leve acompanhando (pool, sem alocar por frame).
+        int usadas = 0;
+        for (Projetil pr : projeteis) {
+            Color cor = corLuzDoEfeito(pr.efeitoHit);
+            if (cor == null || pr.alvo == null && pr.alvoJogador == null) continue;
+            if (usadas == luzesProjeteis.size()) {
+                luzesProjeteis.add(new MapaPropriedades.Luz[]{
+                    new MapaPropriedades.Luz(0, 0, new Color(), RAIO_LUZ_PROJETIL),
+                    new MapaPropriedades.Luz(0, 0, new Color(), RAIO_LUZ_PROJETIL)});
+            }
+            MapaPropriedades.Luz[] par = luzesProjeteis.get(usadas++);
+            float t = Math.min(1f, pr.tempo / pr.duracao);
+            float px = pr.x0 + (pr.x1() - pr.x0) * t, py = pr.y0 + (pr.y1() - pr.y0) * t;
+            par[0].x = par[1].x = px;
+            par[0].y = par[1].y = py;
+            par[0].cor.set(cor);
+            par[1].cor.set(cor.r, cor.g, cor.b, BRILHO_LUZ_PEQUENA);
+            luzesDoFrame.add(par[0]);
+            brilhosDoFrame.add(par[1]);
         }
         iluminacao.atualizar(delta, mapa.propriedades.naCaverna(local.x, local.y));
         iluminacao.renderizar(batch, camera, luzesDoFrame);
@@ -6276,6 +6314,14 @@ public class WorldScreen extends ScreenAdapter {
             : "Sword".equals(nome) || "SwordInv".equals(nome) ? DURACAO_QUADRO_HIT_ESPADA
             : rapido ? DURACAO_QUADRO_HIT_RAPIDO : DURACAO_QUADRO_HIT;
         efeitos.add(e);
+        // Hit de fogo/mana: ilumina um pouco em volta enquanto a animacao toca.
+        Color corLuz = corLuzDoEfeito(nome);
+        if (corLuz != null) {
+            LuzMagia lm = new LuzMagia(x, y + 8f, RAIO_LUZ_HIT, corLuz, quadros.length * e.duracaoQuadro + 0.15f);
+            lm.seguir = e;
+            lm.forcaBrilho = BRILHO_LUZ_PEQUENA;
+            luzesMagia.add(lm);
+        }
         return e;
     }
 
