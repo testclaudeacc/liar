@@ -624,6 +624,8 @@ public final class BookMenuUI {
         } else {
             extraLojaAberta = 0f;
         }
+        // Loja de magia (aba Learn): janela larga, a descricao cabe em menos linhas.
+        if (modoLoja && lojaPage.getParent() == mainWindow && lojaDeMagia() && !abaLojaVenda) extraVisivel = Math.max(extraVisivel, limite);
         // Mercado: lista de itens + painel das ofertas lado a lado.
         if (modoMercado && mercadoPage.getParent() == mainWindow) extraVisivel = Math.max(extraVisivel, limite);
         // Vanity: a coluna da esquerda cresceu com a traducao - a janela alarga o
@@ -3777,7 +3779,7 @@ public final class BookMenuUI {
         linhaMoedas.add(moedasLoja).left().expandX();
         // So' ocupa espaco na loja de magia (invisivel ainda reservava 130px e,
         // com muitas moedas, a linha passava da janela).
-        celulaAprenderRodape = linhaMoedas.add(botaoAprenderRodape).height(40).minWidth(130).right();
+        celulaAprenderRodape = linhaMoedas.add(botaoAprenderRodape).height(40).width(larguraBotaoAprender()).right();
         conteudoCompra.add(linhaMoedas).growX().padTop(2).row();
         conteudoCompra.add(new Stack(barraCapLoja, textoBarra)).growX().height(24).padTop(4);
 
@@ -6359,10 +6361,25 @@ public final class BookMenuUI {
     /** Linha clicavel da aba Spells: slot da magia + nome, custo de mana,
      * descricao e % de dano. Borda clara = ja' esta' nesse slot. */
     private static final float TAM_ICONE_GAVETA = 64f;
+    private static final float TAM_ICONE_GAVETA_LOJA = 80f;
     /** Magia com o Learn no "Are you sure?" (null = nenhuma). */
     private String magiaArmada;
     private TextButton botaoAprenderRodape;
     private com.badlogic.gdx.scenes.scene2d.ui.Cell<?> celulaAprenderRodape;
+
+    /** Largura fixa do Learn: cabe "Are you sure?"/"No Money" com folga (nao
+     * encosta na borda) e nao muda de tamanho entre um clique e outro. */
+    private float larguraBotaoAprender() {
+        com.badlogic.gdx.graphics.g2d.BitmapFont f = botaoAprenderRodape.getLabel().getStyle().font;
+        float l = 130f;
+        for (String t : new String[]{tr("Are you sure?"), tr("No Money")})
+            l = Math.max(l, new com.badlogic.gdx.graphics.g2d.GlyphLayout(f, t).width + 32f);
+        String atual = botaoAprenderRodape.getText().toString();
+        botaoAprenderRodape.setText(tr("Learn"));
+        l = Math.max(l, botaoAprenderRodape.getPrefWidth() + 16f);
+        botaoAprenderRodape.setText(atual);
+        return (float) Math.ceil(l);
+    }
 
     /** Botao Learn de baixo (loja de magia): segue a gaveta selecionada. */
     private void atualizarBotaoAprender() {
@@ -6371,7 +6388,7 @@ public final class BookMenuUI {
         botaoAprenderRodape.setVisible(magia);
         if (celulaAprenderRodape != null && (celulaAprenderRodape.getActor() != null) != magia) {
             celulaAprenderRodape.setActor(magia ? botaoAprenderRodape : null);
-            celulaAprenderRodape.minWidth(magia ? 130f : 0f).height(magia ? 40f : 0f);
+            celulaAprenderRodape.minWidth(magia ? larguraBotaoAprender() : 0f).width(magia ? larguraBotaoAprender() : 0f).height(magia ? 40f : 0f);
             if (celulaAprenderRodape.getTable() != null) celulaAprenderRodape.getTable().invalidateHierarchy();
         }
         if (!magia) return;
@@ -6416,15 +6433,24 @@ public final class BookMenuUI {
         estilo.over = UiSkin.retangulo(c[7], noSlot ? c[4] : c[1], 1);
         Button gaveta = new Button(estilo);
         gaveta.left().pad(6);
-        Button icone = slotAtalho(caminho, noSlot, null, null, false, TAM_ICONE_GAVETA, preco <= 0);
+        boolean loja = preco > 0;
+        // Loja: icone maior e texto mais compacto (mana do lado do nome, preco e
+        // EXP na mesma linha) - o cartao fica com a altura perto da do icone.
+        float tamIcone = loja ? TAM_ICONE_GAVETA_LOJA : TAM_ICONE_GAVETA;
+        Button icone = slotAtalho(caminho, noSlot, null, null, false, tamIcone, preco <= 0);
         icone.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled); // o clique vai pra gaveta
-        gaveta.add(icone).size(TAM_ICONE_GAVETA).center().padRight(10);
+        gaveta.add(icone).size(tamIcone).center().padRight(10);
         Table texto = new Table();
         texto.top().left();
         Label nome = new LabelPixel(nomeExibicao(caminho), new Label.LabelStyle(UiSkin.fonteDescricao(skin, 15), Color.WHITE));
-        texto.add(nome).left().row();
+        if (loja && dados != null) {
+            Table linhaNome = new Table();
+            linhaNome.add(nome);
+            linhaNome.add(linhaComIcone("ui/MPIcon", tr("{0} Mana", dados.magiaMana), COR_MANA)).padLeft(12);
+            texto.add(linhaNome).left().row();
+        } else texto.add(nome).left().row();
         if (dados != null) {
-            texto.add(linhaComIcone("ui/MPIcon", tr("{0} Mana", dados.magiaMana), COR_MANA)).left().row();
+            if (!loja) texto.add(linhaComIcone("ui/MPIcon", tr("{0} Mana", dados.magiaMana), COR_MANA)).left().row();
             if (dados.magiaDescricao != null && !dados.magiaDescricao.isEmpty()) {
                 // Aba Spells: numa linha so' (a janela alarga, ajustarLarguraDetalhes).
                 // Loja: quebra na largura do painel.
@@ -6441,6 +6467,7 @@ public final class BookMenuUI {
             if (dados.magiaLento > 0) texto.add(linhaStat(tr("Slows for {0}s", porcento(dados.magiaLento)), Color.LIGHT_GRAY)).left().row();
             if (dados.magiaGolpes > 1) texto.add(linhaStat(textoGolpes(dados), Color.LIGHT_GRAY)).left().row();
         }
+        Table linhaPrecoLoja = null;
         if (preco > 0) {
             // Preco: moedinha + valor na cor da moeda (igual os slots da loja).
             int m = maiorMoeda(preco);
@@ -6454,7 +6481,7 @@ public final class BookMenuUI {
             Label numero = new LabelPixel(valorNaMoeda(preco, m), new Label.LabelStyle(UiSkin.fontePreco(skin), Color.WHITE));
             numero.setColor(corMoeda(MOEDAS_TRADE[m]));
             linhaPreco.add(numero);
-            texto.add(linhaPreco).left().padTop(2).row();
+            linhaPrecoLoja = linhaPreco;
         }
         // Canto inferior direito: "+ (icone) 3 Focus EXP" - golpes na skill por uso
         // (ultima linha do texto, alinhada a' direita: nao alarga a gaveta).
@@ -6470,8 +6497,16 @@ public final class BookMenuUI {
                 exp.add(ic).size(16).padRight(3);
             }
             exp.add(linhaStat(dados.magiaExp + " " + sk[1] + " EXP", cor));
-            texto.add(exp).right().padTop(2).row();
+            if (linhaPrecoLoja != null) {
+                // Loja: preco na esquerda e EXP na direita, uma linha so'.
+                Table rodape = new Table();
+                rodape.add(linhaPrecoLoja).left().expandX();
+                rodape.add(exp).right();
+                texto.add(rodape).growX().padTop(2).row();
+                linhaPrecoLoja = null;
+            } else texto.add(exp).right().padTop(2).row();
         }
+        if (linhaPrecoLoja != null) { texto.add(linhaPrecoLoja).left().padTop(2).row(); linhaPrecoLoja = null; }
         gaveta.add(texto).growX().center().left();
         gaveta.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) { aoClicar.run(); }
