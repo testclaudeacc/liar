@@ -4159,8 +4159,11 @@ public class WorldScreen extends ScreenAdapter {
             float cy = conversor.rawParaMundoY(data.getFloat("pos_y", 0f));
             int raio = data.getInt("raio", 3);
             String efeitoArea = data.getString("effect", "");
-            // Radiant Burst (LightAtk) num ritmo proprio; Flame Burst no do fogo.
-            float duracaoQuadro = "Fire".equals(efeitoArea) ? DURACAO_QUADRO_HIT_FOGO : DURACAO_QUADRO_LUZ;
+            // Radiant Burst (LightAtk) num ritmo proprio; Flame Burst no do fogo;
+            // Whirlwind Slash no do corte do Knight.
+            float duracaoQuadro = "Fire".equals(efeitoArea) ? DURACAO_QUADRO_HIT_FOGO
+                : "Sword".equals(efeitoArea) ? DURACAO_QUADRO_HIT_ESPADA : DURACAO_QUADRO_LUZ;
+            boolean caixa = "box".equals(data.getString("shape", "")); // quadrado (Knight) em vez de losango
             // Uma luz so', do tamanho da area, enquanto a animacao dura
             // (amarela na Radiant Burst, laranja na Flame Burst).
             Color corArea = "LightAtk".equals(efeitoArea) ? COR_LUZ_RADIANTE : corLuzDoEfeito(efeitoArea);
@@ -4176,7 +4179,7 @@ public class WorldScreen extends ScreenAdapter {
             for (int dx = -raio; dx <= raio; dx++) {
                 for (int dy = -raio; dy <= raio; dy++) {
                     int d = Math.abs(dx) + Math.abs(dy);
-                    if (d == 0 || d > raio) continue;
+                    if (d == 0 || (!caixa && d > raio)) continue;
                     Efeito e = new Efeito(quadros, cx + dx * Jogador.TILE, cy + dy * Jogador.TILE);
                     e.duracaoQuadro = duracaoQuadro;
                     e.porCima = true;

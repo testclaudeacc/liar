@@ -249,7 +249,8 @@ NPC_DB = {
     "nyla":  {"name": "Nyla",  "fixo": True, "role": "spell", "shop": [
         "res://sprites/spells/Igniculus.tres", "res://sprites/spells/HeavyCut.tres",
         "res://sprites/spells/ArrowBarrage.tres", "res://sprites/spells/SmallVines.tres",
-        "res://sprites/spells/RadiantBurst.tres", "res://sprites/spells/FlameBurst.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
+        "res://sprites/spells/RadiantBurst.tres", "res://sprites/spells/FlameBurst.tres",
+        "res://sprites/spells/WhirlwindSlash.tres"], "falas": ["Seeking arcane power? My spells are not for the faint of heart."]},
     "luke":  {"name": "Luke",  "fixo": True, "role": "weapon", "shop": [
         "res://sprites/items/Ranger/SecondHand/StarterArrow.tres", "res://sprites/items/Ranger/SecondHand/FlintArrow.tres",
         "res://sprites/items/Ranger/SecondHand/BronzeArrow.tres",
@@ -480,12 +481,13 @@ ITEM_DB = {
     # vez por cooldown da magia - nao da' pra abusar com atk speed).
     # A Nyla so' mostra a magia pra quem tem o level e a classe dela.
     "res://sprites/spells/Igniculus.tres": {"name": "Small Fire Ball", "type": "Spell", "spell": "igniculus", "spell_words": "Igniculus", "spell_desc": "Hurls a small ball of fire at your target.", "req_level": 7, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 75, "spell_area": False, "spell_skill": "magic", "spell_skill_hits": 3, "spell_hit": "Fire", "spell_proj": "res://ui/FireProjectile.png", "spell_color": "ff7500", "price": 1000, "icon": "sheet/r73_c11", "cap": 0.0},
-    "res://sprites/spells/FlameBurst.tres": {"name": "Flame Burst", "type": "Spell", "spell": "flame_burst", "spell_words": "Ignis Erumpens", "spell_desc": "Unleashes a wave of fire around you, striking every enemy in a medium-range area, with a small chance to set them ablaze.", "req_level": 20, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 140, "spell_skill": "magic", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "Fire", "spell_burn_chance": 10, "spell_burn_ticks": 3, "spell_burn_pct": 10, "spell_burn_every": 1, "spell_color": "ff7500", "spell_slot": "6e2a00", "price": 10000, "icon": "sheet/r73_c13", "cap": 0.0},
+    "res://sprites/spells/FlameBurst.tres": {"name": "Flame Burst", "type": "Spell", "spell": "flame_burst", "spell_words": "Ignis Erumpens", "spell_desc": "Unleashes a wave of fire around you, striking every enemy in a medium-range area, with a small chance to set them ablaze.", "req_level": 20, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 30, "spell_cd": 12, "spell_dmg": 140, "spell_skill": "magic", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "Fire", "spell_dot": "burn", "spell_dot_chance": 10, "spell_dot_ticks": 3, "spell_dot_pct": 10, "spell_dot_every": 1, "spell_color": "ff7500", "spell_slot": "6e2a00", "price": 10000, "icon": "sheet/r73_c13", "cap": 0.0},
     # Heavy Cut (Knight): corte (20%) + sangramento: spell_bleed_ticks ticks de
     # spell_bleed_pct% a cada spell_bleed_every s; cada tick da' 1 golpe na
     # skill spell_bleed_skill. spell_range "melee": so' colado no mob.
     # spell_slot: cor do slot da magia no client (orange/red).
     "res://sprites/spells/HeavyCut.tres": {"name": "Heavy Cut", "type": "Spell", "spell": "heavy_cut", "spell_words": "Incisio Cruenta", "spell_desc": "A brutal cut that leaves the target bleeding.", "req_level": 7, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 15, "spell_cd": 5, "spell_dmg": 20, "spell_area": False, "spell_range": "melee", "spell_bleed_ticks": 3, "spell_bleed_pct": 15, "spell_bleed_every": 2, "spell_bleed_skill": "melee", "spell_hit": "SwordInv", "spell_proj": "", "spell_color": "ff4a4a", "spell_slot": "red", "price": 1000, "icon": "sheet/r77_c8", "cap": 0.0},
+    "res://sprites/spells/WhirlwindSlash.tres": {"name": "Whirlwind Slash", "type": "Spell", "spell": "whirlwind_slash", "spell_words": "Turbo Ferri", "spell_desc": "Spins your weapon in a wide arc, cutting every enemy right next to you, with a small chance to make them bleed.", "req_level": 20, "req_class": "Knight", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 12, "spell_dmg": 120, "spell_skill": "melee", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 1, "spell_forma": "box", "spell_hit": "none", "spell_proj": "", "spell_effect": "Sword", "spell_dot": "bleed", "spell_dot_chance": 5, "spell_dot_ticks": 3, "spell_dot_pct": 15, "spell_dot_every": 2, "spell_color": "ff4a4a", "spell_slot": "137908", "price": 8000, "icon": "sheet/r88_c5", "cap": 0.0},
     # Arrow Barrage (Ranger): spell_hits flechas seguidas (spell_hit_every s
     # entre elas), cada uma com spell_dmg% (3 x 23.333 = 70%); cada flecha da'
     # 1 golpe na skill spell_hit_skill. spell_slot aceita cor hex.
@@ -565,8 +567,8 @@ ITEM_DB = {
     "res://sprites/items/Knight/Weapons/BronzeDagger.tres": {"name": "Bronze Dagger", "type": "Dagger", "slot": "MainHand", "req_level": 20, "req_class": "Knight", "bonus_damage": 29, "defense": 0, "armour": 0, "stamina": 25, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "atk_speed": 1.1, "price": 2500, "icon": "sheet/r98_c0", "cap": 8.0, "sell_price": 500},
     "res://sprites/items/Weaver/WeaverHat.tres": {"name": "Weaver Hat", "type": "Hat", "slot": "Helm", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 5, "mana": 20, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 500, "icon": "sheet/r25_c3", "cap": 5.0, "sell_price": 200},
     "res://sprites/items/Weaver/WeaverRobe.tres": {"name": "Weaver Robe", "type": "Robe", "slot": "Chest", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 10, "mana": 35, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 800, "icon": "sheet/r3_c9", "cap": 10.0, "sell_price": 400},
-    "res://sprites/items/Weaver/WeaverGloves.tres": {"name": "Weaver Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 5, "mana": 15, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 400, "icon": "sheet/r20_c11", "cap": 3.0, "sell_price": 200},
-    "res://sprites/items/Weaver/WeaverBoots.tres": {"name": "Weaver Boots", "type": "Boots", "slot": "Boots", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 5, "mana": 15, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 400, "icon": "sheet/r10_c6", "cap": 5.0, "sell_price": 300},
+    "res://sprites/items/Weaver/WeaverGloves.tres": {"name": "Weaver Gloves", "type": "Gloves", "slot": "Gloves", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 5, "mana": 15, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 400, "icon": "sheet/r20_c9", "cap": 3.0, "sell_price": 200},
+    "res://sprites/items/Weaver/WeaverBoots.tres": {"name": "Weaver Boots", "type": "Boots", "slot": "Boots", "req_level": 20, "req_class": "Mage/Bard", "bonus_damage": 0, "defense": 0, "armour": 2, "stamina": 5, "mana": 15, "fourth_stat_type": "None", "fourth_stat_value": 0, "set": "Weaver", "set_bonus": {"crit": 5}, "set_desc": "+5% Crit Chance", "price": 400, "icon": "sheet/r10_c5", "cap": 5.0, "sell_price": 300},
     "res://sprites/items/Mage/Weapons/VenomStaff.tres": {"name": "Venom Staff", "type": "Staff", "slot": "MainHand", "req_level": 20, "req_class": "Mage", "bonus_damage": 18, "defense": 0, "armour": 0, "stamina": 0, "mana": 30, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 6, "atk_hit": "PoisonCloud", "atk_proj": "res://ui/PoisonProjectile.png", "price": 2500, "icon": "sheet/r105_c8", "cap": 15.0, "sell_price": 500},
     "res://sprites/items/Bard/Weapons/WoodenHarp.tres": {"name": "Wooden Lyre", "type": "Lyre", "slot": "MainHand", "req_level": 20, "req_class": "Bard", "bonus_damage": 18, "defense": 0, "armour": 0, "stamina": 15, "mana": 20, "fourth_stat_type": "None", "fourth_stat_value": 0, "mana_cost": 3, "price": 2500, "icon": "ui/armas/Wooden Lyre", "cap": 12.0, "sell_price": 500},
     "res://sprites/items/Mage/SecondHand/ObsidianTome.tres": {"name": "Nocturne Book", "type": "Book", "slot": "Hand", "req_level": 20, "req_class": "Mage", "bonus_damage": 0, "defense": 0, "armour": 0, "stamina": 0, "mana": 25, "fourth_stat_type": "Magic", "fourth_stat_value": 14, "price": 1200, "icon": "sheet/r61_c15", "cap": 15.0},
@@ -5973,12 +5975,13 @@ def _lancar_magia(sid, p, caminho, mob_id):
         socketio.start_background_task(_sangrar, sid, mob_id, mob_data, token, ticks, cada, dano_tick,
                                        dados.get('spell_bleed_skill'), mob_type_id, dot, critico)
 
-def _tiles_area_magia(centro, raio):
-    """SQMs da magia em area: "circulo" (losango) de raio SQMs em volta do
-    player, sem o SQM dele (raio 3 = 24 SQMs)."""
+def _tiles_area_magia(centro, raio, forma=''):
+    """SQMs da magia em area, sem o SQM do player: "circulo" (losango) de raio
+    SQMs (raio 3 = 24 SQMs) ou forma "box" (quadrado: raio 1 = os 8 em volta)."""
     cx, cy = centro
+    caixa = forma == 'box'
     return {(cx + dx, cy + dy) for dx in range(-raio, raio + 1) for dy in range(-raio, raio + 1)
-            if 0 < abs(dx) + abs(dy) <= raio}
+            if (dx or dy) and (caixa or abs(dx) + abs(dy) <= raio)}
 
 def _lancar_magia_area(sid, p, caminho, dados, now):
     """Magia em area (Radiant Burst): nao precisa de alvo, acerta todo mob
@@ -6001,10 +6004,11 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
     raio = int(dados.get('spell_raio', 3) or 3)
     tp = tile_de(p.get('pos_x', 0), p.get('pos_y', 0))
     cx, cy = centro_tile(tp)
+    forma = dados.get('spell_forma', '')
     emit_tela('spell_area', {'attacker_id': p.get('name', ''), 'pos_x': cx, 'pos_y': cy, 'raio': raio,
-                             'effect': dados.get('spell_effect', '')}, cx, cy, incluir=sid)
+                             'shape': forma, 'effect': dados.get('spell_effect', '')}, cx, cy, incluir=sid)
     if int(p.get('floor', 1) or 1) != MOB_FLOOR: return
-    tiles = _tiles_area_magia(tp, raio)
+    tiles = _tiles_area_magia(tp, raio, forma)
     grade = mapas_colisao.get(p.get('mapa'))
     alvos = []
     for mob_id, m in list(active_mobs.items()):
@@ -6036,20 +6040,21 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
         mob_type_id = m.get('type_id') or (mob_id.rsplit('_', 2)[0] if mob_id.count('_') >= 2 else mob_id)
         extra = {'hit_type': dados.get('spell_hit', 'none'), 'is_crit': critico, 'reduced': False,
                  'is_miss': False, 'w_type': 'Melee', 'proj': ''}
-        # Flame Burst: cada mob atingido tem spell_burn_chance% de pegar fogo
-        # (ticks de % do dano base; critou no golpe = ticks critados).
-        queima = random.random() * 100 < float(dados.get('spell_burn_chance', 0) or 0)
-        ticks_q = int(dados.get('spell_burn_ticks', 0) or 0)
-        cada_q = float(dados.get('spell_burn_every', 1) or 1)
-        if queima and ticks_q > 0: extra['burn_secs'] = ticks_q * cada_q
+        # Chance de DoT em cada mob atingido (Flame Burst: burn; Whirlwind Slash:
+        # bleed). Ticks de % do dano base; critou no golpe = ticks critados.
+        dot = dados.get('spell_dot', 'burn')
+        pega = random.random() * 100 < float(dados.get('spell_dot_chance', 0) or 0)
+        ticks_q = int(dados.get('spell_dot_ticks', 0) or 0)
+        cada_q = float(dados.get('spell_dot_every', 1) or 1)
+        if pega and ticks_q > 0: extra[dot + '_secs'] = ticks_q * cada_q
         _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, now, extra)
-        if queima and ticks_q > 0 and m.get('hp', 0) > 0:
+        if pega and ticks_q > 0 and m.get('hp', 0) > 0:
             token = uuid.uuid4().hex
-            m['queima'] = token
-            dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_burn_pct', 0) or 0) / 100.0)))
+            m['queima' if dot == 'burn' else 'sangria'] = token
+            dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_dot_pct', 0) or 0) / 100.0)))
             if critico: dano_tick *= 2
             socketio.start_background_task(_sangrar, sid, mob_id, m, token, ticks_q, cada_q, dano_tick,
-                                           None, mob_type_id, 'burn', critico)
+                                           None, mob_type_id, dot, critico)
     # Skill: golpes fixos por lancamento (nao por mob atingido), ex: 3 de Focus.
     skill_magia = dados.get('spell_skill')
     if skill_magia: _dar_hits_skill(sid, p, skill_magia, int(dados.get('spell_skill_hits', 0) or 0))
