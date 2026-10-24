@@ -489,7 +489,7 @@ ITEM_DB = {
     # entre elas), cada uma com spell_dmg% (3 x 23.333 = 70%); cada flecha da'
     # 1 golpe na skill spell_hit_skill. spell_slot aceita cor hex.
     "res://sprites/spells/ArrowBarrage.tres": {"name": "Arrow Barrage", "type": "Spell", "spell": "arrow_barrage", "spell_words": "Sequentia Iaculorum", "spell_desc": "Fires three arrows in quick succession.", "req_level": 7, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 20, "spell_cd": 5, "spell_dmg": 23.333, "spell_hits": 3, "spell_hit_every": 0.3, "spell_hit_skill": "distance", "spell_area": False, "spell_hit": "Arrow", "spell_proj": "res://ui/items/Arrow1.png", "spell_color": "4fd1a5", "spell_slot": "00604b", "price": 1000, "icon": "sheet/r77_c12", "cap": 0.0},
-    "res://sprites/spells/RadiantBurst.tres": {"name": "Radiant Burst", "type": "Spell", "spell": "radiant_burst", "spell_words": "Lux Erumpens", "spell_desc": "Releases a burst of light around you, striking every enemy in a medium-range area.", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 40, "spell_cd": 10, "spell_dmg": 130, "spell_hit_skill": "distance", "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "LightAtk", "spell_color": "ffe066", "spell_slot": "6e5000", "price": 10000, "icon": "sheet/r76_c4", "cap": 0.0},
+    "res://sprites/spells/RadiantBurst.tres": {"name": "Radiant Burst", "type": "Spell", "spell": "radiant_burst", "spell_words": "Lux Erumpens", "spell_desc": "Releases a burst of light around you, striking every enemy in a medium-range area.", "req_level": 20, "req_class": "Ranger", "bonus_damage": 0, "defense": 0, "stamina": 0, "mana": 0, "fourth_stat_type": "None", "fourth_stat_value": 0, "spell_mana": 40, "spell_cd": 12, "spell_dmg": 130, "spell_skill": "distance", "spell_skill_hits": 3, "spell_area": True, "spell_raio": 3, "spell_hit": "none", "spell_proj": "", "spell_effect": "LightAtk", "spell_color": "ffe066", "spell_slot": "6e5000", "price": 10000, "icon": "sheet/r76_c4", "cap": 0.0},
     # Small Vines (Bard): vinhas prendem o mob (efeito "Vines" no client, ~2s
     # fechadas): veneno de spell_bleed_ticks ticks (spell_dot "poison") e o mob
     # fica lento (spell_slow s). Sem golpe inicial (spell_dmg 0).
@@ -6033,9 +6033,9 @@ def _lancar_magia_area(sid, p, caminho, dados, now):
         _aplicar_dano_mob(sid, p, mob_id, mob_type_id, m, dano, now,
                           {'hit_type': dados.get('spell_hit', 'none'), 'is_crit': critico, 'reduced': False,
                            'is_miss': False, 'w_type': 'Melee', 'proj': ''})
-    # Skill: 1 golpe por lancamento (nao por mob atingido).
-    skill_golpe = dados.get('spell_hit_skill')
-    if skill_golpe: _dar_hits_skill(sid, p, skill_golpe, 1)
+    # Skill: golpes fixos por lancamento (nao por mob atingido), ex: 3 de Focus.
+    skill_magia = dados.get('spell_skill')
+    if skill_magia: _dar_hits_skill(sid, p, skill_magia, int(dados.get('spell_skill_hits', 0) or 0))
 
 def _rajada(sid, mob_id, mob_ref, restantes, cada, base_dmg, pct, extra, skill, mob_type_id):
     """Flechas seguintes da Arrow Barrage. Param se o mob morrer ou o player sair."""
