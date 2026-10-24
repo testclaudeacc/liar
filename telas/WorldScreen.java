@@ -6185,7 +6185,8 @@ public class WorldScreen extends ScreenAdapter {
             // Tipo do servidor vem minusculo ("spidermushroom" -> SpiderMushroom).
             String alvo = "sprites/mobs/" + mobId;
             for (TextureAtlas.AtlasRegion r : atlas.getRegions()) {
-                if (r.name.equalsIgnoreCase(alvo)) { sprite = r; break; }
+                // Sem espaco tambem: "blackwidow" acha "Black Widow".
+                if (r.name.equalsIgnoreCase(alvo) || r.name.replace(" ", "").equalsIgnoreCase(alvo)) { sprite = r; break; }
             }
         }
         return sprite;

@@ -124,10 +124,17 @@ MOB_DB = {
                        {"item": "res://sprites/items/Ranger/Weapons/IronBow.tres", "chance": 0.025}],
              "currency": {"min": 25, "max": 42}},
     "spider": {"name": "Black Spider", "speed_mult": 2.4, "hp": 450, "xp": 92, "attack": 50.0, "attack_min": 48, "attack_max": 52, "hit": "PoisonPhysATK",
-                       "drops": [{"one_of": ITENS_LV20_ARMADURA, "chance": 0.03},
-                                 {"one_of": ITENS_LV20_ARMAS, "chance": 0.015},
-                                 {"one_of": ITENS_LV20_JOIAS, "chance": 0.02}],
+                       # So' os sets lv20; armas e joias ficam com a Black Widow.
+                       "drops": [{"one_of": ITENS_LV20_ARMADURA, "chance": 0.03}],
                        "currency": {"min": 35, "max": 50}},
+    # Variante tanker da hunt das aranhas: ~1.55x o HP da Black Spider, bate um
+    # pouco mais, XP/gold proporcionais. Dropa as armas, aneis e colares lv20.
+    # Anda como o Mountain Troll (idle, passo 1, idle, passo 2).
+    "blackwidow": {"name": "Black Widow", "walk_idle": True, "speed_mult": 2.2, "hp": 700, "xp": 145,
+                       "attack": 60.0, "attack_min": 56, "attack_max": 64, "hit": "PoisonPhysATK",
+                       "drops": [{"one_of": ITENS_LV20_ARMAS, "chance": 0.025},
+                                 {"one_of": ITENS_LV20_JOIAS, "chance": 0.03}],
+                       "currency": {"min": 55, "max": 80}},
     # Boss: nome carmesim + caveira no client (lista 'mob_boss' do sync).
     # respawn padrao 30 min (o respawn_time do Tiled ainda manda, se tiver).
     "spidermother": {"name": "Spider Mother", "boss": True, "respawn": 1800, "speed_mult": 1.6, "hp": 20000, "xp": 10000,
