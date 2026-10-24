@@ -603,11 +603,21 @@ public class WorldScreen extends ScreenAdapter {
     private static final int MAX_SANGUE = 300;
     private final List<Sangue> sangues = new ArrayList<>();
     private final List<TextureRegion> regioesSangue = new ArrayList<>();
+    private final List<TextureRegion> regioesSangueVerde = new ArrayList<>(); // ui/items/GreenBlood (3 de 16x16)
 
     /** Mancha de sangue no SQM de quem esta em (x = centro, y = pes). */
-    private void sangrar(float x, float y) {
-        if (regioesSangue.isEmpty()) return;
-        TextureRegion r = regioesSangue.get(com.badlogic.gdx.math.MathUtils.random(regioesSangue.size() - 1));
+    private void sangrar(float x, float y) { sangrar(x, y, regioesSangue); }
+
+    /** Mob: aranhas (Black Spider, Black Widow, Spider Mother...) sangram verde. */
+    private void sangrar(MobVisual mob) {
+        String t = mob.tipo == null ? "" : mob.tipo;
+        boolean aranha = t.contains("spider") || t.contains("widow");
+        sangrar(mob.x, mob.y, aranha && !regioesSangueVerde.isEmpty() ? regioesSangueVerde : regioesSangue);
+    }
+
+    private void sangrar(float x, float y, List<TextureRegion> regioes) {
+        if (regioes.isEmpty()) return;
+        TextureRegion r = regioes.get(com.badlogic.gdx.math.MathUtils.random(regioes.size() - 1));
         float sqmX = (float) Math.floor(x / Jogador.TILE) * Jogador.TILE;
         float sqmY = Math.round(y / Jogador.TILE) * Jogador.TILE;
         if (sangues.size() >= MAX_SANGUE) sangues.remove(0);
@@ -1225,6 +1235,12 @@ public class WorldScreen extends ScreenAdapter {
             TextureRegion r = atlas.findRegion("ui/items/Blood" + i);
             if (r == null) r = atlas.findRegion("Blood" + i);
             if (r != null) regioesSangue.add(r);
+        }
+        // Sangue verde das aranhas: tira de 3 quadros 16x16.
+        TextureRegion verde = atlas.findRegion("ui/items/GreenBlood");
+        if (verde != null) {
+            int n = Math.max(1, verde.getRegionWidth() / 16);
+            for (int i = 0; i < n; i++) regioesSangueVerde.add(new TextureRegion(verde, i * 16, 0, 16, verde.getRegionHeight()));
         }
         regiaoBagDourada = atlas.findRegion("ui/currency/GoldBag");
         criarMobsDoMapa();
@@ -4006,7 +4022,7 @@ public class WorldScreen extends ScreenAdapter {
                 NumeroDano n = new NumeroDano(mob.x, mob.y, data.getInt("damage", 0) + (tickCrit ? "!" : ""), tickCrit);
                 numerosDano.add(n);
                 tocarEfeitoNoMob("PhysATK", mob); // mesmo efeito do golpe do rotworm
-                if (data.getInt("damage", 0) > 0) sangrar(mob.x, mob.y);
+                if (data.getInt("damage", 0) > 0) sangrar(mob);
                 return;
             }
             boolean critico = data.getBoolean("is_crit", false);
@@ -4042,7 +4058,7 @@ public class WorldScreen extends ScreenAdapter {
                 // "none": a magia ja' desenhou o proprio efeito (ex: Radiant Burst).
                 if (!"none".equals(efeito)) tocarEfeitoNoMob(efeito, mob);
                 numerosDano.add(numero);
-                if (!errou && data.getInt("damage", 0) > 0) sangrar(mob.x, mob.y);
+                if (!errou && data.getInt("damage", 0) > 0) sangrar(mob);
             }
         });
         socket.on("player_damaged", (nomeEvt, data) -> {
@@ -6826,7 +6842,7 @@ public class WorldScreen extends ScreenAdapter {
                     NumeroDano n = new NumeroDano(pr.alvo.x, pr.alvo.y, pr.numero.texto, pr.numero.critico);
                     n.cor = pr.numero.cor;
                     numerosDano.add(n);
-                    if (pr.numero.sangra) sangrar(pr.alvo.x, pr.alvo.y);
+                    if (pr.numero.sangra) sangrar(pr.alvo);
                 }
             }
         }
