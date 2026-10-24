@@ -5986,8 +5986,10 @@ def _lancar_magia(sid, p, caminho, mob_id, aliado=''):
         dano_tick = max(1, int(round(base_dmg * float(dados.get('spell_bleed_pct', 0) or 0) / 100.0)))
         # A magia critou (mesmo a sem golpe, ex: Small Vines): todos os ticks vem critados.
         if critico: dano_tick *= 2
+        # Tick de veneno (Small Vines): toca o PoisonPhysATK no mob, igual o Venom Chorus.
         socketio.start_background_task(_sangrar, sid, mob_id, mob_data, token, ticks, cada, dano_tick,
-                                       dados.get('spell_bleed_skill'), mob_type_id, dot, critico, chave)
+                                       dados.get('spell_bleed_skill'), mob_type_id, dot, critico, chave,
+                                       'PoisonPhysATK' if dot == 'poison' else '')
 
 def _lancar_magia_cura(sid, p, caminho, dados, now, aliado):
     """Cura (Bard): spell_heal x o dano base de quem lanca. Alvo = o player
