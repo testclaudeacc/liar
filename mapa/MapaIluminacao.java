@@ -220,6 +220,24 @@ public class MapaIluminacao implements Disposable {
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
     }
 
+    /** Brilho por cima da cena (aditivo): luz de magia que aparece ate' de
+     * dia (o mapa de luz multiplicativo nao clareia alem do branco). Uma
+     * textura so' por luz - chamar depois do compositar(). */
+    public void brilhoAditivo(Batch batch, OrthographicCamera camera, List<MapaPropriedades.Luz> luzes) {
+        if (luzes.isEmpty()) return;
+        batch.setProjectionMatrix(camera.combined);
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+        batch.begin();
+        for (MapaPropriedades.Luz luz : luzes) {
+            batch.setColor(luz.cor);
+            float diametro = luz.raio * 2f;
+            batch.draw(regiaoLuz, luz.x - luz.raio, luz.y - luz.raio, diametro, diametro);
+        }
+        batch.setColor(Color.WHITE);
+        batch.end();
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+    }
+
     @Override
     public void dispose() {
         texturaLuz.dispose();

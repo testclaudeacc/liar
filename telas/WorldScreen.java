@@ -931,6 +931,30 @@ public class WorldScreen extends ScreenAdapter {
     private static final Color COR_LUZ_AVISO_SPAWN = new Color(0.25f, 0.5f, 1f, 1f);
     private static final float RAIO_LUZ_AVISO_SPAWN = 12f;
     private final List<AvisoSpawn> avisosSpawn = new ArrayList<>();
+    /** Luz temporaria de magia (ex: Radiant Burst): UMA luz cobrindo a area
+     * toda (nao uma por SQM - pesava no celular). Acende rapido e apaga no fim;
+     * de noite entra no mapa de luz, e por cima vai um brilho aditivo (aparece de dia). */
+    private static class LuzMagia {
+        final MapaPropriedades.Luz luz, brilho;
+        final Color base;
+        final float duracao;
+        float tempo = 0f;
+        LuzMagia(float x, float y, float raio, Color cor, float duracao) {
+            this.base = cor; this.duracao = duracao;
+            this.luz = new MapaPropriedades.Luz(x, y, new Color(cor), raio);
+            this.brilho = new MapaPropriedades.Luz(x, y, new Color(cor), raio);
+        }
+        /** 0..1: sobe em 0.15s, segura, e apaga nos ultimos 40%. */
+        float intensidade() {
+            float subida = Math.min(1f, tempo / 0.15f);
+            float descida = Math.min(1f, (duracao - tempo) / (duracao * 0.4f));
+            return Math.max(0f, Math.min(subida, descida));
+        }
+    }
+    private static final Color COR_LUZ_RADIANTE = new Color(1f, 0.85f, 0.35f, 1f);
+    private static final float BRILHO_LUZ_MAGIA = 0.45f; // forca do brilho aditivo no pico
+    private final List<LuzMagia> luzesMagia = new ArrayList<>();
+    private final List<MapaPropriedades.Luz> brilhosDoFrame = new ArrayList<>();
     private TextureRegion[] quadrosAvisoSpawn;
     private final List<CadaverPlayer> cadaveres = new ArrayList<>();
 
@@ -4107,6 +4131,11 @@ public class WorldScreen extends ScreenAdapter {
             float cx = conversor.rawParaMundoX(data.getFloat("pos_x", 0f));
             float cy = conversor.rawParaMundoY(data.getFloat("pos_y", 0f));
             int raio = data.getInt("raio", 3);
+            // Uma luz amarela so', do tamanho da area, enquanto a animacao dura.
+            if ("LightAtk".equals(data.getString("effect", ""))) {
+                luzesMagia.add(new LuzMagia(cx, cy + Jogador.TILE / 2f, (raio + 1) * Jogador.TILE,
+                    COR_LUZ_RADIANTE, quadros.length * DURACAO_QUADRO_LUZ + 0.2f));
+            }
             for (int dx = -raio; dx <= raio; dx++) {
                 for (int dy = -raio; dy <= raio; dy++) {
                     int d = Math.abs(dx) + Math.abs(dy);
@@ -5176,6 +5205,17 @@ public class WorldScreen extends ScreenAdapter {
         }
         luzesRemotos.keySet().retainAll(remotos.keySet());
         for (AvisoSpawn a : avisosSpawn) luzesDoFrame.add(a.luz);
+        brilhosDoFrame.clear();
+        for (int i = luzesMagia.size() - 1; i >= 0; i--) {
+            LuzMagia lm = luzesMagia.get(i);
+            lm.tempo += delta;
+            if (lm.tempo >= lm.duracao) { luzesMagia.remove(i); continue; }
+            float f = lm.intensidade();
+            lm.luz.cor.set(lm.base.r, lm.base.g, lm.base.b, f);
+            lm.brilho.cor.set(lm.base.r, lm.base.g, lm.base.b, f * BRILHO_LUZ_MAGIA);
+            luzesDoFrame.add(lm.luz);
+            brilhosDoFrame.add(lm.brilho);
+        }
         iluminacao.atualizar(delta, mapa.propriedades.naCaverna(local.x, local.y));
         iluminacao.renderizar(batch, camera, luzesDoFrame);
         if (perf != null) perf.marca("lights");
@@ -5267,6 +5307,7 @@ public class WorldScreen extends ScreenAdapter {
         // A iluminação vai escurecer os roofs, pillars, tiles do mapa e os jogadores
         if (perf != null) perf.marca("names");
         iluminacao.compositar(batch, camera);
+        iluminacao.brilhoAditivo(batch, camera, brilhosDoFrame);
         if (perf != null) perf.marca("light-mix");
 
         // Arcos de HP/MP (coordenadas do uiStage) e, POR CIMA deles, os baloes
