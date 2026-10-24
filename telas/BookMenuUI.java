@@ -5824,7 +5824,8 @@ public final class BookMenuUI {
         if (tira == null) {
             // Tipo vem minusculo do servidor ("spidermushroom" -> SpiderMushroom).
             for (TextureAtlas.AtlasRegion r : atlas.getRegions()) {
-                if (r.name.equalsIgnoreCase("sprites/mobs/" + tipo)) return r;
+                // Sem espaco tambem: "blackwidow" acha "Black Widow".
+                if (r.name.equalsIgnoreCase("sprites/mobs/" + tipo) || r.name.replace(" ", "").equalsIgnoreCase("sprites/mobs/" + tipo)) return r;
             }
         }
         return tira;

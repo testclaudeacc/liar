@@ -50,7 +50,10 @@ public final class SkinsUtil {
      * disso, quadros de FRAME_LARGURA. Igual WorldScreen.larguraQuadro. */
     public static int larguraQuadro(TextureRegion tira) {
         int w = tira.getRegionWidth();
-        return w % 11 == 0 && w / 11 >= FRAME_LARGURA ? w / 11 : FRAME_LARGURA;
+        if (w % 11 == 0 && w / 11 >= FRAME_LARGURA) return w / 11;
+        // Sheet de 13 (lados com 3 quadros: Spider, Mountain Troll 32x32...).
+        if (w % 13 == 0 && w / 13 >= FRAME_LARGURA) return w / 13;
+        return FRAME_LARGURA;
     }
 
     public static Color cor(String hex) {

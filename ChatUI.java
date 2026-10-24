@@ -1031,6 +1031,8 @@ public class ChatUI {
             base = t.substring(0, ultimo + 1);
             List<String> args = argumentosPara(t.substring(1, espaco).toLowerCase(), contarEspacos(t));
             if (args != null) opcoes.addAll(args);
+            String[] multi = baseMultiPalavra(t, espaco, args);
+            if (multi != null) { base = multi[0]; prefixo = multi[1]; }
         }
         for (String o : opcoes) {
             if (o.length() > prefixo.length() && o.toLowerCase().startsWith(prefixo.toLowerCase())) return new String[]{base, o};
@@ -1075,6 +1077,8 @@ public class ChatUI {
             base = t.substring(0, ultimo + 1);
             List<String> args = argumentosPara(cmd, contarEspacos(t));
             if (args != null) opcoes.addAll(args);
+            String[] multi = baseMultiPalavra(t, espaco, args);
+            if (multi != null) { base = multi[0]; prefixo = multi[1]; }
         }
         java.util.List<String> casam = new java.util.ArrayList<>();
         for (String o : opcoes) if (o.toLowerCase().startsWith(prefixo.toLowerCase())) casam.add(o);
@@ -1109,6 +1113,19 @@ public class ChatUI {
         jogadoresOnline.clear();
         if (nomes == null) return;
         for (com.badlogic.gdx.utils.JsonValue v = nomes.child; v != null; v = v.next) jogadoresOnline.add(v.asString());
+    }
+
+    /** Argumento com espaco no nome (ex: "/summons black wi" -> "Black Widow"):
+     * o prefixo vira tudo depois do comando, nao so' a ultima palavra.
+     * {base, prefixo} ou null se nenhuma opcao com espaco casa. */
+    private static String[] baseMultiPalavra(String t, int espaco, List<String> args) {
+        String resto = t.substring(espaco + 1);
+        if (args == null || resto.indexOf(' ') < 0) return null;
+        String r = resto.toLowerCase();
+        for (String a : args) {
+            if (a.indexOf(' ') >= 0 && a.toLowerCase().startsWith(r)) return new String[]{t.substring(0, espaco + 1), resto};
+        }
+        return null;
     }
 
     private static int contarEspacos(String t) {
