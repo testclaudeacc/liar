@@ -419,7 +419,7 @@ final class IdiomaTextos {
             + "Hurls a small ball of fire at your target.	Lan\u00e7a uma pequena bola de fogo no seu alvo.	Lanza una peque\u00f1a bola de fuego a tu objetivo.\n"
             + "A brutal cut that leaves the target bleeding.	Um corte brutal que deixa o alvo sangrando.	Un corte brutal que deja al objetivo sangrando.\n"
             + "Fires three arrows in quick succession.	Dispara tr\u00eas flechas em sequ\u00eancia r\u00e1pida.	Dispara tres flechas en r\u00e1pida sucesi\u00f3n.\n"
-            + "Releases a burst of light around you, striking every enemy within 3 squares.\tLibera uma explos\u00e3o de luz ao seu redor, atingindo todos os inimigos a at\u00e9 3 SQMs.\tLibera una explosi\u00f3n de luz a tu alrededor, golpeando a todos los enemigos a hasta 3 casillas.\n"
+            + "Releases a burst of light around you, striking every enemy in a medium-range area.\tLibera uma explos\u00e3o de luz ao seu redor, atingindo todos os inimigos em uma \u00e1rea de alcance m\u00e9dio.\tLibera una explosi\u00f3n de luz a tu alrededor, golpeando a todos los enemigos en un \u00e1rea de alcance medio.\n"
             + "Vines burst from the ground, slowing and poisoning the target.	Vinhas brotam do ch\u00e3o, deixando o alvo lento e envenenado.	Enredaderas brotan del suelo, ralentizando y envenenando al objetivo.\n"
             + "Hungry, traveler? Fresh food, right here.	Com fome, viajante? Comida fresca, bem aqui.	\u00bfHambre, viajero? Comida fresca, aqu\u00ed mismo.\n"
             + "Seeking arcane power? My spells are not for the faint of heart.	Procurando poder arcano? Minhas magias n\u00e3o s\u00e3o para os fracos de cora\u00e7\u00e3o.	\u00bfBuscas poder arcano? Mis hechizos no son para los d\u00e9biles de coraz\u00f3n.\n"
