@@ -956,7 +956,7 @@ public class WorldScreen extends ScreenAdapter {
     }
     private static final Color COR_LUZ_RADIANTE = new Color(1f, 0.85f, 0.35f, 1f);
     private static final float BRILHO_LUZ_MAGIA = 0.45f; // forca do brilho aditivo no pico
-    private static final float FORCA_LUZ_RADIANTE = 0.75f, BRILHO_LUZ_RADIANTE = 0.3f; // Radiant Burst
+    private static final float FORCA_LUZ_RADIANTE = 0.65f, BRILHO_LUZ_RADIANTE = 0.25f; // Radiant Burst
     // Fogo (laranja) e mana (azul): luz leve no projetil e no hit. Veneno nao brilha.
     private static final Color COR_LUZ_FOGO = new Color(1f, 0.55f, 0.15f, 1f);
     private static final Color COR_LUZ_MANA = new Color(0.3f, 0.55f, 1f, 1f);
@@ -971,6 +971,7 @@ public class WorldScreen extends ScreenAdapter {
     }
     private final List<LuzMagia> luzesMagia = new ArrayList<>();
     private final List<MapaPropriedades.Luz> brilhosDoFrame = new ArrayList<>();
+    private final List<MapaPropriedades.Luz> luzesMagiaDoFrame = new ArrayList<>(); // nao somam entre si
     private TextureRegion[] quadrosAvisoSpawn;
     private final List<CadaverPlayer> cadaveres = new ArrayList<>();
 
@@ -5227,6 +5228,7 @@ public class WorldScreen extends ScreenAdapter {
         luzesRemotos.keySet().retainAll(remotos.keySet());
         for (AvisoSpawn a : avisosSpawn) luzesDoFrame.add(a.luz);
         brilhosDoFrame.clear();
+        luzesMagiaDoFrame.clear();
         for (int i = luzesMagia.size() - 1; i >= 0; i--) {
             LuzMagia lm = luzesMagia.get(i);
             lm.tempo += delta;
@@ -5238,7 +5240,7 @@ public class WorldScreen extends ScreenAdapter {
             float f = lm.intensidade();
             lm.luz.cor.set(lm.base.r, lm.base.g, lm.base.b, f * lm.forcaLuz);
             lm.brilho.cor.set(lm.base.r, lm.base.g, lm.base.b, f * lm.forcaBrilho);
-            luzesDoFrame.add(lm.luz);
+            luzesMagiaDoFrame.add(lm.luz);
             brilhosDoFrame.add(lm.brilho);
         }
         // Projetil de fogo/mana voando: luz leve acompanhando (pool, sem alocar por frame).
@@ -5258,11 +5260,11 @@ public class WorldScreen extends ScreenAdapter {
             par[0].y = par[1].y = py;
             par[0].cor.set(cor);
             par[1].cor.set(cor.r, cor.g, cor.b, BRILHO_LUZ_PEQUENA);
-            luzesDoFrame.add(par[0]);
+            luzesMagiaDoFrame.add(par[0]);
             brilhosDoFrame.add(par[1]);
         }
         iluminacao.atualizar(delta, mapa.propriedades.naCaverna(local.x, local.y));
-        iluminacao.renderizar(batch, camera, luzesDoFrame);
+        iluminacao.renderizar(batch, camera, luzesDoFrame, luzesMagiaDoFrame);
         if (perf != null) perf.marca("lights");
 
         // Mundo inteiro desenhado DIRETO na tela real, num passo so' - igual

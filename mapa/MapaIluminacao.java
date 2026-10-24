@@ -152,7 +152,8 @@ public class MapaIluminacao implements Disposable {
     /** Desenha todas as luzes no FrameBuffer interno - chamar 1x por frame,
      * FORA de qualquer outro batch.begin()/end() (usa o batch recebido pra
      * desenhar DENTRO do proprio FBO, nao na tela). */
-    public void renderizar(Batch batch, OrthographicCamera camera, List<MapaPropriedades.Luz> luzes) {
+    public void renderizar(Batch batch, OrthographicCamera camera, List<MapaPropriedades.Luz> luzes,
+                           List<MapaPropriedades.Luz> luzesMagia) {
         // Resolucao cheia (a pedido do usuario: em meia resolucao a borda da
         // luz perdia os pixels). O que pesava era o mapa trocando de textura
         // (ver UnificadorTilesets) e as luzes fora da tela, ja' resolvidos.
@@ -161,6 +162,9 @@ public class MapaIluminacao implements Disposable {
         int div = qualidade == 1 ? 2 : qualidade == 2 ? 4 : 1;
         garantirFbo(Math.max(1, Gdx.graphics.getBackBufferWidth() / div), Math.max(1, Gdx.graphics.getBackBufferHeight() / div));
         passouLuzNesteFrame = true;
+        // Luzes de magia primeiro (FBO proprio, sem somar entre si) - antes do
+        // fbo.begin(): FrameBuffer nao aninha.
+        boolean comMagia = renderizarMax(batch, camera, luzesMagia);
 
         fbo.begin();
         Gdx.gl.glClearColor(corAmbiente.r, corAmbiente.g, corAmbiente.b, 1f);
@@ -183,6 +187,10 @@ public class MapaIluminacao implements Disposable {
             batch.draw(regiaoLuz, luz.x - luz.raio, luz.y - luz.raio, diametro, diametro);
         }
         batch.setColor(Color.WHITE);
+        if (comMagia) {
+            batch.setBlendFunction(GL20.GL_ONE, GL20.GL_ONE);
+            desenharNaTela(batch, camera, fboMaxRegiao);
+        }
         batch.end();
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
@@ -221,21 +229,97 @@ public class MapaIluminacao implements Disposable {
     }
 
     /** Brilho por cima da cena (aditivo): luz de magia que aparece ate' de
-     * dia (o mapa de luz multiplicativo nao clareia alem do branco). Uma
-     * textura so' por luz - chamar depois do compositar(). */
+     * dia (o mapa de luz multiplicativo nao clareia alem do branco). Chamar
+     * depois do compositar(). Luzes que se cruzam nao somam (ver renderizarMax). */
     public void brilhoAditivo(Batch batch, OrthographicCamera camera, List<MapaPropriedades.Luz> luzes) {
-        if (luzes.isEmpty()) return;
+        if (!renderizarMax(batch, camera, luzes)) return;
         batch.setProjectionMatrix(camera.combined);
-        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+        batch.setBlendFunction(GL20.GL_ONE, GL20.GL_ONE);
+        batch.begin();
+        desenharNaTela(batch, camera, fboMaxRegiao);
+        batch.end();
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+    }
+
+    // ---- Luzes de magia sem somar ----
+    // Duas AOEs lado a lado nao ficam mais fortes onde se cruzam: cada uma vai
+    // num FBO (1/4 da tela, glow e' borrado mesmo) com blend MAX - fica a mais
+    // forte de cada pixel - e esse FBO e' somado uma vez so' no mapa de luz /
+    // na cena. Textura radial propria com a cor ja' multiplicada (o MAX ignora
+    // o alfa). Sem suporte a MAX (GLES2 antigo sem a extensao): soma, como antes.
+    private static final int GL_MAX = 0x8008, GL_FUNC_ADD = 0x8006;
+    private FrameBuffer fboMax;
+    private TextureRegion fboMaxRegiao;
+    private int fboMaxL = -1, fboMaxA = -1;
+    private Texture texturaRadial;
+    private TextureRegion regiaoRadial;
+    private Boolean suportaMax;
+
+    private boolean suportaMax() {
+        if (suportaMax == null) {
+            suportaMax = Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Desktop
+                || Gdx.gl30 != null || Gdx.graphics.supportsExtension("GL_EXT_blend_minmax");
+        }
+        return suportaMax;
+    }
+
+    private void garantirRadial() {
+        if (texturaRadial != null) return;
+        int t = 64;
+        Pixmap px = new Pixmap(t, t, Pixmap.Format.RGBA8888);
+        float c = (t - 1) / 2f;
+        for (int y = 0; y < t; y++) {
+            for (int x = 0; x < t; x++) {
+                float d = (float) Math.sqrt((x - c) * (x - c) + (y - c) * (y - c)) / c;
+                float v = Math.max(0f, 1f - d);
+                v = v * v * (3f - 2f * v);
+                px.drawPixel(x, y, Color.rgba8888(v, v, v, 1f));
+            }
+        }
+        texturaRadial = new Texture(px);
+        texturaRadial.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        regiaoRadial = new TextureRegion(texturaRadial);
+        px.dispose();
+    }
+
+    /** Desenha as luzes no fboMax (fundo preto). false = nada pra desenhar. */
+    private boolean renderizarMax(Batch batch, OrthographicCamera camera, List<MapaPropriedades.Luz> luzes) {
+        if (luzes == null || luzes.isEmpty()) return false;
+        garantirRadial();
+        int l = Math.max(1, Gdx.graphics.getBackBufferWidth() / 4), a = Math.max(1, Gdx.graphics.getBackBufferHeight() / 4);
+        if (fboMax == null || l != fboMaxL || a != fboMaxA) {
+            if (fboMax != null) fboMax.dispose();
+            fboMaxL = l; fboMaxA = a;
+            fboMax = new FrameBuffer(Pixmap.Format.RGBA8888, l, a, false);
+            fboMax.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+            fboMaxRegiao = new TextureRegion(fboMax.getColorBufferTexture(), 0, 0, l, a);
+            fboMaxRegiao.flip(false, true);
+        }
+        boolean max = suportaMax();
+        fboMax.begin();
+        Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        batch.setProjectionMatrix(camera.combined);
+        batch.setBlendFunction(GL20.GL_ONE, GL20.GL_ONE);
+        if (max) Gdx.gl.glBlendEquation(GL_MAX);
         batch.begin();
         for (MapaPropriedades.Luz luz : luzes) {
-            batch.setColor(luz.cor);
+            float k = luz.cor.a;
+            batch.setColor(luz.cor.r * k, luz.cor.g * k, luz.cor.b * k, 1f);
             float diametro = luz.raio * 2f;
-            batch.draw(regiaoLuz, luz.x - luz.raio, luz.y - luz.raio, diametro, diametro);
+            batch.draw(regiaoRadial, luz.x - luz.raio, luz.y - luz.raio, diametro, diametro);
         }
         batch.setColor(Color.WHITE);
         batch.end();
+        if (max) Gdx.gl.glBlendEquation(GL_FUNC_ADD);
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        fboMax.end();
+        return true;
+    }
+
+    private void desenharNaTela(Batch batch, OrthographicCamera camera, TextureRegion regiao) {
+        float meiaL = camera.viewportWidth * camera.zoom / 2f, meiaA = camera.viewportHeight * camera.zoom / 2f;
+        batch.draw(regiao, camera.position.x - meiaL, camera.position.y - meiaA, meiaL * 2f, meiaA * 2f);
     }
 
     @Override
@@ -243,5 +327,7 @@ public class MapaIluminacao implements Disposable {
         texturaLuz.dispose();
         if (fbo != null) fbo.dispose();
         if (texturaBranca != null) texturaBranca.dispose();
+        if (fboMax != null) fboMax.dispose();
+        if (texturaRadial != null) texturaRadial.dispose();
     }
 }
