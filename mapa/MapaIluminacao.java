@@ -134,6 +134,11 @@ public class MapaIluminacao implements Disposable {
         texturaLuz = new Texture(Gdx.files.internal("lights/light.png"));
         texturaLuz.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         regiaoLuz = new TextureRegion(texturaLuz);
+        // Pre-aquece a luz de magia (textura + FBO) no load: criar isso no
+        // primeiro uso dava uma travadinha na primeira AOE.
+        garantirRadial();
+        garantirFboMax();
+        suportaMax();
     }
 
     private void garantirFbo(int largura, int altura) {
@@ -286,15 +291,7 @@ public class MapaIluminacao implements Disposable {
     private boolean renderizarMax(Batch batch, OrthographicCamera camera, List<MapaPropriedades.Luz> luzes) {
         if (luzes == null || luzes.isEmpty()) return false;
         garantirRadial();
-        int l = Math.max(1, Gdx.graphics.getBackBufferWidth() / 4), a = Math.max(1, Gdx.graphics.getBackBufferHeight() / 4);
-        if (fboMax == null || l != fboMaxL || a != fboMaxA) {
-            if (fboMax != null) fboMax.dispose();
-            fboMaxL = l; fboMaxA = a;
-            fboMax = new FrameBuffer(Pixmap.Format.RGBA8888, l, a, false);
-            fboMax.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-            fboMaxRegiao = new TextureRegion(fboMax.getColorBufferTexture(), 0, 0, l, a);
-            fboMaxRegiao.flip(false, true);
-        }
+        garantirFboMax();
         boolean max = suportaMax();
         fboMax.begin();
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
@@ -315,6 +312,17 @@ public class MapaIluminacao implements Disposable {
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         fboMax.end();
         return true;
+    }
+
+    private void garantirFboMax() {
+        int l = Math.max(1, Gdx.graphics.getBackBufferWidth() / 4), a = Math.max(1, Gdx.graphics.getBackBufferHeight() / 4);
+        if (fboMax != null && l == fboMaxL && a == fboMaxA) return;
+        if (fboMax != null) fboMax.dispose();
+        fboMaxL = l; fboMaxA = a;
+        fboMax = new FrameBuffer(Pixmap.Format.RGBA8888, l, a, false);
+        fboMax.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        fboMaxRegiao = new TextureRegion(fboMax.getColorBufferTexture(), 0, 0, l, a);
+        fboMaxRegiao.flip(false, true);
     }
 
     private void desenharNaTela(Batch batch, OrthographicCamera camera, TextureRegion regiao) {
