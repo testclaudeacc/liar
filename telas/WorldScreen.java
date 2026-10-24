@@ -940,6 +940,7 @@ public class WorldScreen extends ScreenAdapter {
         final float duracao;
         float tempo = 0f;
         float forcaBrilho = BRILHO_LUZ_MAGIA;
+        float forcaLuz = 1f; // alfa da luz no mapa de luz (noite/caverna)
         Efeito seguir; // hit num mob andando: a luz vai junto
         LuzMagia(float x, float y, float raio, Color cor, float duracao) {
             this.base = cor; this.duracao = duracao;
@@ -955,6 +956,7 @@ public class WorldScreen extends ScreenAdapter {
     }
     private static final Color COR_LUZ_RADIANTE = new Color(1f, 0.85f, 0.35f, 1f);
     private static final float BRILHO_LUZ_MAGIA = 0.45f; // forca do brilho aditivo no pico
+    private static final float FORCA_LUZ_RADIANTE = 0.75f, BRILHO_LUZ_RADIANTE = 0.3f; // Radiant Burst
     // Fogo (laranja) e mana (azul): luz leve no projetil e no hit. Veneno nao brilha.
     private static final Color COR_LUZ_FOGO = new Color(1f, 0.55f, 0.15f, 1f);
     private static final Color COR_LUZ_MANA = new Color(0.3f, 0.55f, 1f, 1f);
@@ -4147,8 +4149,13 @@ public class WorldScreen extends ScreenAdapter {
             int raio = data.getInt("raio", 3);
             // Uma luz amarela so', do tamanho da area, enquanto a animacao dura.
             if ("LightAtk".equals(data.getString("effect", ""))) {
-                luzesMagia.add(new LuzMagia(cx, cy + Jogador.TILE / 2f, (raio + 1) * Jogador.TILE,
-                    COR_LUZ_RADIANTE, quadros.length * DURACAO_QUADRO_LUZ + 0.2f));
+                // Centro 1 SQM acima do pe' (a luz do sprite sobe 2 SQMs) e raio
+                // folgado: o glow e' radial e apaga antes da borda da textura.
+                LuzMagia lm = new LuzMagia(cx, cy + Jogador.TILE, (raio + 2.5f) * Jogador.TILE,
+                    COR_LUZ_RADIANTE, quadros.length * DURACAO_QUADRO_LUZ + 0.2f);
+                lm.forcaLuz = FORCA_LUZ_RADIANTE;
+                lm.forcaBrilho = BRILHO_LUZ_RADIANTE;
+                luzesMagia.add(lm);
             }
             for (int dx = -raio; dx <= raio; dx++) {
                 for (int dy = -raio; dy <= raio; dy++) {
@@ -5229,7 +5236,7 @@ public class WorldScreen extends ScreenAdapter {
                 lm.luz.y = lm.brilho.y = lm.seguir.posY() + 8f;
             }
             float f = lm.intensidade();
-            lm.luz.cor.set(lm.base.r, lm.base.g, lm.base.b, f);
+            lm.luz.cor.set(lm.base.r, lm.base.g, lm.base.b, f * lm.forcaLuz);
             lm.brilho.cor.set(lm.base.r, lm.base.g, lm.base.b, f * lm.forcaBrilho);
             luzesDoFrame.add(lm.luz);
             brilhosDoFrame.add(lm.brilho);
